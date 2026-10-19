@@ -36,8 +36,8 @@ const FLIGHT_MS: Record<PitchType, number> = {
 
 const PLATE_HEIGHT: Record<'strike' | 'ball', Record<PitchHeight, number>> = {
   // 스트라이크는 존 경계 안쪽, 볼은 경계 바로 바깥. 높이만 보고는 쉽게 구분되지 않게 붙여 둔다.
-  strike: { high: 1.75, low: 0.95 },
-  ball: { high: 2.05, low: 0.65 },
+  strike: { high: 1.82, low: 0.88 },
+  ball: { high: 1.98, low: 0.72 },
 }
 
 /** 높은 공은 조금 빨리, 낮은 공은 조금 늦게 도착한다. 존 가운데에서 1m 벗어날 때마다 이만큼. */
@@ -46,7 +46,7 @@ const ARRIVAL_SHIFT_MS_PER_M = 30
 /** 궤적 모양. 세로 진행도 = s^verticalPower (클수록 늦게 떨어짐), 위로 볼록한 정도 = arc(m). */
 const SHAPE: Record<PitchType, { verticalPower: number; arc: number }> = {
   fastball: { verticalPower: 1, arc: 0.35 },
-  breaking: { verticalPower: 3.4, arc: 2.2 },
+  breaking: { verticalPower: 4, arc: 3.6 },
 }
 
 /** 공이 도착한 뒤 이만큼 지나면 투구가 끝난다. 가장 늦은 판정 구간(파울 130ms)보다 길어야 한다. */
