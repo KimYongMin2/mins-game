@@ -1,6 +1,6 @@
 import { useEffect, useReducer, useRef } from 'react'
 import { randomSeed } from '../../../shared/random'
-import { AUTO_RELEASE_MS, ROUNDS, TOTAL_ARROWS } from '../constants'
+import { AUTO_RELEASE_MS, ROUNDS, SHOT_CLOCK_WARN_MS, TOTAL_ARROWS } from '../constants'
 import { SideView } from '../field/SideView'
 import { TargetView } from '../field/TargetView'
 import { viewHalfSize } from '../field/view'
@@ -15,6 +15,7 @@ import {
   holdMsOf,
   reticleAt,
   roundReducer,
+  shotClockLeft,
   summarizeRound,
 } from '../play/roundState'
 import { totalOf } from '../rules/scoring'
@@ -29,7 +30,8 @@ const DRAG_RATIO = 0.5
 /** 방향키 조준 속도: 1초에 보이는 범위의 몇 배 */
 const KEY_AIM_SPEED = 0.35
 
-function scoreText(points: number, x: boolean) {
+function scoreText(points: number, x: boolean, timedOut: boolean) {
+  if (timedOut) return '시간 초과'
   if (x) return 'X!'
   if (points === 0) return '빗나감'
   return `${points}점`
@@ -51,7 +53,7 @@ function Banner({ state }: { state: RoundState }) {
     return (
       <div className="ar-banner" aria-live="polite">
         <strong className={`ar-banner__title${score.points === 10 ? ' ar-banner__title--gold' : ''}`}>
-          {scoreText(score.points, score.x)}
+          {scoreText(score.points, score.x, phase.shot.impact === null)}
         </strong>
       </div>
     )
@@ -181,8 +183,14 @@ export function GameScreen({ onFinish }: Props) {
   const { phase, now } = state
   const total = totalOf(state.shots.map((s) => s.score))
   const atThisDistance = state.shots.filter((s) => s.distance === distance)
-  const arrows = atThisDistance.map((s, i) => ({ at: s.impact, latest: i === atThisDistance.length - 1 && phase.kind === 'scored' }))
-  const flying = phase.kind === 'flying' ? { to: phase.shot.impact, progress: (now - phase.startAt) / (phase.until - phase.startAt) } : null
+  const arrows = atThisDistance.flatMap((s, i) =>
+    s.impact ? [{ at: s.impact, latest: i === atThisDistance.length - 1 && phase.kind === 'scored' }] : [],
+  )
+  const flying =
+    phase.kind === 'flying' && phase.shot.impact
+      ? { to: phase.shot.impact, progress: (now - phase.startAt) / (phase.until - phase.startAt) }
+      : null
+  const clock = shotClockLeft(state)
   const tier = WIND_TIERS[state.wind.tier]
 
   return (
@@ -218,6 +226,16 @@ export function GameScreen({ onFinish }: Props) {
             {state.wind.speed.toFixed(1)}m/s
           </span>
         </div>
+        {clock !== null && (
+          <div
+            className={`ar-clock${clock <= SHOT_CLOCK_WARN_MS ? ' ar-clock--warn' : ''}`}
+            role="timer"
+            aria-label={`남은 시간 ${Math.ceil(clock / 1000)}초`}
+          >
+            <span className="ar-clock__value">{Math.ceil(clock / 1000)}</span>
+            <span className="ar-clock__unit">초</span>
+          </div>
+        )}
         <Banner state={state} />
       </div>
 

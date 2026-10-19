@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { AUTO_RELEASE_MS, DRAW_MS } from '../constants'
+import { AUTO_RELEASE_MS, DRAW_MS, SHOT_CLOCK_MS } from '../constants'
 import { flightMs, swayOffset } from './shot'
 import { windDrift } from './wind'
 import {
@@ -9,6 +9,7 @@ import {
   currentDistance,
   reticleAt,
   roundReducer,
+  shotClockLeft,
   summarizeRound,
 } from './roundState'
 
@@ -110,6 +111,48 @@ describe('경기 흐름', () => {
     expect(s.sounds.at(-1)?.name).toBe('end')
     const sum = summarizeRound(s)
     expect(sum.points).toBe(s.shots.reduce((a, x) => a + x.score.points, 0))
+  })
+})
+
+describe('한 발 제한 시간', () => {
+  it('거리 안내 중에는 시간이 가지 않고, 당기기 대기부터 15초', () => {
+    const s = createRound(0, 1)
+    expect(shotClockLeft(s)).toBeNull()
+    const r = ready(s)
+    expect(shotClockLeft(r)).toBeGreaterThan(SHOT_CLOCK_MS - 100)
+  })
+
+  it('15초 안에 안 쏘면 0점(시간 초과)으로 넘어간다', () => {
+    let s = ready(createRound(0, 1))
+    const start = s.now
+    s = tickUntil(s, (x) => x.phase.kind === 'scored')
+    expect(s.now - start).toBeGreaterThanOrEqual(SHOT_CLOCK_MS)
+    expect(s.shots[0]).toMatchObject({ impact: null, score: { points: 0, x: false } })
+    expect(s.sounds.at(-1)?.name).toBe('miss')
+    // 다음 화살은 다시 15초
+    s = tickUntil(s, (x) => x.phase.kind === 'ready')
+    expect(s.arrowIndex).toBe(1)
+    expect(shotClockLeft(s)).toBeGreaterThan(SHOT_CLOCK_MS - 100)
+  })
+
+  it('당기는 중에 시간이 끝나면 그 자리에서 발사된다', () => {
+    let s = ready(createRound(0, 1))
+    const start = s.now
+    // 시간이 2초 남았을 때 당기기 시작 → 자동 발사(10초)보다 먼저 제한 시간이 끝난다
+    s = tickUntil(s, (x) => x.now - start >= SHOT_CLOCK_MS - 2000)
+    s = roundReducer(s, { type: 'press', at: s.now })
+    s = tickUntil(s, (x) => x.phase.kind === 'flying')
+    expect(s.now - start).toBeGreaterThanOrEqual(SHOT_CLOCK_MS)
+    expect(s.now - start).toBeLessThan(SHOT_CLOCK_MS + 100)
+    if (s.phase.kind !== 'flying') return
+    expect(s.phase.shot.impact).not.toBeNull()
+  })
+
+  it('쏘고 나면 시간 표시가 없다', () => {
+    let s = ready(createRound(0, 1))
+    s = roundReducer(s, { type: 'press', at: s.now })
+    s = roundReducer(s, { type: 'release', at: s.now + DRAW_MS })
+    expect(shotClockLeft(s)).toBeNull()
   })
 })
 

@@ -247,6 +247,39 @@
   color: var(--accent);
 }
 
+.ar-clock {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: flex;
+  align-items: baseline;
+  gap: 2px;
+  min-width: 3.4em;
+  justify-content: center;
+  padding: 4px 10px;
+  border: 2px solid var(--line);
+  border-radius: 12px;
+  background: var(--paper);
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+}
+
+.ar-clock__value {
+  font-size: 1.5rem;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.ar-clock__unit {
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.ar-clock--warn {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
 .ar-banner {
   position: absolute;
   inset: auto 0 10%;

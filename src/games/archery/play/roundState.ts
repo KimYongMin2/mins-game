@@ -1,6 +1,6 @@
 // 한 경기(10발)의 진행 상태. 시간(now)과 시드 난수를 상태에 담아 순수 리듀서로 유지한다.
 import { createRng } from '../../../shared/random'
-import { type Distance, TOTAL_ARROWS } from '../constants'
+import { type Distance, SHOT_CLOCK_MS, TOTAL_ARROWS } from '../constants'
 import { viewHalfSize } from '../field/view'
 import {
   type ArrowScore,
@@ -19,7 +19,8 @@ export type Shot = {
   index: number
   distance: Distance
   wind: Wind
-  impact: Point
+  /** 꽂힌 자리. 시간 초과로 못 쏘면 null */
+  impact: Point | null
   score: ArrowScore
   /** 놓을 때 당긴 정도 */
   progress: number
@@ -48,6 +49,8 @@ export type RoundState = {
   swayPhase: number
   /** 조준점 (흔들림 제외) */
   aim: Point
+  /** 이번 화살을 쏴야 하는 시각 (대기·당기는 중에만 의미 있음) */
+  deadline: number | null
   shots: Shot[]
   phase: Phase
   sounds: { id: number; name: SoundName }[]
@@ -80,8 +83,18 @@ function prepareArrow(state: RoundState, index: number, now: number): RoundState
   const rng = createRng(state.seed)
   const wind = randomWind(rng)
   const swayPhase = rng.next() * Math.PI * 2
-  const phase: Phase = isFirstAtDistance(index) ? { kind: 'announce', until: now + ANNOUNCE_MS } : { kind: 'ready' }
-  return { ...state, seed: rng.seed(), arrowIndex: index, wind, swayPhase, aim: CENTER, phase }
+  const announce = isFirstAtDistance(index)
+  const phase: Phase = announce ? { kind: 'announce', until: now + ANNOUNCE_MS } : { kind: 'ready' }
+  return {
+    ...state,
+    seed: rng.seed(),
+    arrowIndex: index,
+    wind,
+    swayPhase,
+    aim: CENTER,
+    phase,
+    deadline: announce ? null : now + SHOT_CLOCK_MS,
+  }
 }
 
 export function createRound(now: number, seed: number): RoundState {
@@ -92,6 +105,7 @@ export function createRound(now: number, seed: number): RoundState {
     wind: { direction: 0, tier: 'light', speed: 0 },
     swayPhase: 0,
     aim: CENTER,
+    deadline: null,
     shots: [],
     phase: { kind: 'ready' },
     sounds: [],
@@ -127,6 +141,29 @@ function fire(state: RoundState, at: number): RoundState {
   )
 }
 
+/** 남은 시간(ms). 시간 제한이 없는 단계면 null */
+export function shotClockLeft(state: RoundState, now = state.now): number | null {
+  const { kind } = state.phase
+  if (state.deadline === null || (kind !== 'ready' && kind !== 'drawing')) return null
+  return Math.max(0, state.deadline - now)
+}
+
+/** 시간 안에 못 쏜 화살: 0점, 바로 점수 표시로 */
+function timeOut(state: RoundState): RoundState {
+  const shot: Shot = {
+    index: state.arrowIndex,
+    distance: currentDistance(state),
+    wind: state.wind,
+    impact: null,
+    score: { points: 0, x: false },
+    progress: 0,
+  }
+  return withSounds(
+    { ...state, shots: [...state.shots, shot], phase: { kind: 'scored', shot, until: state.now + SCORED_MS } },
+    'miss',
+  )
+}
+
 function hitSound(score: ArrowScore): SoundName {
   if (score.x) return 'x'
   if (score.points === 10) return 'ten'
@@ -138,9 +175,14 @@ function tick(state: RoundState): RoundState {
   const { phase, now } = state
   switch (phase.kind) {
     case 'announce':
-      return now >= phase.until ? { ...state, phase: { kind: 'ready' } } : state
-    case 'drawing':
-      return shouldAutoRelease(now - phase.startedAt) ? fire(state, now) : state
+      return now >= phase.until ? { ...state, phase: { kind: 'ready' }, deadline: now + SHOT_CLOCK_MS } : state
+    case 'ready':
+      return state.deadline !== null && now >= state.deadline ? timeOut(state) : state
+    case 'drawing': {
+      // 팔이 풀리거나 제한 시간이 끝나면 그 자리에서 발사
+      const outOfTime = state.deadline !== null && now >= state.deadline
+      return shouldAutoRelease(now - phase.startedAt) || outOfTime ? fire(state, now) : state
+    }
     case 'flying': {
       if (now < phase.until) return state
       return withSounds(
@@ -154,7 +196,6 @@ function tick(state: RoundState): RoundState {
       if (next >= TOTAL_ARROWS) return withSounds({ ...state, arrowIndex: next, phase: { kind: 'done' } }, 'end')
       return prepareArrow(state, next, now)
     }
-    case 'ready':
     case 'done':
       return state
   }

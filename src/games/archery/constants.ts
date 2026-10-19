@@ -22,6 +22,11 @@ export const X_RADIUS = RING_WIDTH / 2
 export const DRAW_MS = 800
 /** 완전히 당긴 뒤 이만큼은 흔들림이 늘지 않는다 */
 export const FATIGUE_GRACE_MS = 2000
+/** 한 발을 쏘는 제한 시간. '눌러서 당기기'가 뜨면 시작. 못 쏘면 0점, 당기는 중이면 바로 발사 */
+export const SHOT_CLOCK_MS = 15000
+/** 이때부터 시간 표시가 빨개진다 */
+export const SHOT_CLOCK_WARN_MS = 5000
+
 /** 누른 뒤 이 시간이 지나면 팔이 풀려 자동 발사 */
 export const AUTO_RELEASE_MS = 10000
 
