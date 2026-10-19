@@ -363,13 +363,189 @@
   }
 }
 
+/* 시작 */
+.ar-start {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-width: 420px;
+  margin: 8px auto 0;
+  text-align: center;
+}
+
+.ar-start__rounds {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+
+.ar-start__rounds li {
+  display: flex;
+  flex-direction: column;
+  padding: 10px 4px;
+  border: 2px solid var(--line);
+  border-radius: 12px;
+}
+
+.ar-start__rounds strong {
+  font-size: 1.25rem;
+  font-weight: 900;
+}
+
+.ar-start__rounds span {
+  font-size: 0.8125rem;
+  color: var(--ink-soft);
+}
+
+.ar-start__record {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin: 0;
+}
+
+.ar-start__record div {
+  display: flex;
+  flex-direction: column;
+  padding: 12px;
+  border: 1.5px solid var(--muted-line);
+  border-radius: 12px;
+}
+
+.ar-start__record dt {
+  font-size: 0.8125rem;
+  color: var(--ink-soft);
+}
+
+.ar-start__record dd {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+}
+
+.ar-start__record span {
+  font-size: 0.75rem;
+  color: var(--ink-soft);
+}
+
+.ar-start__button {
+  min-height: 64px;
+  font-size: 1.25rem;
+}
+
+.ar-start__how {
+  font-size: 0.8125rem;
+  color: var(--ink-soft);
+}
+
 /* 결과 */
 .ar-result {
   display: flex;
   flex-direction: column;
-  align-items: stretch;
-  gap: 12px;
+  gap: 14px;
   max-width: 420px;
-  margin: 16px auto 0;
+  margin: 8px auto 0;
+}
+
+.ar-result__headline {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 16px;
+  border: 2px solid var(--line);
+  border-radius: 14px;
+  font-variant-numeric: tabular-nums;
+}
+
+.ar-result__headline strong {
+  font-size: 3rem;
+  font-weight: 900;
+  line-height: 1.1;
+}
+
+.ar-result__headline span {
+  color: var(--ink-soft);
+}
+
+.ar-result__headline--best {
+  border-color: #d97706;
+  background: #fffbeb;
+}
+
+.ar-result__headline .ar-result__badge {
+  padding: 2px 10px;
+  font-size: 0.8125rem;
+  font-weight: 800;
+  color: var(--paper);
+  background: #d97706;
+  border-radius: 999px;
+}
+
+.ar-result__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+
+.ar-result__table th,
+.ar-result__table td {
+  padding: 8px 4px;
+  border-bottom: 1.5px solid var(--muted-line);
+}
+
+.ar-result__table th {
+  width: 3.5em;
+  text-align: left;
+  color: var(--ink-soft);
+}
+
+.ar-result__arrows {
+  display: flex;
+  gap: 6px;
+}
+
+.ar-result__arrow {
+  width: 2em;
   text-align: center;
+  font-weight: 800;
+  border: 1.5px solid var(--muted-line);
+  border-radius: 6px;
+}
+
+.ar-result__arrow--gold {
+  background: #fdf0b5;
+  border-color: #d97706;
+}
+
+.ar-result__sub {
+  width: 3em;
+  text-align: right;
+  font-weight: 900;
+  font-size: 1.125rem;
+}
+
+.ar-result__career {
+  text-align: center;
+  font-size: 0.875rem;
+  color: var(--ink-soft);
+}
+
+.ar-result__buttons {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.ar-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
 }

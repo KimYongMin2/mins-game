@@ -18,6 +18,7 @@ import {
   summarizeRound,
 } from '../play/roundState'
 import { totalOf } from '../rules/scoring'
+import { playSound } from '../sounds'
 
 type Props = {
   onFinish: (summary: RoundSummary) => void
@@ -130,6 +131,16 @@ export function GameScreen({ onFinish }: Props) {
       dispatch({ type: 'aimBy', dx: dx * metersPerPx, dy: -dy * metersPerPx })
     },
   })
+
+  // 효과음: 리듀서가 쌓은 것 중 아직 재생하지 않은 것만
+  const playedRef = useRef(0)
+  useEffect(() => {
+    for (const s of state.sounds) {
+      if (s.id <= playedRef.current) continue
+      playedRef.current = s.id
+      playSound(s.name)
+    }
+  }, [state.sounds])
 
   // 매 프레임: 시간 진행 + 방향키 조준
   const distanceRef = useRef(distance)
