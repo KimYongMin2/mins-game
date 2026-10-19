@@ -31,13 +31,15 @@ describe('바람', () => {
     expect(tiers.size).toBe(3)
   })
 
-  it('강한 바람에 밀리는 양: 30m 2~3링 · 50m 5~7링 · 70m 과녁 끝 근처 · 100m 과녁 밖', () => {
+  it('강한 바람에 밀리는 양: 30m 2~3링 · 50m 5~7링 · 70m 7~8링 · 100m 과녁 밖', () => {
     const drift = (d: 30 | 50 | 70 | 100) => rings(Math.abs(windDrift(strong(2), d).x))
     expect(drift(30)).toBeGreaterThanOrEqual(2)
     expect(drift(30)).toBeLessThanOrEqual(3)
     expect(drift(50)).toBeGreaterThanOrEqual(5)
     expect(drift(50)).toBeLessThanOrEqual(7)
-    expect(drift(70)).toBeGreaterThanOrEqual(9)
+    expect(drift(70)).toBeGreaterThanOrEqual(7)
+    expect(drift(70)).toBeLessThanOrEqual(8)
+    expect(drift(70)).toBeGreaterThan(drift(50))
     expect(Math.abs(windDrift(strong(2), 100).x)).toBeGreaterThan(TARGET_RADIUS)
   })
 

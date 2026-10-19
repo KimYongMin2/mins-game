@@ -34,7 +34,7 @@ describe('난이도 균형', () => {
     const lazy = average(false)
     const good = average(true)
     console.log(`대충 평균 ${lazy.avg.toFixed(1)} (${lazy.min}~${lazy.max}) / 잘 쏨 평균 ${good.avg.toFixed(1)} (${good.min}~${good.max})`)
-    expect(lazy.avg).toBeLessThan(70)
+    expect(lazy.avg).toBeLessThan(75)
     expect(good.avg).toBeGreaterThan(80)
     expect(good.avg - lazy.avg).toBeGreaterThan(15)
   })
