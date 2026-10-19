@@ -60,7 +60,7 @@ export function ZolaballPage() {
           {screen.kind === 'ranking' && ' · 랭킹'}
         </h1>
         <SoundToggle />
-        {screen.kind === 'match' || screen.kind === 'practice' || screen.kind === 'ranking' ? (
+        {screen.kind === 'match' || screen.kind === 'practice' ? (
           <button type="button" className="button button--small" onClick={toMenu}>
             그만하기
           </button>

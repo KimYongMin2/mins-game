@@ -187,6 +187,13 @@ src/
 - **투수 조작**: 구종(1~4)과 높이(↑↓)를 둘 다 고르면 즉시 투구, 5초 초과 시 고르지 않은 항목만 무작위
 - **경기 진행**: `match/matchState.ts` 순수 리듀서. 시간(now)과 시드 난수(seed)를 상태에 담아 테스트로 경기 전체를 시뮬레이션할 수 있다
 - **PvP 대비**: 조작 주체는 `Controller`('user' | 'bot'). PvP는 'remote'를 추가하고 입력을 원격에서 받는다
-- **기록**: `shared/storage/records.ts`의 `RecordStore` 인터페이스. 지금은 localStorage 구현
+- **기록**: 기기 통산 전적은 `shared/storage/records.ts`의 `RecordStore`(localStorage). 온라인 랭킹은 아래 참고
+- **온라인 랭킹 (Supabase)**
+  - 스키마·보안 규칙: `supabase/schema.sql` (대시보드 SQL Editor에서 실행). 경기 한 판 = `zolaball_games` 한 줄, 본인 것만 읽기/쓰기, 공개는 `zolaball_leaderboard(난이도)` 합계 함수뿐
+  - 사용자 구분: 익명 로그인(기기별 ID). 닉네임 중복 허용, 랭킹엔 가장 최근 닉네임
+  - 랭킹(난이도별 상위 10): 승률(3경기↑, 무승부 제외) · 타율(10타수↑) · 경기당 타점(3경기↑) · 한 경기 최다 타점 · 평균자책점(6이닝↑, 3이닝당 실점, 낮을수록 위) — 조건은 `ranking/leaderboard.ts`의 `BOARD_RULES`
+  - 타점 = 볼넷·안타·홈런 타석에서 들어온 점수(홈런은 본인 포함). 실책이 없어 실점 = 자책점
+  - 올리기 실패 시 기기에 보관 후 다음 접속 때 재전송(경기별 uuid로 중복 방지)
+  - 접속 정보는 `.env`(공개용 publishable 키). secret/service_role 키는 절대 저장소에 두지 않는다
 - **효과음**: 음원 없이 Web Audio로 합성 (`shared/audio/synth.ts`, 레시피는 `games/zolaball/sounds.ts`)
 - **테스트**: `npm test` (vitest). 규칙·판정·봇 확률·경기 시뮬레이션은 단위 테스트로 확인
