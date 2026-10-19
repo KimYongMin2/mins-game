@@ -25,8 +25,11 @@ export const FATIGUE_GRACE_MS = 2000
 /** 누른 뒤 이 시간이 지나면 팔이 풀려 자동 발사 */
 export const AUTO_RELEASE_MS = 10000
 
-/** 조준 흔들림(각도, 라디안). 거리가 멀수록 과녁 위에서는 크게 흔들린다 */
-export const SWAY_ANGLE = 0.0008
+/**
+ * 조준 흔들림(각도, 라디안). 거리가 멀수록 과녁 위에서는 크게 흔들린다.
+ * 30m 약 1링 · 100m 약 3.6링. 흔들림이 가운데를 지나는 순간에 놓는 게 실력
+ */
+export const SWAY_ANGLE = 0.0022
 
 /** 화살 속도 (m/s). 비행 시간 = 거리 / 속도 */
 export const ARROW_SPEED = 70

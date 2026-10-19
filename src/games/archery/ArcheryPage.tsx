@@ -1,14 +1,19 @@
 import { useState } from 'react'
 import { Link } from 'react-router'
-import { type Distance, ROUNDS } from './constants'
-import { SideView } from './field/SideView'
-import { TargetView } from './field/TargetView'
+import { GameScreen } from './game/GameScreen'
+import type { RoundSummary } from './play/roundState'
 import './archery.css'
 
-// 지금은 그림 미리보기. 경기 흐름은 다음 단계에서 이 자리에 붙인다.
+// 화면 흐름: 경기 → 결과. 시작 화면과 기록은 다음 단계에서.
+type Screen = { kind: 'game'; key: number } | { kind: 'result'; summary: RoundSummary }
+
 export function ArcheryPage() {
-  const [distance, setDistance] = useState<Distance>(30)
-  const [draw, setDraw] = useState(1)
+  const [screen, setScreen] = useState<Screen>({ kind: 'game', key: 0 })
+  const [games, setGames] = useState(0)
+  const restart = () => {
+    setGames((n) => n + 1)
+    setScreen({ kind: 'game', key: games + 1 })
+  }
 
   return (
     <main className="page ar-page">
@@ -19,35 +24,23 @@ export function ArcheryPage() {
         </Link>
       </header>
 
-      <SideView distance={distance} draw={draw} />
-      <div className="ar-target-wrap">
-        <TargetView
-          distance={distance}
-          reticle={{ x: 0.05, y: 0.08 }}
-          drawProgress={draw}
-          arrows={[
-            { at: { x: -0.03, y: 0.02 }, latest: false },
-            { at: { x: 0.2, y: -0.15 }, latest: true },
-          ]}
-        />
-      </div>
+      {screen.kind === 'game' && (
+        <GameScreen key={screen.key} onFinish={(summary) => setScreen({ kind: 'result', summary })} />
+      )}
 
-      <div className="ar-preview-controls">
-        {ROUNDS.map((r) => (
+      {screen.kind === 'result' && (
+        <section className="ar-result">
+          <strong className="title">{screen.summary.points}점</strong>
+          <p className="subtitle">X {screen.summary.xCount}개</p>
           <button
-            key={r.distance}
             type="button"
-            className="button button--small"
-            aria-pressed={distance === r.distance}
-            onClick={() => setDistance(r.distance)}
+            className="button button--primary"
+            onClick={restart}
           >
-            {r.distance}m
+            다시 하기
           </button>
-        ))}
-        <button type="button" className="button button--small" onClick={() => setDraw(draw === 1 ? 0 : 1)}>
-          {draw === 1 ? '활 내리기' : '활 당기기'}
-        </button>
-      </div>
+        </section>
+      )}
     </main>
   )
 }

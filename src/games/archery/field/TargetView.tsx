@@ -64,11 +64,11 @@ export function TargetView({ distance, reticle = null, drawProgress = 0, arrows 
       ))}
 
       {flying && (
-        // 멀리서 날아와 점점 작아지며 과녁에 다가가는 화살 (정면에서 본 화살 꽁무니)
+        // 궁수 쪽(화면 아래)에서 출발해 작아지며 꽂힐 자리로 날아가는 화살 (정면에서 본 화살 꽁무니)
         <circle
-          cx={flying.to.x}
-          cy={-flying.to.y}
-          r={u * (1 + (1 - flying.progress) * 6)}
+          cx={flying.to.x * flying.progress}
+          cy={-(-h + (flying.to.y + h) * flying.progress)}
+          r={u * (1 + (1 - flying.progress) * 2.5)}
           className="ar-flying"
         />
       )}

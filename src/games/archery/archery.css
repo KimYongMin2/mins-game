@@ -162,7 +162,7 @@
 
 .ar-target-wrap {
   width: 100%;
-  max-width: min(100%, calc(100dvh - 330px));
+  max-width: min(100%, calc(100dvh - 380px));
   aspect-ratio: 1;
   margin: 8px auto 0;
   border: 2px solid var(--line);
@@ -171,15 +171,205 @@
   background: var(--paper);
 }
 
-.ar-preview-controls {
+/* 경기 화면 */
+.ar-game {
   display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 6px;
-  margin-top: 12px;
+  flex-direction: column;
+  gap: 8px;
 }
 
-.ar-preview-controls .button[aria-pressed='true'] {
-  color: var(--paper);
+.ar-hud {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-variant-numeric: tabular-nums;
+}
+
+.ar-hud strong {
+  font-size: 1.25rem;
+  font-weight: 900;
+}
+
+.ar-hud__total {
+  color: var(--ink-soft);
+}
+
+.ar-hud__total strong {
+  color: var(--ink);
+}
+
+.ar-target-wrap--game {
+  position: relative;
+  margin-top: 0;
+  cursor: crosshair;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+
+.ar-wind {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px 4px 6px;
+  border: 2px solid var(--line);
+  border-radius: 12px;
+  background: var(--paper);
+  pointer-events: none;
+}
+
+.ar-wind__arrow {
+  font-size: 1.75rem;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.ar-wind__text {
+  font-size: 0.75rem;
+  font-weight: 700;
+  line-height: 1.25;
+  font-variant-numeric: tabular-nums;
+}
+
+.ar-wind--medium .ar-wind__arrow {
+  color: #d97706;
+}
+
+.ar-wind--strong {
+  border-color: var(--accent);
+}
+
+.ar-wind--strong .ar-wind__arrow {
+  color: var(--accent);
+}
+
+.ar-banner {
+  position: absolute;
+  inset: auto 0 10%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  pointer-events: none;
+}
+
+.ar-banner__title {
+  font-size: clamp(2rem, 9vw, 3.25rem);
+  font-weight: 900;
+  line-height: 1.1;
+  background: var(--paper);
+  padding: 0 10px;
+  border-radius: 10px;
+}
+
+.ar-banner__title--gold {
+  color: #b45309;
+}
+
+.ar-banner__sub {
+  font-size: 0.9375rem;
+  color: var(--ink-soft);
+  background: var(--paper);
+  padding: 0 6px;
+}
+
+.ar-meter {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 22px;
+}
+
+.ar-meter__track {
+  flex: 1;
+  height: 8px;
+  border: 1.5px solid var(--line);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.ar-meter__fill {
+  height: 100%;
   background: var(--ink);
+  transform-origin: left center;
+}
+
+.ar-meter__fill--tired {
+  background: var(--accent);
+}
+
+.ar-meter__label {
+  min-width: 10em;
+  font-size: 0.8125rem;
+  color: var(--ink-soft);
+  text-align: right;
+}
+
+.ar-sheet {
+  display: grid;
+  grid-template-columns: 3fr 3fr 3fr 1.4fr;
+  gap: 6px;
+}
+
+.ar-sheet__group {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.ar-sheet__distance {
+  font-size: 0.75rem;
+  font-weight: 800;
+  color: var(--ink-soft);
+}
+
+.ar-sheet__cells {
+  display: flex;
+  gap: 3px;
+  width: 100%;
+}
+
+.ar-sheet__cell {
+  flex: 1;
+  min-width: 0;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1.5px solid var(--muted-line);
+  border-radius: 6px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.ar-sheet__cell--current {
+  border-color: var(--accent);
+  border-width: 2px;
+}
+
+.ar-hint {
+  text-align: center;
+  font-size: 0.8125rem;
+  color: var(--ink-soft);
+}
+
+@media (hover: none) and (pointer: coarse) {
+  .ar-hint__pc {
+    display: none;
+  }
+}
+
+/* 결과 */
+.ar-result {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 12px;
+  max-width: 420px;
+  margin: 16px auto 0;
+  text-align: center;
 }

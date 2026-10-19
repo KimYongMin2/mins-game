@@ -89,8 +89,8 @@ describe('당기기와 흔들림', () => {
       return m
     }
     expect(maxSway(100)).toBeGreaterThan(maxSway(30) * 3)
-    // 30m에서는 지친 상태가 아니면 링 1개 안쪽으로 흔들린다
-    expect(rings(maxSway(30))).toBeLessThan(1)
+    // 30m에서는 지친 상태가 아니면 링 1개 남짓 흔들린다
+    expect(rings(maxSway(30))).toBeLessThan(1.2)
   })
 
   it('덜 당기면 아래로 처지고, 완전히 당기면 처지지 않는다', () => {
