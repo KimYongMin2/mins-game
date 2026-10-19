@@ -42,3 +42,15 @@ export function judgeSwing({ diffMs, difficulty, pitchIsBall }: JudgeInput): Swi
   const result = hit ? hit[1] : 'miss'
   return pitchIsBall ? downgrade(result) : result
 }
+
+/**
+ * 일반 난이도에서 주어진 결과가 나오는 스윙 시각 차이(ms)를 하나 고른다. 봇 타자가 쓴다.
+ * random은 0 이상 1 미만 값을 돌려주는 함수.
+ */
+export function diffForResult(result: SwingResult, random: () => number): number {
+  const i = SWING_RESULTS.indexOf(result)
+  const min = i === 0 ? 0 : WINDOWS[i - 1][0] + 1
+  const max = i < WINDOWS.length ? WINDOWS[i][0] : 300
+  const abs = min + random() * (max - min)
+  return random() < 0.5 ? -abs : abs
+}

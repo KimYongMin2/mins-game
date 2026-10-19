@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { downgrade, judgeSwing } from './judge'
+import { diffForResult, downgrade, judgeSwing } from './judge'
 
 const normal = (diffMs: number) => judgeSwing({ diffMs, difficulty: 'normal', pitchIsBall: false })
 const hard = (diffMs: number) => judgeSwing({ diffMs, difficulty: 'hard', pitchIsBall: false })
@@ -60,3 +60,19 @@ describe('downgrade', () => {
   })
 })
 
+
+describe('diffForResult', () => {
+  it('고른 시각 차이로 판정하면 그 결과가 나온다', () => {
+    let seed = 1
+    const random = () => {
+      seed = (seed * 16807) % 2147483647
+      return (seed - 1) / 2147483646
+    }
+    for (const result of ['homerun', 'double', 'single', 'out', 'foul', 'miss'] as const) {
+      for (let i = 0; i < 50; i++) {
+        const diffMs = diffForResult(result, random)
+        expect(judgeSwing({ diffMs, difficulty: 'normal', pitchIsBall: false })).toBe(result)
+      }
+    }
+  })
+})
