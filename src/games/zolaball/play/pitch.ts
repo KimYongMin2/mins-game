@@ -30,8 +30,8 @@ const BALL_MIN_Y = 0.2 // 땅에 박히지 않게 (공 반지름)
 export const STRIKE_ZONE = { bottom: 0.8, top: 1.9 }
 
 const FLIGHT_MS: Record<PitchType, number> = {
-  fastball: 450,
-  breaking: 600,
+  fastball: 380,
+  breaking: 500,
 }
 
 const PLATE_HEIGHT: Record<'strike' | 'ball', Record<PitchHeight, number>> = {
