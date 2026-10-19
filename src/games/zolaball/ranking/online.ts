@@ -39,6 +39,19 @@ export function toGameRow(summary: MatchSummary, nickname: string, id: string): 
   }
 }
 
+/**
+ * 경기마다 붙이는 고유 id (UUID v4). crypto.randomUUID는 https·localhost에서만 있어서
+ * 같은 와이파이의 http 주소(휴대폰 테스트 등)에서는 getRandomValues로 직접 만든다.
+ */
+export function newGameId(): string {
+  if (typeof crypto.randomUUID === 'function') return crypto.randomUUID()
+  const b = crypto.getRandomValues(new Uint8Array(16))
+  b[6] = (b[6] & 0x0f) | 0x40 // 버전 4
+  b[8] = (b[8] & 0x3f) | 0x80 // RFC 4122 변형
+  const h = Array.from(b, (x) => x.toString(16).padStart(2, '0')).join('')
+  return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}`
+}
+
 function loadPending(): GameRow[] {
   try {
     const parsed: unknown = JSON.parse(readLocal(PENDING_KEY) ?? '[]')
@@ -83,7 +96,7 @@ export type UploadStatus = 'saving' | 'saved' | 'queued'
 
 /** 경기 결과를 올린다. */
 export async function submitGame(summary: MatchSummary, nickname: string): Promise<'saved' | 'queued'> {
-  savePending([...loadPending(), toGameRow(summary, nickname, crypto.randomUUID())])
+  savePending([...loadPending(), toGameRow(summary, nickname, newGameId())])
   const left = await flushPendingGames()
   return left === 0 ? 'saved' : 'queued'
 }
