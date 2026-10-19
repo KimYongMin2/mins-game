@@ -184,6 +184,11 @@
   opacity: 0.55;
 }
 
+.zb-field .zb-mark {
+  stroke: var(--accent);
+  stroke-width: 2.5px;
+}
+
 .zb-field .zb-ball {
   fill: var(--paper);
   stroke-width: 2px;

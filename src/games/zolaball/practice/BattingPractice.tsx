@@ -122,13 +122,16 @@ export function BattingPractice() {
   const swingProgress =
     swingAt !== null && isSwinging(state) ? Math.max(0, now - swingAt) / SWING_DURATION_MS : null
   const outcome = state.outcome && describeOutcome(state.outcome)
+  // 공이 홈플레이트를 지난 자리. 투구가 끝난 뒤에도 결과와 함께 남겨 둔다.
+  const marked = state.lastPitch
+  const mark = marked && now >= marked.arriveAt ? { x: 0, y: marked.plateHeight } : null
   // 투구가 끝난 뒤에만 구종을 알려준다.
   const pitchInfo = !pitch && state.lastPitch ? describePitch(state.lastPitch) : null
 
   return (
     <>
       <div className="zb-field-wrap">
-        <Field camera={CAMERA_PITCH} ball={ball} swing={swingProgress} />
+        <Field camera={CAMERA_PITCH} ball={ball} swing={swingProgress} mark={mark} />
       </div>
 
       <div className="zb-practice-result" aria-live="polite">

@@ -137,6 +137,9 @@ export function MatchScreen({ config, onFinish }: Props) {
   // 필드에 그릴 것: 투구 중에는 날아오는 공, 결과 중에는 타구와 그 공을 따라가는 카메라
   let ball: Point | null = null
   let camera: Camera = CAMERA_PITCH
+  // 공이 홈플레이트를 지난 뒤에는 지나간 자리를 표시
+  const shownPitch = phase.kind === 'pitching' || phase.kind === 'result' ? phase.pitch : null
+  const mark = shownPitch && now >= shownPitch.arriveAt ? { x: 0, y: shownPitch.plateHeight } : null
   if (phase.kind === 'pitching') {
     const contact = phase.swing && phase.swing.result !== 'miss'
     ball = contact && now >= phase.pitch.arriveAt ? null : ballPosition(phase.pitch, now)
@@ -167,7 +170,7 @@ export function MatchScreen({ config, onFinish }: Props) {
       <Scoreboard game={state.game} userSide={config.userSide} />
 
       <div className="zb-field-wrap zb-field-wrap--match">
-        <Field camera={camera} ball={ball} swing={swingProgress} />
+        <Field camera={camera} ball={ball} swing={swingProgress} mark={mark} />
         <Banner state={state} />
       </div>
 

@@ -19,14 +19,16 @@ type Props = {
   ball?: Point | null
   /** 타자 스윙 진행도(0~1). null이면 준비 자세. */
   swing?: number | null
+  /** 공이 홈플레이트를 지난 자리 표시. 볼/스트라이크를 눈으로 확인할 수 있게 한다. */
+  mark?: Point | null
 }
 
-const BALL_RADIUS = 0.2 // 잘 보이도록 실제(약 0.037m)보다 크게
+const BALL_RADIUS = 0.15 // 잘 보이도록 실제(약 0.037m)보다 크게, 존 근처 볼이 존에 걸쳐 보이지 않을 만큼만
 
 const GROUND_END = 175
 const MINOR_TICK_EVERY = 10
 
-export function Field({ camera, ball = null, swing = null }: Props) {
+export function Field({ camera, ball = null, swing = null, mark = null }: Props) {
   const u = screenUnit(camera)
   const minorTicks = Array.from(
     { length: Math.floor(GROUND_END / MINOR_TICK_EVERY) },
@@ -93,6 +95,13 @@ export function Field({ camera, ball = null, swing = null }: Props) {
         className="zb-zone"
       />
       <Batter x={BATTER_X} height={PLAYER_HEIGHT} swing={swing} />
+
+      {mark && (
+        <path
+          d={`M${mark.x - 0.12} ${-mark.y - 0.12} L${mark.x + 0.12} ${-mark.y + 0.12} M${mark.x - 0.12} ${-mark.y + 0.12} L${mark.x + 0.12} ${-mark.y - 0.12}`}
+          className="zb-mark"
+        />
+      )}
 
       {/* 카메라가 멀어져도 공이 점처럼 사라지지 않게 화면 기준 최소 크기를 둔다 */}
       {ball && <circle cx={ball.x} cy={-ball.y} r={Math.max(BALL_RADIUS, u * 0.5)} className="zb-ball" />}
