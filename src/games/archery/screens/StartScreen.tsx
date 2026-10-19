@@ -1,5 +1,6 @@
 import { ROUNDS, TOTAL_ARROWS } from '../constants'
 import { type ArcheryRecord, averageOf } from '../records'
+import { formatPoints } from '../rules/scoring'
 
 type Props = {
   record: ArcheryRecord
@@ -27,7 +28,7 @@ export function StartScreen({ record, onStart }: Props) {
       <dl className="ar-start__record">
         <div>
           <dt>최고 점수</dt>
-          <dd>{record.best ? `${record.best.points}점` : '-'}</dd>
+          <dd>{record.best ? `${formatPoints(record.best.points)}점` : '-'}</dd>
           {record.best && <span>X {record.best.xCount}개</span>}
         </div>
         <div>

@@ -157,11 +157,12 @@ describe('한 발 제한 시간', () => {
 })
 
 describe('조준과 점수', () => {
-  it('바람과 흔들림을 완벽히 보정하면 전부 X', () => {
+  it('바람과 흔들림을 완벽히 보정하면 전부 X 10.9점 (만점 109점)', () => {
     const hold = DRAW_MS + 400
     const sum = summarizeRound(playAll(7, hold, perfectAim(hold)))
-    expect(sum.points).toBe(100)
+    expect(sum.points).toBe(109)
     expect(sum.xCount).toBe(10)
+    expect(sum.tenCount).toBe(10)
   })
 
   it('보정 없이 가운데만 노리면 100점보다 낮다 (바람 때문에)', () => {

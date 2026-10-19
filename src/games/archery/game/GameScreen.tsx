@@ -18,7 +18,7 @@ import {
   shotClockLeft,
   summarizeRound,
 } from '../play/roundState'
-import { totalOf } from '../rules/scoring'
+import { type ArrowScore, formatArrow, formatPoints, totalOf } from '../rules/scoring'
 import { playSound } from '../sounds'
 
 type Props = {
@@ -30,11 +30,11 @@ const DRAG_RATIO = 0.5
 /** 방향키 조준 속도: 1초에 보이는 범위의 몇 배 */
 const KEY_AIM_SPEED = 0.35
 
-function scoreText(points: number, x: boolean, timedOut: boolean) {
+function scoreText(score: ArrowScore, timedOut: boolean) {
   if (timedOut) return '시간 초과'
-  if (x) return 'X!'
-  if (points === 0) return '빗나감'
-  return `${points}점`
+  if (score.ring === 0) return '빗나감'
+  if (score.x) return `X! ${formatArrow(score)}`
+  return `${formatArrow(score)}점`
 }
 
 function Banner({ state }: { state: RoundState }) {
@@ -52,8 +52,8 @@ function Banner({ state }: { state: RoundState }) {
     const { score } = phase.shot
     return (
       <div className="ar-banner" aria-live="polite">
-        <strong className={`ar-banner__title${score.points === 10 ? ' ar-banner__title--gold' : ''}`}>
-          {scoreText(score.points, score.x, phase.shot.impact === null)}
+        <strong className={`ar-banner__title${score.ring === 10 ? ' ar-banner__title--gold' : ''}`}>
+          {scoreText(score, phase.shot.impact === null)}
         </strong>
       </div>
     )
@@ -106,8 +106,11 @@ function ScoreSheet({ state }: { state: RoundState }) {
               const shot = state.shots[index]
               const current = index === state.arrowIndex && state.phase.kind !== 'done'
               return (
-                <span key={index} className={`ar-sheet__cell${current ? ' ar-sheet__cell--current' : ''}`}>
-                  {shot ? (shot.score.x ? 'X' : shot.score.points === 0 ? 'M' : shot.score.points) : ''}
+                <span
+                  key={index}
+                  className={`ar-sheet__cell${current ? ' ar-sheet__cell--current' : ''}${shot?.score.ring === 10 ? ' ar-sheet__cell--gold' : ''}`}
+                >
+                  {shot ? (shot.score.x ? 'X' : formatArrow(shot.score)) : ''}
                 </span>
               )
             })}
@@ -200,7 +203,7 @@ export function GameScreen({ onFinish }: Props) {
           <strong>{distance}m</strong> · {Math.min(state.arrowIndex + 1, TOTAL_ARROWS)}/{TOTAL_ARROWS}발
         </span>
         <span className="ar-hud__total">
-          <strong>{total.points}</strong>점 · X {total.xCount}
+          <strong>{formatPoints(total.points)}</strong>점 · X {total.xCount}
         </span>
       </div>
 

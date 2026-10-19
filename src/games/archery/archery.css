@@ -370,6 +370,8 @@
   flex: 1;
   min-width: 0;
   height: 30px;
+  font-size: 0.8125rem;
+  letter-spacing: -0.02em;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -377,6 +379,11 @@
   border-radius: 6px;
   font-weight: 800;
   font-variant-numeric: tabular-nums;
+}
+
+.ar-sheet__cell--gold {
+  background: #fdf0b5;
+  border-color: #d97706;
 }
 
 .ar-sheet__cell--current {
@@ -543,11 +550,16 @@
 }
 
 .ar-result__arrow {
-  width: 2em;
+  min-width: 2.6em;
+  padding: 0 2px;
   text-align: center;
   font-weight: 800;
   border: 1.5px solid var(--muted-line);
   border-radius: 6px;
+}
+
+.ar-result__arrow--x {
+  color: var(--accent);
 }
 
 .ar-result__arrow--gold {

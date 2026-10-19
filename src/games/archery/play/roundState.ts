@@ -4,6 +4,7 @@ import { type Distance, SHOT_CLOCK_MS, TOTAL_ARROWS } from '../constants'
 import { viewHalfSize } from '../field/view'
 import {
   type ArrowScore,
+  MISS,
   type Point,
   distanceOfArrow,
   isFirstAtDistance,
@@ -155,7 +156,7 @@ function timeOut(state: RoundState): RoundState {
     distance: currentDistance(state),
     wind: state.wind,
     impact: null,
-    score: { points: 0, x: false },
+    score: MISS,
     progress: 0,
   }
   return withSounds(
@@ -166,8 +167,8 @@ function timeOut(state: RoundState): RoundState {
 
 function hitSound(score: ArrowScore): SoundName {
   if (score.x) return 'x'
-  if (score.points === 10) return 'ten'
-  if (score.points === 0) return 'miss'
+  if (score.ring === 10) return 'ten'
+  if (score.ring === 0) return 'miss'
   return 'hit'
 }
 
@@ -227,9 +228,9 @@ export type RoundSummary = {
   shots: Shot[]
   points: number
   xCount: number
+  tenCount: number
 }
 
 export function summarizeRound(state: RoundState): RoundSummary {
-  const { points, xCount } = totalOf(state.shots.map((s) => s.score))
-  return { shots: state.shots, points, xCount }
+  return { shots: state.shots, ...totalOf(state.shots.map((s) => s.score)) }
 }
