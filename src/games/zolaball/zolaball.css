@@ -243,6 +243,7 @@
   display: flex;
   align-items: center;
   gap: 10px;
+  min-height: 22px;
   margin-bottom: 10px;
 }
 
@@ -270,4 +271,192 @@
   color: var(--ink-soft);
   text-align: right;
   font-variant-numeric: tabular-nums;
+}
+
+/* 메뉴·결과 */
+.zb-menu {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 12px;
+  max-width: 360px;
+  margin: 24px auto 0;
+  text-align: center;
+}
+
+.zb-menu__buttons {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.zb-menu__button {
+  min-height: 72px;
+  font-size: 1.25rem;
+}
+
+/* 경기 화면 */
+.zb-match {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  /* PC에서 필드가 너무 커서 조작 버튼이 화면 밖으로 밀리지 않게, 화면 높이에 맞춰 폭을 줄인다. */
+  width: min(100%, calc((100dvh - 400px) * 1.6));
+  min-width: min(100%, 320px);
+  margin: 0 auto;
+}
+
+.zb-scoreboard {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 12px;
+  border: 2px solid var(--line);
+  border-radius: 14px;
+  font-variant-numeric: tabular-nums;
+}
+
+.zb-scoreboard__inning {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  line-height: 1.2;
+  font-size: 0.875rem;
+  min-width: 3em;
+}
+
+.zb-scoreboard__inning strong {
+  font-size: 1.125rem;
+}
+
+.zb-scoreboard__score {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.zb-team {
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: var(--ink-soft);
+}
+
+.zb-team--batting {
+  color: var(--ink);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.zb-runs {
+  font-size: 1.75rem;
+  line-height: 1;
+}
+
+.zb-colon {
+  color: var(--ink-soft);
+}
+
+.zb-scoreboard__count {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.zb-count {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.zb-count__label {
+  width: 1.1em;
+  font-size: 0.75rem;
+  font-weight: 800;
+}
+
+.zb-dot {
+  width: 10px;
+  height: 10px;
+  border: 1.5px solid var(--line);
+  border-radius: 50%;
+}
+
+.zb-dot--on {
+  background: var(--ink);
+}
+
+.zb-bases {
+  width: 44px;
+  height: 36px;
+  flex-shrink: 0;
+}
+
+.zb-base {
+  fill: var(--paper);
+  stroke: var(--ink);
+  stroke-width: 1.5;
+}
+
+.zb-base--on {
+  fill: var(--ink);
+}
+
+.zb-field-wrap--match {
+  position: relative;
+}
+
+.zb-banner {
+  position: absolute;
+  inset: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding-top: 6%;
+  text-align: center;
+  pointer-events: none;
+}
+
+.zb-banner__title {
+  font-size: clamp(1.5rem, 6vw, 2.5rem);
+  font-weight: 900;
+  line-height: 1.1;
+  background: var(--paper);
+  padding: 0 8px;
+}
+
+.zb-banner__title--big {
+  font-size: clamp(2.25rem, 10vw, 4rem);
+}
+
+.zb-banner__runs {
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: var(--accent);
+}
+
+.zb-banner__sub {
+  font-size: 0.9375rem;
+  color: var(--ink-soft);
+  background: var(--paper);
+  padding: 0 6px;
+  font-variant-numeric: tabular-nums;
+}
+
+.zb-match__controls {
+  min-height: 190px;
+}
+
+.zb-swing-button {
+  width: 100%;
+  min-height: 96px;
+  font-size: 1.5rem;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+
+.zb-swing-button:disabled {
+  opacity: 0.4;
 }
