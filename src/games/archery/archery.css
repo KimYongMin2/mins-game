@@ -1,0 +1,185 @@
+/* 졸라 양궁 전용 스타일. 모든 클래스는 ar- 접두사를 쓴다. */
+.ar-page {
+  max-width: 640px;
+}
+
+.ar-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.ar-header .title {
+  flex: 1;
+  min-width: 0;
+}
+
+/* 옆모습 띠 */
+.ar-side {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 100 / 18;
+  color: var(--ink);
+}
+
+.ar-side path,
+.ar-side circle {
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+
+.ar-figure path,
+.ar-figure circle {
+  stroke-width: 2px;
+}
+
+.ar-side .ar-head {
+  fill: var(--paper);
+}
+
+.ar-side .ar-bow {
+  stroke-width: 2.5px;
+}
+
+.ar-side .ar-string {
+  stroke-width: 1px;
+  opacity: 0.7;
+}
+
+.ar-side .ar-arrow {
+  stroke-width: 2px;
+  stroke: var(--accent);
+}
+
+.ar-side .ar-face {
+  stroke-width: 4px;
+}
+
+.ar-ground {
+  stroke-width: 2px;
+}
+
+.ar-measure {
+  stroke-width: 1px;
+  stroke-dasharray: 3 3;
+  opacity: 0.4;
+}
+
+.ar-distance-label {
+  font-size: 1.6px;
+  font-weight: 800;
+  fill: var(--ink-soft);
+}
+
+/* 과녁 정면 */
+.ar-target {
+  display: block;
+  width: 100%;
+  height: 100%;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.ar-target circle,
+.ar-target path,
+.ar-target rect {
+  stroke: var(--ink);
+  vector-effect: non-scaling-stroke;
+}
+
+.ar-board {
+  fill: #fbfaf5;
+  stroke-width: 2px;
+}
+
+.ar-ring {
+  stroke-width: 1.2px;
+}
+
+/* 실제 과녁 색을 옅게 */
+.ar-ring--white {
+  fill: #ffffff;
+}
+.ar-ring--black {
+  fill: #e4e4e4;
+}
+.ar-ring--blue {
+  fill: #d7e8fb;
+}
+.ar-ring--red {
+  fill: #fbd9d7;
+}
+.ar-ring--gold {
+  fill: #fdf0b5;
+}
+.ar-ring--x {
+  fill: none;
+  stroke-dasharray: 2 2;
+}
+
+.ar-center {
+  stroke-width: 1px;
+  opacity: 0.5;
+}
+
+.ar-hit circle {
+  fill: var(--ink);
+  stroke-width: 1px;
+}
+
+.ar-hit path {
+  stroke-width: 1.5px;
+  opacity: 0.6;
+}
+
+.ar-hit--latest circle {
+  fill: var(--accent);
+  stroke: var(--accent);
+}
+
+.ar-hit--latest path {
+  stroke: var(--accent);
+  opacity: 1;
+}
+
+.ar-flying {
+  fill: var(--paper);
+  stroke-width: 2px;
+}
+
+.ar-reticle circle,
+.ar-reticle path {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 2px;
+}
+
+.ar-target-wrap {
+  width: 100%;
+  max-width: min(100%, calc(100dvh - 330px));
+  aspect-ratio: 1;
+  margin: 8px auto 0;
+  border: 2px solid var(--line);
+  border-radius: 14px;
+  overflow: hidden;
+  background: var(--paper);
+}
+
+.ar-preview-controls {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+  margin-top: 12px;
+}
+
+.ar-preview-controls .button[aria-pressed='true'] {
+  color: var(--paper);
+  background: var(--ink);
+}

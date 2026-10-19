@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router'
+import { ArcheryPage } from './games/archery/ArcheryPage'
 import { ZolaballPage } from './games/zolaball/ZolaballPage'
 import { MainPage } from './pages/MainPage'
 import { NicknamePage } from './pages/NicknamePage'
@@ -21,6 +22,10 @@ function App() {
         <Route
           path="/games/zolaball"
           element={nickname ? <ZolaballPage /> : <Navigate to="/nickname" replace />}
+        />
+        <Route
+          path="/games/archery"
+          element={nickname ? <ArcheryPage /> : <Navigate to="/nickname" replace />}
         />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

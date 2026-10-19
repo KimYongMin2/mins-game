@@ -15,4 +15,11 @@ export const GAMES: GameEntry[] = [
     path: '/games/zolaball',
     ready: true,
   },
+  {
+    id: 'archery',
+    title: '졸라 양궁',
+    description: '30m부터 100m까지 10발. 바람을 읽고 X를 노려라!',
+    path: '/games/archery',
+    ready: true,
+  },
 ]
