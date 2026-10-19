@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { EMPTY_SELECTION, completeSelection, isSelectionComplete } from './pitchSelection'
-import { createRng } from './random'
+import { createRng } from '../../../shared/random'
 
 describe('pitchSelection', () => {
   it('구종과 높이를 모두 골라야 완성', () => {

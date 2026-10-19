@@ -11,7 +11,7 @@ import {
   completeSelection,
   isSelectionComplete,
 } from '../play/pitchSelection'
-import { createRng } from '../play/random'
+import { createRng } from '../../../shared/random'
 import {
   type GameState,
   type PitchOutcome,

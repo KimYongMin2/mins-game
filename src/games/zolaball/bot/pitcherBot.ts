@@ -1,5 +1,5 @@
 import type { PitchCall, PitchType } from '../play/pitch'
-import { type Rng, chance, pickOne } from '../play/random'
+import { type Rng, chance, pickOne } from '../../../shared/random'
 import type { Difficulty } from '../rules/judge'
 
 export type Count = { balls: number; strikes: number }

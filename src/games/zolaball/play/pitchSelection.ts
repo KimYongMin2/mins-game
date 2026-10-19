@@ -1,5 +1,5 @@
 import type { PitchCall, PitchHeight, PitchType } from './pitch'
-import { type Rng, pickOne } from './random'
+import { type Rng, pickOne } from '../../../shared/random'
 
 /** 투수가 고르는 시간. 넘기면 고르지 않은 항목을 무작위로 채워 던진다. */
 export const PITCH_CHOICE_MS = 5000

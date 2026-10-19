@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { PitchCall, PitchType } from '../play/pitch'
-import { createRng } from '../play/random'
+import { createRng } from '../../../shared/random'
 import { type Difficulty, type SwingResult, judgeSwing } from '../rules/judge'
 import { botDecideSwing } from './batterBot'
 import { botChoosePitch } from './pitcherBot'

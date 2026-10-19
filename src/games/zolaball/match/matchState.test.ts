@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { PITCH_CHOICE_MS } from '../play/pitchSelection'
-import { createRng } from '../play/random'
+import { createRng } from '../../../shared/random'
 import { INNINGS } from '../rules/game'
 import {
   ANNOUNCE_MS,

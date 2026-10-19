@@ -1,5 +1,5 @@
 import type { PitchCall, PitchType } from '../play/pitch'
-import { type Rng, chance, pickWeighted } from '../play/random'
+import { type Rng, chance, pickWeighted } from '../../../shared/random'
 import { type Difficulty, type SwingResult, diffForResult } from '../rules/judge'
 import type { Count } from './pitcherBot'
 

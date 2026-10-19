@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { FENCE_DISTANCE, FENCE_HEIGHT } from '../constants'
 import { type BattedKind, battedBallPosition, createBattedBall, standsHeightAt } from './battedBall'
-import { createRng } from './random'
+import { createRng } from '../../../shared/random'
 
 const START = { x: 0, y: 1.1 }
 

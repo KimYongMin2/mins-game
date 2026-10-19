@@ -1,6 +1,6 @@
 import { STANDS_START, STANDS_STEPS, STANDS_STEP_DEPTH, STANDS_STEP_RISE } from '../constants'
 import type { Point } from './pitch'
-import type { Rng } from './random'
+import type { Rng } from '../../../shared/random'
 
 // 배트에 맞은 공의 비행. 결과(안타·홈런 등)는 판정으로 이미 정해져 있고, 그에 맞는 그림만 만든다.
 
