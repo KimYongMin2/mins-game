@@ -1,18 +1,27 @@
 import type { MatchSummary } from '../match/matchState'
+import type { UploadStatus } from '../ranking/online'
 import { type ZolaballRecord, formatAverage, formatEra, formatInnings } from '../records'
 import { INNINGS, type Side } from '../rules/game'
 
 type Props = {
   summary: MatchSummary
   record: ZolaballRecord
+  upload: UploadStatus
   onRematch: () => void
+  onRanking: () => void
   onMenu: () => void
+}
+
+const UPLOAD_TEXT: Record<UploadStatus, string> = {
+  saving: '랭킹에 기록을 올리는 중…',
+  saved: '랭킹에 기록을 올렸어요',
+  queued: '지금은 올리지 못했어요. 다음에 접속할 때 다시 올릴게요',
 }
 
 const HEADLINE = { win: '승리!', lose: '패배', draw: '무승부' } as const
 const DIFFICULTY_TEXT = { normal: '일반', hard: '어려움' } as const
 
-export function ResultScreen({ summary, record, onRematch, onMenu }: Props) {
+export function ResultScreen({ summary, record, upload, onRematch, onRanking, onMenu }: Props) {
   const { userSide, difficulty } = summary.config
   const { linescore, userStats, userPitching } = summary
   // 선공이 위 줄
@@ -91,9 +100,16 @@ export function ResultScreen({ summary, record, onRematch, onMenu }: Props) {
         {formatAverage(record.hits, record.atBats)} · 홈런 {record.homeruns}
       </p>
 
+      <p className={`zb-result__upload zb-result__upload--${upload}`} aria-live="polite">
+        {UPLOAD_TEXT[upload]}
+      </p>
+
       <div className="zb-result__buttons">
         <button type="button" className="button button--primary" onClick={onRematch}>
           다시 하기
+        </button>
+        <button type="button" className="button" onClick={onRanking}>
+          랭킹
         </button>
         <button type="button" className="button" onClick={onMenu}>
           난이도 선택

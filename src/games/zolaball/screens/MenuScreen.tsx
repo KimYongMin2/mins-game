@@ -5,6 +5,7 @@ type Props = {
   record: ZolaballRecord
   onStart: (difficulty: Difficulty) => void
   onPractice: () => void
+  onRanking: () => void
 }
 
 const OPTIONS: { value: Difficulty; label: string; desc: string }[] = [
@@ -13,7 +14,7 @@ const OPTIONS: { value: Difficulty; label: string; desc: string }[] = [
 ]
 
 /** 난이도 선택 */
-export function MenuScreen({ record, onStart, onPractice }: Props) {
+export function MenuScreen({ record, onStart, onPractice, onRanking }: Props) {
   return (
     <section className="zb-menu">
       <p className="subtitle">봇과 3이닝 대결! 선공·후공은 무작위예요.</p>
@@ -34,9 +35,14 @@ export function MenuScreen({ record, onStart, onPractice }: Props) {
       <p className="zb-menu__career">
         통산 타율 {formatAverage(record.hits, record.atBats)} · 홈런 {record.homeruns}
       </p>
-      <button type="button" className="button" onClick={onPractice}>
-        타격 연습
-      </button>
+      <div className="zb-menu__sub-buttons">
+        <button type="button" className="button" onClick={onRanking}>
+          랭킹
+        </button>
+        <button type="button" className="button" onClick={onPractice}>
+          타격 연습
+        </button>
+      </div>
     </section>
   )
 }
