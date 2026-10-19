@@ -273,26 +273,170 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* 메뉴·결과 */
+/* 난이도 선택 */
 .zb-menu {
   display: flex;
   flex-direction: column;
   align-items: stretch;
   gap: 12px;
-  max-width: 360px;
-  margin: 24px auto 0;
+  max-width: 420px;
+  margin: 16px auto 0;
   text-align: center;
 }
 
-.zb-menu__buttons {
+.zb-menu__options {
+  display: grid;
+  gap: 10px;
+}
+
+.zb-menu__option {
+  flex-direction: column;
+  gap: 2px;
+  min-height: 0;
+  padding: 16px;
+  border-radius: 14px;
+}
+
+.zb-menu__option:hover {
+  box-shadow: 4px 4px 0 var(--line);
+}
+
+.zb-menu__label {
+  font-size: 1.5rem;
+  font-weight: 900;
+}
+
+.zb-menu__desc {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--ink-soft);
+}
+
+.zb-menu__record {
+  margin-top: 4px;
+  font-size: 0.875rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.zb-menu__career {
+  font-size: 0.875rem;
+  color: var(--ink-soft);
+}
+
+/* 결과 */
+.zb-result {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-width: 420px;
+  margin: 8px auto 0;
+}
+
+.zb-result__headline {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 16px;
+  border: 2px solid var(--line);
+  border-radius: 14px;
+  font-variant-numeric: tabular-nums;
+}
+
+.zb-result__headline strong {
+  font-size: 2.25rem;
+  font-weight: 900;
+  line-height: 1.2;
+}
+
+.zb-result__headline--win {
+  color: var(--paper);
+  background: var(--ink);
+}
+
+.zb-result__headline--lose span,
+.zb-result__headline--draw span {
+  color: var(--ink-soft);
+}
+
+.zb-linescore {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.zb-linescore th,
+.zb-linescore td {
+  padding: 8px 4px;
+  border-bottom: 1.5px solid var(--muted-line);
+}
+
+.zb-linescore thead th {
+  font-size: 0.8125rem;
+  color: var(--ink-soft);
+  border-bottom-color: var(--line);
+}
+
+.zb-linescore tbody th {
+  text-align: left;
+  padding-left: 8px;
+}
+
+.zb-linescore__me {
+  font-weight: 800;
+}
+
+.zb-linescore__total {
+  font-weight: 900;
+  font-size: 1.125rem;
+}
+
+.zb-stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin: 0;
+}
+
+.zb-stats div {
+  padding: 10px;
+  border: 1.5px solid var(--muted-line);
+  border-radius: 10px;
+  text-align: center;
+}
+
+.zb-stats dt {
+  font-size: 0.8125rem;
+  color: var(--ink-soft);
+}
+
+.zb-stats dd {
+  margin: 0;
+  font-size: 1.375rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.zb-result__career {
+  text-align: center;
+  font-size: 0.875rem;
+  color: var(--ink-soft);
+}
+
+.zb-result__buttons {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 10px;
 }
 
-.zb-menu__button {
-  min-height: 72px;
-  font-size: 1.25rem;
+.zb-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
 }
 
 /* 경기 화면 */
