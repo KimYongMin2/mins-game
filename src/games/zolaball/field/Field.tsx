@@ -7,6 +7,7 @@ import {
   PITCHER_DISTANCE,
   PLAYER_HEIGHT,
 } from '../constants'
+import type { Point } from '../play/pitch'
 import { type Camera, screenUnit, viewBoxOf } from './camera'
 import { Clouds } from './Clouds'
 import { Stands } from './Stands'
@@ -14,12 +15,18 @@ import { Batter, Pitcher } from './StickMen'
 
 type Props = {
   camera: Camera
+  /** 공 위치(월드 좌표). 없으면 그리지 않는다. */
+  ball?: Point | null
+  /** 타자 스윙 진행도(0~1). null이면 준비 자세. */
+  swing?: number | null
 }
+
+const BALL_RADIUS = 0.2 // 잘 보이도록 실제(약 0.037m)보다 크게
 
 const GROUND_END = 175
 const MINOR_TICK_EVERY = 10
 
-export function Field({ camera }: Props) {
+export function Field({ camera, ball = null, swing = null }: Props) {
   const u = screenUnit(camera)
   const minorTicks = Array.from(
     { length: Math.floor(GROUND_END / MINOR_TICK_EVERY) },
@@ -77,7 +84,9 @@ export function Field({ camera }: Props) {
 
       {/* 홈플레이트와 타자 */}
       <path d="M-0.3 0 L0.3 0" className="zb-plate" />
-      <Batter x={BATTER_X} height={PLAYER_HEIGHT} />
+      <Batter x={BATTER_X} height={PLAYER_HEIGHT} swing={swing} />
+
+      {ball && <circle cx={ball.x} cy={-ball.y} r={BALL_RADIUS} className="zb-ball" />}
     </svg>
   )
 }

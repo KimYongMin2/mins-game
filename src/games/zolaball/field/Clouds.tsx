@@ -1,3 +1,4 @@
+import { memo } from 'react'
 // 하늘의 선 구름. 작은 구름은 투수-타자 시점에, 큰 구름은 전체 필드 시점에 보인다.
 const CLOUDS = [
   { x: 4, y: 9.5, size: 1.4 },
@@ -17,7 +18,7 @@ function cloudPath(x: number, y: number, s: number) {
     Z`
 }
 
-export function Clouds() {
+export const Clouds = memo(function Clouds() {
   return (
     <g className="zb-cloud">
       {CLOUDS.map((c) => (
@@ -25,4 +26,4 @@ export function Clouds() {
       ))}
     </g>
   )
-}
+})

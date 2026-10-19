@@ -1,3 +1,4 @@
+import { memo } from 'react'
 import {
   STANDS_START,
   STANDS_STEPS,
@@ -22,7 +23,7 @@ const spectators = Array.from({ length: STANDS_STEPS }, (_, step) =>
   }),
 ).flat()
 
-export function Stands() {
+export const Stands = memo(function Stands() {
   const topY = STANDS_STEPS * STANDS_STEP_RISE
   const endX = STANDS_START + STANDS_STEPS * STANDS_STEP_DEPTH
 
@@ -45,4 +46,4 @@ export function Stands() {
       ))}
     </g>
   )
-}
+})

@@ -93,13 +93,84 @@
   fill: var(--ink);
 }
 
-.zb-view-toggle {
+/* 타격 연습 */
+.zb-practice-result {
+  min-height: 72px;
   display: flex;
-  gap: 8px;
-  margin-top: 12px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 8px 0;
 }
 
-.zb-view-toggle .button[aria-pressed='true'] {
+.zb-practice-result__title {
+  font-size: 1.75rem;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.zb-practice-result__detail {
+  color: var(--ink-soft);
+  font-variant-numeric: tabular-nums;
+}
+
+.zb-controls {
+  display: grid;
+  grid-template-columns: 1fr 2fr;
+  gap: 10px;
+}
+
+.zb-controls .button {
+  min-height: 64px;
+  font-size: 1.125rem;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+
+.zb-controls .button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.zb-controls__swing {
+  font-size: 1.375rem;
+}
+
+.zb-hint {
+  margin-top: 8px;
+  text-align: center;
+  font-size: 0.875rem;
+  color: var(--ink-soft);
+}
+
+.zb-options {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px 16px;
+  margin-top: 16px;
+}
+
+.zb-toggle {
+  display: flex;
+  gap: 6px;
+}
+
+.zb-toggle .button[aria-pressed='true'] {
   color: var(--paper);
   background: var(--ink);
+}
+
+.zb-field .zb-ball {
+  fill: var(--paper);
+  stroke-width: 2px;
+}
+
+/* 터치 기기에서는 키보드 안내를 숨긴다. */
+@media (hover: none) and (pointer: coarse) {
+  .zb-hint {
+    display: none;
+  }
 }
