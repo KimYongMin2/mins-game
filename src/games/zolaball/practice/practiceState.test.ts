@@ -4,7 +4,11 @@ import { pitchEndAt } from '../play/pitch'
 import { type PracticeState, initialPracticeState, practiceReducer } from './practiceState'
 
 function pitched(isBall = false): PracticeState {
-  return practiceReducer(initialPracticeState(0), { type: 'pitch', releaseAt: 1000, isBall })
+  return practiceReducer(initialPracticeState(0), {
+    type: 'pitch',
+    releaseAt: 1000,
+    call: { type: 'fastball', isBall, height: 'low' },
+  })
 }
 
 describe('practiceReducer', () => {

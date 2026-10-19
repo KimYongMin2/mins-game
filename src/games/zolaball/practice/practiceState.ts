@@ -1,5 +1,5 @@
 import { SWING_DURATION_MS } from '../constants'
-import { type Pitch, createPracticePitch, pitchEndAt } from '../play/pitch'
+import { type Pitch, type PitchCall, createPitch, pitchEndAt } from '../play/pitch'
 import { type Difficulty, type SwingResult, judgeSwing } from '../rules/judge'
 
 export type Outcome =
@@ -9,6 +9,8 @@ export type Outcome =
 export type PracticeState = {
   now: number
   pitch: Pitch | null
+  /** 가장 최근에 던진 공. 투구가 끝난 뒤에도 결과와 함께 보여준다. */
+  lastPitch: Pitch | null
   /** 이번 투구에 이미 스윙했는지 (투구당 판정은 한 번) */
   swung: boolean
   /** 배트에 맞았는지. 맞으면 공은 홈플레이트에서 사라진다. */
@@ -18,12 +20,12 @@ export type PracticeState = {
 }
 
 export type PracticeAction =
-  | { type: 'pitch'; releaseAt: number; isBall: boolean }
+  | { type: 'pitch'; releaseAt: number; call: PitchCall }
   | { type: 'swing'; at: number; difficulty: Difficulty }
   | { type: 'tick'; now: number }
 
 export function initialPracticeState(now: number): PracticeState {
-  return { now, pitch: null, swung: false, contact: false, swingAt: null, outcome: null }
+  return { now, pitch: null, lastPitch: null, swung: false, contact: false, swingAt: null, outcome: null }
 }
 
 export function isSwinging(state: PracticeState, at = state.now): boolean {
@@ -34,9 +36,11 @@ export function practiceReducer(state: PracticeState, action: PracticeAction): P
   switch (action.type) {
     case 'pitch': {
       if (state.pitch) return state
+      const pitch = createPitch(action.call, action.releaseAt)
       return {
         ...state,
-        pitch: createPracticePitch(action.releaseAt, action.isBall),
+        pitch,
+        lastPitch: pitch,
         swung: false,
         contact: false,
         outcome: null,

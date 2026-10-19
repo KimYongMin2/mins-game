@@ -7,7 +7,7 @@ import {
   PITCHER_DISTANCE,
   PLAYER_HEIGHT,
 } from '../constants'
-import type { Point } from '../play/pitch'
+import { type Point, STRIKE_ZONE } from '../play/pitch'
 import { type Camera, screenUnit, viewBoxOf } from './camera'
 import { Clouds } from './Clouds'
 import { Stands } from './Stands'
@@ -84,6 +84,8 @@ export function Field({ camera, ball = null, swing = null }: Props) {
 
       {/* 홈플레이트와 타자 */}
       <path d="M-0.3 0 L0.3 0" className="zb-plate" />
+      {/* 스트라이크 존 (옆에서 본 높이 범위) */}
+      <path d={`M0 ${-STRIKE_ZONE.bottom} L0 ${-STRIKE_ZONE.top}`} className="zb-zone" />
       <Batter x={BATTER_X} height={PLAYER_HEIGHT} swing={swing} />
 
       {ball && <circle cx={ball.x} cy={-ball.y} r={BALL_RADIUS} className="zb-ball" />}
