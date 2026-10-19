@@ -188,3 +188,86 @@
     display: none;
   }
 }
+
+/* 투수 조작 */
+.zb-pitchpad {
+  display: grid;
+  gap: 8px;
+}
+
+.zb-pitchpad__kinds {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.zb-pitchpad__heights {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.zb-pitchpad__button {
+  min-height: 52px;
+  gap: 8px;
+  padding: 0 10px;
+  font-size: 0.9375rem;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.zb-pitchpad__button[aria-pressed='true'] {
+  color: var(--paper);
+  background: var(--ink);
+}
+
+.zb-pitchpad__button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.zb-key {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.6em;
+  height: 1.6em;
+  font: inherit;
+  font-size: 0.8125rem;
+  border: 1.5px solid currentColor;
+  border-radius: 6px;
+}
+
+/* 5초 타이머 */
+.zb-timer {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.zb-timer__track {
+  flex: 1;
+  height: 8px;
+  border: 1.5px solid var(--line);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.zb-timer__fill {
+  height: 100%;
+  background: var(--ink);
+  transform-origin: left center;
+}
+
+.zb-timer__fill--low {
+  background: var(--accent);
+}
+
+.zb-timer__label {
+  min-width: 7em;
+  font-size: 0.875rem;
+  color: var(--ink-soft);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
