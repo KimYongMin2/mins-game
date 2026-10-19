@@ -22,6 +22,13 @@ describe('createPitch', () => {
     expect(low.arriveAt - high.arriveAt).toBeLessThan(60)
   })
 
+  it('높은 직구 볼은 높은 변화구 볼보다 더 높게, 낮은 변화구 볼은 낮은 직구 볼보다 더 낮게', () => {
+    const h = (type: 'fastball' | 'breaking', height: 'high' | 'low') =>
+      createPitch(call({ type, isBall: true, height }), 0).plateHeight
+    expect(h('fastball', 'high')).toBeGreaterThan(h('breaking', 'high'))
+    expect(h('breaking', 'low')).toBeLessThan(h('fastball', 'low'))
+  })
+
   it('볼은 존 위나 아래로, 스트라이크는 존 안으로', () => {
     expect(createPitch(call({ isBall: true, height: 'high' }), 0).plateHeight).toBeGreaterThan(STRIKE_ZONE.top)
     expect(createPitch(call({ isBall: true, height: 'low' }), 0).plateHeight).toBeLessThan(STRIKE_ZONE.bottom)

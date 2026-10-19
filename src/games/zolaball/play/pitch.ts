@@ -34,10 +34,17 @@ const FLIGHT_MS: Record<PitchType, number> = {
   breaking: 540,
 }
 
-const PLATE_HEIGHT: Record<'strike' | 'ball', Record<PitchHeight, number>> = {
-  // 스트라이크는 존 경계 안쪽, 볼은 공 전체가 경계 바로 바깥에 오게 (화면의 공 반지름 0.15m).
-  strike: { high: 1.75, low: 0.95 },
-  ball: { high: 2.12, low: 0.58 },
+// 스트라이크는 존 경계 안쪽, 볼은 공 전체가 경계 바깥에 오게 (화면의 공 반지름 0.15m).
+// 높은 직구 볼은 떠오르듯 더 높게, 낮은 변화구 볼은 떨어지듯 더 낮게 빠진다.
+const PLATE_HEIGHT: Record<PitchType, Record<'strike' | 'ball', Record<PitchHeight, number>>> = {
+  fastball: {
+    strike: { high: 1.75, low: 0.95 },
+    ball: { high: 2.35, low: 0.58 },
+  },
+  breaking: {
+    strike: { high: 1.75, low: 0.95 },
+    ball: { high: 2.12, low: 0.35 },
+  },
 }
 
 /** 높은 공은 조금 빨리, 낮은 공은 조금 늦게 도착한다. 존 가운데에서 1m 벗어날 때마다 이만큼. */
@@ -53,7 +60,7 @@ const SHAPE: Record<PitchType, { verticalPower: number; arc: number }> = {
 export const PITCH_END_AFTER_ARRIVAL_MS = 300
 
 export function createPitch(call: PitchCall, releaseAt: number): Pitch {
-  const plateHeight = PLATE_HEIGHT[call.isBall ? 'ball' : 'strike'][call.height]
+  const plateHeight = PLATE_HEIGHT[call.type][call.isBall ? 'ball' : 'strike'][call.height]
   const zoneMiddle = (STRIKE_ZONE.top + STRIKE_ZONE.bottom) / 2
   const shift = -(plateHeight - zoneMiddle) * ARRIVAL_SHIFT_MS_PER_M
   return {
