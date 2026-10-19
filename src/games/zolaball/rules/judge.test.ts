@@ -7,16 +7,16 @@ const hard = (diffMs: number) => judgeSwing({ diffMs, difficulty: 'hard', pitchI
 describe('judgeSwing (일반)', () => {
   it.each([
     [0, 'homerun'],
-    [25, 'homerun'],
-    [26, 'double'],
-    [50, 'double'],
-    [51, 'single'],
-    [85, 'single'],
-    [86, 'out'],
-    [120, 'out'],
-    [121, 'foul'],
-    [170, 'foul'],
-    [171, 'miss'],
+    [15, 'homerun'],
+    [16, 'double'],
+    [30, 'double'],
+    [31, 'single'],
+    [55, 'single'],
+    [56, 'out'],
+    [85, 'out'],
+    [86, 'foul'],
+    [130, 'foul'],
+    [131, 'miss'],
     [1000, 'miss'],
   ] as const)('%ims → %s', (diff, expected) => {
     expect(normal(diff)).toBe(expected)
@@ -26,16 +26,16 @@ describe('judgeSwing (일반)', () => {
 
 describe('judgeSwing (어려움: 구간 70%)', () => {
   it.each([
-    [17.5, 'homerun'],
-    [18, 'double'],
-    [35, 'double'],
-    [36, 'single'],
-    [59.5, 'single'],
-    [60, 'out'],
-    [84, 'out'],
-    [85, 'foul'],
-    [119, 'foul'],
-    [120, 'miss'],
+    [10.5, 'homerun'],
+    [11, 'double'],
+    [21, 'double'],
+    [22, 'single'],
+    [38.5, 'single'],
+    [39, 'out'],
+    [59.5, 'out'],
+    [60, 'foul'],
+    [91, 'foul'],
+    [92, 'miss'],
   ] as const)('%ims → %s', (diff, expected) => {
     expect(hard(diff)).toBe(expected)
   })

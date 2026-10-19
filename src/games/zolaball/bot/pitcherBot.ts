@@ -6,15 +6,15 @@ export type Count = { balls: number; strikes: number }
 
 /** 어려움: 볼카운트에 따라 스트라이크를 던질 확률 */
 function hardStrikeChance({ balls, strikes }: Count): number {
-  if (balls === 3) return 0.85 // 볼넷 위기면 승부
-  if (strikes === 2) return 0.4 // 유리하면 볼로 유인
-  if (balls > strikes) return 0.7 // 불리하면 카운트 잡기
-  return 0.6
+  if (balls === 3) return 0.75 // 볼넷 위기면 승부
+  if (strikes === 2) return 0.3 // 유리하면 볼로 유인
+  if (balls > strikes) return 0.6 // 불리하면 카운트 잡기
+  return 0.5
 }
 
 /**
  * 봇 투수의 투구 선택.
- * - 일반: 무작위, 스트라이크 약 60%
+ * - 일반: 무작위, 스트라이크 약 50%
  * - 어려움: 볼카운트를 보고 스트라이크/볼을 정하고, 같은 구종이 반복되지 않게 섞는다
  * recentTypes는 최근 투구 구종(마지막이 가장 최근).
  */
@@ -29,7 +29,7 @@ export function botChoosePitch(
   if (difficulty === 'normal') {
     return {
       type: pickOne(rng, ['fastball', 'breaking'] as const),
-      isBall: !chance(rng, 0.6),
+      isBall: !chance(rng, 0.5),
       height,
     }
   }

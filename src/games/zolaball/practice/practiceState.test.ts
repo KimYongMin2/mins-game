@@ -21,8 +21,8 @@ describe('practiceReducer', () => {
 
   it('늦은 스윙은 diffMs가 양수', () => {
     const s = pitched()
-    const after = practiceReducer(s, { type: 'swing', at: s.pitch!.arriveAt + 60, difficulty: 'normal' })
-    expect(after.outcome).toEqual({ kind: 'swing', result: 'single', diffMs: 60 })
+    const after = practiceReducer(s, { type: 'swing', at: s.pitch!.arriveAt + 40, difficulty: 'normal' })
+    expect(after.outcome).toEqual({ kind: 'swing', result: 'single', diffMs: 40 })
   })
 
   it('투구당 판정은 한 번뿐', () => {

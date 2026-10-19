@@ -8,11 +8,11 @@ export type SwingResult = (typeof SWING_RESULTS)[number]
 
 /** 일반 난이도 기준 판정 구간 (공 도착과 스윙 시점 차이의 절댓값, ms 이하). */
 const WINDOWS: ReadonlyArray<readonly [maxDiffMs: number, result: SwingResult]> = [
-  [25, 'homerun'],
-  [50, 'double'],
-  [85, 'single'],
-  [120, 'out'],
-  [170, 'foul'],
+  [15, 'homerun'],
+  [30, 'double'],
+  [55, 'single'],
+  [85, 'out'],
+  [130, 'foul'],
 ]
 
 /** 난이도별 구간 폭(%). 85 × 0.7 같은 소수 곱의 부동소수점 오차를 피하려고 정수 백분율로 계산한다. */

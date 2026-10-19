@@ -38,13 +38,13 @@ const strike: PitchCall = { type: 'fastball', isBall: false, height: 'high' }
 const ball: PitchCall = { type: 'fastball', isBall: true, height: 'low' }
 
 describe('봇 투수', () => {
-  it('일반: 스트라이크 약 60%', () => {
-    expect(strikeRate('normal')).toBeCloseTo(0.6, 1)
+  it('일반: 스트라이크 약 50%', () => {
+    expect(strikeRate('normal')).toBeCloseTo(0.5, 1)
   })
 
   it('어려움: 3볼이면 스트라이크, 2스트라이크면 유인구가 늘어난다', () => {
-    expect(strikeRate('hard', { balls: 3, strikes: 1 })).toBeGreaterThan(0.8)
-    expect(strikeRate('hard', { balls: 0, strikes: 2 })).toBeLessThan(0.45)
+    expect(strikeRate('hard', { balls: 3, strikes: 1 })).toBeGreaterThan(0.7)
+    expect(strikeRate('hard', { balls: 0, strikes: 2 })).toBeLessThan(0.35)
   })
 
   it('어려움: 같은 구종을 두 번 던졌으면 대체로 바꾼다', () => {

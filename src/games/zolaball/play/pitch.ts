@@ -49,7 +49,7 @@ const SHAPE: Record<PitchType, { verticalPower: number; arc: number }> = {
   breaking: { verticalPower: 3.4, arc: 2.2 },
 }
 
-/** 공이 도착한 뒤 이만큼 지나면 투구가 끝난다. 가장 늦은 판정 구간(170ms)보다 길어야 한다. */
+/** 공이 도착한 뒤 이만큼 지나면 투구가 끝난다. 가장 늦은 판정 구간(파울 130ms)보다 길어야 한다. */
 export const PITCH_END_AFTER_ARRIVAL_MS = 300
 
 export function createPitch(call: PitchCall, releaseAt: number): Pitch {
