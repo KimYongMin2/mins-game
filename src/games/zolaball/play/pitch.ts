@@ -26,8 +26,8 @@ const RELEASE: Point = { x: PITCHER_DISTANCE - 0.4, y: MOUND_HEIGHT + PLAYER_HEI
 const CATCHER_X = -1.6
 const BALL_MIN_Y = 0.2 // 땅에 박히지 않게 (공 반지름)
 
-/** 스트라이크 존(m). 필드에 옅게 그려서 볼/스트라이크를 구분할 수 있게 한다. */
-export const STRIKE_ZONE = { bottom: 0.55, top: 1.55 }
+/** 스트라이크 존(m). 졸라맨(키 3m) 기준 무릎~가슴. 필드에 그려서 볼/스트라이크를 구분할 수 있게 한다. */
+export const STRIKE_ZONE = { bottom: 0.8, top: 1.9 }
 
 const FLIGHT_MS: Record<PitchType, number> = {
   fastball: 550,
@@ -35,17 +35,18 @@ const FLIGHT_MS: Record<PitchType, number> = {
 }
 
 const PLATE_HEIGHT: Record<'strike' | 'ball', Record<PitchHeight, number>> = {
-  strike: { high: 1.35, low: 0.75 },
-  ball: { high: 2.05, low: 0.25 },
+  strike: { high: 1.65, low: 1.05 },
+  // 볼은 한눈에 빠진 게 보이도록 머리 높이 / 발목 높이로
+  ball: { high: 2.75, low: 0.25 },
 }
 
 /** 높은 공은 조금 빨리, 낮은 공은 조금 늦게 도착한다. 존 가운데에서 1m 벗어날 때마다 이만큼. */
-const ARRIVAL_SHIFT_MS_PER_M = 40
+const ARRIVAL_SHIFT_MS_PER_M = 30
 
 /** 궤적 모양. 세로 진행도 = s^verticalPower (클수록 늦게 떨어짐), 위로 볼록한 정도 = arc(m). */
 const SHAPE: Record<PitchType, { verticalPower: number; arc: number }> = {
   fastball: { verticalPower: 1, arc: 0.35 },
-  breaking: { verticalPower: 2.4, arc: 0.9 },
+  breaking: { verticalPower: 3.4, arc: 2.2 },
 }
 
 /** 공이 도착한 뒤 이만큼 지나면 투구가 끝난다. 가장 늦은 판정 구간(170ms)보다 길어야 한다. */

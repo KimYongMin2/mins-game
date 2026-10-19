@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { diffForResult, downgrade, judgeSwing } from './judge'
+import { diffForResult, judgeSwing } from './judge'
 
 const normal = (diffMs: number) => judgeSwing({ diffMs, difficulty: 'normal', pitchIsBall: false })
 const hard = (diffMs: number) => judgeSwing({ diffMs, difficulty: 'hard', pitchIsBall: false })
@@ -41,22 +41,10 @@ describe('judgeSwing (어려움: 구간 70%)', () => {
   })
 })
 
-describe('볼에 스윙하면 한 단계 하향', () => {
-  it.each([
-    [0, 'double'],
-    [40, 'single'],
-    [70, 'out'],
-    [100, 'foul'],
-    [150, 'miss'],
-    [500, 'miss'],
-  ] as const)('%ims → %s', (diff, expected) => {
-    expect(judgeSwing({ diffMs: diff, difficulty: 'normal', pitchIsBall: true })).toBe(expected)
-  })
-})
-
-describe('downgrade', () => {
-  it('헛스윙은 더 내려가지 않는다', () => {
-    expect(downgrade('miss')).toBe('miss')
+describe('볼에 스윙하면 타이밍과 상관없이 헛스윙', () => {
+  it.each([0, 10, 40, 70, 100, 150, 500, -30])('%ims → miss', (diff) => {
+    expect(judgeSwing({ diffMs: diff, difficulty: 'normal', pitchIsBall: true })).toBe('miss')
+    expect(judgeSwing({ diffMs: diff, difficulty: 'hard', pitchIsBall: true })).toBe('miss')
   })
 })
 

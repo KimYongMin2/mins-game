@@ -48,7 +48,7 @@ function swingChance(difficulty: Difficulty, pitch: PitchCall, count: Count): nu
  * 봇 타자의 스윙 결정.
  * - 일반: 스트라이크에 약 50% 정타, 볼에도 자주 스윙
  * - 어려움: 볼을 잘 참고, 같은 구종이 반복되면 더 잘 친다
- * 볼에 스윙한 결과의 한 단계 하향은 판정(judgeSwing)에서 처리된다.
+ * 볼에 스윙하면 판정(judgeSwing)에서 헛스윙이 된다.
  */
 export function botDecideSwing(
   difficulty: Difficulty,

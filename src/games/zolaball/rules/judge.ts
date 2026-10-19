@@ -21,26 +21,20 @@ const WINDOW_PERCENT: Record<Difficulty, number> = {
   hard: 70,
 }
 
-/** 결과를 한 단계 낮춘다. 헛스윙은 더 내려가지 않는다. */
-export function downgrade(result: SwingResult): SwingResult {
-  const i = SWING_RESULTS.indexOf(result)
-  return SWING_RESULTS[Math.min(i + 1, SWING_RESULTS.length - 1)]
-}
-
 type JudgeInput = {
   /** 스윙 시점 − 공 도착 시점 (ms). 음수면 빠름, 양수면 늦음. */
   diffMs: number
   difficulty: Difficulty
-  /** 볼(스트라이크 존 밖)에 스윙했는지 */
+  /** 볼(스트라이크 존 밖)에 스윙했는지. 볼에 스윙하면 타이밍과 상관없이 헛스윙. */
   pitchIsBall: boolean
 }
 
 export function judgeSwing({ diffMs, difficulty, pitchIsBall }: JudgeInput): SwingResult {
+  if (pitchIsBall) return 'miss'
   const percent = WINDOW_PERCENT[difficulty]
   const abs = Math.abs(diffMs)
   const hit = WINDOWS.find(([max]) => abs * 100 <= max * percent)
-  const result = hit ? hit[1] : 'miss'
-  return pitchIsBall ? downgrade(result) : result
+  return hit ? hit[1] : 'miss'
 }
 
 /**

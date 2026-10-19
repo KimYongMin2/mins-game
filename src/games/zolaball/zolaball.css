@@ -175,10 +175,13 @@
   background: var(--ink);
 }
 
-.zb-zone {
+.zb-field .zb-zone {
+  fill: rgba(0, 0, 0, 0.04);
+  stroke: currentColor;
   stroke-width: 1.5px;
-  stroke-dasharray: 4 4;
-  opacity: 0.35;
+  stroke-dasharray: 4 3;
+  vector-effect: non-scaling-stroke;
+  opacity: 0.55;
 }
 
 .zb-field .zb-ball {

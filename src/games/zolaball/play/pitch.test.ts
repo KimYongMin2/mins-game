@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { type PitchCall, ballPosition, createPitch, pitchEndAt } from './pitch'
+import { type PitchCall, STRIKE_ZONE, ballPosition, createPitch, pitchEndAt } from './pitch'
 
 const call = (over: Partial<PitchCall> = {}): PitchCall => ({
   type: 'fastball',
@@ -23,12 +23,12 @@ describe('createPitch', () => {
   })
 
   it('볼은 존 위나 아래로, 스트라이크는 존 안으로', () => {
-    expect(createPitch(call({ isBall: true, height: 'high' }), 0).plateHeight).toBeGreaterThan(1.55)
-    expect(createPitch(call({ isBall: true, height: 'low' }), 0).plateHeight).toBeLessThan(0.55)
+    expect(createPitch(call({ isBall: true, height: 'high' }), 0).plateHeight).toBeGreaterThan(STRIKE_ZONE.top)
+    expect(createPitch(call({ isBall: true, height: 'low' }), 0).plateHeight).toBeLessThan(STRIKE_ZONE.bottom)
     for (const height of ['high', 'low'] as const) {
       const h = createPitch(call({ height }), 0).plateHeight
-      expect(h).toBeGreaterThanOrEqual(0.55)
-      expect(h).toBeLessThanOrEqual(1.55)
+      expect(h).toBeGreaterThanOrEqual(STRIKE_ZONE.bottom)
+      expect(h).toBeLessThanOrEqual(STRIKE_ZONE.top)
     }
   })
 })

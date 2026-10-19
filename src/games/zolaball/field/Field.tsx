@@ -84,8 +84,14 @@ export function Field({ camera, ball = null, swing = null }: Props) {
 
       {/* 홈플레이트와 타자 */}
       <path d="M-0.3 0 L0.3 0" className="zb-plate" />
-      {/* 스트라이크 존 (옆에서 본 높이 범위) */}
-      <path d={`M0 ${-STRIKE_ZONE.bottom} L0 ${-STRIKE_ZONE.top}`} className="zb-zone" />
+      {/* 스트라이크 존: 홈플레이트 위 상자 (옆에서 본 높이 범위) */}
+      <rect
+        x={-0.3}
+        y={-STRIKE_ZONE.top}
+        width={0.6}
+        height={STRIKE_ZONE.top - STRIKE_ZONE.bottom}
+        className="zb-zone"
+      />
       <Batter x={BATTER_X} height={PLAYER_HEIGHT} swing={swing} />
 
       {/* 카메라가 멀어져도 공이 점처럼 사라지지 않게 화면 기준 최소 크기를 둔다 */}

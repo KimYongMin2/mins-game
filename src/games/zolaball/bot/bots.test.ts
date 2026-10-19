@@ -77,9 +77,10 @@ describe('봇 타자', () => {
     expect(repeated.miss).toBeLessThan(first.miss)
   })
 
-  it('볼에 스윙하면 결과가 한 단계 낮아져 안타가 줄어든다', () => {
-    const onStrike = batterResults('normal', strike)
+  it('볼에 스윙하면 모두 헛스윙', () => {
     const onBall = batterResults('normal', ball)
-    expect(onBall.hit / onBall.swing).toBeLessThan(onStrike.hit / onStrike.swing)
+    expect(onBall.swing).toBeGreaterThan(0)
+    expect(onBall.miss).toBeCloseTo(onBall.swing)
+    expect(onBall.solid).toBe(0)
   })
 })
