@@ -87,3 +87,95 @@ $$;
 
 revoke all on function public.zolaball_leaderboard(text) from public;
 grant execute on function public.zolaball_leaderboard(text) to anon, authenticated;
+
+
+-- ───────────────────────────────────────────────────────────────
+-- 졸라 양궁 온라인 랭킹
+-- - archery_games: 경기 한 판(10발)의 결과 한 줄. 본인 기록만 쓰고 읽을 수 있다.
+-- - archery_leaderboard(): 선수별 최고 점수·평균 점수·한 경기 최다 X. 이 합계만 공개한다.
+
+create table if not exists public.archery_games (
+  id uuid primary key default gen_random_uuid(),
+  player_id uuid not null default auth.uid() references auth.users (id) on delete cascade,
+  nickname text not null check (char_length(btrim(nickname)) between 1 and 10),
+  -- 한 발 최대 10.9점 × 10발. 소수점 한 자리
+  points numeric(4, 1) not null check (points between 0 and 109),
+  x_count int not null check (x_count between 0 and 10),
+  ten_count int not null check (ten_count between x_count and 10),
+  created_at timestamptz not null default now(),
+  -- 10점 링(X 포함)이 n개면 최소 10n점 (조작 방지용 최소한의 검사)
+  constraint archery_points_cover_tens check (points >= ten_count * 10)
+);
+
+create index if not exists archery_games_player_idx on public.archery_games (player_id);
+
+alter table public.archery_games enable row level security;
+
+drop policy if exists "본인 기록 추가" on public.archery_games;
+create policy "본인 기록 추가" on public.archery_games
+  for insert to authenticated
+  with check (player_id = (select auth.uid()));
+
+drop policy if exists "본인 기록 보기" on public.archery_games;
+create policy "본인 기록 보기" on public.archery_games
+  for select to authenticated
+  using (player_id = (select auth.uid()));
+
+drop policy if exists "본인 기록 삭제" on public.archery_games;
+create policy "본인 기록 삭제" on public.archery_games
+  for delete to authenticated
+  using (player_id = (select auth.uid()));
+
+revoke all on public.archery_games from anon;
+grant select, insert, delete on public.archery_games to authenticated;
+
+-- 선수별 합계. 닉네임은 가장 최근 경기의 것.
+-- 최고 점수 경기: 점수 → X → 10점 개수가 높고, 같으면 먼저 세운 기록
+-- 최다 X 경기: X → 점수가 높고, 같으면 먼저 세운 기록
+create or replace function public.archery_leaderboard()
+returns table (
+  player_id uuid,
+  nickname text,
+  games int,
+  avg_points numeric,
+  best_points numeric,
+  best_x int,
+  best_ten int,
+  best_at timestamptz,
+  most_x int,
+  most_x_points numeric,
+  most_x_at timestamptz
+)
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  with agg as (
+    select g.player_id,
+           (array_agg(g.nickname order by g.created_at desc))[1] as nickname,
+           count(*)::int as games,
+           round(avg(g.points), 2) as avg_points
+    from public.archery_games g
+    group by g.player_id
+  ),
+  best as (
+    select distinct on (g.player_id) g.player_id, g.points, g.x_count, g.ten_count, g.created_at
+    from public.archery_games g
+    order by g.player_id, g.points desc, g.x_count desc, g.ten_count desc, g.created_at asc
+  ),
+  most_x as (
+    select distinct on (g.player_id) g.player_id, g.x_count, g.points, g.created_at
+    from public.archery_games g
+    order by g.player_id, g.x_count desc, g.points desc, g.created_at asc
+  )
+  select a.player_id, a.nickname, a.games, a.avg_points,
+         b.points, b.x_count, b.ten_count, b.created_at,
+         m.x_count, m.points, m.created_at
+  from agg a
+  join best b on b.player_id = a.player_id
+  join most_x m on m.player_id = a.player_id
+$$;
+
+revoke all on function public.archery_leaderboard() from public;
+grant execute on function public.archery_leaderboard() to anon, authenticated;

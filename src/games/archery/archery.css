@@ -586,6 +586,39 @@
   gap: 10px;
 }
 
+.ar-result__buttons .button--primary {
+  grid-column: 1 / -1;
+}
+
+.ar-result__upload {
+  text-align: center;
+  font-size: 0.8125rem;
+  color: var(--ink-soft);
+}
+
+.ar-result__upload--queued {
+  color: var(--accent);
+}
+
+/* 랭킹 */
+.ar-ranking {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-width: 480px;
+  margin: 0 auto;
+}
+
+.ar-ranking__status {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  text-align: center;
+  font-size: 0.875rem;
+  color: var(--ink-soft);
+}
+
 .ar-visually-hidden {
   position: absolute;
   width: 1px;

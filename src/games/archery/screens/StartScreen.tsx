@@ -5,10 +5,11 @@ import { formatPoints } from '../rules/scoring'
 type Props = {
   record: ArcheryRecord
   onStart: () => void
+  onRanking: () => void
 }
 
 /** 시작 화면: 경기 구성과 내 기록 */
-export function StartScreen({ record, onStart }: Props) {
+export function StartScreen({ record, onStart, onRanking }: Props) {
   const avg = averageOf(record)
   return (
     <section className="ar-start">
@@ -40,6 +41,9 @@ export function StartScreen({ record, onStart }: Props) {
 
       <button type="button" className="button button--primary ar-start__button" onClick={onStart}>
         시작
+      </button>
+      <button type="button" className="button" onClick={onRanking}>
+        랭킹
       </button>
       <p className="ar-start__how">
         누른 채로 드래그해서 조준, 떼면 발사

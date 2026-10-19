@@ -1,3 +1,4 @@
+import type { UploadStatus } from '../../../shared/online/uploadQueue'
 import { ROUNDS } from '../constants'
 import type { RoundSummary } from '../play/roundState'
 import { type ArcheryRecord, averageOf } from '../records'
@@ -7,11 +8,19 @@ type Props = {
   summary: RoundSummary
   record: ArcheryRecord
   newBest: boolean
+  upload: UploadStatus
   onRetry: () => void
+  onRanking: () => void
   onMenu: () => void
 }
 
-export function ResultScreen({ summary, record, newBest, onRetry, onMenu }: Props) {
+const UPLOAD_TEXT: Record<UploadStatus, string> = {
+  saving: '랭킹에 기록을 올리는 중…',
+  saved: '랭킹에 기록을 올렸어요',
+  queued: '지금은 올리지 못했어요. 다음에 접속할 때 다시 올릴게요',
+}
+
+export function ResultScreen({ summary, record, newBest, upload, onRetry, onRanking, onMenu }: Props) {
   const avg = averageOf(record)
   return (
     <section className="ar-result">
@@ -56,9 +65,16 @@ export function ResultScreen({ summary, record, newBest, onRetry, onMenu }: Prop
         {record.games}경기
       </p>
 
+      <p className={`ar-result__upload ar-result__upload--${upload}`} aria-live="polite">
+        {UPLOAD_TEXT[upload]}
+      </p>
+
       <div className="ar-result__buttons">
         <button type="button" className="button button--primary" onClick={onRetry}>
           다시 하기
+        </button>
+        <button type="button" className="button" onClick={onRanking}>
+          랭킹
         </button>
         <button type="button" className="button" onClick={onMenu}>
           처음으로

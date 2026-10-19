@@ -205,3 +205,98 @@ a.game-card:hover {
   border: 1.5px solid currentColor;
   border-radius: 999px;
 }
+
+/* 랭킹 표 (shared/ui/RankingBoard) */
+.rank-board {
+  border: 2px solid var(--line);
+  border-radius: 14px;
+  padding: 12px 14px;
+}
+
+.rank-board__header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+
+.rank-board__title {
+  margin: 0;
+  font-size: 1.125rem;
+  font-weight: 900;
+}
+
+.rank-board__rule {
+  font-size: 0.75rem;
+  color: var(--ink-soft);
+}
+
+.rank-board__empty {
+  font-size: 0.875rem;
+  color: var(--ink-soft);
+}
+
+.rank-board__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.rank-board__row {
+  display: grid;
+  grid-template-columns: 2em 1fr auto;
+  grid-template-areas:
+    'rank name value'
+    'rank detail detail';
+  column-gap: 8px;
+  padding: 6px 0;
+  border-top: 1px solid var(--muted-line);
+  font-variant-numeric: tabular-nums;
+}
+
+.rank-board__row:first-child {
+  border-top: 0;
+}
+
+.rank-board__row--me {
+  background: rgba(229, 72, 77, 0.08);
+  border-radius: 8px;
+}
+
+.rank-board__rank {
+  grid-area: rank;
+  align-self: center;
+  text-align: center;
+  font-weight: 900;
+}
+
+.rank-board__name {
+  grid-area: name;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 700;
+}
+
+.rank-board__me {
+  margin-left: 6px;
+  padding: 0 6px;
+  font-size: 0.6875rem;
+  color: var(--paper);
+  background: var(--accent);
+  border-radius: 999px;
+}
+
+.rank-board__value {
+  grid-area: value;
+  font-weight: 900;
+}
+
+.rank-board__detail {
+  grid-area: detail;
+  font-size: 0.75rem;
+  color: var(--ink-soft);
+}
