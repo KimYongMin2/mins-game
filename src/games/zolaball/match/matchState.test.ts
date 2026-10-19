@@ -67,6 +67,10 @@ describe('경기 진행', () => {
     expect(s.phase.userDiffMs).toBe(0)
     expect(s.sounds.map((x) => x.name)).toEqual(['pitch', 'hit', 'cheer'])
     expect(s.game.linescore.away[0]).toBe(1)
+    // 홈런 타구는 관중석으로 날아가고, 떨어진 뒤에야 다음으로 넘어간다
+    expect(s.phase.batted?.kind).toBe('homerun')
+    expect(s.phase.batted!.end.x).toBeGreaterThan(120)
+    expect(s.phase.until).toBeGreaterThan(s.phase.batted!.startAt + s.phase.batted!.duration)
   })
 
   it('사용자 타자: 스윙하지 않으면 볼/스트라이크, 미트 소리', () => {
@@ -77,6 +81,7 @@ describe('경기 진행', () => {
     if (s.phase.kind !== 'result') return
     expect(s.phase.event.outcome).toBe(expected)
     expect(s.sounds.map((x) => x.name)).toEqual(['pitch', 'mitt'])
+    expect(s.phase.batted).toBeNull()
   })
 
   it('사용자가 타자가 아닐 때 스윙은 무시된다', () => {

@@ -1,5 +1,7 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router'
+import { installAudioUnlock } from '../../shared/audio/synth'
+import { SoundToggle } from '../../shared/ui/SoundToggle'
 import { MatchScreen } from './match/MatchScreen'
 import type { MatchConfig, MatchSummary } from './match/matchState'
 import { BattingPractice } from './practice/BattingPractice'
@@ -19,6 +21,7 @@ type Screen =
 export function ZolaballPage() {
   const [screen, setScreen] = useState<Screen>({ kind: 'menu' })
   const [record, setRecord] = useState<ZolaballRecord>(() => loadRecord())
+  useEffect(installAudioUnlock, [])
 
   function startMatch(difficulty: Difficulty) {
     // 선공·후공은 매 경기 무작위
@@ -39,6 +42,7 @@ export function ZolaballPage() {
     <main className="page zb-page">
       <header className="zb-header">
         <h1 className="title">졸라볼{screen.kind === 'practice' && ' · 타격 연습'}</h1>
+        <SoundToggle />
         {screen.kind === 'match' || screen.kind === 'practice' ? (
           <button type="button" className="button button--small" onClick={toMenu}>
             그만하기

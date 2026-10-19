@@ -88,7 +88,8 @@ export function Field({ camera, ball = null, swing = null }: Props) {
       <path d={`M0 ${-STRIKE_ZONE.bottom} L0 ${-STRIKE_ZONE.top}`} className="zb-zone" />
       <Batter x={BATTER_X} height={PLAYER_HEIGHT} swing={swing} />
 
-      {ball && <circle cx={ball.x} cy={-ball.y} r={BALL_RADIUS} className="zb-ball" />}
+      {/* 카메라가 멀어져도 공이 점처럼 사라지지 않게 화면 기준 최소 크기를 둔다 */}
+      {ball && <circle cx={ball.x} cy={-ball.y} r={Math.max(BALL_RADIUS, u * 0.5)} className="zb-ball" />}
     </svg>
   )
 }

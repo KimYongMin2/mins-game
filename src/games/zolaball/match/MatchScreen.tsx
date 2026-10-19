@@ -1,13 +1,16 @@
 import { useEffect, useReducer, useRef } from 'react'
 import { SWING_DURATION_MS } from '../constants'
 import { Field } from '../field/Field'
-import { CAMERA_PITCH } from '../field/camera'
+import { CAMERA_PITCH, type Camera } from '../field/camera'
+import { followCamera } from '../field/followCamera'
 import { usePitchKeys } from '../input/pitchKeys'
 import { eventTime, useSpaceSwing } from '../input/swingInput'
-import { ballPosition } from '../play/pitch'
+import { battedBallPosition } from '../play/battedBall'
+import { type Point, ballPosition } from '../play/pitch'
 import { PITCH_CHOICE_MS } from '../play/pitchSelection'
 import { randomSeed } from '../play/random'
 import { INNINGS } from '../rules/game'
+import { playSound } from '../sounds'
 import { outcomeText, pitchText, timingText } from './describe'
 import {
   type MatchConfig,
@@ -50,7 +53,9 @@ function Banner({ state }: { state: MatchState }) {
   }
 
   if (phase.kind === 'result') {
-    const { event, pitch, userDiffMs } = phase
+    const { event, pitch, userDiffMs, batted } = phase
+    // 멀리 날아가는 타구는 떨어질 즈음 결과를 보여준다.
+    if (batted && batted.kind !== 'foul' && state.now < batted.startAt + batted.duration * 0.75) return null
     const details = [pitchText(pitch)]
     if (userDiffMs !== null) details.unshift(timingText(userDiffMs))
     return (
@@ -112,6 +117,16 @@ export function MatchScreen({ config, onFinish }: Props) {
     finishRef.current(summarize(state))
   }, [finished, state])
 
+  // 효과음: 리듀서가 쌓은 것 중 아직 재생하지 않은 것만
+  const playedRef = useRef(0)
+  useEffect(() => {
+    for (const s of state.sounds) {
+      if (s.id <= playedRef.current) continue
+      playedRef.current = s.id
+      playSound(s.name)
+    }
+  }, [state.sounds])
+
   useSpaceSwing((at) => dispatch({ type: 'swing', at }))
   const choosing = phase.kind === 'choosing' && userPitching
   usePitchKeys(choosing, {
@@ -119,11 +134,15 @@ export function MatchScreen({ config, onFinish }: Props) {
     onHeight: (height) => dispatch({ type: 'selectHeight', height }),
   })
 
-  // 필드에 그릴 것
-  let ball = null
+  // 필드에 그릴 것: 투구 중에는 날아오는 공, 결과 중에는 타구와 그 공을 따라가는 카메라
+  let ball: Point | null = null
+  let camera: Camera = CAMERA_PITCH
   if (phase.kind === 'pitching') {
     const contact = phase.swing && phase.swing.result !== 'miss'
     ball = contact && now >= phase.pitch.arriveAt ? null : ballPosition(phase.pitch, now)
+  } else if (phase.kind === 'result' && phase.batted) {
+    ball = battedBallPosition(phase.batted, now)
+    camera = followCamera(ball)
   }
   const swingProgress =
     state.swingAt !== null && now < state.swingAt + SWING_DURATION_MS
@@ -148,7 +167,7 @@ export function MatchScreen({ config, onFinish }: Props) {
       <Scoreboard game={state.game} userSide={config.userSide} />
 
       <div className="zb-field-wrap zb-field-wrap--match">
-        <Field camera={CAMERA_PITCH} ball={ball} swing={swingProgress} />
+        <Field camera={camera} ball={ball} swing={swingProgress} />
         <Banner state={state} />
       </div>
 

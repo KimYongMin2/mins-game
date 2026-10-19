@@ -171,3 +171,20 @@ src/
 - **지금**: 닉네임과 전적(승/패/무 등)은 localStorage에 저장 (`src/shared/storage`)
 - **나중에**: 랭킹은 PvP와 함께 Supabase로 이전
   - 저장 로직을 인터페이스로 감싸서 localStorage ↔ Supabase 교체가 쉽도록 한다
+
+## 구현하면서 정한 것 (졸라볼)
+
+기획에 없거나 해석이 필요했던 부분. 바꾸려면 아래 위치를 수정한다.
+
+- **경기 종료**: 마지막 이닝 초가 끝났을 때 후공이 앞서면 말 공격 생략, 마지막 이닝 말에 앞서는 순간 끝내기 (`rules/game.ts`)
+- **판정 기준 시각**: 공이 홈플레이트(x=0)를 지나는 시점. 입력 시각은 `event.timeStamp` 사용 (`input/swingInput.ts`)
+- **구종 속도**: 직구 약 550ms, 변화구 약 720ms. 높은 공은 조금 빨리, 낮은 공은 조금 늦게 도착 (`play/pitch.ts`)
+- **봇 '정타'**: 페어 타구(범타 이상)로 해석. 일반은 스트라이크의 약 50% (`bot/batterBot.ts`)
+- **봇 타격 판정**: 확률로 결과 등급을 고른 뒤 그 구간의 스윙 시각으로 변환해 일반 구간으로 판정. 어려움 70% 구간은 사람 타자에게만 적용
+- **어려움 봇 투수**: 3볼이면 스트라이크 85%, 2스트라이크면 40%, 같은 구종 두 번 뒤엔 대체로 바꿈 (`bot/pitcherBot.ts`)
+- **투수 조작**: 구종(1~4)과 높이(↑↓)를 둘 다 고르면 즉시 투구, 5초 초과 시 고르지 않은 항목만 무작위
+- **경기 진행**: `match/matchState.ts` 순수 리듀서. 시간(now)과 시드 난수(seed)를 상태에 담아 테스트로 경기 전체를 시뮬레이션할 수 있다
+- **PvP 대비**: 조작 주체는 `Controller`('user' | 'bot'). PvP는 'remote'를 추가하고 입력을 원격에서 받는다
+- **기록**: `shared/storage/records.ts`의 `RecordStore` 인터페이스. 지금은 localStorage 구현
+- **효과음**: 음원 없이 Web Audio로 합성 (`shared/audio/synth.ts`, 레시피는 `games/zolaball/sounds.ts`)
+- **테스트**: `npm test` (vitest). 규칙·판정·봇 확률·경기 시뮬레이션은 단위 테스트로 확인

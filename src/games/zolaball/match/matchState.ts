@@ -1,6 +1,7 @@
 // 한 경기의 진행 상태. 시간(now)과 시드 난수를 상태에 담아 순수 리듀서로 유지한다.
 import { type BotSwing, botDecideSwing } from '../bot/batterBot'
 import { botChoosePitch } from '../bot/pitcherBot'
+import { type BattedBall, battedBallEndAt, createBattedBall } from '../play/battedBall'
 import { type Pitch, type PitchCall, type PitchHeight, type PitchType, createPitch, pitchEndAt } from '../play/pitch'
 import {
   EMPTY_SELECTION,
@@ -58,8 +59,8 @@ export type Phase =
       pitch: Pitch
       /** 사용자가 타자로 스윙했을 때의 시각 차이(ms) */
       userDiffMs: number | null
-      /** 배트에 맞은 시각 (타구 연출용) */
-      contactAt: number | null
+      /** 배트에 맞아 날아가는 공. 헛스윙·스윙 안 함이면 null */
+      batted: BattedBall | null
     }
   | { kind: 'final' }
 
@@ -90,6 +91,8 @@ const BOT_WINDUP_MS = [300, 800] as const
 const USER_WINDUP_MS = 250
 const MITT_DELAY_MS = 40
 const RESULT_MS = 1100
+/** 타구가 떨어진 뒤 결과를 더 보여주는 시간 */
+const AFTER_LANDING_MS = 700
 const PLATE_RESULT_MS = 1600
 const HOMERUN_MS = 2400
 const FINAL_MS = 2200
@@ -172,8 +175,19 @@ function resultDuration(event: PlayEvent): number {
 function resolvePitch(state: MatchState, contactAt: number | null): MatchState {
   if (state.phase.kind !== 'pitching') return state
   const { pitch, swing } = state.phase
-  const { game, event } = applyPitch(state.game, outcomeOf(pitch, swing))
+  const outcome = outcomeOf(pitch, swing)
+  const { game, event } = applyPitch(state.game, outcome)
   const userDiffMs = swing && isUserBatting(state) ? swing.at - pitch.arriveAt : null
+
+  const rng = createRng(state.seed)
+  const batted =
+    contactAt !== null && (outcome === 'foul' || outcome === 'out' || outcome === 'single' || outcome === 'double' || outcome === 'homerun')
+      ? createBattedBall(outcome, { x: 0, y: pitch.plateHeight }, contactAt, rng)
+      : null
+  const until = Math.max(
+    state.now + resultDuration(event),
+    batted ? battedBallEndAt(batted) + AFTER_LANDING_MS : 0,
+  )
 
   const sounds: SoundName[] = []
   if (contactAt !== null) sounds.push('hit')
@@ -186,14 +200,8 @@ function resolvePitch(state: MatchState, contactAt: number | null): MatchState {
     {
       ...state,
       game,
-      phase: {
-        kind: 'result',
-        until: state.now + resultDuration(event),
-        event,
-        pitch,
-        userDiffMs,
-        contactAt,
-      },
+      seed: rng.seed(),
+      phase: { kind: 'result', until, event, pitch, userDiffMs, batted },
     },
     ...sounds,
   )

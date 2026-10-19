@@ -6,9 +6,13 @@
 .zb-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
+  gap: 8px;
   margin-bottom: 16px;
+}
+
+.zb-header .title {
+  flex: 1;
+  min-width: 0;
 }
 
 .zb-field-wrap {
