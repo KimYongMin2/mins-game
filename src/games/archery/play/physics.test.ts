@@ -31,16 +31,21 @@ describe('바람', () => {
     expect(tiers.size).toBe(3)
   })
 
-  it('강한 바람에 밀리는 양: 30m 2~3링 · 50m 5~7링 · 70m 7~8링 · 100m 과녁 밖', () => {
+  it('강한 바람에 밀리는 양: 30m 2~3링 · 50m 3.5~4.5링 · 70m 5~6링 · 100m 7.5~8.5링 (과녁 안)', () => {
     const drift = (d: 30 | 50 | 70 | 100) => rings(Math.abs(windDrift(strong(2), d).x))
     expect(drift(30)).toBeGreaterThanOrEqual(2)
     expect(drift(30)).toBeLessThanOrEqual(3)
-    expect(drift(50)).toBeGreaterThanOrEqual(5)
-    expect(drift(50)).toBeLessThanOrEqual(7)
-    expect(drift(70)).toBeGreaterThanOrEqual(7)
-    expect(drift(70)).toBeLessThanOrEqual(8)
+    expect(drift(50)).toBeGreaterThanOrEqual(3.5)
+    expect(drift(50)).toBeLessThanOrEqual(4.5)
+    expect(drift(70)).toBeGreaterThanOrEqual(5)
+    expect(drift(70)).toBeLessThanOrEqual(6)
+    expect(drift(100)).toBeGreaterThanOrEqual(7.5)
+    expect(drift(100)).toBeLessThanOrEqual(8.5)
+    // 거리가 멀수록 더 밀린다
+    expect(drift(50)).toBeGreaterThan(drift(30))
     expect(drift(70)).toBeGreaterThan(drift(50))
-    expect(Math.abs(windDrift(strong(2), 100).x)).toBeGreaterThan(TARGET_RADIUS)
+    expect(drift(100)).toBeGreaterThan(drift(70))
+    expect(Math.abs(windDrift(strong(2), 100).x)).toBeLessThan(TARGET_RADIUS)
   })
 
   it('바람 방향대로 밀린다 (← 바람이면 왼쪽, ↓ 바람이면 아래)', () => {
