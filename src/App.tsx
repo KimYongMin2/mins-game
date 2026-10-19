@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router'
+import { ZolaballPage } from './games/zolaball/ZolaballPage'
 import { MainPage } from './pages/MainPage'
 import { NicknamePage } from './pages/NicknamePage'
 import { loadNickname } from './shared/storage/nickname'
@@ -17,6 +18,10 @@ function App() {
           }
         />
         <Route path="/nickname" element={<NicknamePage onSaved={setNickname} />} />
+        <Route
+          path="/games/zolaball"
+          element={nickname ? <ZolaballPage /> : <Navigate to="/nickname" replace />}
+        />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>

@@ -13,6 +13,6 @@ export const GAMES: GameEntry[] = [
     title: '졸라볼',
     description: '졸라맨 야구. 타이밍 맞춰 스윙하고 봇을 이겨라!',
     path: '/games/zolaball',
-    ready: false,
+    ready: true,
   },
 ]
