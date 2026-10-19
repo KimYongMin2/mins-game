@@ -430,6 +430,11 @@
   font-variant-numeric: tabular-nums;
 }
 
+.zb-stats__sub {
+  font-size: 0.75rem;
+  color: var(--ink-soft);
+}
+
 .zb-result__career {
   text-align: center;
   font-size: 0.875rem;

@@ -85,6 +85,34 @@ describe('주자 진루', () => {
   })
 })
 
+describe('타점과 투수 기록', () => {
+  it('안타·홈런·밀어내기 볼넷으로 들어온 점수는 타자의 타점', () => {
+    let r = applyPitch(withBases([true, true, true]), 'homerun')
+    expect(r.game.stats.away.rbi).toBe(4)
+    r = applyPitch({ ...withBases([true, true, true]), balls: 3 }, 'ball')
+    expect(r.game.stats.away.rbi).toBe(1)
+    r = applyPitch(withBases([false, true, true]), 'single')
+    expect(r.game.stats.away.rbi).toBe(1)
+  })
+
+  it('수비 쪽에 잡은 아웃과 실점이 쌓인다', () => {
+    let g = play(createGame(), 'homerun', 'out', ...strikeout) // 1회 초: 1실점, 2아웃
+    expect(g.pitching.home).toEqual({ outs: 2, runsAllowed: 1 })
+    g = play(g, 'out') // 3아웃 → 공수 교대
+    expect(g.pitching.home).toEqual({ outs: 3, runsAllowed: 1 })
+    g = play(g, 'single', 'out')
+    expect(g.pitching.away).toEqual({ outs: 1, runsAllowed: 0 })
+    expect(g.pitching.home).toEqual({ outs: 3, runsAllowed: 1 })
+  })
+
+  it('3이닝을 다 던지면 9아웃', () => {
+    let g = createGame()
+    for (let i = 0; i < 6; i++) g = play(g, ...threeOuts)
+    expect(g.pitching.home.outs).toBe(9)
+    expect(g.pitching.away.outs).toBe(9)
+  })
+})
+
 describe('이닝과 경기 종료', () => {
   it('3아웃이면 공수 교대, 주자와 카운트 초기화', () => {
     const g = play({ ...withBases([true, true, false]), balls: 2 }, ...threeOuts)

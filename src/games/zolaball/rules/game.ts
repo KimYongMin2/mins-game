@@ -28,6 +28,15 @@ export type BattingStats = {
   homeruns: number
   strikeouts: number
   walks: number
+  /** 타점: 이 타자의 타석 결과로 들어온 점수 (홈런은 본인 득점 포함) */
+  rbi: number
+}
+
+/** 수비(투수) 기록 */
+export type PitchingStats = {
+  /** 잡은 아웃 수. 3개 = 1이닝 */
+  outs: number
+  runsAllowed: number
 }
 
 export type GameState = {
@@ -41,6 +50,7 @@ export type GameState = {
   /** 이닝별 득점. 시작한 이닝까지만 들어 있다. */
   linescore: Record<Side, number[]>
   stats: Record<Side, BattingStats>
+  pitching: Record<Side, PitchingStats>
   final: boolean
 }
 
@@ -57,7 +67,11 @@ export type PlayEvent = {
 const EMPTY_BASES: Bases = [false, false, false]
 
 function emptyStats(): BattingStats {
-  return { atBats: 0, hits: 0, homeruns: 0, strikeouts: 0, walks: 0 }
+  return { atBats: 0, hits: 0, homeruns: 0, strikeouts: 0, walks: 0, rbi: 0 }
+}
+
+function emptyPitching(): PitchingStats {
+  return { outs: 0, runsAllowed: 0 }
 }
 
 export function createGame(): GameState {
@@ -70,6 +84,7 @@ export function createGame(): GameState {
     bases: EMPTY_BASES,
     linescore: { away: [0], home: [] },
     stats: { away: emptyStats(), home: emptyStats() },
+    pitching: { away: emptyPitching(), home: emptyPitching() },
     final: false,
   }
 }
@@ -167,6 +182,14 @@ export function applyPitch(game: GameState, outcome: PitchOutcome): { game: Game
   if (plateResult === 'single' || plateResult === 'double' || plateResult === 'homerun') stats.hits++
   if (plateResult === 'homerun') stats.homeruns++
   if (plateResult === 'strikeout') stats.strikeouts++
+  // 점수는 볼넷·안타·홈런 타석에서만 나므로 모두 그 타자의 타점
+  stats.rbi += runs
+
+  const defense = fieldingSide(game.half)
+  const pitching = {
+    outs: game.pitching[defense].outs + (outs - game.outs),
+    runsAllowed: game.pitching[defense].runsAllowed + runs,
+  }
 
   const sideLine = [...game.linescore[side]]
   sideLine[game.inning - 1] += runs
@@ -179,6 +202,7 @@ export function applyPitch(game: GameState, outcome: PitchOutcome): { game: Game
     bases,
     linescore: { ...game.linescore, [side]: sideLine },
     stats: { ...game.stats, [side]: stats },
+    pitching: { ...game.pitching, [defense]: pitching },
   }
 
   const lastInning = game.inning >= INNINGS

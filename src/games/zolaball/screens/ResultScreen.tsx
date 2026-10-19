@@ -1,5 +1,5 @@
 import type { MatchSummary } from '../match/matchState'
-import { type ZolaballRecord, formatAverage } from '../records'
+import { type ZolaballRecord, formatAverage, formatEra, formatInnings } from '../records'
 import { INNINGS, type Side } from '../rules/game'
 
 type Props = {
@@ -14,7 +14,7 @@ const DIFFICULTY_TEXT = { normal: '일반', hard: '어려움' } as const
 
 export function ResultScreen({ summary, record, onRematch, onMenu }: Props) {
   const { userSide, difficulty } = summary.config
-  const { linescore, userStats } = summary
+  const { linescore, userStats, userPitching } = summary
   // 선공이 위 줄
   const rows: { side: Side; name: string; runs: number }[] = (['away', 'home'] as const).map((side) => ({
     side,
@@ -61,24 +61,28 @@ export function ResultScreen({ summary, record, onRematch, onMenu }: Props) {
 
       <dl className="zb-stats">
         <div>
-          <dt>홈런</dt>
-          <dd>{userStats.homeruns}</dd>
-        </div>
-        <div>
           <dt>타율</dt>
           <dd>{formatAverage(userStats.hits, userStats.atBats)}</dd>
+          <span className="zb-stats__sub">
+            {userStats.atBats}타수 {userStats.hits}안타
+          </span>
         </div>
         <div>
-          <dt>안타 / 타수</dt>
-          <dd>
-            {userStats.hits} / {userStats.atBats}
-          </dd>
+          <dt>타점</dt>
+          <dd>{userStats.rbi}</dd>
+          <span className="zb-stats__sub">홈런 {userStats.homeruns}</span>
         </div>
         <div>
-          <dt>삼진 · 볼넷</dt>
-          <dd>
-            {userStats.strikeouts} · {userStats.walks}
-          </dd>
+          <dt>투구</dt>
+          <dd>{formatInnings(userPitching.outs)}이닝</dd>
+          <span className="zb-stats__sub">{userPitching.runsAllowed}실점</span>
+        </div>
+        <div>
+          <dt>평균자책점</dt>
+          <dd>{formatEra(userPitching.runsAllowed, userPitching.outs)}</dd>
+          <span className="zb-stats__sub">
+            삼진 {userStats.strikeouts} · 볼넷 {userStats.walks} (타격)
+          </span>
         </div>
       </dl>
 

@@ -315,6 +315,7 @@ export type MatchSummary = {
   botRuns: number
   linescore: GameState['linescore']
   userStats: GameState['stats'][Side]
+  userPitching: GameState['pitching'][Side]
 }
 
 export function summarize(state: MatchState): MatchSummary {
@@ -329,5 +330,6 @@ export function summarize(state: MatchState): MatchSummary {
     botRuns,
     linescore: state.game.linescore,
     userStats: state.game.stats[userSide],
+    userPitching: state.game.pitching[userSide],
   }
 }

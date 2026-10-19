@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { RecordStore } from '../../shared/storage/records'
 import type { MatchSummary } from './match/matchState'
-import { EMPTY_RECORD, addMatch, formatAverage, loadRecord, saveRecord } from './records'
+import { EMPTY_RECORD, addMatch, formatAverage, formatEra, formatInnings, loadRecord, saveRecord } from './records'
 
 function summary(over: Partial<MatchSummary>): MatchSummary {
   return {
@@ -10,7 +10,8 @@ function summary(over: Partial<MatchSummary>): MatchSummary {
     userRuns: 3,
     botRuns: 1,
     linescore: { away: [1, 2, 0], home: [0, 1, 0] },
-    userStats: { atBats: 9, hits: 4, homeruns: 1, strikeouts: 2, walks: 1 },
+    userStats: { atBats: 9, hits: 4, homeruns: 1, strikeouts: 2, walks: 1, rbi: 3 },
+    userPitching: { outs: 9, runsAllowed: 2 },
     ...over,
   }
 }
@@ -23,6 +24,7 @@ describe('addMatch', () => {
     expect(r.normal).toEqual({ wins: 1, losses: 0, draws: 1 })
     expect(r.hard).toEqual({ wins: 0, losses: 1, draws: 0 })
     expect([r.atBats, r.hits, r.homeruns]).toEqual([27, 12, 3])
+    expect([r.rbi, r.outsPitched, r.runsAllowed]).toEqual([9, 27, 6])
   })
 
   it('원래 기록은 바꾸지 않는다', () => {
@@ -39,6 +41,27 @@ describe('formatAverage', () => {
     [4, 4, '1.000'],
   ])('%i안타 / %i타수 → %s', (h, ab, text) => {
     expect(formatAverage(h, ab)).toBe(text)
+  })
+})
+
+describe('평균자책점·이닝 표기', () => {
+  it.each([
+    [2, 9, '2.00'],
+    [1, 18, '0.50'],
+    [5, 7, '6.43'],
+    [3, 0, '-'],
+  ])('%i실점 / %i아웃 → %s', (runs, outs, text) => {
+    expect(formatEra(runs, outs)).toBe(text)
+  })
+
+  it.each([
+    [0, '0'],
+    [1, '⅓'],
+    [2, '⅔'],
+    [7, '2⅓'],
+    [9, '3'],
+  ])('%i아웃 → %s이닝', (outs, text) => {
+    expect(formatInnings(outs)).toBe(text)
   })
 })
 
