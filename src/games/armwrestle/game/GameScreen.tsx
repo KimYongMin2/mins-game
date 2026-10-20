@@ -5,9 +5,9 @@ import { randomSeed } from '../../../shared/random'
 import { loadNickname } from '../../../shared/storage/nickname'
 import { DONE_MS, type Difficulty, type Event, ROUND_MS, WINS_NEEDED } from '../constants'
 import { ArmView } from '../field/ArmView'
-import { type MatchState, type MatchSummary, createMatch, matchReducer, phaseLeft, summarizeMatch } from '../play/matchState'
+import { type MatchState, type MatchSummary, createMatch, matchReducer, phaseLeft, summarizeMatch, zoneOf } from '../play/matchState'
 import { type ArmMsg, guestActionOf, guestPressOut, hostActionOf, hostSync, phaseChanged } from '../play/pvp'
-import { GRADES, GRADE_LABEL, markerAt, zoneCenter } from '../rules/timing'
+import { GRADES, GRADE_LABEL, markerAt } from '../rules/timing'
 import { playSound } from '../sounds'
 
 type Props = {
@@ -68,9 +68,9 @@ function Lead({ pos, pulling }: { pos: number; pulling: boolean }) {
 /** 타이밍전 게이지: 가운데로 갈수록 좋은 판정, 막대가 왔다 갔다 */
 function Gauge({ state }: { state: MatchState }) {
   const { phase } = state
-  const { pass, x } = phase.kind === 'pull' ? markerAt(state.now - phase.start) : { pass: 0, x: 0 }
-  // 과녁은 이번 지나감의 자리에 (지나갈 때마다 바뀜)
-  const center = phase.kind === 'pull' ? zoneCenter(state.zoneSeed, pass) : 0
+  const x = phase.kind === 'pull' ? markerAt(state.now - phase.start).x : 0
+  // 과녁은 누를 때마다 옮겨 간다
+  const center = phase.kind === 'pull' ? zoneOf(state) : 0
   const mine = state.lastGrade[0]
   const showGrade = mine && state.now - mine.at < GRADE_SHOW_MS ? mine.grade : null
   return (
@@ -227,16 +227,16 @@ export function GameScreen({ event, difficulty, pvp, onFinish, onQuit }: Props) 
       </div>
 
       <Lead pos={shownPos} pulling={pulling} />
-      {/* 위치 막대: 손이 오른쪽(상대 쪽) 끝까지 가면 내가 이김. 손 그림과 같은 방향 */}
+      {/* 위치 막대: 손이 왼쪽(내 쪽) 끝까지 오면 내가 이김. 손 그림과 같은 방향 */}
       <div className="aw-bar" role="meter" aria-valuemin={-1} aria-valuemax={1} aria-valuenow={shownPos} aria-label="손 위치">
-        <span className="aw-bar__end aw-bar__end--lose">◀ 짐</span>
-        <span className="aw-bar__end aw-bar__end--win">이김 ▶</span>
+        <span className="aw-bar__end aw-bar__end--win">◀ 이김</span>
+        <span className="aw-bar__end aw-bar__end--lose">짐 ▶</span>
         <span
           className={`aw-bar__fill aw-bar__fill--${shownPos >= 0 ? 'me' : 'foe'}`}
-          style={{ left: `${50 - Math.max(0, -shownPos) * 50}%`, width: `${Math.abs(shownPos) * 50}%` }}
+          style={{ left: `${50 - Math.max(0, shownPos) * 50}%`, width: `${Math.abs(shownPos) * 50}%` }}
         />
         <span className="aw-bar__mid" />
-        <span className="aw-bar__knob" style={{ left: `${50 + shownPos * 50}%` }} />
+        <span className="aw-bar__knob" style={{ left: `${50 - shownPos * 50}%` }} />
       </div>
       <div className="aw-timer" aria-hidden>
         <div className="aw-timer__fill" style={{ transform: `scaleX(${pulling ? phaseLeft(state) / ROUND_MS : 0})` }} />
@@ -259,7 +259,7 @@ export function GameScreen({ event, difficulty, pvp, onFinish, onQuit }: Props) 
       <p className="aw-hint">
         {event === 'mash'
           ? '빠르게 많이 누를수록 내 쪽으로 넘어가요 · PC는 스페이스바'
-          : '노란 곳은 지나갈 때마다 바뀌어요 · 한 번에 한 번만 · PC는 스페이스바'}
+          : '누르면 노란 곳이 옮겨 가요 · 지나갈 때 한 번만 · PC 스페이스바'}
       </p>
 
       {peerGone && !done && (

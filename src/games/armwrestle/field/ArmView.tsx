@@ -1,4 +1,5 @@
 // 옆에서 본 팔씨름. 왼쪽이 나, 오른쪽이 상대. 탁자 가운데에서 맞잡은 손이 위치만큼 기운다.
+// 이기는 쪽이 손을 자기 쪽으로 끌어당긴다 (처음엔 상대 쪽으로 넘기는 그림이었는데 거꾸로 보여서 바꿈).
 
 export const VIEW_W = 360
 export const VIEW_H = 210
@@ -52,21 +53,21 @@ function Wrestler({ side, hand, lean, shake, name, lost }: { side: 0 | 1; hand: 
 
 export function ArmView({ pos, straining, now, names, winner }: Props) {
   const tilt = pos * MAX_TILT
-  const hand: Point = [PIVOT_X + Math.sin(tilt) * FOREARM, TABLE_Y - 4 - Math.cos(tilt) * FOREARM]
+  const hand: Point = [PIVOT_X - Math.sin(tilt) * FOREARM, TABLE_Y - 4 - Math.cos(tilt) * FOREARM]
   const shake = (side: 0 | 1) => (straining ? Math.sin(now / 35 + side * 2) * 1.2 : 0)
   return (
     <svg className="aw-view" viewBox={`0 0 ${VIEW_W} ${VIEW_H}`} role="img" aria-label="팔씨름하는 두 졸라맨">
       <path className="aw-floor" d={`M10 196H${VIEW_W - 10}`} />
       {/* 탁자 */}
       <path className="aw-table" d={`M${PIVOT_X - 62} ${TABLE_Y}H${PIVOT_X + 62}M${PIVOT_X - 50} ${TABLE_Y}V196M${PIVOT_X + 50} ${TABLE_Y}V196`} />
-      {/* 이기는 쪽은 앞으로 기울고, 지는 쪽은 뒤로 젖혀진다 */}
-      <Wrestler side={0} hand={hand} lean={pos * 8} shake={shake(0)} name={names[0]} lost={winner === 1} />
-      <Wrestler side={1} hand={hand} lean={-pos * 8} shake={shake(1)} name={names[1]} lost={winner === 0} />
+      {/* 이기는 쪽은 뒤로 젖히며 당기고, 지는 쪽은 앞으로 끌려온다 */}
+      <Wrestler side={0} hand={hand} lean={-pos * 10} shake={shake(0)} name={names[0]} lost={winner === 1} />
+      <Wrestler side={1} hand={hand} lean={pos * 10} shake={shake(1)} name={names[1]} lost={winner === 0} />
       {/* 맞잡은 손 */}
       <circle className="aw-grip" cx={hand[0]} cy={hand[1]} r={7} />
-      {/* 손이 닿으면 지는 자리: 왼쪽(내 쪽)은 빨강, 오른쪽(상대 쪽)은 파랑 */}
-      <path className="aw-pad aw-pad--lose" d={`M${PIVOT_X - FOREARM - 8} ${TABLE_Y - 1}h16`} />
-      <path className="aw-pad aw-pad--win" d={`M${PIVOT_X + FOREARM - 8} ${TABLE_Y - 1}h16`} />
+      {/* 손이 닿으면 끝나는 자리: 왼쪽(내 쪽으로 당김)은 파랑 = 이김, 오른쪽은 빨강 = 짐 */}
+      <path className="aw-pad aw-pad--win" d={`M${PIVOT_X - FOREARM - 8} ${TABLE_Y - 1}h16`} />
+      <path className="aw-pad aw-pad--lose" d={`M${PIVOT_X + FOREARM - 8} ${TABLE_Y - 1}h16`} />
     </svg>
   )
 }

@@ -16,7 +16,7 @@ import {
   TAP_PUSH,
   WINS_NEEDED,
 } from '../constants'
-import { type Grade, gradeAt, pushOf } from '../rules/timing'
+import { type Grade, gradeAt, pushOf, zoneCenter } from '../rules/timing'
 
 /** 당기는 주체. remote = 방에 들어온 친구 */
 export type Controller = 'user' | 'bot' | 'remote'
@@ -63,6 +63,8 @@ export type MatchState = {
   taps: Pair<number>
   /** 타이밍전: 이번 판 과녁 위치를 정하는 시드 (방장·친구가 각자 정함) */
   zoneSeed: number
+  /** 타이밍전: 이번 판에서 내가 누른 횟수 (누를 때마다 과녁이 옮겨 감) */
+  shots: number
   /** 타이밍전: 이번 판에서 마지막으로 누른 지나감 번호 (−1 = 아직) */
   pressed: Pair<number>
   /** 타이밍전: 마지막 판정 (화면에 잠깐 띄움) */
@@ -135,6 +137,7 @@ export function createMatch(opts: {
     phase: { kind: 'countdown', until: 0, shown: 3 },
     taps: [0, 0],
     zoneSeed: 0,
+    shots: 0,
     pressed: [-1, -1],
     lastGrade: [null, null],
     perfects: [0, 0],
@@ -179,7 +182,7 @@ function afterRound(state: MatchState): MatchState {
 function newZones(state: MatchState): MatchState {
   const rng = createRng(state.seed)
   const zoneSeed = Math.floor(rng.next() * 2 ** 32)
-  return { ...state, seed: rng.seed(), zoneSeed }
+  return { ...state, seed: rng.seed(), zoneSeed, shots: 0 }
 }
 
 function startPull(state: MatchState): MatchState {
@@ -270,9 +273,14 @@ function tap(state: MatchState): MatchState {
 function press(state: MatchState, at: number): MatchState {
   const { phase } = state
   if (state.event !== 'timing' || phase.kind !== 'pull') return state
-  const { pass, grade } = gradeAt(at - phase.start, state.zoneSeed)
+  const { pass, grade } = gradeAt(at - phase.start, zoneOf(state))
   if (pass <= state.pressed[0]) return state
-  return applyGrade(state, 0, pass, grade)
+  return applyGrade({ ...state, shots: state.shots + 1 }, 0, pass, grade)
+}
+
+/** 타이밍전: 지금 내 과녁 위치 (−0.6 ~ 0.6) */
+export function zoneOf(state: MatchState): number {
+  return zoneCenter(state.zoneSeed, state.shots)
 }
 
 function remoteTaps(state: MatchState, total: number): MatchState {

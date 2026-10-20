@@ -212,14 +212,14 @@
   color: var(--accent);
 }
 
-/* 위치 막대: 왼쪽 끝(빨강) = 짐, 오른쪽 끝(파랑) = 이김 */
+/* 위치 막대: 왼쪽 끝(파랑, 내 쪽) = 이김, 오른쪽 끝(빨강) = 짐 */
 .aw-bar {
   position: relative;
   height: 28px;
   border: 2px solid var(--line);
   border-radius: 999px;
   overflow: hidden;
-  background: linear-gradient(90deg, #fee2e2 0 12%, var(--paper) 12% 88%, #dbeafe 88%);
+  background: linear-gradient(90deg, #dbeafe 0 12%, var(--paper) 12% 88%, #fee2e2 88%);
 }
 
 .aw-bar__end {
@@ -231,14 +231,14 @@
   z-index: 1;
 }
 
-.aw-bar__end--lose {
+.aw-bar__end--win {
   left: 8px;
-  color: var(--accent);
+  color: #2563eb;
 }
 
-.aw-bar__end--win {
+.aw-bar__end--lose {
   right: 8px;
-  color: #2563eb;
+  color: var(--accent);
 }
 
 .aw-bar__knob {

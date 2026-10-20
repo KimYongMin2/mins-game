@@ -16,16 +16,16 @@ describe('타이밍 게이지', () => {
     const hit = elapsedAt(0, c)
     // 첫 지나감은 왼쪽 → 오른쪽: 0.1ms 늦으면 막대가 0.1 / (PASS_MS / 2)만큼 더 감
     const later = (d: number) => hit + (d * PASS_MS) / 2
-    expect(gradeAt(hit, seed).grade).toBe('perfect')
-    expect(gradeAt(later(0.12), seed).grade).toBe('great')
-    expect(gradeAt(later(0.3), seed).grade).toBe('good')
-    expect(gradeAt(later(-0.6), seed).grade).toBe('miss')
+    expect(gradeAt(hit, c).grade).toBe('perfect')
+    expect(gradeAt(later(0.12), c).grade).toBe('great')
+    expect(gradeAt(later(0.3), c).grade).toBe('good')
+    expect(gradeAt(later(-0.6), c).grade).toBe('miss')
     expect(pushOf('perfect')).toBeGreaterThan(pushOf('great'))
     expect(pushOf('miss')).toBe(0)
   })
 
-  it('과녁은 지나갈 때마다 다른 곳에, 범위 안에서', () => {
-    const centers = Array.from({ length: 30 }, (_, pass) => zoneCenter(123, pass))
+  it('과녁은 누를 때마다 다른 곳에, 범위 안에서', () => {
+    const centers = Array.from({ length: 30 }, (_, n) => zoneCenter(123, n))
     for (const c of centers) expect(Math.abs(c)).toBeLessThanOrEqual(ZONE_RANGE)
     expect(new Set(centers.map((c) => c.toFixed(2))).size).toBeGreaterThan(20)
     expect(zoneCenter(123, 5)).toBe(centers[5])

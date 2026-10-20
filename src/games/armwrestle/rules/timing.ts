@@ -2,7 +2,7 @@ import { createRng } from '../../../shared/random'
 import { PASS_MS } from '../constants'
 
 // 타이밍전 게이지. 막대가 왼쪽 끝(−1) ↔ 오른쪽 끝(+1)을 왔다 갔다 하고, 노란 구간(과녁) 한가운데에서 누르면 가장 세다.
-// 과녁 위치는 막대가 한 번 지나갈 때마다 바뀐다 (처음엔 늘 가운데라 외워서 칠 수 있었음).
+// 과녁 위치는 누를 때마다 바뀐다 (처음엔 늘 가운데라 외워서 칠 수 있었고, 지나갈 때마다 바꿔 봤다가 누를 때로 바꿈).
 
 export type Grade = 'perfect' | 'great' | 'good' | 'miss'
 
@@ -30,15 +30,16 @@ export function markerAt(elapsed: number): { pass: number; x: number } {
 /** 과녁 한가운데가 놓일 수 있는 범위 (−0.6 ~ 0.6) */
 export const ZONE_RANGE = 0.6
 
-/** zoneSeed로 정해지는 pass번째 지나감의 과녁 위치. 같은 시드·번호면 늘 같다 */
-export function zoneCenter(zoneSeed: number, pass: number): number {
-  const rng = createRng((zoneSeed + Math.imul(pass + 1, 0x9e3779b9)) >>> 0)
+/** zoneSeed로 정해지는 n번째 과녁(이번 판에서 n번 누른 뒤)의 위치. 같은 시드·번호면 늘 같다 */
+export function zoneCenter(zoneSeed: number, n: number): number {
+  const rng = createRng((zoneSeed + Math.imul(n + 1, 0x9e3779b9)) >>> 0)
   return (rng.next() * 2 - 1) * ZONE_RANGE
 }
 
-export function gradeAt(elapsed: number, zoneSeed: number): { pass: number; grade: Grade } {
+/** 과녁이 center에 있을 때 elapsed에 누른 판정 */
+export function gradeAt(elapsed: number, center: number): { pass: number; grade: Grade } {
   const { pass, x } = markerAt(elapsed)
-  const off = Math.abs(x - zoneCenter(zoneSeed, pass))
+  const off = Math.abs(x - center)
   return { pass, grade: GRADES.find((g) => off <= g.within)?.grade ?? 'miss' }
 }
 

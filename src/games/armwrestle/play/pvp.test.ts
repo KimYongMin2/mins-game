@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { type Event, PASS_MS } from '../constants'
-import { elapsedAt, zoneCenter } from '../rules/timing'
-import { type MatchAction, type MatchState, createMatch, matchReducer } from './matchState'
+import { elapsedAt } from '../rules/timing'
+import { type MatchAction, type MatchState, createMatch, matchReducer, zoneOf } from './matchState'
 import { type ArmMsg, guestActionOf, guestPressOut, hostActionOf, hostSync, phaseChanged } from './pvp'
 
 // 방장·친구 두 기기를 가짜 통신(지연)으로 이어 경기 전체가 똑같이 흘러가는지 본다.
@@ -27,7 +27,7 @@ function simulate(event: Event, latencyMs: number, rate: { host: number; guest: 
     }
     const elapsed = now - s.phase.start
     const pass = Math.floor(elapsed / PASS_MS)
-    if (pass <= s.pressed[0] || elapsed < elapsedAt(pass, zoneCenter(s.zoneSeed, pass)) + rate[who]) return s
+    if (pass <= s.pressed[0] || elapsed < elapsedAt(pass, zoneOf(s)) + rate[who]) return s
     return matchReducer(s, { type: 'press', at: now })
   }
   const deliver = (inbox: Inbox, s: MatchState, now: number, toAction: (m: ArmMsg) => MatchAction | null) => {
