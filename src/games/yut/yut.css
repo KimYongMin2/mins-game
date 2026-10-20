@@ -1,0 +1,434 @@
+/* 윷놀이(yut) 전용 스타일. 모든 클래스는 yt- 접두사를 쓴다. */
+.yt-page {
+  max-width: 560px;
+}
+
+.yt-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.yt-header .title {
+  flex: 1;
+  min-width: 0;
+}
+
+/* 경기 화면 */
+.yt-game {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.yt-players {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+
+.yt-player {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  column-gap: 6px;
+  padding: 4px 8px;
+  border: 2px solid var(--muted-line);
+  border-radius: 10px;
+}
+
+.yt-player--turn {
+  border-width: 3px;
+}
+
+.yt-player--left {
+  opacity: 0.4;
+}
+
+.yt-player__dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  grid-row: span 2;
+}
+
+.yt-player__name {
+  font-weight: 800;
+  font-size: 0.875rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.yt-player__count {
+  font-size: 0.75rem;
+  color: var(--ink-soft);
+}
+
+.yt-board-wrap {
+  border: 2px solid var(--line);
+  border-radius: 14px;
+  background: #fffbeb;
+}
+
+.yt-board {
+  display: block;
+  width: 100%;
+  max-height: 52dvh;
+  height: auto;
+  aspect-ratio: 1 / 1;
+  margin: 0 auto;
+}
+
+.yt-board__line {
+  fill: none;
+  stroke: #92400e;
+  stroke-width: 2;
+}
+
+.yt-node {
+  fill: var(--paper);
+  stroke: #92400e;
+  stroke-width: 2;
+}
+
+.yt-node--corner {
+  stroke-width: 3;
+}
+
+.yt-board__label {
+  font-size: 9px;
+  fill: var(--ink-soft);
+  text-anchor: middle;
+}
+
+.yt-target {
+  fill: none;
+  stroke: var(--ink);
+  stroke-width: 2.5;
+  stroke-dasharray: 4 4;
+}
+
+.yt-last {
+  fill: none;
+  stroke: #f59e0b;
+  stroke-width: 2;
+  opacity: 0.8;
+}
+
+.yt-piece circle {
+  stroke: var(--paper);
+  stroke-width: 2.5;
+}
+
+.yt-piece text {
+  fill: var(--paper);
+  font-size: 13px;
+  font-weight: 900;
+  text-anchor: middle;
+  pointer-events: none;
+}
+
+.yt-piece--movable {
+  cursor: pointer;
+}
+
+.yt-piece--movable circle {
+  stroke: var(--ink);
+  stroke-width: 3;
+  animation: yt-blink 0.6s ease-in-out infinite alternate;
+}
+
+@keyframes yt-blink {
+  from { opacity: 1; }
+  to { opacity: 0.55; }
+}
+
+/* 윷가락 + 결과 */
+.yt-status {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.yt-sticks {
+  display: flex;
+  gap: 5px;
+}
+
+.yt-sticks--shake {
+  animation: yt-shake 0.45s ease-out;
+}
+
+@keyframes yt-shake {
+  0% { transform: translateY(-14px) rotate(-8deg); }
+  40% { transform: translateY(2px) rotate(5deg); }
+  70% { transform: translateY(-3px) rotate(-2deg); }
+  100% { transform: translateY(0) rotate(0); }
+}
+
+.yt-stick {
+  width: 12px;
+  height: 46px;
+  border: 2px solid #78350f;
+  border-radius: 6px;
+  background: #b45309;
+}
+
+/* 배(평평한 면): 밝게 X 무늬 */
+.yt-stick--flat {
+  background:
+    linear-gradient(45deg, transparent 45%, #78350f 45% 55%, transparent 55%) center / 10px 10px no-repeat,
+    linear-gradient(-45deg, transparent 45%, #78350f 45% 55%, transparent 55%) center / 10px 10px no-repeat,
+    #fde68a;
+}
+
+/* 빽도 표시 */
+.yt-stick--marked.yt-stick--flat {
+  box-shadow: inset 0 -8px 0 #e5484d;
+}
+
+.yt-status__text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.yt-status__result {
+  font-size: 1.75rem;
+  font-weight: 900;
+  line-height: 1.1;
+}
+
+.yt-status__tip {
+  font-size: 0.875rem;
+  color: var(--ink-soft);
+}
+
+.yt-status__tip--mine {
+  color: var(--ink);
+  font-weight: 800;
+}
+
+.yt-timer {
+  height: 6px;
+  border: 2px solid var(--line);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.yt-timer__fill {
+  height: 100%;
+  background: var(--ink);
+  transform-origin: left;
+}
+
+.yt-pending {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.yt-chip {
+  min-width: 56px;
+  font-weight: 900;
+}
+
+.yt-chip--on {
+  color: var(--paper);
+  background: var(--ink);
+}
+
+.yt-actions {
+  display: grid;
+}
+
+.yt-throw,
+.yt-new {
+  min-height: 64px;
+  font-size: 1.25rem;
+  font-weight: 900;
+  border-radius: 16px;
+  touch-action: manipulation;
+}
+
+.yt-new:disabled,
+.yt-throw:disabled {
+  opacity: 0.4;
+}
+
+.yt-hint,
+.yt-tip {
+  text-align: center;
+  font-size: 0.8125rem;
+  color: var(--ink-soft);
+}
+
+/* 시작 */
+.yt-start {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-width: 420px;
+  margin: 8px auto 0;
+  text-align: center;
+}
+
+.yt-start__rules {
+  margin: 0;
+  padding: 12px 16px;
+  list-style: none;
+  text-align: left;
+  font-size: 0.875rem;
+  border: 1.5px solid var(--muted-line);
+  border-radius: 12px;
+  display: grid;
+  gap: 4px;
+}
+
+.yt-start__button {
+  flex-direction: column;
+  min-height: 64px;
+  font-size: 1.25rem;
+}
+
+.yt-start__button span {
+  font-size: 0.8125rem;
+  font-weight: 500;
+  opacity: 0.8;
+}
+
+.yt-start__record {
+  font-size: 0.8125rem;
+  color: var(--ink-soft);
+}
+
+.yt-start__bots {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border: 1.5px solid var(--muted-line);
+  border-radius: 12px;
+}
+
+.yt-start__label {
+  font-weight: 800;
+}
+
+.yt-start__counts {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 6px;
+}
+
+.yt-start__count--on {
+  color: var(--paper);
+  background: var(--ink);
+}
+
+/* 결과 */
+.yt-result {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-width: 420px;
+  margin: 8px auto 0;
+}
+
+.yt-result__headline {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 20px 16px;
+  border: 2px solid var(--line);
+  border-radius: 14px;
+  text-align: center;
+}
+
+.yt-result__headline strong {
+  font-size: 3rem;
+  font-weight: 900;
+  line-height: 1.1;
+}
+
+.yt-result__headline span {
+  color: var(--ink-soft);
+  font-size: 0.875rem;
+}
+
+.yt-result__headline--win {
+  border-color: #d97706;
+  background: #fffbeb;
+}
+
+.yt-result__headline--win strong {
+  color: var(--accent);
+}
+
+.yt-result__ranking {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 6px;
+}
+
+.yt-result__ranking li {
+  padding: 8px 12px;
+  border: 1.5px solid var(--muted-line);
+  border-radius: 10px;
+  font-weight: 700;
+}
+
+.yt-result__ranking li span {
+  display: inline-block;
+  width: 2.5em;
+  color: var(--ink-soft);
+}
+
+.yt-result__ranking .yt-result__me {
+  border-color: #2563eb;
+  color: #2563eb;
+}
+
+.yt-result__career,
+.yt-result__note {
+  text-align: center;
+  font-size: 0.875rem;
+  color: var(--ink-soft);
+}
+
+.yt-result__buttons {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+}
+
+.yt-start__row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+
+.yt-start__row .yt-start__counts {
+  grid-template-columns: repeat(3, 72px);
+}
+
+.yt-start__bots .yt-start__counts {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.yt-result__ranking em {
+  float: right;
+  font-style: normal;
+  font-weight: 500;
+  color: var(--ink-soft);
+}

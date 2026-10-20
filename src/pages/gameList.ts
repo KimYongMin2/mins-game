@@ -67,6 +67,15 @@ export const GAMES: GameEntry[] = [
     players: '3~6인',
   },
   {
+    id: 'yut',
+    title: '윷놀이',
+    description: '말 2~4개, 윷·모면 한 번 더! 업고 잡으며 먼저 다 내보내라',
+    path: '/games/yut',
+    ready: true,
+    play: 'pvp',
+    players: '2~4인',
+  },
+  {
     id: 'batting',
     title: '배팅',
     description: '정면에서 날아오는 직구·슬라이더·커브. 칸을 터치해 홈런을 노려라!',
