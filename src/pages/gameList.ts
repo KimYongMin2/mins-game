@@ -23,6 +23,13 @@ export const GAMES: GameEntry[] = [
     ready: true,
   },
   {
+    id: 'memory',
+    title: '짝맞추기',
+    description: '카드 24장, 번갈아 두 장씩. 기억해 두고 짝을 더 많이 찾아라!',
+    path: '/games/memory',
+    ready: true,
+  },
+  {
     id: 'batting',
     title: '배팅',
     description: '정면에서 날아오는 직구·슬라이더·커브. 칸을 터치해 홈런을 노려라!',

@@ -1,0 +1,412 @@
+/* 짝맞추기(memory) 전용 스타일. 모든 클래스는 mm- 접두사를 쓴다. */
+.mm-page {
+  max-width: 560px;
+}
+
+.mm-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.mm-header .title {
+  flex: 1;
+  min-width: 0;
+}
+
+/* 경기 화면 */
+.mm-game {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.mm-hud {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 8px;
+}
+
+.mm-score {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding: 4px 10px;
+  border: 2px solid transparent;
+  border-radius: 12px;
+}
+
+.mm-score--foe {
+  align-items: flex-end;
+}
+
+.mm-score--me.mm-score--active {
+  border-color: #2563eb;
+}
+
+.mm-score--foe.mm-score--active {
+  border-color: var(--accent);
+}
+
+.mm-score__name {
+  font-size: 0.8125rem;
+  color: var(--ink-soft);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
+
+.mm-score strong {
+  font-size: 1.375rem;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+}
+
+.mm-turn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  font-weight: 800;
+  color: var(--ink-soft);
+  text-align: center;
+}
+
+.mm-turn--mine {
+  color: #2563eb;
+}
+
+.mm-turn--done {
+  font-size: 1.375rem;
+  color: var(--ink);
+}
+
+.mm-turn--win {
+  color: var(--accent);
+}
+
+.mm-turn__time {
+  font-size: 0.8125rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.mm-turn__time--low {
+  color: var(--accent);
+}
+
+.mm-timer {
+  height: 6px;
+  border: 2px solid var(--line);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.mm-timer__fill {
+  height: 100%;
+  background: #2563eb;
+  transform-origin: left;
+}
+
+/* 카드판: 모바일 4열 × 6줄, 넓은 화면 6열 × 4줄 */
+.mm-board {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+}
+
+@media (min-width: 520px) {
+  .mm-board {
+    grid-template-columns: repeat(6, 1fr);
+    gap: 8px;
+  }
+
+  .mm-board .mm-card {
+    aspect-ratio: 3 / 4;
+  }
+}
+
+.mm-card {
+  /* 모바일에서 6줄이 한 화면에 들어오게 정사각형에 가깝게 */
+  aspect-ratio: 5 / 6;
+  padding: 0;
+  border: 0;
+  background: none;
+  perspective: 600px;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  touch-action: manipulation;
+}
+
+.mm-card:disabled {
+  cursor: default;
+}
+
+.mm-card__inner {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 100%;
+  transition: transform 0.25s ease;
+  transform-style: preserve-3d;
+}
+
+.mm-card--up .mm-card__inner {
+  transform: rotateY(180deg);
+}
+
+.mm-card__back,
+.mm-card__front {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid var(--line);
+  border-radius: 10px;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
+/* 뒷면: 빗금 무늬 */
+.mm-card__back {
+  background: repeating-linear-gradient(45deg, var(--paper) 0 6px, #e5e7eb 6px 8px);
+}
+
+.mm-board--mine .mm-card:not(:disabled):hover .mm-card__back {
+  border-color: #2563eb;
+  box-shadow: 2px 2px 0 #2563eb;
+}
+
+.mm-card__front {
+  background: var(--paper);
+  transform: rotateY(180deg);
+}
+
+.mm-face {
+  width: 72%;
+  height: auto;
+}
+
+.mm-face path,
+.mm-face circle {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.mm-card--match .mm-card__front {
+  border-color: #16a34a;
+  border-width: 3px;
+  background: #f0fdf4;
+}
+
+.mm-card--miss .mm-card__front {
+  border-color: var(--accent);
+  border-width: 3px;
+}
+
+/* 가져간 카드: 흐리게, 누가 가져갔는지 테두리 색 */
+.mm-card--taken .mm-card__front {
+  opacity: 0.35;
+}
+
+.mm-card--by0 .mm-card__front {
+  border-color: #2563eb;
+}
+
+.mm-card--by1 .mm-card__front {
+  border-color: var(--accent);
+}
+
+.mm-hint {
+  text-align: center;
+  font-size: 0.8125rem;
+  color: var(--ink-soft);
+}
+
+/* 시작 */
+.mm-start {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-width: 420px;
+  margin: 8px auto 0;
+  text-align: center;
+}
+
+.mm-start__rules {
+  margin: 0;
+  padding: 12px 16px;
+  list-style: none;
+  text-align: left;
+  font-size: 0.875rem;
+  border: 1.5px solid var(--muted-line);
+  border-radius: 12px;
+  display: grid;
+  gap: 4px;
+}
+
+.mm-start__options {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.mm-start__option {
+  flex-direction: column;
+  gap: 2px;
+  min-height: 0;
+  padding: 10px 8px;
+  border-color: var(--muted-line);
+  border-radius: 12px;
+}
+
+.mm-start__option--on {
+  border-color: var(--line);
+  box-shadow: 3px 3px 0 var(--line);
+}
+
+.mm-start__name {
+  font-size: 1.25rem;
+  font-weight: 900;
+}
+
+.mm-start__desc {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--ink-soft);
+}
+
+.mm-start__record {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin: 0;
+}
+
+.mm-start__record div {
+  display: flex;
+  flex-direction: column;
+  padding: 12px;
+  border: 1.5px solid var(--muted-line);
+  border-radius: 12px;
+}
+
+.mm-start__record dt {
+  font-size: 0.8125rem;
+  color: var(--ink-soft);
+}
+
+.mm-start__record dd {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+}
+
+.mm-start__record span {
+  font-size: 0.75rem;
+  color: var(--ink-soft);
+}
+
+.mm-start__button {
+  min-height: 64px;
+  font-size: 1.25rem;
+}
+
+/* 결과 */
+.mm-result {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-width: 420px;
+  margin: 8px auto 0;
+}
+
+.mm-result__headline {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 20px 16px;
+  border: 2px solid var(--line);
+  border-radius: 14px;
+  text-align: center;
+}
+
+.mm-result__headline strong {
+  font-size: 3rem;
+  font-weight: 900;
+  line-height: 1.1;
+}
+
+.mm-result__headline span {
+  color: var(--ink-soft);
+  font-size: 0.875rem;
+}
+
+.mm-result__headline--win {
+  border-color: #d97706;
+  background: #fffbeb;
+}
+
+.mm-result__headline--win strong {
+  color: var(--accent);
+}
+
+.mm-result__headline .mm-result__streak {
+  padding: 2px 10px;
+  font-weight: 800;
+  color: var(--paper);
+  background: #d97706;
+  border-radius: 999px;
+}
+
+.mm-result__career {
+  text-align: center;
+  font-size: 0.875rem;
+  color: var(--ink-soft);
+}
+
+.mm-result__buttons {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.mm-result__buttons .button--primary {
+  grid-column: 1 / -1;
+}
+
+/* 친구 대전 */
+.mm-pvp-wait {
+  margin-top: 24px;
+  text-align: center;
+  color: var(--ink-soft);
+}
+
+.mm-result__note {
+  text-align: center;
+  font-size: 0.875rem;
+  color: var(--ink-soft);
+}
+
+.mm-start__pvp span {
+  margin-left: 4px;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--ink-soft);
+}
+
+.mm-start__pvp-record {
+  font-size: 0.8125rem;
+  color: var(--ink-soft);
+}
