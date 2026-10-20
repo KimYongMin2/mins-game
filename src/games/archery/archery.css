@@ -596,7 +596,8 @@
   color: var(--ink-soft);
 }
 
-.ar-result__upload--queued {
+.ar-result__upload--queued,
+.ar-result__upload--rejected {
   color: var(--accent);
 }
 

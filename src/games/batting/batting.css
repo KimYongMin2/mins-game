@@ -432,7 +432,8 @@
   color: var(--ink-soft);
 }
 
-.bt-result__upload--queued {
+.bt-result__upload--queued,
+.bt-result__upload--rejected {
   color: var(--accent);
 }
 

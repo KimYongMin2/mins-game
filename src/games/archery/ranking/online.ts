@@ -1,5 +1,5 @@
 import { getSupabase } from '../../../shared/online/supabase'
-import { createUploadQueue, newRecordId } from '../../../shared/online/uploadQueue'
+import { createUploadQueue, newRecordId, type UploadStatus } from '../../../shared/online/uploadQueue'
 import type { RoundSummary } from '../play/roundState'
 import type { ArcheryLeaderRow } from './leaderboard'
 
@@ -29,7 +29,7 @@ const queue = createUploadQueue<ArcheryGameRow>('archery_games', 'archery:pendin
 
 export const flushPendingGames = queue.flush
 
-export function submitGame(summary: RoundSummary, nickname: string): Promise<'saved' | 'queued'> {
+export function submitGame(summary: RoundSummary, nickname: string): Promise<Exclude<UploadStatus, 'saving'>> {
   return queue.submit(toGameRow(summary, nickname, newRecordId()))
 }
 

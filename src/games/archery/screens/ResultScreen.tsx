@@ -18,6 +18,7 @@ const UPLOAD_TEXT: Record<UploadStatus, string> = {
   saving: '랭킹에 기록을 올리는 중…',
   saved: '랭킹에 기록을 올렸어요',
   queued: '지금은 올리지 못했어요. 다음에 접속할 때 다시 올릴게요',
+  rejected: '서버가 이 기록을 받지 않았어요',
 }
 
 export function ResultScreen({ summary, record, newBest, upload, onRetry, onRanking, onMenu }: Props) {
@@ -67,7 +68,7 @@ export function ResultScreen({ summary, record, newBest, upload, onRetry, onRank
 
       <p className={`ar-result__upload ar-result__upload--${upload}`} aria-live="polite">
         {UPLOAD_TEXT[upload]}
-        {upload === 'queued' && lastUploadError() && <span className="upload-error"> ({lastUploadError()})</span>}
+        {upload !== 'saved' && upload !== 'saving' && lastUploadError() && <span className="upload-error"> ({lastUploadError()})</span>}
       </p>
 
       <div className="ar-result__buttons">

@@ -1,5 +1,5 @@
 import { getSupabase } from '../../../shared/online/supabase'
-import { createUploadQueue, newRecordId } from '../../../shared/online/uploadQueue'
+import { createUploadQueue, newRecordId, type UploadStatus } from '../../../shared/online/uploadQueue'
 import type { MatchSummary } from '../match/matchState'
 import type { Difficulty } from '../rules/judge'
 import type { LeaderRow } from './leaderboard'
@@ -47,7 +47,7 @@ export type { UploadStatus } from '../../../shared/online/uploadQueue'
 export const flushPendingGames = queue.flush
 
 /** 경기 결과를 올린다. */
-export function submitGame(summary: MatchSummary, nickname: string): Promise<'saved' | 'queued'> {
+export function submitGame(summary: MatchSummary, nickname: string): Promise<Exclude<UploadStatus, 'saving'>> {
   return queue.submit(toGameRow(summary, nickname, newRecordId()))
 }
 

@@ -5,8 +5,11 @@ import { ensurePlayerId, getSupabase, isAuthError, isOnlineConfigured, recoverSe
 // 올리기에 실패하면 기기(localStorage)에 쌓아 두었다가 다음에 다시 보낸다.
 // 기록마다 고유 id가 있어 같은 기록을 두 번 보내도 서버에 한 번만 들어간다.
 
-/** 결과 화면에 보여줄 업로드 상태. 'queued'면 기기에 보관해 두었다가 나중에 다시 보낸다. */
-export type UploadStatus = 'saving' | 'saved' | 'queued'
+/**
+ * 결과 화면에 보여줄 업로드 상태. 'queued'면 기기에 보관해 두었다가 나중에 다시 보낸다.
+ * 'rejected'면 서버가 이 기록을 받지 않았다 (다시 보내도 안 돼서 버림)
+ */
+export type UploadStatus = 'saving' | 'saved' | 'queued' | 'rejected'
 
 let lastError: string | null = null
 
@@ -42,9 +45,14 @@ export function newRecordId(): string {
 
 export type UploadQueue<Row extends { id: string }> = {
   /** 한 줄을 큐에 넣고 바로 보내 본다 */
-  submit: (row: Row) => Promise<'saved' | 'queued'>
+  submit: (row: Row) => Promise<'saved' | 'queued' | 'rejected'>
   /** 쌓여 있는 기록을 모두 보낸다. 남은 개수를 돌려준다 */
   flush: () => Promise<number>
+}
+
+/** 서버가 요청 내용 때문에 거부함 (다시 보내도 똑같이 거부된다). 401·403은 로그인 문제라 따로 본다 */
+export function isPermanent(status: number): boolean {
+  return status >= 400 && status < 500 && status !== 401 && status !== 403 && status !== 408 && status !== 429
 }
 
 /** table: Supabase 테이블 이름, storageKey: 기기에 보관할 때 쓰는 키 */
@@ -62,12 +70,15 @@ export function createUploadQueue<Row extends { id: string }>(table: string, sto
     writeLocal(storageKey, JSON.stringify(rows))
   }
 
-  async function flush(): Promise<number> {
+  /** 남은 개수와, 서버가 거부해서 버린 기록 id */
+  async function send(): Promise<{ left: number; dropped: string[] }> {
     const pending = load()
-    if (pending.length === 0 || !isOnlineConfigured()) return pending.length
+    const dropped: string[] = []
+    if (pending.length === 0 || !isOnlineConfigured()) return { left: pending.length, dropped }
     try {
       await ensurePlayerId()
       const supabase = await getSupabase()
+      lastError = null
       let { error, status } = await supabase.from(table).insert(pending)
       // 저장된 로그인이 만료됐으면 되살려서 한 번 더
       if (error && isAuthError({ ...error, status })) {
@@ -75,32 +86,48 @@ export function createUploadQueue<Row extends { id: string }>(table: string, sto
         await recoverSession()
         ;({ error, status } = await supabase.from(table).insert(pending))
       }
-      // 23505: 이미 올라간 기록(같은 id)을 다시 보낸 경우. 하나씩 보내 중복만 건너뛴다.
-      if (error?.code === '23505') {
+      // 한꺼번에 거부되면 하나씩 보낸다. 한 줄 때문에 나머지까지 막히지 않게
+      // - 23505: 이미 올라간 기록(같은 id) → 올라간 것으로 친다
+      // - 서버가 내용 때문에 거부(400대): 다시 보내도 안 되니 버리고 이유를 남긴다
+      // - 그 밖(통신 끊김·서버 오류): 남겨 뒀다가 다음에 다시 보낸다
+      if (error && (error.code === '23505' || isPermanent(status))) {
         const left: Row[] = []
         for (const row of pending) {
           const r = await supabase.from(table).insert(row)
-          if (r.error && r.error.code !== '23505') left.push(row)
+          if (!r.error || r.error.code === '23505') continue
+          if (isPermanent(r.status) && !isAuthError({ ...r.error, status: r.status })) {
+            console.warn('[upload] 서버가 거부한 기록을 버림', table, r.error.code, r.error.message, row)
+            lastError = describeError(r.error)
+            dropped.push(row.id)
+            continue
+          }
+          left.push(row)
         }
         save(left)
-        return left.length
+        return { left: left.length, dropped }
       }
       if (error) throw error
       save([])
-      lastError = null
-      return 0
+      return { left: 0, dropped }
     } catch (e) {
       // 원인을 나중에 확인할 수 있게 남긴다. 기록은 기기에 남아 다음에 다시 보낸다
       console.warn('[upload] 기록 올리기 실패', table, e)
       lastError = describeError(e)
-      return pending.length
+      return { left: pending.length, dropped }
     }
+  }
+
+  async function flush(): Promise<number> {
+    return (await send()).left
   }
 
   return {
     async submit(row) {
       save([...load(), row])
-      return (await flush()) === 0 ? 'saved' : 'queued'
+      const { dropped } = await send()
+      if (dropped.includes(row.id)) return 'rejected'
+      // 이번 기록이 아직 남아 있으면 나중에 다시 보낸다
+      return load().some((r) => r.id === row.id) ? 'queued' : 'saved'
     },
     flush,
   }
