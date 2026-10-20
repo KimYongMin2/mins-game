@@ -74,12 +74,20 @@
   font-variant-numeric: tabular-nums;
 }
 
-.aw-hud__time {
-  font-size: 0.8125rem;
-  color: var(--ink-soft);
+.aw-clock {
+  position: absolute;
+  top: 4%;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 2.75rem;
+  font-weight: 900;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+  pointer-events: none;
 }
 
-.aw-hud__time--low {
+.aw-clock--low {
   color: var(--accent);
 }
 

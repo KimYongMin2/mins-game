@@ -208,10 +208,7 @@ export function GameScreen({ event, difficulty, pvp, onFinish, onQuit }: Props) 
           <span className="aw-side__name">{names[0]}</span>
           <WinDots wins={state.wins[0]} />
         </div>
-        <span className="aw-hud__round">
-          {state.round}판
-          {pulling && <span className={phaseLeft(state) <= 3000 ? 'aw-hud__time aw-hud__time--low' : 'aw-hud__time'}>{Math.ceil(phaseLeft(state) / 1000)}초</span>}
-        </span>
+        <span className="aw-hud__round">{state.round}판</span>
         <div className="aw-side aw-side--foe">
           <span className="aw-side__name">{names[1]}</span>
           <WinDots wins={state.wins[1]} />
@@ -220,6 +217,10 @@ export function GameScreen({ event, difficulty, pvp, onFinish, onQuit }: Props) 
 
       <div className="aw-view-wrap">
         <ArmView pos={shownPos} straining={pulling} now={state.now} names={names} winner={winner} />
+        {/* 남은 시간: 두 졸라맨 사이 위쪽에 크게 ('당겨!'가 뜨는 동안은 숨김) */}
+        {pulling && state.now - phase.start >= 500 && (
+          <span className={`aw-clock${phaseLeft(state) <= 3000 ? ' aw-clock--low' : ''}`}>{Math.ceil(phaseLeft(state) / 1000)}</span>
+        )}
         <Banner state={state} />
         {event === 'timing' && foeGrade && state.now - foeGrade.at < GRADE_SHOW_MS && (
           <span className={`aw-foe-grade aw-gauge__grade--${foeGrade.grade}`}>{GRADE_LABEL[foeGrade.grade]}</span>
