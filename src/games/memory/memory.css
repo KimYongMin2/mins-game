@@ -178,9 +178,16 @@
   -webkit-backface-visibility: hidden;
 }
 
-/* 뒷면: 빗금 무늬 */
+/* 뒷면: 단색 + 가운데 작은 물음표 (빗금은 눈이 어른거려서 뺌) */
 .mm-card__back {
-  background: repeating-linear-gradient(45deg, var(--paper) 0 6px, #e5e7eb 6px 8px);
+  background: #eef2f7;
+}
+
+.mm-card__back::after {
+  content: '?';
+  font-size: 1.5rem;
+  font-weight: 900;
+  color: #c3cad6;
 }
 
 .mm-board--mine .mm-card:not(:disabled):hover .mm-card__back {
