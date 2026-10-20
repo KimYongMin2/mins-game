@@ -101,18 +101,25 @@ export function waitingOf(s: EngineState): number[] {
   return aliveIndexes(s).filter((i) => !s.presses.some((p) => p.player === i))
 }
 
-/** 판이 끝났으면 탈락자 정리. 아직이면 null */
+/**
+ * 판이 끝났으면 탈락자 정리. 아직이면 null
+ * - 겹치면 그 자리에서 판이 끝나고 겹친 사람만 탈락, 남은 사람끼리 1부터 다시 (처음엔 판 끝까지 갔는데 바꿈)
+ * - 안 겹치면 마지막 한 명 / 시간 초과면 안 누른 사람 모두 탈락
+ */
 function judgeCall(s: EngineState): EngineState | null {
   if (s.phase.kind !== 'call') return null
   const waiting = waitingOf(s)
   const lastPress = s.presses.at(-1)?.at ?? -Infinity
-  // 마지막으로 누른 뒤 COLLIDE_MS가 지나야 '동시'인지 확정된다
+  // 마지막으로 누른 뒤 COLLIDE_MS가 지나야 '동시'인지 확정된다 (셋이 겹치는 것도 다 잡게)
   const settled = s.now - lastPress > COLLIDE_MS
-  const timeout = s.now >= s.phase.until
-  if (!timeout && !(waiting.length <= 1 && settled)) return null
   const collided = collidedOf(s.presses)
-  const losers: { player: number; reason: OutReason }[] = [...collided].map((player) => ({ player, reason: 'collide' }))
-  for (const w of waiting) losers.push({ player: w, reason: timeout && waiting.length > 1 ? 'timeout' : 'last' })
+  const timeout = s.now >= s.phase.until
+  let losers: { player: number; reason: OutReason }[]
+  if (collided.size > 0 && (settled || timeout)) {
+    losers = [...collided].map((player) => ({ player, reason: 'collide' }))
+  } else if (timeout || (waiting.length <= 1 && settled)) {
+    losers = waiting.map((player) => ({ player, reason: timeout && waiting.length > 1 ? 'timeout' : 'last' }))
+  } else return null
   const replay = losers.length >= aliveIndexes(s).length
   return { ...s, botAt: {}, phase: { kind: 'result', losers: replay ? [] : losers, replay, until: s.now + RESULT_MS } }
 }

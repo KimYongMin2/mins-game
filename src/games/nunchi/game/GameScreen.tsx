@@ -96,9 +96,11 @@ function Banner({ screen }: { screen: ScreenState }) {
     case 'result': {
       if (v.replay) return <div className="nc-banner"><strong className="nc-banner__small">모두 탈락할 뻔! 다시</strong></div>
       const names = v.losers.map((l) => (l.player === me ? '나' : v.players[l.player].name))
+      const clash = v.losers.some((l) => l.reason === 'collide')
       return (
         <div className="nc-banner">
           <strong className="nc-banner__small nc-banner__bad">{names.join(', ')} 탈락</strong>
+          {clash && <span>겹쳤다! 1부터 다시</span>}
         </div>
       )
     }
@@ -298,7 +300,7 @@ export function GameScreen(props: Props) {
       <p className="nc-hint">
         {final
           ? '결승은 가위바위보 · 3초 안에 고르기 · 안 고르면 무작위'
-          : `아무 때나 한 번 외치기 · ${COLLIDE_SEC}초 안에 겹치면 탈락 · 마지막 한 명도 탈락 · PC는 스페이스바`}
+          : `아무 때나 한 번 외치기 · ${COLLIDE_SEC}초 안에 겹치면 탈락하고 1부터 다시 · 마지막 한 명도 탈락 · PC는 스페이스바`}
       </p>
       {hostGone && props.mode === 'guest' && (
         <div className="pvp-gone" role="alert">

@@ -30,16 +30,32 @@ describe('외치기', () => {
     expect(s.phase).toMatchObject({ kind: 'result', losers: [{ player: 1, reason: 'last' }], replay: false })
   })
 
-  it('동시에 누른 둘 + 마지막 한 명이 탈락', () => {
+  it('겹치면 그 자리에서 판이 끝나고 겹친 사람만 탈락, 남은 사람끼리 1부터 다시', () => {
     let s = calling(5)
     s = press(s, 0, T + 500)
     s = press(s, 1, T + 1500)
     s = press(s, 2, T + 1600)
-    s = press(s, 3, T + 3000)
-    s = at(s, T + 3000 + COLLIDE_MS + 1)
+    s = at(s, T + 1600 + COLLIDE_MS)
+    expect(s.phase.kind).toBe('call')
+    s = at(s, T + 1600 + COLLIDE_MS + 1)
     expect(s.phase.kind).toBe('result')
     if (s.phase.kind !== 'result') return
-    expect(s.phase.losers.map((l) => l.player).sort()).toEqual([1, 2, 4])
+    expect(s.phase.losers.map((l) => l.player).sort()).toEqual([1, 2])
+    s = at(s, s.now + RESULT_MS)
+    expect(s.phase.kind).toBe('countdown')
+    expect(s.alive).toEqual([true, false, false, true, true])
+    s = at(s, s.now + COUNTDOWN_MS)
+    expect(s.presses).toEqual([])
+  })
+
+  it('셋이 겹치면 셋 다', () => {
+    let s = calling(5)
+    s = press(s, 0, T + 1000)
+    s = press(s, 1, T + 1200)
+    s = press(s, 2, T + 1400)
+    s = at(s, T + 1400 + COLLIDE_MS + 1)
+    if (s.phase.kind !== 'result') throw new Error()
+    expect(s.phase.losers.map((l) => l.player).sort()).toEqual([0, 1, 2])
   })
 
   it('한 판에 한 번만 누를 수 있다', () => {
@@ -56,11 +72,12 @@ describe('외치기', () => {
     expect(s.phase.losers).toEqual([2, 3, 4].map((player) => ({ player, reason: 'timeout' })))
   })
 
-  it('모두 탈락하게 되면 그 판은 다시', () => {
+  it('모두 겹쳐서 다 탈락하게 되면 그 판은 다시', () => {
     let s = calling(3)
     s = press(s, 0, T + 500)
     s = press(s, 1, T + 600)
-    s = at(s, T + 600 + COLLIDE_MS + 1)
+    s = press(s, 2, T + 700)
+    s = at(s, T + 700 + COLLIDE_MS + 1)
     expect(s.phase).toMatchObject({ kind: 'result', losers: [], replay: true })
     s = at(s, s.now + RESULT_MS)
     expect(s.phase.kind).toBe('countdown')

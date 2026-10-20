@@ -21,7 +21,7 @@ export function StartScreen({ record, onBots, onBot, onPvp }: Props) {
 
       <ul className="nc-start__rules">
         <li>'시작!' 뒤 아무 때나 <strong>[외치기]</strong> 한 번. 누른 순서대로 1, 2, 3…</li>
-        <li>{COLLIDE_MS / 1000}초 안에 둘 이상 누르면 <strong>겹친 사람 모두 탈락</strong></li>
+        <li>{COLLIDE_MS / 1000}초 안에 둘 이상 누르면 <strong>겹친 사람 모두 탈락</strong>, 남은 사람끼리 1부터 다시</li>
         <li>끝까지 안 누르고 <strong>마지막 한 명</strong>이 되면 탈락</li>
         <li>{CALL_MS / 1000}초 안에 안 누르면 탈락</li>
         <li>2명이 남으면 <strong>결승 가위바위보</strong>!</li>
