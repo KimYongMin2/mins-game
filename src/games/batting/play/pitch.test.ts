@@ -98,7 +98,7 @@ describe('project', () => {
     const z = zoneRect()
     expect(z.x + z.width / 2).toBeCloseTo(180)
     expect(z.width).toBeGreaterThan(150)
-    expect(project({ x: 0, y: 1, z: 10 }).scale).toBeLessThan(project({ x: 0, y: 1, z: 0 }).scale / 4)
+    expect(project({ x: 0, y: 1, z: 10 }).scale).toBeLessThan(project({ x: 0, y: 1, z: 0 }).scale / 3)
   })
 
   it('투수 손은 존보다 위에 보인다', () => {

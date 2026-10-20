@@ -6,7 +6,7 @@ import { CELL_HEIGHT, CELL_WIDTH, type Vec3, ZONE } from '../play/pitch'
 export const VIEW_W = 360
 export const VIEW_H = 400
 
-const CAMERA = { x: 0, y: 1.5, z: -2.4 }
+const CAMERA = { x: 0, y: 1.5, z: -4 }
 /** 홈플레이트(z=0)에서 1m가 화면 몇 단위인지. 존이 터치하기 좋은 크기가 되게 정했다 */
 const PLATE_SCALE = 300
 const FOCAL = PLATE_SCALE * -CAMERA.z

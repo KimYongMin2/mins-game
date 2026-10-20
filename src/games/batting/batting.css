@@ -104,7 +104,12 @@
 
 .bt-view .bt-ball {
   fill: var(--paper);
-  stroke-width: 1.5;
+  stroke-width: 2;
+}
+
+.bt-view .bt-trail path {
+  stroke: var(--accent);
+  opacity: 0.35;
 }
 
 .bt-view .bt-mark {

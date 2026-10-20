@@ -28,6 +28,8 @@ type Props = {
   swing: SwingPose | null
   /** 공이 지나간 자리 (×) */
   marks: Mark[]
+  /** 이번 공이 지나온 길 (오래된 것부터) */
+  trail: Vec3[]
   /** 누르는 순간 그 자리에 잠깐 표시 */
   touched: ZonePoint | null
   onPointerDown?: (e: PointerEvent<SVGSVGElement>) => void
@@ -37,7 +39,7 @@ const ZONE = zoneRect()
 
 /** 화면에서 보이는 공 반지름. 멀리서도 보이게 키운다 */
 function ballRadius(scale: number) {
-  return Math.max(1.6, BALL_RADIUS * scale * 1.5)
+  return Math.max(2.6, BALL_RADIUS * scale * 1.5)
 }
 
 /** 존 안 위치(칸 단위) → 화면 좌표 */
@@ -181,7 +183,20 @@ function Batter({ hand, swing }: { hand: Hand; swing: SwingPose | null }) {
   )
 }
 
-export function FrontView({ hand, pitcher, ball, swing, marks, touched, onPointerDown }: Props) {
+/** 궤적 꼬리: 가까울수록 굵게 (공 크기를 따라감) */
+function Trail({ points }: { points: Vec3[] }) {
+  const p = points.map(project)
+  return (
+    <g className="bt-trail">
+      {p.slice(1).map((b, i) => {
+        const a = p[i]
+        return <path key={i} d={`M${a.x} ${a.y}L${b.x} ${b.y}`} strokeWidth={ballRadius(b.scale) * 0.9} />
+      })}
+    </g>
+  )
+}
+
+export function FrontView({ hand, pitcher, ball, swing, marks, trail, touched, onPointerDown }: Props) {
   // 카메라 뒤로 넘어간 공(뒤로 뜬 파울)은 그리지 않는다
   const b = ball && ball.z > -2 ? project(ball) : null
   return (
@@ -200,6 +215,7 @@ export function FrontView({ hand, pitcher, ball, swing, marks, touched, onPointe
           />
         )
       })}
+      <Trail points={trail} />
       {b && <circle className="bt-ball" cx={b.x} cy={b.y} r={ballRadius(b.scale)} />}
       <Batter hand={hand} swing={swing} />
     </svg>

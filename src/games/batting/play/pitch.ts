@@ -27,8 +27,8 @@ export const BALL_RADIUS = 0.037
 
 /** 구종별 비행 시간(놓은 순간 → 홈 도착) */
 const FLIGHT_MS: Record<Difficulty, Record<PitchType, number>> = {
-  normal: { fastball: 520, slider: 600, curve: 700 },
-  hard: { fastball: 430, slider: 500, curve: 580 },
+  normal: { fastball: 620, slider: 710, curve: 820 },
+  hard: { fastball: 510, slider: 590, curve: 680 },
 }
 
 /** 외워서 치지 못하게 비행 시간을 공마다 이만큼(±) 흔든다 */

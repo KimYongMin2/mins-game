@@ -4,7 +4,7 @@ import { type Difficulty, type Hand, TOTAL_PITCHES } from '../constants'
 import { FrontView, type Mark } from '../field/FrontView'
 import { useZoneSwing } from '../input/useZoneSwing'
 import { battedBallPosition } from '../play/battedBall'
-import { PITCH_LABEL, ballPosition, cellCenter } from '../play/pitch'
+import { PITCH_LABEL, type Pitch, type Vec3, ballPosition, cellCenter } from '../play/pitch'
 import {
   DONE_MS,
   type PitchRecord,
@@ -26,6 +26,18 @@ type Props = {
   onFinish: (summary: SessionSummary) => void
 }
 
+/** 궤적 꼬리를 찍는 간격 */
+const TRAIL_STEP_MS = 12
+
+/** 놓은 순간부터 지금(홈 도착까지)의 공 자리들 */
+function trailOf(pitch: Pitch, now: number): Vec3[] {
+  const end = Math.min(now, pitch.arriveAt)
+  const points: Vec3[] = []
+  for (let t = pitch.releaseAt; t < end; t += TRAIL_STEP_MS) points.push(ballPosition(pitch, t)!)
+  if (end > pitch.releaseAt) points.push(ballPosition(pitch, end)!)
+  return points
+}
+
 /** 스윙 동작 시간 (준비 → 맞힘 → 팔로스루) */
 const SWING_MS = 320
 /** 터치한 칸을 밝게 보여주는 시간 */
@@ -33,15 +45,6 @@ const TOUCH_FLASH_MS = 180
 
 function Banner({ state }: { state: SessionState }) {
   const { phase } = state
-  if (phase.kind === 'ready' || phase.kind === 'windup') {
-    return (
-      <div className="bt-banner bt-banner--hint">
-        <span className="bt-banner__sub">
-          {state.index + 1}번째 공 · 들어오는 곳을 터치!
-        </span>
-      </div>
-    )
-  }
   if (phase.kind === 'done') {
     const total = totalOf(state.records.map((r) => r.outcome))
     return (
@@ -153,6 +156,9 @@ export function GameScreen({ difficulty, hand, onFinish }: Props) {
   if (phase.kind === 'pitching') ball = ballPosition(phase.pitch, now)
   else if (phase.kind === 'result') ball = phase.batted ? battedBallPosition(phase.batted, now) : ballPosition(phase.pitch, now)
 
+  // 공이 지나온 길. 결과가 나온 뒤에도 남겨 어떻게 휘었는지 보여준다
+  const trail = phase.kind === 'pitching' || phase.kind === 'result' ? trailOf(phase.pitch, now) : []
+
   const swingOf = phase.kind === 'pitching' || phase.kind === 'result' ? phase.swing : null
   const swing = swingOf ? { point: swingOf.point, progress: Math.min(1, Math.max(0, (now - swingOf.at) / SWING_MS)) } : null
   const touched = swingOf && now - swingOf.at < TOUCH_FLASH_MS ? swingOf.point : null
@@ -183,6 +189,7 @@ export function GameScreen({ difficulty, hand, onFinish }: Props) {
           ball={ball}
           swing={swing}
           marks={marks}
+          trail={trail}
           touched={touched}
           onPointerDown={pointer.onPointerDown}
         />
