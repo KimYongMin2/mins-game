@@ -58,6 +58,15 @@ export const GAMES: GameEntry[] = [
     players: '2~6인',
   },
   {
+    id: 'nunchi',
+    title: '눈치게임',
+    description: '눈치껏 1, 2, 3! 겹치거나 마지막이면 탈락, 결승은 가위바위보',
+    path: '/games/nunchi',
+    ready: true,
+    play: 'pvp',
+    players: '3~6인',
+  },
+  {
     id: 'batting',
     title: '배팅',
     description: '정면에서 날아오는 직구·슬라이더·커브. 칸을 터치해 홈런을 노려라!',

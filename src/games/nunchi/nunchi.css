@@ -1,0 +1,443 @@
+/* 눈치게임(nunchi) 전용 스타일. 모든 클래스는 nc- 접두사를 쓴다. */
+.nc-page {
+  max-width: 560px;
+}
+
+.nc-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.nc-header .title {
+  flex: 1;
+  min-width: 0;
+}
+
+/* 경기 화면 */
+.nc-game {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.nc-view {
+  position: relative;
+}
+
+.nc-table {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  max-height: 70dvh;
+  margin: 0 auto;
+  border: 2px solid var(--line);
+  border-radius: 18px;
+  background: var(--paper);
+  overflow: hidden;
+  touch-action: manipulation;
+}
+
+.nc-table--empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ink-soft);
+}
+
+/* 둥근 탁자 */
+.nc-table__top {
+  position: absolute;
+  left: 26%;
+  top: 28%;
+  width: 48%;
+  height: 44%;
+  border: 3px solid #92400e;
+  border-radius: 50%;
+  background: #fffbeb;
+}
+
+.nc-seat {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0;
+  width: 25%;
+  padding: 4px 0;
+  border: 2px solid transparent;
+  border-radius: 14px;
+  background: none;
+  color: var(--ink);
+  font: inherit;
+  transform: translate(-50%, -50%);
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+
+.nc-seat:disabled {
+  cursor: default;
+  color: var(--ink);
+  opacity: 1;
+}
+
+.nc-seat--me {
+  color: #2563eb;
+}
+
+.nc-seat--me:disabled {
+  color: #2563eb;
+}
+
+.nc-seat--out,
+.nc-seat--out:disabled {
+  color: var(--muted-line);
+}
+
+.nc-stick {
+  width: 56%;
+  height: auto;
+}
+
+.nc-stick circle,
+.nc-stick path {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.nc-seat__name {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.8125rem;
+  font-weight: 800;
+}
+
+/* 가운데 안내 */
+.nc-banner {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  pointer-events: none;
+  text-align: center;
+}
+
+.nc-banner strong {
+  font-size: 2.5rem;
+  font-weight: 900;
+  line-height: 1.1;
+}
+
+.nc-banner span {
+  font-size: 0.875rem;
+  color: var(--ink-soft);
+}
+
+.nc-banner__win {
+  color: var(--accent);
+}
+
+.nc-tip {
+  text-align: center;
+  font-weight: 800;
+  color: var(--ink-soft);
+}
+
+.nc-view .nc-tip {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  padding: 0 31%;
+  font-size: 0.8125rem;
+  line-height: 1.35;
+  pointer-events: none;
+}
+
+.nc-hint {
+  text-align: center;
+  font-size: 0.8125rem;
+  color: var(--ink-soft);
+}
+
+/* 시작 */
+.nc-start {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-width: 420px;
+  margin: 8px auto 0;
+  text-align: center;
+}
+
+.nc-start__rules {
+  margin: 0;
+  padding: 12px 16px;
+  list-style: none;
+  text-align: left;
+  font-size: 0.875rem;
+  border: 1.5px solid var(--muted-line);
+  border-radius: 12px;
+  display: grid;
+  gap: 4px;
+}
+
+.nc-start__button {
+  flex-direction: column;
+  min-height: 64px;
+  font-size: 1.25rem;
+}
+
+.nc-start__button span {
+  font-size: 0.8125rem;
+  font-weight: 500;
+  opacity: 0.8;
+}
+
+.nc-start__record {
+  font-size: 0.8125rem;
+  color: var(--ink-soft);
+}
+
+.nc-start__bots {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border: 1.5px solid var(--muted-line);
+  border-radius: 12px;
+}
+
+.nc-start__label {
+  font-weight: 800;
+}
+
+.nc-start__counts {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 6px;
+}
+
+.nc-start__count--on {
+  color: var(--paper);
+  background: var(--ink);
+}
+
+/* 결과 */
+.nc-result {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-width: 420px;
+  margin: 8px auto 0;
+}
+
+.nc-result__headline {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 20px 16px;
+  border: 2px solid var(--line);
+  border-radius: 14px;
+  text-align: center;
+}
+
+.nc-result__headline strong {
+  font-size: 3rem;
+  font-weight: 900;
+  line-height: 1.1;
+}
+
+.nc-result__headline span {
+  color: var(--ink-soft);
+  font-size: 0.875rem;
+}
+
+.nc-result__headline--win {
+  border-color: #d97706;
+  background: #fffbeb;
+}
+
+.nc-result__headline--win strong {
+  color: var(--accent);
+}
+
+.nc-result__ranking {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 6px;
+}
+
+.nc-result__ranking li {
+  padding: 8px 12px;
+  border: 1.5px solid var(--muted-line);
+  border-radius: 10px;
+  font-weight: 700;
+}
+
+.nc-result__ranking li span {
+  display: inline-block;
+  width: 2.5em;
+  color: var(--ink-soft);
+}
+
+.nc-result__ranking .nc-result__me {
+  border-color: #2563eb;
+  color: #2563eb;
+}
+
+.nc-result__career,
+.nc-result__note {
+  text-align: center;
+  font-size: 0.875rem;
+  color: var(--ink-soft);
+}
+
+.nc-result__buttons {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+}
+
+
+/* 머리 위 말풍선: 외친 숫자 / 겹침 / 결승 손 */
+.nc-seat {
+  pointer-events: none;
+}
+
+.nc-bubble {
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 2px 10px;
+  border: 2px solid var(--line);
+  border-radius: 999px;
+  background: var(--paper);
+  font-size: 1.125rem;
+  font-weight: 900;
+  white-space: nowrap;
+  animation: nc-pop 0.2s ease-out;
+}
+
+@keyframes nc-pop {
+  from { transform: translateX(-50%) scale(0.4); }
+  to { transform: translateX(-50%) scale(1); }
+}
+
+.nc-bubble--clash {
+  border-color: var(--accent);
+  color: var(--paper);
+  background: var(--accent);
+  font-size: 0.875rem;
+}
+
+.nc-bubble--wait {
+  font-size: 0.8125rem;
+  color: var(--ink-soft);
+  border-color: var(--muted-line);
+}
+
+.nc-bubble--hand {
+  font-size: 0.9375rem;
+}
+
+.nc-seat--lost,
+.nc-seat--lost:disabled {
+  color: var(--accent);
+}
+
+.nc-seat--win {
+  color: #d97706;
+}
+
+.nc-banner__num {
+  color: #2563eb;
+}
+
+.nc-banner__small {
+  font-size: 1.25rem !important;
+}
+
+.nc-banner__bad {
+  color: var(--accent);
+}
+
+.nc-timer {
+  height: 6px;
+  border: 2px solid var(--line);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.nc-timer__fill {
+  height: 100%;
+  background: var(--ink);
+  transform-origin: left;
+}
+
+/* 외치기 버튼: 크게 */
+.nc-call {
+  min-height: 110px;
+  font-size: 2rem;
+  font-weight: 900;
+  border-radius: 18px;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  touch-action: manipulation;
+}
+
+.nc-call:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.nc-call--on {
+  border-color: #2563eb;
+  color: #2563eb;
+}
+
+.nc-call--on:active {
+  color: var(--paper);
+  background: #2563eb;
+}
+
+/* 결승 가위바위보 */
+.nc-hands {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.nc-hands__button {
+  min-height: 110px;
+  font-size: 1.125rem;
+  font-weight: 900;
+  border-radius: 16px;
+  touch-action: manipulation;
+}
+
+.nc-hands__button[aria-pressed='true'] {
+  color: var(--paper);
+  background: var(--ink);
+}
+
+.nc-hands__button:disabled {
+  opacity: 0.45;
+}
