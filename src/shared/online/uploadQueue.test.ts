@@ -20,3 +20,20 @@ describe('newRecordId', () => {
     for (const id of ids) expect(id).toMatch(UUID_V4)
   })
 })
+
+describe('isAuthError', () => {
+  it('토큰 만료·권한 거부는 로그인 문제로 본다', async () => {
+    const { isAuthError } = await import('./supabase')
+    expect(isAuthError({ code: 'PGRST301', message: 'JWT expired' })).toBe(true)
+    expect(isAuthError({ message: 'invalid JWT: unable to parse or verify signature' })).toBe(true)
+    expect(isAuthError({ code: '42501', message: 'new row violates row-level security policy' })).toBe(true)
+    expect(isAuthError({ status: 401 })).toBe(true)
+  })
+
+  it('중복·형식 오류는 로그인 문제가 아니다', async () => {
+    const { isAuthError } = await import('./supabase')
+    expect(isAuthError({ code: '23505', message: 'duplicate key' })).toBe(false)
+    expect(isAuthError({ code: '23514', message: 'violates check constraint' })).toBe(false)
+    expect(isAuthError(null)).toBe(false)
+  })
+})

@@ -1,5 +1,5 @@
 import { readLocal, writeLocal } from '../storage/local'
-import { ensurePlayerId, getSupabase, isOnlineConfigured } from './supabase'
+import { ensurePlayerId, getSupabase, isAuthError, isOnlineConfigured, recoverSession } from './supabase'
 
 // 게임 결과를 Supabase 테이블에 올리는 공용 큐.
 // 올리기에 실패하면 기기(localStorage)에 쌓아 두었다가 다음에 다시 보낸다.
@@ -49,7 +49,13 @@ export function createUploadQueue<Row extends { id: string }>(table: string, sto
     try {
       await ensurePlayerId()
       const supabase = await getSupabase()
-      const { error } = await supabase.from(table).insert(pending)
+      let { error, status } = await supabase.from(table).insert(pending)
+      // 저장된 로그인이 만료됐으면 되살려서 한 번 더
+      if (error && isAuthError({ ...error, status })) {
+        console.warn('[upload] 로그인 문제로 거부됨, 다시 로그인해서 재시도', error.code, error.message)
+        await recoverSession()
+        ;({ error, status } = await supabase.from(table).insert(pending))
+      }
       // 23505: 이미 올라간 기록(같은 id)을 다시 보낸 경우. 하나씩 보내 중복만 건너뛴다.
       if (error?.code === '23505') {
         const left: Row[] = []
@@ -63,7 +69,9 @@ export function createUploadQueue<Row extends { id: string }>(table: string, sto
       if (error) throw error
       save([])
       return 0
-    } catch {
+    } catch (e) {
+      // 원인을 나중에 확인할 수 있게 콘솔에 남긴다. 기록은 기기에 남아 다음에 다시 보낸다
+      console.warn('[upload] 기록 올리기 실패', table, e)
       return pending.length
     }
   }

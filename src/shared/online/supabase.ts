@@ -55,3 +55,29 @@ export async function ensurePlayerId(): Promise<string> {
   if (error || !data.user) throw error ?? new Error('익명 로그인 실패')
   return data.user.id
 }
+
+/**
+ * 저장된 로그인이 만료·손상돼 서버가 거부할 때 되살린다.
+ * 먼저 같은 계정으로 토큰을 새로 받고(기록이 같은 사람으로 이어짐), 그것도 안 되면 새 익명 계정을 만든다.
+ */
+export async function recoverSession(): Promise<void> {
+  const supabase = await getSupabase()
+  const refreshed = await supabase.auth.refreshSession()
+  if (!refreshed.error && refreshed.data.session) return
+  console.warn('[upload] 로그인 갱신 실패, 새 익명 계정으로 접속', refreshed.error?.message)
+  await supabase.auth.signOut({ scope: 'local' })
+  await ensurePlayerId()
+}
+
+/** 로그인(토큰·권한) 문제로 거부된 오류인지 */
+export function isAuthError(error: { code?: string; message?: string; status?: number } | null): boolean {
+  if (!error) return false
+  return (
+    error.status === 401 ||
+    error.code === 'PGRST301' ||
+    error.code === 'PGRST303' ||
+    error.code === '42501' ||
+    /jwt/i.test(error.message ?? '')
+  )
+}
+
