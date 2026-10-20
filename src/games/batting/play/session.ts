@@ -1,7 +1,7 @@
 // 한 경기(10구)의 진행 상태. 시간(now)과 시드 난수를 상태에 담아 순수 리듀서로 유지한다.
 import { createRng } from '../../../shared/random'
 import { type Difficulty, type Hand, TOTAL_PITCHES } from '../constants'
-import { type Cell, type Contact, type Outcome, judgeSwing, timingWindows } from '../rules/judge'
+import { type Contact, type Outcome, type ZonePoint, judgeSwing, timingWindows } from '../rules/judge'
 import { type Totals, totalOf } from '../rules/scoring'
 import { type BattedBall, battedBallEndAt, createBattedBall } from './battedBall'
 import { type Pitch, ballPosition, createPitch, pitchEndAt } from './pitch'
@@ -12,15 +12,15 @@ export type SoundName = 'pitch' | 'mitt' | 'hit' | 'weak' | 'whiff' | 'homerun' 
 export type PitchRecord = {
   index: number
   pitch: Pitch
-  /** 터치한 칸. 안 쳤으면 null */
-  touched: Cell | null
+  /** 터치한 곳. 안 쳤으면 null */
+  touched: ZonePoint | null
   outcome: Outcome
   contact: Contact | null
   /** 터치 시각 − 도착 시각. 안 쳤으면 null */
   offsetMs: number | null
 }
 
-export type Swing = { cell: Cell; at: number }
+export type Swing = { point: ZonePoint; at: number }
 
 export type Phase =
   /** 다음 공 기다리는 중 */
@@ -46,15 +46,16 @@ export type SessionState = {
   soundSeq: number
 }
 
-export type SessionAction = { type: 'tick'; now: number } | { type: 'swing'; cell: Cell; at: number }
+export type SessionAction = { type: 'tick'; now: number } | { type: 'swing'; point: ZonePoint; at: number }
 
-export const FIRST_READY_MS = 900
-export const READY_MS = 500
+export const FIRST_READY_MS = 1200
+/** 공과 공 사이 쉬는 시간 */
+export const READY_MS = 1500
 export const WINDUP_MS = 900
 /** 결과를 보여주는 최소 시간 */
-export const RESULT_MS = 1300
-/** 마지막 공 뒤 결과 화면으로 넘어가기까지 */
-export const DONE_MS = 900
+export const RESULT_MS = 1800
+/** 마지막 공 뒤 '경기 끝'을 보여주고 결과 화면으로 넘어가기까지 */
+export const DONE_MS = 1800
 
 function withSounds(state: SessionState, ...names: SoundName[]): SessionState {
   let seq = state.soundSeq
@@ -114,20 +115,20 @@ function showResult(state: SessionState, pitch: Pitch, swing: Swing | null, reco
   }
 }
 
-function swing(state: SessionState, cell: Cell, at: number): SessionState {
+function swing(state: SessionState, point: ZonePoint, at: number): SessionState {
   const { phase } = state
   if (phase.kind !== 'pitching' || phase.swing) return state
   const { pitch } = phase
   const result = judgeSwing({
     difficulty: state.difficulty,
     hand: state.hand,
-    touched: cell,
+    touch: point,
     ball: pitch.cell,
     swingAt: at,
     arriveAt: pitch.arriveAt,
   })
-  const record: PitchRecord = { index: state.index, pitch, touched: cell, ...result }
-  const s: Swing = { cell, at }
+  const record: PitchRecord = { index: state.index, pitch, touched: point, ...result }
+  const s: Swing = { point, at }
   if (result.outcome === 'whiff') {
     // 헛스윙: 공은 미트까지 그대로 가고 끝나면 결과로
     return withSounds({ ...state, phase: { ...phase, swing: s, record } }, 'whiff')
@@ -171,7 +172,7 @@ export function sessionReducer(state: SessionState, action: SessionAction): Sess
     case 'tick':
       return tick({ ...state, now: action.now })
     case 'swing':
-      return swing(state, action.cell, action.at)
+      return swing(state, action.point, action.at)
   }
 }
 

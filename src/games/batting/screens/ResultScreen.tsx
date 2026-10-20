@@ -4,7 +4,7 @@ import { timingText } from '../game/describe'
 import { PITCH_LABEL } from '../play/pitch'
 import type { SessionSummary } from '../play/session'
 import { type BattingRecord, averageOf } from '../records'
-import { CONTACT_LABEL, OUTCOME_LABEL } from '../rules/judge'
+import { CONTACT_LABEL, OUTCOME_LABEL, nearestCell } from '../rules/judge'
 import { OUTCOME_POINTS, isHit } from '../rules/scoring'
 
 type Props = {
@@ -57,7 +57,7 @@ export function ResultScreen({ summary, record, newBest, upload, onRetry, onRank
               <td>
                 {PITCH_LABEL[r.pitch.type]} {r.pitch.cell}
               </td>
-              <td>{r.touched ?? '-'}</td>
+              <td>{r.touched ? nearestCell(r.touched) : '-'}</td>
               <td>
                 <strong>{OUTCOME_LABEL[r.outcome]}</strong>
                 {isHit(r.outcome) && ` +${OUTCOME_POINTS[r.outcome]}`}

@@ -6,6 +6,7 @@ import { useZoneSwing } from '../input/useZoneSwing'
 import { battedBallPosition } from '../play/battedBall'
 import { PITCH_LABEL, ballPosition, cellCenter } from '../play/pitch'
 import {
+  DONE_MS,
   type PitchRecord,
   type SessionState,
   type SessionSummary,
@@ -36,8 +37,20 @@ function Banner({ state }: { state: SessionState }) {
     return (
       <div className="bt-banner bt-banner--hint">
         <span className="bt-banner__sub">
-          {state.index + 1}번째 공 · 들어오는 칸을 터치!
+          {state.index + 1}번째 공 · 들어오는 곳을 터치!
         </span>
+      </div>
+    )
+  }
+  if (phase.kind === 'done') {
+    const total = totalOf(state.records.map((r) => r.outcome))
+    return (
+      <div className="bt-banner bt-banner--done" aria-live="polite">
+        <strong className="bt-banner__title">경기 끝!</strong>
+        <span className="bt-banner__sub">
+          {total.points}점 · 홈런 {total.homeruns}개
+        </span>
+        <span className="bt-banner__sub">결과 화면으로 넘어가요…</span>
       </div>
     )
   }
@@ -51,8 +64,7 @@ function Banner({ state }: { state: SessionState }) {
         {hit && <span className="bt-banner__points"> +{OUTCOME_POINTS[r.outcome]}</span>}
       </strong>
       <span className="bt-banner__sub">
-        {PITCH_LABEL[r.pitch.type]} · {r.pitch.cell}번
-        {r.touched !== null && ` · ${r.touched}번 터치`}
+        {PITCH_LABEL[r.pitch.type]} · {r.pitch.cell}번 칸
       </span>
       {r.offsetMs !== null && r.contact !== 'miss' && (
         <span className="bt-banner__sub">
@@ -102,7 +114,7 @@ export function GameScreen({ difficulty, hand, onFinish }: Props) {
   )
   const done = state.phase.kind === 'done'
 
-  const pointer = useZoneSwing((cell, at) => dispatch({ type: 'swing', cell, at }))
+  const pointer = useZoneSwing((point, at) => dispatch({ type: 'swing', point, at }))
 
   // 효과음: 리듀서가 쌓은 것 중 아직 재생하지 않은 것만
   const playedRef = useRef(0)
@@ -122,17 +134,19 @@ export function GameScreen({ difficulty, hand, onFinish }: Props) {
     return () => cancelAnimationFrame(id)
   }, [])
 
-  // 10구가 끝나면 잠깐 보여준 뒤 결과로
+  // 10구가 끝나면 '경기 끝'을 보여준 뒤 결과로.
+  // 상태는 매 프레임 바뀌므로 ref로 읽어서 타이머가 다시 걸리지 않게 한다
   const finishRef = useRef(onFinish)
+  const stateRef = useRef(state)
   useEffect(() => {
     finishRef.current = onFinish
+    stateRef.current = state
   })
   useEffect(() => {
     if (!done) return
-    const summary = summarizeSession(state)
-    const timer = setTimeout(() => finishRef.current(summary), 900)
+    const timer = setTimeout(() => finishRef.current(summarizeSession(stateRef.current)), DONE_MS)
     return () => clearTimeout(timer)
-  }, [done, state])
+  }, [done])
 
   const { phase, now } = state
   let ball = null
@@ -140,8 +154,8 @@ export function GameScreen({ difficulty, hand, onFinish }: Props) {
   else if (phase.kind === 'result') ball = phase.batted ? battedBallPosition(phase.batted, now) : ballPosition(phase.pitch, now)
 
   const swingOf = phase.kind === 'pitching' || phase.kind === 'result' ? phase.swing : null
-  const swing = swingOf ? { cell: swingOf.cell, progress: Math.min(1, Math.max(0, (now - swingOf.at) / SWING_MS)) } : null
-  const touched = swingOf && now - swingOf.at < TOUCH_FLASH_MS ? swingOf.cell : null
+  const swing = swingOf ? { point: swingOf.point, progress: Math.min(1, Math.max(0, (now - swingOf.at) / SWING_MS)) } : null
+  const touched = swingOf && now - swingOf.at < TOUCH_FLASH_MS ? swingOf.point : null
 
   // 지나간 공 자리. 이번 공은 결과가 나온 뒤에 진하게
   const marks: Mark[] = state.records.map((r, i) => {
@@ -177,8 +191,7 @@ export function GameScreen({ difficulty, hand, onFinish }: Props) {
 
       <ScoreStrip state={state} />
       <p className="bt-hint">
-        공이 들어오는 칸을 타이밍 맞춰 터치
-        <span className="bt-hint__pc"> · PC: 클릭 또는 Q W E / A S D / Z X C</span>
+        공이 들어오는 곳을 타이밍 맞춰 터치 (PC는 클릭)
       </p>
     </div>
   )

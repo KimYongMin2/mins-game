@@ -93,19 +93,13 @@
 
 .bt-zone .bt-zone__grid {
   stroke-width: 1;
-  stroke: var(--ink-soft);
-  stroke-dasharray: 4 4;
+  stroke: #eee;
 }
 
 .bt-view .bt-zone__touched {
   fill: rgba(0, 0, 0, 0.12);
-  stroke: none;
-}
-
-.bt-zone__num {
-  font-size: 11px;
-  fill: var(--muted-line);
-  font-weight: 700;
+  stroke: var(--ink-soft);
+  stroke-width: 1.5;
 }
 
 .bt-view .bt-ball {
@@ -151,6 +145,10 @@
   flex-direction: column;
   align-items: center;
   pointer-events: none;
+}
+
+.bt-banner--done {
+  inset: 22% 0 auto;
 }
 
 .bt-banner__title {
@@ -219,12 +217,6 @@
   text-align: center;
   font-size: 0.8125rem;
   color: var(--ink-soft);
-}
-
-@media (hover: none) and (pointer: coarse) {
-  .bt-hint__pc {
-    display: none;
-  }
 }
 
 /* 시작 */

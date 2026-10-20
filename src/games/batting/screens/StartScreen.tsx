@@ -61,7 +61,7 @@ export function StartScreen({ record, onChange, onStart, onRanking }: Props) {
   const avg = averageOf(level)
   return (
     <section className="bt-start">
-      <p className="subtitle">공 {TOTAL_PITCHES}개! 들어오는 칸을 타이밍 맞춰 터치해서 홈런을 노려요.</p>
+      <p className="subtitle">공 {TOTAL_PITCHES}개! 들어오는 곳을 타이밍 맞춰 터치해서 홈런을 노려요.</p>
 
       <Choice
         label="난이도"
@@ -102,9 +102,9 @@ export function StartScreen({ record, onChange, onStart, onRanking }: Props) {
         </button>
       )}
       <p className="bt-start__how">
-        같은 칸 + 정확한 타이밍 = 홈런. 배트 끝 너머는 헛스윙, 손잡이 쪽은 빗맞아요.
+        공 위치 + 정확한 타이밍 = 홈런. 배트 끝 너머는 헛스윙, 손잡이 쪽은 빗맞아요.
         <br />
-        PC는 클릭하거나 Q W E / A S D / Z X C
+        화면 아무 곳이나 터치(PC는 클릭)
       </p>
     </section>
   )

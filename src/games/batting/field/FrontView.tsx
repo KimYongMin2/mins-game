@@ -1,7 +1,7 @@
 import type { PointerEvent } from 'react'
 import type { Hand } from '../constants'
 import { BALL_RADIUS, RELEASE, type Vec3 } from '../play/pitch'
-import { type Cell, CELLS, cellPosition } from '../rules/judge'
+import type { ZonePoint } from '../rules/judge'
 import { CELL_SIZE, HORIZON_Y, VIEW_H, VIEW_W, project, zoneRect } from './view'
 
 // 정면 화면: 포수 뒤에서 본 투수·존·타자. 흰 바탕 선화.
@@ -12,7 +12,8 @@ export type PitcherPose = number
 export type SwingPose = {
   /** 0 준비 → CONTACT_AT 공을 맞히는 자세 → 1 팔로스루 */
   progress: number
-  cell: Cell
+  /** 터치한 곳 */
+  point: ZonePoint
 }
 
 /** 터치한 순간이 곧 맞는 순간이라 배트가 빨리 공에 닿게 한다 */
@@ -27,8 +28,8 @@ type Props = {
   swing: SwingPose | null
   /** 공이 지나간 자리 (×) */
   marks: Mark[]
-  /** 칸을 누르는 순간 잠깐 표시 */
-  touched: Cell | null
+  /** 누르는 순간 그 자리에 잠깐 표시 */
+  touched: ZonePoint | null
   onPointerDown?: (e: PointerEvent<SVGSVGElement>) => void
 }
 
@@ -39,14 +40,9 @@ function ballRadius(scale: number) {
   return Math.max(1.6, BALL_RADIUS * scale * 1.5)
 }
 
-function cellRect(cell: Cell) {
-  const { col, row } = cellPosition(cell)
-  return { x: ZONE.x + col * CELL_SIZE.width, y: ZONE.y + row * CELL_SIZE.height }
-}
-
-function cellMiddle(cell: Cell) {
-  const r = cellRect(cell)
-  return { x: r.x + CELL_SIZE.width / 2, y: r.y + CELL_SIZE.height / 2 }
+/** 존 안 위치(칸 단위) → 화면 좌표 */
+function viewOf(p: ZonePoint) {
+  return { x: ZONE.x + p.col * CELL_SIZE.width, y: ZONE.y + p.row * CELL_SIZE.height }
 }
 
 /** 땅 위 한 점 */
@@ -120,12 +116,11 @@ function Pitcher({ pose }: { pose: PitcherPose }) {
   )
 }
 
-function Zone({ touched }: { touched: Cell | null }) {
+/** 존 테두리와 옅은 칸 선. 칸 경계와 상관없이 아무 곳이나 누를 수 있다 */
+function Zone({ touched }: { touched: ZonePoint | null }) {
+  const t = touched && viewOf(touched)
   return (
     <g className="bt-zone">
-      {touched && (
-        <rect className="bt-zone__touched" {...cellRect(touched)} width={CELL_SIZE.width} height={CELL_SIZE.height} />
-      )}
       <rect x={ZONE.x} y={ZONE.y} width={ZONE.width} height={ZONE.height} />
       <path
         className="bt-zone__grid"
@@ -136,14 +131,7 @@ function Zone({ touched }: { touched: Cell | null }) {
           )
           .join('')}
       />
-      {CELLS.map((c) => {
-        const r = cellRect(c)
-        return (
-          <text key={c} className="bt-zone__num" x={r.x + 5} y={r.y + 14}>
-            {c}
-          </text>
-        )
-      })}
+      {t && <circle className="bt-zone__touched" cx={t.x} cy={t.y} r={16} />}
     </g>
   )
 }
@@ -163,15 +151,15 @@ function Batter({ hand, swing }: { hand: Hand; swing: SwingPose | null }) {
   const ready = { hands: { x: bodyX + 18, y: 196 }, tip: { x: bodyX - 6, y: 112 } }
   let pose = ready
   if (swing) {
-    const real = cellMiddle(swing.cell)
-    // 우타 기준 좌표로 그리므로 좌타는 칸 위치도 뒤집는다
+    const real = viewOf(swing.point)
+    // 우타 기준 좌표로 그리므로 좌타는 터치 위치도 뒤집는다
     const target = { x: side === 1 ? real.x : VIEW_W - real.x, y: real.y }
-    // 스윗스팟(터치한 칸)이 배트 길이의 70% 지점에 오도록
+    // 스윗스팟이 터치한 곳, 배트 끝은 그보다 반 칸 너머 (판정과 같게)
     const handsY = target.y + 14
     const hands = { x: Math.min(ZONE.x - 8, target.x - 80), y: handsY }
     const sweetLen = Math.hypot(target.x - hands.x, target.y - hands.y)
     const dir = { x: (target.x - hands.x) / sweetLen, y: (target.y - hands.y) / sweetLen }
-    const contact = { hands, tip: { x: hands.x + dir.x * sweetLen * 1.25, y: hands.y + dir.y * sweetLen * 1.25 } }
+    const contact = { hands, tip: { x: target.x + dir.x * CELL_SIZE.width * 0.5, y: target.y + dir.y * CELL_SIZE.width * 0.5 } }
     const follow = { hands: { x: hands.x + 30, y: hands.y - 40 }, tip: { x: hands.x + 10, y: hands.y - 150 } }
     const lerp = (a: typeof ready, b: typeof ready, k: number) => ({
       hands: { x: a.hands.x + (b.hands.x - a.hands.x) * k, y: a.hands.y + (b.hands.y - a.hands.y) * k },

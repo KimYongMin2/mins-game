@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { type Cell, CELLS, cellAt, cellPosition, contactOf, judgeSwing } from './judge'
+import { type Cell, CELLS, cellAt, cellMiddle, cellPosition, contactAt, contactOf, judgeSwing, nearestCell } from './judge'
 
 describe('칸 번호', () => {
   it('키패드 배치: 1 2 3 / 4 5 6 / 7 8 9', () => {
@@ -63,7 +63,7 @@ describe('contactOf (맞은 위치)', () => {
 
 describe('judgeSwing (타이밍)', () => {
   const swing = (offset: number, touched: Cell = 5, ball: Cell = 5, difficulty: 'normal' | 'hard' = 'normal') =>
-    judgeSwing({ difficulty, hand: 'right', touched, ball, swingAt: 1000 + offset, arriveAt: 1000 })
+    judgeSwing({ difficulty, hand: 'right', touch: cellMiddle(touched), ball, swingAt: 1000 + offset, arriveAt: 1000 })
 
   it.each([
     [0, 'homerun'],
@@ -103,5 +103,33 @@ describe('judgeSwing (타이밍)', () => {
 
   it('타이밍 차이는 부호 그대로 (빠르면 음수)', () => {
     expect(swing(-42).offsetMs).toBe(-42)
+  })
+})
+
+describe('contactAt (칸 경계와 상관없이 터치)', () => {
+  const six = cellMiddle(6)
+
+  it('공이 들어온 칸 안 어디를 눌러도 정타', () => {
+    expect(contactAt('right', { col: 2.05, row: 1.1 }, six)).toBe('sweet')
+    expect(contactAt('right', { col: 2.95, row: 1.9 }, six)).toBe('sweet')
+  })
+
+  it('칸 경계(5·6 사이)를 누르면 좋은 쪽으로 판정', () => {
+    expect(contactAt('right', { col: 2, row: 1.5 }, six)).toBe('sweet')
+    expect(contactAt('right', { col: 1.5, row: 1.5 }, cellMiddle(5))).toBe('sweet')
+  })
+
+  it('공보다 반 칸 넘게 손잡이 쪽에서 맞으면 빗맞음, 끝 너머면 헛스윙', () => {
+    // 공은 5번 가운데(1.5), 터치는 그보다 0.7칸 오른쪽
+    expect(contactAt('right', { col: 2.2, row: 1.5 }, cellMiddle(5))).toBe('off')
+    expect(contactAt('left', { col: 2.2, row: 1.5 }, cellMiddle(5))).toBe('miss')
+    // 반 칸 이내로 끝 너머면 아직 정타
+    expect(contactAt('right', { col: 1.9, row: 1.5 }, six)).toBe('miss')
+    expect(contactAt('right', { col: 2.05, row: 1.5 }, six)).toBe('sweet')
+  })
+
+  it('nearestCell: 존 밖은 가장 가까운 칸', () => {
+    expect(nearestCell({ col: 2.5, row: 1.5 })).toBe(6)
+    expect(nearestCell({ col: -1, row: 5 })).toBe(7)
   })
 })
