@@ -6,6 +6,7 @@ import { EMPTY_RECORD, addMatch, formatAverage, formatEra, formatInnings, loadRe
 function summary(over: Partial<MatchSummary>): MatchSummary {
   return {
     config: { difficulty: 'normal', userSide: 'away' },
+    mode: 'bot',
     outcome: 'win',
     userRuns: 3,
     botRuns: 1,
@@ -17,6 +18,14 @@ function summary(over: Partial<MatchSummary>): MatchSummary {
 }
 
 describe('addMatch', () => {
+  it('친구 대전은 승패무만 따로 세고 봇전 기록·타격 기록에 섞지 않는다', () => {
+    let r = addMatch(EMPTY_RECORD, summary({ mode: 'pvp' }))
+    r = addMatch(r, summary({ mode: 'pvp', outcome: 'lose' }))
+    expect(r.pvp).toEqual({ wins: 1, losses: 1, draws: 0 })
+    expect(r.normal).toEqual(EMPTY_RECORD.normal)
+    expect([r.atBats, r.homeruns]).toEqual([0, 0])
+  })
+
   it('난이도별 승패무와 타격 기록을 더한다', () => {
     let r = addMatch(EMPTY_RECORD, summary({}))
     r = addMatch(r, summary({ outcome: 'lose', config: { difficulty: 'hard', userSide: 'home' } }))

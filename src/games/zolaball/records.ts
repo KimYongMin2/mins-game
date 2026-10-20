@@ -6,8 +6,9 @@ const GAME_ID = 'zolaball'
 
 export type WinLossDraw = { wins: number; losses: number; draws: number }
 
-/** 야구 통산 전적 */
+/** 야구 통산 전적 (봇 대전). 친구 대전은 pvp에 승패무만 따로 센다 */
 export type ZolaballRecord = Record<Difficulty, WinLossDraw> & {
+  pvp: WinLossDraw
   homeruns: number
   atBats: number
   hits: number
@@ -19,6 +20,7 @@ export type ZolaballRecord = Record<Difficulty, WinLossDraw> & {
 export const EMPTY_RECORD: ZolaballRecord = {
   normal: { wins: 0, losses: 0, draws: 0 },
   hard: { wins: 0, losses: 0, draws: 0 },
+  pvp: { wins: 0, losses: 0, draws: 0 },
   homeruns: 0,
   atBats: 0,
   hits: 0,
@@ -27,12 +29,18 @@ export const EMPTY_RECORD: ZolaballRecord = {
   runsAllowed: 0,
 }
 
+function addOutcome(wld: WinLossDraw, outcome: MatchSummary['outcome']): WinLossDraw {
+  return {
+    wins: wld.wins + (outcome === 'win' ? 1 : 0),
+    losses: wld.losses + (outcome === 'lose' ? 1 : 0),
+    draws: wld.draws + (outcome === 'draw' ? 1 : 0),
+  }
+}
+
 export function addMatch(record: ZolaballRecord, summary: MatchSummary): ZolaballRecord {
+  if (summary.mode === 'pvp') return { ...record, pvp: addOutcome(record.pvp, summary.outcome) }
   const { difficulty } = summary.config
-  const wld = { ...record[difficulty] }
-  if (summary.outcome === 'win') wld.wins++
-  else if (summary.outcome === 'lose') wld.losses++
-  else wld.draws++
+  const wld = addOutcome(record[difficulty], summary.outcome)
   return {
     ...record,
     [difficulty]: wld,

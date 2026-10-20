@@ -6,6 +6,7 @@ type Props = {
   record: ZolaballRecord
   onStart: (difficulty: Difficulty) => void
   onPractice: () => void
+  onPvp: () => void
   onRanking: () => void
 }
 
@@ -15,7 +16,7 @@ const OPTIONS: { value: Difficulty; label: string; desc: string }[] = [
 ]
 
 /** 난이도 선택 */
-export function MenuScreen({ record, onStart, onPractice, onRanking }: Props) {
+export function MenuScreen({ record, onStart, onPractice, onPvp, onRanking }: Props) {
   return (
     <section className="zb-menu">
       <p className="subtitle">봇과 {INNINGS}이닝 대결! 선공·후공은 무작위예요.</p>
@@ -35,6 +36,12 @@ export function MenuScreen({ record, onStart, onPractice, onRanking }: Props) {
       </div>
       <p className="zb-menu__career">
         통산 타율 {formatAverage(record.hits, record.atBats)} · 홈런 {record.homeruns}
+      </p>
+      <button type="button" className="button zb-menu__pvp" onClick={onPvp}>
+        친구 대전 <span>(방 코드로 초대)</span>
+      </button>
+      <p className="zb-menu__career">
+        친구 대전 {record.pvp.wins}승 {record.pvp.losses}패 {record.pvp.draws}무
       </p>
       <div className="zb-menu__sub-buttons">
         <button type="button" className="button" onClick={onRanking}>

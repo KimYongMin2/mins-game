@@ -3,6 +3,8 @@ import { type Bases, type GameState, type Side, totalRuns } from '../rules/game'
 type Props = {
   game: GameState
   userSide: Side
+  /** 상대 이름 (봇 대전은 '봇') */
+  opponentName?: string
 }
 
 function Dots({ count, max, label }: { count: number; max: number; label: string }) {
@@ -43,7 +45,7 @@ function BaseDiamond({ bases }: { bases: Bases }) {
   )
 }
 
-export function Scoreboard({ game, userSide }: Props) {
+export function Scoreboard({ game, userSide, opponentName = '봇' }: Props) {
   const botSide: Side = userSide === 'away' ? 'home' : 'away'
   const userBatting = (game.half === 'top') === (userSide === 'away')
 
@@ -54,12 +56,12 @@ export function Scoreboard({ game, userSide }: Props) {
         <span>{game.half === 'top' ? '초 ▲' : '말 ▼'}</span>
       </div>
 
-      <div className="zb-scoreboard__score" aria-label={`나 ${totalRuns(game, userSide)}점, 봇 ${totalRuns(game, botSide)}점`}>
+      <div className="zb-scoreboard__score" aria-label={`나 ${totalRuns(game, userSide)}점, ${opponentName} ${totalRuns(game, botSide)}점`}>
         <span className={userBatting ? 'zb-team zb-team--batting' : 'zb-team'}>나</span>
         <strong className="zb-runs">{totalRuns(game, userSide)}</strong>
         <span className="zb-colon">:</span>
         <strong className="zb-runs">{totalRuns(game, botSide)}</strong>
-        <span className={userBatting ? 'zb-team' : 'zb-team zb-team--batting'}>봇</span>
+        <span className={userBatting ? 'zb-team' : 'zb-team zb-team--batting'}>{opponentName}</span>
       </div>
 
       <div className="zb-scoreboard__count">

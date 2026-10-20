@@ -1,4 +1,5 @@
-import { useEffect, useReducer, useRef } from 'react'
+import { useEffect, useReducer, useRef, useState } from 'react'
+import type { Room } from '../../../shared/online/room'
 import { SWING_DURATION_MS } from '../constants'
 import { Field } from '../field/Field'
 import { CAMERA_PITCH, type Camera } from '../field/camera'
@@ -24,12 +25,17 @@ import {
   summarize,
 } from './matchState'
 import { PitchPad } from './PitchPad'
+import { type BaseballMsg, actionOf, outbox } from './pvp'
 import { Scoreboard } from './Scoreboard'
 import { TimerBar } from './TimerBar'
 
 type Props = {
   config: MatchConfig
+  /** 친구 대전이면 방과 상대 이름 */
+  pvp?: { room: Room<BaseballMsg>; peerName: string }
   onFinish: (summary: MatchSummary) => void
+  /** 친구 대전 중 상대가 나갔을 때 '나가기' */
+  onQuit?: () => void
 }
 
 function Banner({ state }: { state: MatchState }) {
@@ -88,10 +94,35 @@ function Banner({ state }: { state: MatchState }) {
   return null
 }
 
-export function MatchScreen({ config, onFinish }: Props) {
+export function MatchScreen({ config, pvp, onFinish, onQuit }: Props) {
   const [state, dispatch] = useReducer(matchReducer, undefined, () =>
     createMatch(config, performance.now(), randomSeed()),
   )
+  const [peerGone, setPeerGone] = useState(false)
+
+  // 친구 대전: 받은 투구·판정을 경기에 넣고, 상대가 나가면 알린다
+  useEffect(() => {
+    if (!pvp) return
+    const offMsg = pvp.room.onMessage((msg) => {
+      const action = actionOf(msg)
+      if (action) dispatch(action)
+    })
+    const offPeer = pvp.room.onPeer((peer) => {
+      if (!peer) setPeerGone(true)
+    })
+    return () => {
+      offMsg()
+      offPeer()
+    }
+  }, [pvp])
+
+  // 친구 대전: 내가 던진 공·내 판정을 보낸다 (지난번 보낸 뒤의 모든 변화를 비교)
+  const sentRef = useRef(state)
+  useEffect(() => {
+    if (!pvp) return
+    for (const msg of outbox(sentRef.current, state)) pvp.room.send(msg)
+    sentRef.current = state
+  }, [pvp, state])
   const userBatting = isUserBatting(state)
   const userPitching = isUserPitching(state)
   const { phase, now } = state
@@ -113,10 +144,10 @@ export function MatchScreen({ config, onFinish }: Props) {
   // 경기가 끝난 순간 한 번만 알린다.
   const reportedRef = useRef(false)
   useEffect(() => {
-    if (!finished || reportedRef.current) return
+    if (!finished || reportedRef.current || peerGone) return
     reportedRef.current = true
     finishRef.current(summarize(state))
-  }, [finished, state])
+  }, [finished, state, peerGone])
 
   // 효과음: 리듀서가 쌓은 것 중 아직 재생하지 않은 것만
   const playedRef = useRef(0)
@@ -161,14 +192,14 @@ export function MatchScreen({ config, onFinish }: Props) {
     timerRemaining = left / PITCH_CHOICE_MS
     timerLabel = `${Math.max(0, Math.ceil(left / 1000))}초 남음`
   } else if (phase.kind === 'choosing') {
-    timerLabel = '상대 투수 준비 중'
+    timerLabel = pvp ? `${pvp.peerName}님이 구종을 고르는 중` : '상대 투수 준비 중'
   } else if (phase.kind === 'pitching') {
     timerLabel = userBatting ? '지금 스윙!' : '투구!'
   }
 
   return (
     <div className="zb-match">
-      <Scoreboard game={state.game} userSide={config.userSide} />
+      <Scoreboard game={state.game} userSide={config.userSide} opponentName={pvp?.peerName} />
 
       <div className="zb-field-wrap zb-field-wrap--match">
         <Field camera={camera} ball={ball} swing={swingProgress} mark={mark} />
@@ -202,6 +233,15 @@ export function MatchScreen({ config, onFinish }: Props) {
         )}
         {userPitching && <p className="zb-hint">PC: 숫자 1~4로 구종, ↑↓로 높이</p>}
       </div>
+      {peerGone && !finished && (
+        <div className="pvp-gone" role="alert">
+          <strong>{pvp?.peerName}님이 나갔어요</strong>
+          <span>이 경기는 기록되지 않아요</span>
+          <button type="button" className="button" onClick={onQuit}>
+            나가기
+          </button>
+        </div>
+      )}
     </div>
   )
 }
