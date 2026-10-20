@@ -6,11 +6,11 @@ import { PASS_MS } from '../constants'
 
 export type Grade = 'perfect' | 'great' | 'good' | 'miss'
 
-/** 과녁 한가운데에서 떨어진 정도(게이지 끝까지 = 1) 이내면 그 판정. 위에서부터 */
+/** 과녁 한가운데에서 떨어진 정도(게이지 끝까지 = 1) 이내면 그 판정. 위에서부터 (처음 0.08/0.2/0.4는 너무 쉬워 반쯤으로 좁힘) */
 export const GRADES: readonly { grade: Exclude<Grade, 'miss'>; within: number; push: number }[] = [
-  { grade: 'perfect', within: 0.08, push: 0.16 },
-  { grade: 'great', within: 0.2, push: 0.1 },
-  { grade: 'good', within: 0.4, push: 0.05 },
+  { grade: 'perfect', within: 0.04, push: 0.16 },
+  { grade: 'great', within: 0.1, push: 0.1 },
+  { grade: 'good', within: 0.22, push: 0.05 },
 ]
 
 export const GRADE_LABEL: Record<Grade, string> = { perfect: '완벽!', great: '좋음', good: '보통', miss: '놓침' }

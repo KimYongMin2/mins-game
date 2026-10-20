@@ -17,8 +17,9 @@ describe('타이밍 게이지', () => {
     // 첫 지나감은 왼쪽 → 오른쪽: 0.1ms 늦으면 막대가 0.1 / (PASS_MS / 2)만큼 더 감
     const later = (d: number) => hit + (d * PASS_MS) / 2
     expect(gradeAt(hit, c).grade).toBe('perfect')
-    expect(gradeAt(later(0.12), c).grade).toBe('great')
-    expect(gradeAt(later(0.3), c).grade).toBe('good')
+    expect(gradeAt(later(0.07), c).grade).toBe('great')
+    expect(gradeAt(later(0.15), c).grade).toBe('good')
+    expect(gradeAt(later(0.3), c).grade).toBe('miss')
     expect(gradeAt(later(-0.6), c).grade).toBe('miss')
     expect(pushOf('perfect')).toBeGreaterThan(pushOf('great'))
     expect(pushOf('miss')).toBe(0)
