@@ -275,3 +275,84 @@ $$;
 
 revoke all on function public.batting_leaderboard(text) from public;
 grant execute on function public.batting_leaderboard(text) to anon, authenticated;
+
+
+-- ───────────────────────────────────────────────────────────────
+-- 격투 온라인 랭킹
+-- - fight_games: 경기 한 판의 결과 한 줄. 본인 기록만 쓰고 읽을 수 있다.
+-- - fight_leaderboard(난이도): 선수별 승/패/무와 최다 연승. 이 합계만 공개한다.
+
+create table if not exists public.fight_games (
+  id uuid primary key default gen_random_uuid(),
+  player_id uuid not null default auth.uid() references auth.users (id) on delete cascade,
+  nickname text not null check (char_length(btrim(nickname)) between 1 and 10),
+  difficulty text not null check (difficulty in ('normal', 'hard')),
+  outcome text not null check (outcome in ('win', 'lose', 'draw')),
+  -- 생명력 3이라 최소 3턴, 턴 제한 30
+  turns int not null check (turns between 3 and 30),
+  -- 이 경기 뒤의 연승. 이긴 경기만 1 이상
+  win_streak int not null check (win_streak between 0 and 100000),
+  created_at timestamptz not null default now(),
+  constraint fight_streak_only_on_win check ((outcome = 'win') = (win_streak > 0))
+);
+
+create index if not exists fight_games_difficulty_player_idx
+  on public.fight_games (difficulty, player_id);
+
+alter table public.fight_games enable row level security;
+
+drop policy if exists "본인 기록 추가" on public.fight_games;
+create policy "본인 기록 추가" on public.fight_games
+  for insert to authenticated
+  with check (player_id = (select auth.uid()));
+
+drop policy if exists "본인 기록 보기" on public.fight_games;
+create policy "본인 기록 보기" on public.fight_games
+  for select to authenticated
+  using (player_id = (select auth.uid()));
+
+drop policy if exists "본인 기록 삭제" on public.fight_games;
+create policy "본인 기록 삭제" on public.fight_games
+  for delete to authenticated
+  using (player_id = (select auth.uid()));
+
+revoke all on public.fight_games from anon;
+grant select, insert, delete on public.fight_games to authenticated;
+
+-- 선수별 합계. 닉네임은 가장 최근 경기의 것. 최다 연승은 그 연승에 처음 닿은 시각도 함께.
+create or replace function public.fight_leaderboard(p_difficulty text)
+returns table (
+  player_id uuid,
+  nickname text,
+  wins int,
+  losses int,
+  draws int,
+  best_streak int,
+  best_streak_at timestamptz
+)
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  with mine as (
+    select * from public.fight_games g where g.difficulty = p_difficulty
+  ),
+  agg as (
+    select m.player_id,
+           (array_agg(m.nickname order by m.created_at desc))[1] as nickname,
+           (count(*) filter (where m.outcome = 'win'))::int as wins,
+           (count(*) filter (where m.outcome = 'lose'))::int as losses,
+           (count(*) filter (where m.outcome = 'draw'))::int as draws,
+           max(m.win_streak)::int as best_streak
+    from mine m
+    group by m.player_id
+  )
+  select a.player_id, a.nickname, a.wins, a.losses, a.draws, a.best_streak,
+         (select min(m.created_at) from mine m
+           where m.player_id = a.player_id and m.win_streak = a.best_streak and a.best_streak > 0)
+  from agg a
+$$;
+
+revoke all on function public.fight_leaderboard(text) from public;
+grant execute on function public.fight_leaderboard(text) to anon, authenticated;

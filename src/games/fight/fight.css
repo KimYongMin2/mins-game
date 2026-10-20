@@ -1,0 +1,465 @@
+/* 격투(fight) 전용 스타일. 모든 클래스는 ft- 접두사를 쓴다. */
+.ft-page {
+  max-width: 560px;
+}
+
+.ft-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.ft-header .title {
+  flex: 1;
+  min-width: 0;
+}
+
+/* 경기 화면 */
+.ft-game {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.ft-hud {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 8px;
+}
+
+.ft-hud__turn {
+  font-size: 0.8125rem;
+  color: var(--ink-soft);
+  font-variant-numeric: tabular-nums;
+}
+
+.ft-status {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.ft-status--foe {
+  align-items: flex-end;
+}
+
+.ft-status__name {
+  font-weight: 800;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
+
+.ft-status__life {
+  font-size: 1.375rem;
+  line-height: 1;
+  letter-spacing: 2px;
+}
+
+.ft-heart {
+  color: var(--accent);
+}
+
+.ft-heart--lost {
+  color: var(--muted-line);
+}
+
+.ft-status__stacks {
+  display: flex;
+  gap: 4px;
+}
+
+.ft-stack {
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--line);
+  border-radius: 50%;
+}
+
+.ft-stack--on {
+  background: #f59e0b;
+  border-color: #b45309;
+}
+
+.ft-view-wrap {
+  position: relative;
+  border: 2px solid var(--line);
+  border-radius: 14px;
+  overflow: hidden;
+  background: var(--paper);
+}
+
+.ft-view {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 360 / 220;
+  color: var(--ink);
+}
+
+.ft-view path,
+.ft-view circle {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.ft-view .ft-ground {
+  stroke: var(--muted-line);
+  stroke-width: 2;
+}
+
+.ft-view .ft-head {
+  fill: var(--paper);
+}
+
+.ft-fighter--hurt {
+  color: var(--accent);
+}
+
+.ft-view .ft-aura {
+  stroke: #f59e0b;
+  stroke-width: 2.5;
+}
+
+.ft-view .ft-shield {
+  stroke: #3b82f6;
+  stroke-width: 4;
+  opacity: 0.6;
+}
+
+.ft-view .ft-shield--hit {
+  opacity: 1;
+  stroke-width: 6;
+}
+
+.ft-view .ft-clash path {
+  stroke: #f59e0b;
+  stroke-width: 3;
+}
+
+.ft-view text {
+  text-anchor: middle;
+  font-weight: 900;
+}
+
+.ft-secret {
+  font-size: 28px;
+  fill: var(--muted-line);
+}
+
+.ft-pop {
+  font-size: 22px;
+  paint-order: stroke;
+  stroke: var(--paper);
+  stroke-width: 4px;
+}
+
+.ft-pop--good {
+  fill: #15803d;
+}
+
+.ft-pop--bad {
+  fill: var(--accent);
+}
+
+.ft-pop--plain {
+  fill: var(--ink-soft);
+}
+
+.ft-name {
+  font-size: 12px;
+  fill: var(--ink-soft);
+  font-weight: 700;
+}
+
+.ft-banner {
+  position: absolute;
+  inset: 8% 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  pointer-events: none;
+}
+
+.ft-banner strong {
+  font-size: clamp(2rem, 9vw, 3rem);
+  font-weight: 900;
+  line-height: 1.1;
+  background: var(--paper);
+  padding: 0 10px;
+  border-radius: 10px;
+}
+
+.ft-banner .ft-banner__win {
+  color: var(--accent);
+}
+
+.ft-banner span {
+  font-size: 0.9375rem;
+  color: var(--ink-soft);
+  background: var(--paper);
+  padding: 0 6px;
+}
+
+.ft-timer {
+  height: 8px;
+  border: 2px solid var(--line);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.ft-timer__fill {
+  height: 100%;
+  background: var(--ink);
+  transform-origin: left;
+}
+
+.ft-pad {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.ft-pad__button {
+  flex-direction: column;
+  gap: 2px;
+  min-height: 84px;
+  padding: 8px 4px;
+  border-radius: 14px;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+
+.ft-pad__button[aria-pressed='true'] {
+  color: var(--paper);
+  background: var(--ink);
+}
+
+.ft-pad__button:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.ft-pad__label {
+  font-size: 1.375rem;
+  font-weight: 900;
+}
+
+.ft-pad__desc {
+  font-size: 0.75rem;
+  font-weight: 500;
+  opacity: 0.75;
+}
+
+.ft-hint {
+  text-align: center;
+  font-size: 0.8125rem;
+  color: var(--ink-soft);
+}
+
+/* 시작 */
+.ft-start {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-width: 420px;
+  margin: 8px auto 0;
+  text-align: center;
+}
+
+.ft-start__rules {
+  margin: 0;
+  padding: 12px 16px;
+  list-style: none;
+  text-align: left;
+  font-size: 0.875rem;
+  border: 1.5px solid var(--muted-line);
+  border-radius: 12px;
+  display: grid;
+  gap: 4px;
+}
+
+.ft-start__rules strong {
+  display: inline-block;
+  width: 3em;
+}
+
+.ft-start__options {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.ft-start__option {
+  flex-direction: column;
+  gap: 2px;
+  min-height: 0;
+  padding: 10px 8px;
+  border-color: var(--muted-line);
+  border-radius: 12px;
+}
+
+.ft-start__option--on {
+  border-color: var(--line);
+  box-shadow: 3px 3px 0 var(--line);
+}
+
+.ft-start__name {
+  font-size: 1.25rem;
+  font-weight: 900;
+}
+
+.ft-start__desc {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--ink-soft);
+}
+
+.ft-start__record {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin: 0;
+}
+
+.ft-start__record div {
+  display: flex;
+  flex-direction: column;
+  padding: 12px;
+  border: 1.5px solid var(--muted-line);
+  border-radius: 12px;
+}
+
+.ft-start__record dt {
+  font-size: 0.8125rem;
+  color: var(--ink-soft);
+}
+
+.ft-start__record dd {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+}
+
+.ft-start__record span {
+  font-size: 0.75rem;
+  color: var(--ink-soft);
+}
+
+.ft-start__button {
+  min-height: 64px;
+  font-size: 1.25rem;
+}
+
+/* 결과 */
+.ft-result {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-width: 420px;
+  margin: 8px auto 0;
+}
+
+.ft-result__headline {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 20px 16px;
+  border: 2px solid var(--line);
+  border-radius: 14px;
+  text-align: center;
+}
+
+.ft-result__headline strong {
+  font-size: 3rem;
+  font-weight: 900;
+  line-height: 1.1;
+}
+
+.ft-result__headline span {
+  color: var(--ink-soft);
+  font-size: 0.875rem;
+}
+
+.ft-result__headline--win {
+  border-color: #d97706;
+  background: #fffbeb;
+}
+
+.ft-result__headline--win strong {
+  color: var(--accent);
+}
+
+.ft-result__headline .ft-result__streak {
+  padding: 2px 10px;
+  font-weight: 800;
+  color: var(--paper);
+  background: #d97706;
+  border-radius: 999px;
+}
+
+.ft-result__career {
+  text-align: center;
+  font-size: 0.875rem;
+  color: var(--ink-soft);
+}
+
+.ft-result__buttons {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.ft-result__buttons .button--primary {
+  grid-column: 1 / -1;
+}
+
+.ft-result__upload {
+  text-align: center;
+  font-size: 0.8125rem;
+  color: var(--ink-soft);
+}
+
+.ft-result__upload--queued {
+  color: var(--accent);
+}
+
+/* 랭킹 */
+.ft-ranking {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-width: 480px;
+  margin: 0 auto;
+}
+
+.ft-ranking__tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+
+.ft-ranking__tabs .button[aria-pressed='true'] {
+  color: var(--paper);
+  background: var(--ink);
+}
+
+.ft-ranking__status {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  text-align: center;
+  font-size: 0.875rem;
+  color: var(--ink-soft);
+}

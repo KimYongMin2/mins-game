@@ -29,4 +29,11 @@ export const GAMES: GameEntry[] = [
     path: '/games/batting',
     ready: true,
   },
+  {
+    id: 'fight',
+    title: '격투',
+    description: '2초마다 준비·방어·타격! 봇의 수를 읽고 먼저 쓰러뜨려라!',
+    path: '/games/fight',
+    ready: true,
+  },
 ]
