@@ -2,12 +2,16 @@ import type { RealtimeChannel, SupabaseClient } from '@supabase/supabase-js'
 import { getRealtimeClient } from './supabase'
 
 // 친구 대전(PvP)용 방. Supabase Realtime 채널 하나 = 방 하나.
-// 방장이 4자리 코드로 방을 만들고, 친구가 그 코드로 들어온다. 둘이 메시지를 주고받는다.
+// 방장이 4자리 코드로 방을 만들고, 친구들이 그 코드로 들어온다. 서로 메시지를 주고받는다.
+// 정원은 기본 2명(1:1 게임), 여럿이 하는 게임은 정원을 정해서 만든다.
 // 게임 규칙은 모른다: 메시지 내용은 각 게임이 정한다.
 
 export type RoomRole = 'host' | 'guest'
 
 export type Peer = { nickname: string }
+
+/** 방에 있는 사람 (나 빼고). id는 방 안에서만 쓰는 접속 번호 */
+export type Member = { id: string; nickname: string; role: RoomRole }
 
 /** 헷갈리는 글자(0·O·1·I·L)는 뺀다 */
 const CODE_CHARS = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'
@@ -29,13 +33,23 @@ export function normalizeCode(input: string): string | null {
   return [...code].every((c) => CODE_CHARS.includes(c)) ? code : null
 }
 
-type Meta = { role: RoomRole; nickname: string }
+type Meta = { role: RoomRole; nickname: string; /** 들어온 시각 (먼저 온 사람이 자리를 가진다) */ joinedAt: number }
 
-/** presence 상태에서 나 말고 다른 사람들 */
-export function othersIn(state: Record<string, Meta[]>, myKey: string): Meta[] {
+type Other = Meta & { key: string }
+
+/** presence 상태에서 나 말고 다른 사람들, 먼저 들어온 순서 (방장이 맨 앞) */
+export function othersIn(state: Record<string, Meta[]>, myKey: string): Other[] {
   return Object.entries(state)
     .filter(([key]) => key !== myKey)
-    .flatMap(([, metas]) => metas.slice(0, 1))
+    .flatMap(([key, metas]) => metas.slice(0, 1).map((m) => ({ ...m, key })))
+    .sort((a, b) => rank(a) - rank(b) || a.joinedAt - b.joinedAt || (a.key < b.key ? -1 : 1))
+}
+
+const rank = (m: Meta) => (m.role === 'host' ? 0 : 1)
+
+/** 나보다 먼저 자리를 잡은 사람들 (동시에 들어오면 접속 번호로 순서를 정한다) */
+export function aheadOf(others: Other[], me: Meta, myKey: string): Other[] {
+  return others.filter((o) => o.role === 'host' || o.joinedAt < me.joinedAt || (o.joinedAt === me.joinedAt && o.key < myKey))
 }
 
 export type RoomErrorReason = 'not-found' | 'full' | 'offline'
@@ -51,11 +65,15 @@ export class RoomError extends Error {
 export interface Room<M> {
   code: string
   role: RoomRole
+  /** 내 접속 번호 (Member.id와 같은 종류) */
+  myId: string
   send(msg: M): void
   /** 받은 메시지. 해제 함수를 돌려준다 */
   onMessage(fn: (msg: M) => void): () => void
-  /** 상대가 들어오면 Peer, 나가면 null. 등록 직후(바로 다음 틈에) 지금 상태도 한 번 알려준다 */
+  /** 1:1 게임용: 상대가 들어오면 Peer, 나가면 null. 등록 직후(바로 다음 틈에) 지금 상태도 한 번 알려준다 */
   onPeer(fn: (peer: Peer | null) => void): () => void
+  /** 여럿이 하는 게임용: 나 말고 방에 있는 사람들 (들어온 순서). 바뀔 때마다, 등록 직후에도 한 번 */
+  onMembers(fn: (members: Member[]) => void): () => void
   leave(): void
 }
 
@@ -83,8 +101,14 @@ function subscribe(channel: RealtimeChannel, meta: Meta): Promise<void> {
   })
 }
 
-/** client: 테스트에서 방장·친구를 서로 다른 연결로 만들 때만 넘긴다 */
-async function open<M>(gameId: string, code: string, meta: Meta, client?: SupabaseClient): Promise<Room<M>> {
+export type RoomOptions = {
+  /** 정원 (나 포함). 기본 2 */
+  capacity?: number
+  /** 테스트에서 방장·친구를 서로 다른 연결로 만들 때만 넘긴다 */
+  client?: SupabaseClient
+}
+
+async function open<M>(gameId: string, code: string, meta: Meta, { capacity = 2, client }: RoomOptions): Promise<Room<M>> {
   const supabase =
     client ??
     (await getRealtimeClient().catch(() => {
@@ -102,7 +126,9 @@ async function open<M>(gameId: string, code: string, meta: Meta, client?: Supaba
 
   const messageFns = new Set<(msg: M) => void>()
   const peerFns = new Set<(peer: Peer | null) => void>()
+  const memberFns = new Set<(members: Member[]) => void>()
   let peer: Peer | null = null
+  let members: Member[] = []
   let synced = false
   const syncWaiters: (() => void)[] = []
 
@@ -118,6 +144,11 @@ async function open<M>(gameId: string, code: string, meta: Meta, client?: Supaba
       peer = next
       for (const fn of peerFns) fn(peer)
     }
+    const nextMembers = others.map((o) => ({ id: o.key, nickname: o.nickname, role: o.role }))
+    if (JSON.stringify(nextMembers) !== JSON.stringify(members)) {
+      members = nextMembers
+      for (const fn of memberFns) fn(members)
+    }
   })
 
   try {
@@ -131,6 +162,7 @@ async function open<M>(gameId: string, code: string, meta: Meta, client?: Supaba
   const room: Room<M> = {
     code,
     role: meta.role,
+    myId: myKey,
     send(msg) {
       void channel.send({ type: 'broadcast', event: 'msg', payload: msg })
     },
@@ -146,9 +178,17 @@ async function open<M>(gameId: string, code: string, meta: Meta, client?: Supaba
       })
       return () => peerFns.delete(fn)
     },
+    onMembers(fn) {
+      memberFns.add(fn)
+      queueMicrotask(() => {
+        if (memberFns.has(fn)) fn(members)
+      })
+      return () => memberFns.delete(fn)
+    },
     leave() {
       messageFns.clear()
       peerFns.clear()
+      memberFns.clear()
       void supabase.removeChannel(channel)
     },
   }
@@ -161,11 +201,14 @@ async function open<M>(gameId: string, code: string, meta: Meta, client?: Supaba
   while (Date.now() < deadline) {
     await Promise.race([waitSync(), new Promise((r) => setTimeout(r, 500))])
     const others = othersIn(channel.presenceState<Meta>(), myKey)
-    if (others.some((o) => o.role === 'guest')) {
-      room.leave()
-      throw new RoomError('full')
+    if (others.some((o) => o.role === 'host')) {
+      // 나보다 먼저 온 사람만으로 정원이 차 있으면 못 들어간다
+      if (aheadOf(others, meta, myKey).length >= capacity) {
+        room.leave()
+        throw new RoomError('full')
+      }
+      return room
     }
-    if (others.some((o) => o.role === 'host')) return room
     synced = false
   }
   room.leave()
@@ -173,11 +216,11 @@ async function open<M>(gameId: string, code: string, meta: Meta, client?: Supaba
 }
 
 /** 새 방을 만든다 (방장) */
-export function createRoom<M>(gameId: string, nickname: string, client?: SupabaseClient): Promise<Room<M>> {
-  return open<M>(gameId, makeRoomCode(), { role: 'host', nickname }, client)
+export function createRoom<M>(gameId: string, nickname: string, opts: RoomOptions = {}): Promise<Room<M>> {
+  return open<M>(gameId, makeRoomCode(), { role: 'host', nickname, joinedAt: Date.now() }, opts)
 }
 
-/** 코드로 친구 방에 들어간다 */
-export function joinRoom<M>(gameId: string, code: string, nickname: string, client?: SupabaseClient): Promise<Room<M>> {
-  return open<M>(gameId, code, { role: 'guest', nickname }, client)
+/** 코드로 친구 방에 들어간다. 정원은 방장과 같게 넘긴다 */
+export function joinRoom<M>(gameId: string, code: string, nickname: string, opts: RoomOptions = {}): Promise<Room<M>> {
+  return open<M>(gameId, code, { role: 'guest', nickname, joinedAt: Date.now() }, opts)
 }

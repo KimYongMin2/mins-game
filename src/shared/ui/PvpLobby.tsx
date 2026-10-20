@@ -19,7 +19,7 @@ type View =
 
 const ERROR_TEXT: Record<RoomError['reason'], string> = {
   'not-found': '그 코드의 방이 없어요. 코드를 다시 확인해 주세요',
-  full: '이미 두 명이 들어간 방이에요',
+  full: '방이 가득 찼어요',
   offline: '서버에 연결하지 못했어요. 인터넷 연결을 확인해 주세요',
 }
 
