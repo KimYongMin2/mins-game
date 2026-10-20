@@ -16,10 +16,10 @@ export const GAMES: GameEntry[] = [
     ready: true,
   },
   {
-    id: 'archery',
-    title: '양궁',
-    description: '30m부터 100m까지 10발. 바람을 읽고 X를 노려라!',
-    path: '/games/archery',
+    id: 'fight',
+    title: '격투',
+    description: '2초마다 준비·방어·타격! 봇의 수를 읽고 먼저 쓰러뜨려라!',
+    path: '/games/fight',
     ready: true,
   },
   {
@@ -30,10 +30,10 @@ export const GAMES: GameEntry[] = [
     ready: true,
   },
   {
-    id: 'fight',
-    title: '격투',
-    description: '2초마다 준비·방어·타격! 봇의 수를 읽고 먼저 쓰러뜨려라!',
-    path: '/games/fight',
+    id: 'archery',
+    title: '양궁',
+    description: '30m부터 100m까지 10발. 바람을 읽고 X를 노려라!',
+    path: '/games/archery',
     ready: true,
   },
 ]
