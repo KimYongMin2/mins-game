@@ -7,6 +7,8 @@ export type GameEntry = {
   ready: boolean
   /** pvp = 친구 대전과 봇 대전 / solo = 혼자 하는 기록 도전 (메인 화면에서 나눠 보여줌) */
   play: 'pvp' | 'solo'
+  /** 몇 명이 하는지 (메인 카드에 표시) */
+  players: string
 }
 
 export const GAMES: GameEntry[] = [
@@ -17,6 +19,7 @@ export const GAMES: GameEntry[] = [
     path: '/games/zolaball',
     ready: true,
     play: 'pvp',
+    players: '2인',
   },
   {
     id: 'fight',
@@ -25,6 +28,7 @@ export const GAMES: GameEntry[] = [
     path: '/games/fight',
     ready: true,
     play: 'pvp',
+    players: '2인',
   },
   {
     id: 'memory',
@@ -33,6 +37,7 @@ export const GAMES: GameEntry[] = [
     path: '/games/memory',
     ready: true,
     play: 'pvp',
+    players: '2인',
   },
   {
     id: 'armwrestle',
@@ -41,14 +46,16 @@ export const GAMES: GameEntry[] = [
     path: '/games/armwrestle',
     ready: true,
     play: 'pvp',
+    players: '2인',
   },
   {
     id: 'bomb',
     title: '폭탄 돌리기',
-    description: '2~6명. 폭탄을 들면 얼른 넘겨라! 터질 때 들고 있으면 탈락',
+    description: '폭탄을 들면 얼른 옆 사람에게! 터질 때 들고 있으면 탈락',
     path: '/games/bomb',
     ready: true,
     play: 'pvp',
+    players: '2~6인',
   },
   {
     id: 'batting',
@@ -57,6 +64,7 @@ export const GAMES: GameEntry[] = [
     path: '/games/batting',
     ready: true,
     play: 'solo',
+    players: '1인',
   },
   {
     id: 'archery',
@@ -65,5 +73,6 @@ export const GAMES: GameEntry[] = [
     path: '/games/archery',
     ready: true,
     play: 'solo',
+    players: '1인',
   },
 ]

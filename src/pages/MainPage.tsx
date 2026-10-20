@@ -28,6 +28,7 @@ function GameCard({ game }: { game: GameEntry }) {
     <Link className="game-card" to={game.path}>
       <span className="game-card__title">
         {game.title}
+        <span className="badge badge--count">{game.players}</span>
         {PLAY_BADGES[game.play].map((b) => (
           <span key={b} className={`badge badge--${game.play}`}>
             {b}

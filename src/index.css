@@ -233,6 +233,12 @@ a.game-card:hover {
   color: var(--ink-soft);
 }
 
+.badge--count {
+  color: var(--paper);
+  background: var(--ink);
+  border-color: var(--ink);
+}
+
 /* 랭킹 표 (shared/ui/RankingBoard) */
 .rank-board {
   border: 2px solid var(--line);
