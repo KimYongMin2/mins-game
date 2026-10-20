@@ -19,7 +19,7 @@ export function StartScreen({ record, onBots, onBot, onPvp }: Props) {
       </p>
 
       <ul className="bm-start__rules">
-        <li>폭탄을 든 사람이 다른 사람을 눌러 던져요</li>
+        <li>폭탄을 든 사람이 <strong>바로 옆(왼쪽·오른쪽)</strong> 사람에게 던져요</li>
         <li>언제 터질지는 아무도 몰라요. 째깍 소리가 점점 빨라져요</li>
         <li>던지는 중에 터지면 받던 사람이 탈락</li>
         <li>한 명이 탈락할 때마다 남은 사람끼리 다시</li>

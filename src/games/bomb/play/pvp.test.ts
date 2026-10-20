@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { createRng } from '../../../shared/random'
-import { type EngineState, type Player, createEngine, engineReducer } from './engine'
+import { type EngineState, type Player, createEngine, engineReducer, neighborsOf } from './engine'
 import type { BombMsg } from './pvp'
 import { type ScreenState, createScreen, myIndex, screenReducer, toView, viewChanged } from './view'
 
@@ -26,8 +26,8 @@ function simulate(guests: number, latencyMs: number, seed: number) {
     toHost.splice(0, toHost.length, ...toHost.filter((m) => m.at > now))
     // 방장 본인도 들고 있으면 0.5초 뒤 던짐
     if (engine.phase.kind === 'play' && engine.holder === 0 && !engine.flight && rng.next() < 0.05) {
-      const alive = engine.alive.flatMap((a, i) => (a && i !== 0 ? [i] : []))
-      engine = engineReducer(engine, { type: 'pass', from: 0, to: alive[Math.floor(rng.next() * alive.length)] })
+      const side = neighborsOf(engine.alive, 0)!
+      engine = engineReducer(engine, { type: 'pass', from: 0, to: side[Math.floor(rng.next() * 2)] })
     }
     const view = toView(engine)
     if (viewChanged(last, view) || now - lastAt >= 1000) {
@@ -45,8 +45,8 @@ function simulate(guests: number, latencyMs: number, seed: number) {
       if (v && v.phase === 'play' && v.holder === me && !next.flight && v.alive[me]) {
         throwAt[gi] ??= now + 200 + rng.next() * 800
         if (now >= throwAt[gi]!) {
-          const alive = v.alive.flatMap((a, i) => (a && i !== me ? [i] : []))
-          toHost.push({ at: now + latencyMs, msg: { t: 'pass', from: players[me].id, to: players[alive[Math.floor(rng.next() * alive.length)]].id } })
+          const side = neighborsOf(v.alive, me)!
+          toHost.push({ at: now + latencyMs, msg: { t: 'pass', from: players[me].id, to: players[side[Math.floor(rng.next() * 2)]].id } })
           throwAt[gi] = null
         }
       } else throwAt[gi] = null

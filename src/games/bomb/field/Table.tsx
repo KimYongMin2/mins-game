@@ -1,7 +1,8 @@
+import { neighborsOf } from '../play/engine'
 import { myIndex, type ScreenState } from '../play/view'
 
 // 둥근 탁자에 둘러앉은 졸라맨들. 나는 항상 맨 아래. 폭탄은 든 사람 앞에, 던지면 포물선으로 날아간다.
-// 다른 사람을 누르면 그 사람에게 던진다 (내가 들고 있을 때만).
+// 바로 옆(왼쪽·오른쪽) 사람을 누르면 그 사람에게 던진다 (내가 들고 있을 때만).
 
 type Props = {
   screen: ScreenState
@@ -17,7 +18,7 @@ function seatAt(seat: number, count: number): { x: number; y: number } {
 
 /** 폭탄이 놓이는 곳: 자리에서 탁자 가운데 쪽으로 조금 */
 function bombAt(p: { x: number; y: number }): { x: number; y: number } {
-  return { x: p.x + (50 - p.x) * 0.38, y: p.y + (50 - p.y) * 0.38 }
+  return { x: p.x + (50 - p.x) * 0.5, y: p.y + (50 - p.y) * 0.5 }
 }
 
 function Stick({ out, hurt }: { out: boolean; hurt: boolean }) {
@@ -54,6 +55,7 @@ export function Table({ screen, onPick }: Props) {
   const seatOf = (i: number) => (me < 0 ? i : (i - me + n) % n)
   const pos = v.players.map((_, i) => seatAt(seatOf(i), n))
   const canThrow = v.phase === 'play' && !screen.flight && v.holder === me && me >= 0
+  const side = canThrow ? neighborsOf(v.alive, me) : null
 
   let bomb: { x: number; y: number; lift: number } | null = null
   if (v.phase === 'play' || v.phase === 'countdown') {
@@ -75,7 +77,7 @@ export function Table({ screen, onPick }: Props) {
       {v.players.map((p, i) => {
         const out = !v.alive[i]
         const holding = v.phase === 'play' && v.holder === i && !screen.flight
-        const target = canThrow && i !== me && !out
+        const target = side?.includes(i) ?? false
         return (
           <button
             key={p.id}

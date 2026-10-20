@@ -3,7 +3,7 @@ import type { Member, Room } from '../../../shared/online/room'
 import { randomSeed } from '../../../shared/random'
 import { loadNickname } from '../../../shared/storage/nickname'
 import { Table } from '../field/Table'
-import { type EngineAction, type EngineState, type Player, createEngine, engineReducer } from '../play/engine'
+import { type EngineAction, type EngineState, type Player, createEngine, engineReducer, neighborsOf } from '../play/engine'
 import type { BombMsg } from '../play/pvp'
 import { type BombView, type ScreenState, createScreen, myIndex, screenReducer, toView, viewChanged } from '../play/view'
 import type { GameSummary } from '../records'
@@ -87,7 +87,7 @@ function Banner({ screen }: { screen: ScreenState }) {
     )
   }
   if (me >= 0 && !v.alive[me]) return <p className="bm-tip">탈락했어요. 끝까지 구경해요</p>
-  if (v.holder === me && !screen.flight) return <p className="bm-tip bm-tip--hot">폭탄을 들었어요! 다른 사람을 눌러 던져요</p>
+  if (v.holder === me && !screen.flight) return <p className="bm-tip bm-tip--hot">폭탄을 들었어요! 옆 사람에게 던져요</p>
   return <p className="bm-tip">째깍째깍… 언제 터질지 몰라요</p>
 }
 
@@ -194,6 +194,27 @@ export function GameScreen(props: Props) {
   }
 
   const watching = screen.view !== null && myIndex(screen) < 0
+  const v = screen.view
+  const me = myIndex(screen)
+  const canThrow = !!v && v.phase === 'play' && !screen.flight && v.holder === me && me >= 0
+  const side = v && me >= 0 && v.alive[me] ? neighborsOf(v.alive, me) : null
+
+  // PC: ← → 방향키로 왼쪽·오른쪽에 던지기
+  const throwRef = useRef<(dir: 0 | 1) => void>(() => {})
+  useEffect(() => {
+    throwRef.current = (dir) => {
+      if (canThrow && side) pick(side[dir])
+    }
+  })
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return
+      e.preventDefault()
+      if (!e.repeat) throwRef.current(e.key === 'ArrowLeft' ? 0 : 1)
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [])
 
   return (
     <div className="bm-game">
@@ -202,7 +223,27 @@ export function GameScreen(props: Props) {
         <Banner screen={screen} />
       </div>
       {watching && <p className="bm-tip">이미 시작한 판이라 구경해요. 다음 판부터 같이 해요</p>}
-      <p className="bm-hint">폭탄을 들면 다른 사람을 눌러 던져요 · 터질 때 들고 있으면 탈락 · 마지막까지 살아남으면 우승</p>
+      {/* 왼쪽·오른쪽 던지기 (옆 사람을 직접 눌러도 됨) */}
+      <div className="bm-throw" role="group" aria-label="던지기">
+        {([0, 1] as const).map((dir) => (
+          <button
+            key={dir}
+            type="button"
+            className={`button bm-throw__button${canThrow ? ' bm-throw__button--hot' : ''}`}
+            disabled={!canThrow}
+            onPointerDown={(e) => {
+              // 터치하자마자 던지도록
+              e.preventDefault()
+              if (canThrow && side) pick(side[dir])
+            }}
+            onClick={() => canThrow && side && pick(side[dir])}
+          >
+            {dir === 0 ? '◀ 왼쪽' : '오른쪽 ▶'}
+            {side && v && <span>{v.players[side[dir]].name}</span>}
+          </button>
+        ))}
+      </div>
+      <p className="bm-hint">폭탄은 바로 옆 사람에게만 · 터질 때 들고 있으면 탈락 · PC는 ← → 방향키</p>
       {hostGone && props.mode === 'guest' && (
         <div className="pvp-gone" role="alert">
           <strong>방장이 나갔어요</strong>

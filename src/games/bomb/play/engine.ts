@@ -1,5 +1,6 @@
 // 폭탄 돌리기 심판. 방장 기기(또는 봇 연습)에서만 돈다. 시간(now)과 시드 난수를 상태에 담은 순수 리듀서.
 // 판: 3·2·1 → 폭탄 돌리기(언제 터질지 모름) → 펑! 들고 있던 사람 탈락 → 남은 사람끼리 다음 판. 한 명 남으면 끝.
+// 폭탄은 바로 옆(왼쪽·오른쪽) 살아 있는 사람에게만 던질 수 있다 (처음엔 아무에게나였는데 바꿈).
 import { type Rng, createRng, pickOne } from '../../../shared/random'
 import { BOOM_MS, BOT_HOLD_MS, COUNTDOWN_MS, DONE_MS, FLIGHT_MS, FUSE_MS } from '../constants'
 
@@ -99,18 +100,31 @@ function botTurn(state: EngineState): EngineState {
   const rng = createRng(state.seed)
   if (state.botAt === null) return { ...state, seed: rng.seed(), botAt: state.now + within(rng, BOT_HOLD_MS) }
   if (state.now < state.botAt) return state
-  const to = pickOne(
-    rng,
-    aliveIndexes(state).filter((i) => i !== holder),
-  )
+  const to = pickOne(rng, neighborsOf(state.alive, holder) ?? [])
   return pass({ ...state, seed: rng.seed() }, holder, to)
 }
 
-/** 지금 from이 to에게 던질 수 있는지 */
+/**
+ * i 바로 옆에 앉은 살아 있는 사람: [왼쪽, 오른쪽]. 자리 번호가 커지는 쪽이 왼쪽
+ * (화면에서 나를 맨 아래에 두고 시계 방향으로 앉히므로 다음 번호가 내 왼쪽에 보인다). 둘만 남으면 같은 사람
+ */
+export function neighborsOf(alive: readonly boolean[], i: number): [number, number] | null {
+  const n = alive.length
+  const step = (dir: 1 | -1) => {
+    for (let k = 1; k < n; k++) {
+      const j = (i + dir * k + n) % n
+      if (alive[j]) return j
+    }
+    return -1
+  }
+  const left = step(1)
+  return left < 0 ? null : [left, step(-1)]
+}
+
+/** 지금 from이 to에게 던질 수 있는지 (바로 옆 사람에게만) */
 export function canPass(state: EngineState, from: number, to: number): boolean {
-  return (
-    state.phase.kind === 'play' && state.flight === null && state.holder === from && from !== to && state.alive[to] === true
-  )
+  if (state.phase.kind !== 'play' || state.flight !== null || state.holder !== from || from === to) return false
+  return neighborsOf(state.alive, from)?.includes(to) ?? false
 }
 
 function pass(state: EngineState, from: number, to: number): EngineState {

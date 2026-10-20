@@ -1,12 +1,31 @@
 import { describe, expect, it } from 'vitest'
 import { BOOM_MS, COUNTDOWN_MS, FLIGHT_MS, FUSE_MS } from '../constants'
-import { type EngineState, type Player, type PlayerKind, canPass, createEngine, engineReducer, rankingOf } from './engine'
+import { type EngineState, type Player, type PlayerKind, canPass, createEngine, engineReducer, neighborsOf, rankingOf } from './engine'
 
 const players = (...kinds: PlayerKind[]): Player[] => kinds.map((kind, i) => ({ id: `p${i}`, name: `사람${i}`, kind }))
 const at = (s: EngineState, now: number) => engineReducer(s, { type: 'tick', now })
 const playing = (kinds: PlayerKind[], seed = 1) => at(createEngine({ now: 0, seed, players: players(...kinds) }), COUNTDOWN_MS)
 
+describe('neighborsOf', () => {
+  it('바로 옆 살아 있는 사람 [왼쪽(다음 번호), 오른쪽(이전 번호)], 탈락한 자리는 건너뜀', () => {
+    expect(neighborsOf([true, true, true, true], 0)).toEqual([1, 3])
+    expect(neighborsOf([true, false, true, true], 0)).toEqual([2, 3])
+    expect(neighborsOf([true, false, true, false], 0)).toEqual([2, 2])
+    expect(neighborsOf([true, false, false], 0)).toBeNull()
+  })
+})
+
 describe('던지기', () => {
+  it('옆 사람에게만 (맞은편은 안 됨)', () => {
+    let s = playing(['user', 'remote', 'remote', 'remote'])
+    const h = s.holder
+    expect(canPass(s, h, (h + 2) % 4)).toBe(false)
+    expect(canPass(s, h, (h + 1) % 4)).toBe(true)
+    expect(canPass(s, h, (h + 3) % 4)).toBe(true)
+    s = engineReducer(s, { type: 'pass', from: h, to: (h + 2) % 4 })
+    expect(s.flight).toBeNull()
+  })
+
   it('들고 있는 사람만, 살아 있는 다른 사람에게, 날아가는 동안엔 못 던짐', () => {
     let s = playing(['user', 'remote', 'remote'])
     expect(s.phase.kind).toBe('play')
