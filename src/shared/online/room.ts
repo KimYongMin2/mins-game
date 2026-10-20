@@ -15,6 +15,8 @@ export const CODE_LENGTH = 4
 
 /** 친구가 이만큼 기다려도 방장이 안 보이면 '방이 없음' (모바일 데이터는 느릴 수 있어 넉넉히) */
 const JOIN_TIMEOUT_MS = 8000
+/** 채널 접속을 이만큼 기다린다. 첫 시도가 실패해도 Realtime이 스스로 다시 시도하므로 바로 포기하지 않는다 */
+const SUBSCRIBE_TIMEOUT_MS = 12000
 
 export function makeRoomCode(random: () => number = Math.random): string {
   return Array.from({ length: CODE_LENGTH }, () => CODE_CHARS[Math.floor(random() * CODE_CHARS.length)]).join('')
@@ -52,21 +54,30 @@ export interface Room<M> {
   send(msg: M): void
   /** 받은 메시지. 해제 함수를 돌려준다 */
   onMessage(fn: (msg: M) => void): () => void
-  /** 상대가 들어오면 Peer, 나가면 null. 등록하는 순간 지금 상태도 한 번 알려준다 */
+  /** 상대가 들어오면 Peer, 나가면 null. 등록 직후(바로 다음 틈에) 지금 상태도 한 번 알려준다 */
   onPeer(fn: (peer: Peer | null) => void): () => void
   leave(): void
 }
 
 function subscribe(channel: RealtimeChannel, meta: Meta): Promise<void> {
   return new Promise((resolve, reject) => {
+    let settled = false
+    const timer = setTimeout(() => {
+      if (settled) return
+      settled = true
+      reject(new RoomError('offline'))
+    }, SUBSCRIBE_TIMEOUT_MS)
     channel.subscribe(async (status, err) => {
+      if (settled) return
       if (status === 'SUBSCRIBED') {
-        await channel.track(meta)
+        // 상대에게 내가 들어온 걸 알린다. 한 번 실패하면 한 번 더
+        if ((await channel.track(meta)) !== 'ok') await channel.track(meta)
+        settled = true
+        clearTimeout(timer)
         resolve()
       } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-        // 원인을 나중에 확인할 수 있게 콘솔에 남긴다
-        console.warn('[room] 채널 접속 실패', status, err?.message)
-        reject(new RoomError('offline'))
+        // 바로 포기하지 않는다: Realtime이 곧 다시 접속을 시도한다. 원인은 콘솔에 남긴다
+        console.warn('[room] 채널 접속 재시도', status, err?.message)
       }
     })
   })
@@ -80,7 +91,12 @@ async function open<M>(gameId: string, code: string, meta: Meta, client?: Supaba
       throw new RoomError('offline')
     }))
   const myKey = `${meta.role}-${Math.random().toString(36).slice(2, 10)}`
-  const channel = supabase.channel(`pvp:${gameId}:${code}`, {
+  const topic = `pvp:${gameId}:${code}`
+  // 같은 방에 다시 들어가면 Supabase가 예전 채널을 그대로 돌려줘서 오류가 난다. 남은 게 있으면 먼저 닫는다
+  for (const old of supabase.getChannels()) {
+    if (old.topic === `realtime:${topic}`) await supabase.removeChannel(old)
+  }
+  const channel = supabase.channel(topic, {
     config: { broadcast: { self: false }, presence: { key: myKey } },
   })
 
@@ -104,7 +120,13 @@ async function open<M>(gameId: string, code: string, meta: Meta, client?: Supaba
     }
   })
 
-  await subscribe(channel, meta)
+  try {
+    await subscribe(channel, meta)
+  } catch (e) {
+    // 실패한 채널을 닫아서 나중에 혼자 재접속해 상대에게 '들어왔다'로 보이는 일이 없게 한다
+    void supabase.removeChannel(channel)
+    throw e
+  }
 
   const room: Room<M> = {
     code,
@@ -118,7 +140,10 @@ async function open<M>(gameId: string, code: string, meta: Meta, client?: Supaba
     },
     onPeer(fn) {
       peerFns.add(fn)
-      fn(peer)
+      // 등록하는 쪽이 해제 함수를 받기 전에 불리지 않게 한 박자 늦게 알려준다
+      queueMicrotask(() => {
+        if (peerFns.has(fn)) fn(peer)
+      })
       return () => peerFns.delete(fn)
     },
     leave() {

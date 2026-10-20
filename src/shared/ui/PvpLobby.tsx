@@ -42,16 +42,21 @@ export function PvpLobby<M>({ gameId, nickname, onConnected, onBack }: Props<M>)
   )
 
   function handOff(room: Room<M>) {
-    const off = room.onPeer((peer) => {
+    // 상대가 이미 있으면 등록하자마자 불릴 수 있어서, 해제 함수는 등록이 끝난 뒤에만 쓴다
+    let off: (() => void) | null = null
+    off = room.onPeer((peer) => {
       if (!peer || handedOff.current) return
       handedOff.current = true
-      off()
+      off?.()
       connectedRef.current(room, peer)
     })
   }
 
   function fail(e: unknown) {
     if (!(e instanceof RoomError)) console.warn('[room] 방 접속 오류', e)
+    // 반쯤 열린 방이 남아 있으면 닫는다 (다시 시도할 때 부딪히지 않게)
+    roomRef.current?.leave()
+    roomRef.current = null
     setView({ kind: 'error', text: e instanceof RoomError ? ERROR_TEXT[e.reason] : ERROR_TEXT.offline })
   }
 

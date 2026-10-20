@@ -166,10 +166,19 @@ export function FightPage() {
         <PvpLobby<FightMsg> gameId="fight" nickname={loadNickname() ?? '익명'} onConnected={connected} onBack={toStart} />
       )}
       {screen.kind === 'pvp-wait' && pvp && (
-        <p className="ft-pvp-wait">
-          {pvp.room.role === 'host' ? `${pvp.peer.nickname}님이 들어왔어요` : `${pvp.peer.nickname}님 방에 들어왔어요`}. 곧
-          시작해요…
-        </p>
+        peerGone ? (
+          <div className="ft-pvp-wait">
+            <p>연결이 끊겼어요. 다시 방을 만들거나 코드를 입력해 주세요</p>
+            <button type="button" className="button" onClick={leavePvp}>
+              나가기
+            </button>
+          </div>
+        ) : (
+          <p className="ft-pvp-wait">
+            {pvp.room.role === 'host' ? `${pvp.peer.nickname}님이 들어왔어요` : `${pvp.peer.nickname}님 방에 들어왔어요`}. 곧
+            시작해요…
+          </p>
+        )
       )}
       {screen.kind === 'pvp-game' && pvp && (
         <GameScreen

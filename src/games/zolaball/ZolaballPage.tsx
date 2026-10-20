@@ -180,10 +180,19 @@ export function ZolaballPage() {
         <PvpLobby<BaseballMsg> gameId="zolaball" nickname={loadNickname() ?? '익명'} onConnected={connected} onBack={toMenu} />
       )}
       {screen.kind === 'pvp-wait' && pvp && (
-        <p className="zb-pvp-wait">
-          {pvp.room.role === 'host' ? `${pvp.peer.nickname}님이 들어왔어요` : `${pvp.peer.nickname}님 방에 들어왔어요`}. 곧
-          시작해요…
-        </p>
+        peerGone ? (
+          <div className="zb-pvp-wait">
+            <p>연결이 끊겼어요. 다시 방을 만들거나 코드를 입력해 주세요</p>
+            <button type="button" className="button" onClick={leavePvp}>
+              나가기
+            </button>
+          </div>
+        ) : (
+          <p className="zb-pvp-wait">
+            {pvp.room.role === 'host' ? `${pvp.peer.nickname}님이 들어왔어요` : `${pvp.peer.nickname}님 방에 들어왔어요`}. 곧
+            시작해요…
+          </p>
+        )
       )}
       {screen.kind === 'pvp-match' && pvp && (
         <MatchScreen
