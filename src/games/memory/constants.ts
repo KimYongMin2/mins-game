@@ -4,8 +4,8 @@ export type Difficulty = 'normal' | 'hard'
 
 export const DIFFICULTY_LABEL: Record<Difficulty, string> = { normal: '일반', hard: '어려움' }
 
-/** 그림 가짓수 = 쌍 수. 카드는 그 두 배 */
-export const PAIRS = 12
+/** 그림 가짓수 = 쌍 수. 카드는 그 두 배. 홀수라 무승부가 없다 (처음 12쌍에서 하나 뺌) */
+export const PAIRS = 11
 export const CARD_COUNT = PAIRS * 2
 
 /** 한 장 고르는 시간. 넘기면 무작위로 열린다 */

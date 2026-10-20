@@ -1,6 +1,6 @@
 import { PAIRS } from '../constants'
 
-// 카드 그림 12가지. 그림 파일 없이 40×40 안에 선으로 그린다. 그림마다 선 색을 달리해 기억하기 쉽게.
+// 카드 그림 11가지. 그림 파일 없이 40×40 안에 선으로 그린다. 그림마다 선 색을 달리해 기억하기 쉽게.
 
 type Face = { name: string; color: string; draw: () => React.ReactNode }
 
@@ -12,19 +12,6 @@ const star = (cx: number, cy: number, r: number) =>
   }).join('') + 'Z'
 
 const FACES: Face[] = [
-  {
-    name: '해',
-    color: '#ea580c',
-    draw: () => (
-      <>
-        <circle cx={20} cy={20} r={7} />
-        {Array.from({ length: 8 }, (_, i) => {
-          const a = (i * Math.PI) / 4
-          return <path key={i} d={`M${20 + Math.cos(a) * 11} ${20 + Math.sin(a) * 11}L${20 + Math.cos(a) * 16} ${20 + Math.sin(a) * 16}`} />
-        })}
-      </>
-    ),
-  },
   { name: '달', color: '#ca8a04', draw: () => <path d="M25 6A14 14 0 1 0 34 28A11 11 0 1 1 25 6Z" /> },
   { name: '별', color: '#d97706', draw: () => <path d={star(20, 21, 15)} /> },
   { name: '하트', color: '#e11d48', draw: () => <path d="M20 33C8 24 5 18 5 13A7.5 7.5 0 0 1 20 11A7.5 7.5 0 0 1 35 13C35 18 32 24 20 33Z" /> },

@@ -25,7 +25,7 @@ export const GAMES: GameEntry[] = [
   {
     id: 'memory',
     title: '짝맞추기',
-    description: '카드 24장, 번갈아 두 장씩. 기억해 두고 짝을 더 많이 찾아라!',
+    description: '카드 22장, 번갈아 두 장씩. 기억해 두고 짝을 더 많이 찾아라!',
     path: '/games/memory',
     ready: true,
   },

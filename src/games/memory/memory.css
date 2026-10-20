@@ -111,17 +111,21 @@
   transform-origin: left;
 }
 
-/* 카드판: 모바일 4열 × 6줄, 넓은 화면 6열 × 4줄 */
+/* 카드판: 모바일 4열, 넓은 화면 6열 */
 .mm-board {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 6px;
+  --cols: 4;
+  --gap: 6px;
+  display: flex;
+  flex-wrap: wrap;
+  /* 22장이라 마지막 줄이 덜 차면 가운데로 */
+  justify-content: center;
+  gap: var(--gap);
 }
 
 @media (min-width: 520px) {
   .mm-board {
-    grid-template-columns: repeat(6, 1fr);
-    gap: 8px;
+    --cols: 6;
+    --gap: 8px;
   }
 
   .mm-board .mm-card {
@@ -130,6 +134,7 @@
 }
 
 .mm-card {
+  width: calc((100% - (var(--cols) - 1) * var(--gap)) / var(--cols));
   /* 모바일에서 6줄이 한 화면에 들어오게 정사각형에 가깝게 */
   aspect-ratio: 5 / 6;
   padding: 0;

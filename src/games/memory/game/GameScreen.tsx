@@ -3,7 +3,7 @@ import type { Room } from '../../../shared/online/room'
 import { randomSeed } from '../../../shared/random'
 import { loadNickname } from '../../../shared/storage/nickname'
 import { CardFace } from '../cards/CardFace'
-import { DONE_MS, type Difficulty, PICK_MS } from '../constants'
+import { CARD_COUNT, DONE_MS, type Difficulty, PICK_MS } from '../constants'
 import { type MatchState, type MatchSummary, type Side, canFlip, createMatch, matchReducer, pairsOf, summarizeMatch } from '../play/matchState'
 import { type MemoryMsg, actionOf, outbox } from '../play/pvp'
 import { playSound } from '../sounds'
@@ -128,7 +128,7 @@ export function GameScreen({ difficulty, pvp, onFinish, onQuit }: Props) {
         <div className="mm-timer__fill" style={{ transform: `scaleX(${left / PICK_MS})` }} />
       </div>
 
-      <div className={`mm-board${myTurn ? ' mm-board--mine' : ''}`} role="grid" aria-label="카드 24장">
+      <div className={`mm-board${myTurn ? ' mm-board--mine' : ''}`} role="grid" aria-label={`카드 ${CARD_COUNT}장`}>
         {state.cards.map((card, i) => {
           const isOpen = state.open.includes(i)
           const faceUp = isOpen || card.owner !== null
