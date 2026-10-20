@@ -35,15 +35,15 @@ const FLIGHT_MS: Record<PitchType, number> = {
 }
 
 // 스트라이크는 존 경계 안쪽, 볼은 공 전체가 경계 바깥에 오게 (화면의 공 반지름 0.15m).
-// 볼은 스트라이크와 50cm 넘게 떨어뜨려 구분되게 한다. 높은 직구 볼은 떠오르듯, 낮은 변화구 볼은 떨어지듯 더 빠진다.
+// 볼은 스트라이크와 60cm 넘게 떨어뜨려 구분되게 한다. 높은 직구 볼은 떠오르듯, 낮은 변화구 볼은 떨어지듯 더 빠진다.
 const PLATE_HEIGHT: Record<PitchType, Record<'strike' | 'ball', Record<PitchHeight, number>>> = {
   fastball: {
-    strike: { high: 1.75, low: 0.95 },
-    ball: { high: 2.35, low: 0.45 },
+    strike: { high: 1.7, low: 1.0 },
+    ball: { high: 2.45, low: 0.4 },
   },
   breaking: {
-    strike: { high: 1.75, low: 0.95 },
-    ball: { high: 2.3, low: 0.35 },
+    strike: { high: 1.7, low: 1.0 },
+    ball: { high: 2.4, low: 0.3 },
   },
 }
 
@@ -53,7 +53,7 @@ const ARRIVAL_SHIFT_MS_PER_M = 30
 /** 궤적 모양. 세로 진행도 = s^verticalPower (클수록 늦게 떨어짐), 위로 볼록한 정도 = arc(m). */
 const SHAPE: Record<PitchType, { verticalPower: number; arc: number }> = {
   fastball: { verticalPower: 1, arc: 0.35 },
-  breaking: { verticalPower: 4, arc: 3.6 },
+  breaking: { verticalPower: 5, arc: 5.5 },
 }
 
 /** 공이 도착한 뒤 이만큼 지나면 투구가 끝난다. 가장 늦은 판정 구간(파울 130ms)보다 길어야 한다. */
