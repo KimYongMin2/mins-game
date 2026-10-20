@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router'
 import { ArcheryPage } from './games/archery/ArcheryPage'
+import { ArmwrestlePage } from './games/armwrestle/ArmwrestlePage'
 import { BattingPage } from './games/batting/BattingPage'
 import { FightPage } from './games/fight/FightPage'
 import { MemoryPage } from './games/memory/MemoryPage'
@@ -41,6 +42,10 @@ function App() {
         <Route
           path="/games/memory"
           element={nickname ? <MemoryPage /> : <Navigate to="/nickname" replace />}
+        />
+        <Route
+          path="/games/armwrestle"
+          element={nickname ? <ArmwrestlePage /> : <Navigate to="/nickname" replace />}
         />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

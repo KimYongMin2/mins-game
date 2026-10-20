@@ -56,6 +56,8 @@ export type MatchState = {
   round: number
   wins: Pair<number>
   pos: number
+  /** 화면에 그리는 위치. 친구 쪽은 0.1초마다 오는 위치를 부드럽게 따라간다 */
+  shownPos: number
   phase: Phase
   /** 경기 전체 누른 횟수 (친구 것은 친구가 보낸 총 횟수) */
   taps: Pair<number>
@@ -127,6 +129,7 @@ export function createMatch(opts: {
     round: 1,
     wins: [0, 0],
     pos: 0,
+    shownPos: 0,
     phase: { kind: 'countdown', until: 0, shown: 3 },
     taps: [0, 0],
     pressed: [-1, -1],
@@ -220,8 +223,16 @@ function applyGrade(state: MatchState, side: Side, pass: number, grade: Grade): 
 }
 
 function tick(state: MatchState): MatchState {
+  if (state.follow) {
+    const shownPos = state.shownPos + (state.pos - state.shownPos) * 0.3
+    return { ...state, shownPos: Math.abs(state.pos - shownPos) < 0.002 ? state.pos : shownPos }
+  }
+  const next = advance(state)
+  return next.shownPos === next.pos ? next : { ...next, shownPos: next.pos }
+}
+
+function advance(state: MatchState): MatchState {
   const { phase, now } = state
-  if (state.follow) return state
   switch (phase.kind) {
     case 'countdown': {
       if (now >= phase.until) return startPull(state)

@@ -30,6 +30,13 @@ export const GAMES: GameEntry[] = [
     ready: true,
   },
   {
+    id: 'armwrestle',
+    title: '팔씨름',
+    description: '연타전 또는 타이밍전. 손을 끝까지 넘겨 3판 2선승!',
+    path: '/games/armwrestle',
+    ready: true,
+  },
+  {
     id: 'batting',
     title: '배팅',
     description: '정면에서 날아오는 직구·슬라이더·커브. 칸을 터치해 홈런을 노려라!',

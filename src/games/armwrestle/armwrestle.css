@@ -1,0 +1,508 @@
+/* 팔씨름(armwrestle) 전용 스타일. 모든 클래스는 aw- 접두사를 쓴다. */
+.aw-page {
+  max-width: 560px;
+}
+
+.aw-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.aw-header .title {
+  flex: 1;
+  min-width: 0;
+}
+
+/* 경기 화면 */
+.aw-game {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.aw-hud {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 8px;
+}
+
+.aw-side {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.aw-side--foe {
+  align-items: flex-end;
+}
+
+.aw-side__name {
+  font-weight: 800;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
+
+.aw-dots {
+  display: flex;
+  gap: 4px;
+}
+
+.aw-dot {
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--line);
+  border-radius: 50%;
+}
+
+.aw-dot--on {
+  background: #f59e0b;
+  border-color: #b45309;
+}
+
+.aw-hud__round {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.aw-hud__time {
+  font-size: 0.8125rem;
+  color: var(--ink-soft);
+}
+
+.aw-hud__time--low {
+  color: var(--accent);
+}
+
+.aw-view-wrap {
+  position: relative;
+  border: 2px solid var(--line);
+  border-radius: 14px;
+  overflow: hidden;
+  background: var(--paper);
+}
+
+.aw-view {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 360 / 210;
+  color: var(--ink);
+}
+
+.aw-view path,
+.aw-view circle {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.aw-view .aw-head {
+  fill: var(--paper);
+}
+
+.aw-view .aw-floor,
+.aw-view .aw-chair {
+  stroke: var(--muted-line);
+  stroke-width: 2;
+}
+
+.aw-view .aw-table {
+  stroke: #92400e;
+  stroke-width: 4;
+}
+
+.aw-view .aw-pad {
+  stroke: var(--muted-line);
+  stroke-width: 4;
+}
+
+.aw-view .aw-grip {
+  fill: var(--paper);
+  stroke-width: 3;
+}
+
+.aw-wrestler--lost {
+  color: var(--ink-soft);
+}
+
+.aw-view text {
+  text-anchor: middle;
+  font-size: 12px;
+  fill: var(--ink-soft);
+}
+
+.aw-banner {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  padding-top: 8px;
+  font-size: 1.75rem;
+  font-weight: 900;
+  pointer-events: none;
+  text-shadow: 0 0 6px var(--paper), 0 0 6px var(--paper);
+}
+
+.aw-banner--count {
+  font-size: 3rem;
+  padding-top: 0;
+}
+
+.aw-banner--go,
+.aw-banner--win {
+  color: var(--accent);
+}
+
+.aw-banner--done span {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--ink-soft);
+}
+
+.aw-foe-grade {
+  position: absolute;
+  top: 34%;
+  right: 12%;
+  font-weight: 900;
+  pointer-events: none;
+}
+
+/* 위치 막대 */
+.aw-bar {
+  position: relative;
+  height: 16px;
+  border: 2px solid var(--line);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.aw-bar__fill {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+}
+
+.aw-bar__fill--me {
+  background: #2563eb;
+}
+
+.aw-bar__fill--foe {
+  background: var(--accent);
+}
+
+.aw-bar__mid {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: calc(50% - 1px);
+  width: 2px;
+  background: var(--line);
+}
+
+.aw-timer {
+  height: 6px;
+  border: 2px solid var(--line);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.aw-timer__fill {
+  height: 100%;
+  background: var(--ink);
+  transform-origin: left;
+}
+
+/* 타이밍 게이지: 가운데로 갈수록 진한 구간 */
+.aw-gauge {
+  position: relative;
+  height: 40px;
+  border: 2px solid var(--line);
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--paper);
+}
+
+.aw-gauge__zone {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.aw-gauge__zone--good {
+  background: #dbeafe;
+}
+
+.aw-gauge__zone--great {
+  background: #93c5fd;
+}
+
+.aw-gauge__zone--perfect {
+  background: #f59e0b;
+}
+
+.aw-gauge__marker {
+  position: absolute;
+  top: 2px;
+  bottom: 2px;
+  width: 4px;
+  margin-left: -2px;
+  border-radius: 2px;
+  background: var(--ink);
+}
+
+.aw-gauge__grade {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-weight: 900;
+  pointer-events: none;
+  text-shadow: 0 0 4px var(--paper), 0 0 4px var(--paper);
+}
+
+.aw-gauge__grade--perfect {
+  color: #b45309;
+}
+
+.aw-gauge__grade--great {
+  color: #1d4ed8;
+}
+
+.aw-gauge__grade--good {
+  color: var(--ink);
+}
+
+.aw-gauge__grade--miss {
+  color: var(--ink-soft);
+}
+
+/* 당기기 버튼: 크게 */
+.aw-pull {
+  min-height: 120px;
+  font-size: 1.75rem;
+  font-weight: 900;
+  border-radius: 18px;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  touch-action: manipulation;
+}
+
+.aw-pull:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.aw-pull--on:active {
+  color: var(--paper);
+  background: var(--ink);
+}
+
+.aw-hint {
+  text-align: center;
+  font-size: 0.8125rem;
+  color: var(--ink-soft);
+}
+
+/* 시작 */
+.aw-start {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-width: 420px;
+  margin: 8px auto 0;
+  text-align: center;
+}
+
+.aw-start__rules {
+  margin: 0;
+  padding: 12px 16px;
+  list-style: none;
+  text-align: left;
+  font-size: 0.875rem;
+  border: 1.5px solid var(--muted-line);
+  border-radius: 12px;
+  display: grid;
+  gap: 4px;
+}
+
+.aw-start__options {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.aw-start__option {
+  flex-direction: column;
+  gap: 2px;
+  min-height: 0;
+  padding: 10px 8px;
+  border-color: var(--muted-line);
+  border-radius: 12px;
+}
+
+.aw-start__option--on {
+  border-color: var(--line);
+  box-shadow: 3px 3px 0 var(--line);
+}
+
+.aw-start__name {
+  font-size: 1.25rem;
+  font-weight: 900;
+}
+
+.aw-start__desc {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--ink-soft);
+}
+
+.aw-start__record {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin: 0;
+}
+
+.aw-start__record div {
+  display: flex;
+  flex-direction: column;
+  padding: 12px;
+  border: 1.5px solid var(--muted-line);
+  border-radius: 12px;
+}
+
+.aw-start__record dt {
+  font-size: 0.8125rem;
+  color: var(--ink-soft);
+}
+
+.aw-start__record dd {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+}
+
+.aw-start__record span {
+  font-size: 0.75rem;
+  color: var(--ink-soft);
+}
+
+.aw-start__button {
+  min-height: 64px;
+  font-size: 1.25rem;
+}
+
+/* 결과 */
+.aw-result {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-width: 420px;
+  margin: 8px auto 0;
+}
+
+.aw-result__headline {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 20px 16px;
+  border: 2px solid var(--line);
+  border-radius: 14px;
+  text-align: center;
+}
+
+.aw-result__headline strong {
+  font-size: 3rem;
+  font-weight: 900;
+  line-height: 1.1;
+}
+
+.aw-result__headline span {
+  color: var(--ink-soft);
+  font-size: 0.875rem;
+}
+
+.aw-result__headline--win {
+  border-color: #d97706;
+  background: #fffbeb;
+}
+
+.aw-result__headline--win strong {
+  color: var(--accent);
+}
+
+.aw-result__headline .aw-result__streak {
+  padding: 2px 10px;
+  font-weight: 800;
+  color: var(--paper);
+  background: #d97706;
+  border-radius: 999px;
+}
+
+.aw-result__career {
+  text-align: center;
+  font-size: 0.875rem;
+  color: var(--ink-soft);
+}
+
+.aw-result__buttons {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.aw-result__buttons .button--primary {
+  grid-column: 1 / -1;
+}
+
+/* 친구 대전 */
+.aw-pvp-wait {
+  margin-top: 24px;
+  text-align: center;
+  color: var(--ink-soft);
+}
+
+.aw-result__note {
+  text-align: center;
+  font-size: 0.875rem;
+  color: var(--ink-soft);
+}
+
+.aw-start__pvp span {
+  margin-left: 4px;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--ink-soft);
+}
+
+.aw-start__pvp-record {
+  font-size: 0.8125rem;
+  color: var(--ink-soft);
+}
+
+.aw-start__options--small .aw-start__option {
+  padding: 6px 8px;
+}
+
+.aw-start__options--small .aw-start__name {
+  font-size: 1rem;
+}
