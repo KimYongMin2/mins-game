@@ -30,8 +30,8 @@ const BALL_MIN_Y = 0.2 // 땅에 박히지 않게 (공 반지름)
 export const STRIKE_ZONE = { bottom: 0.8, top: 1.9 }
 
 const FLIGHT_MS: Record<PitchType, number> = {
-  fastball: 380,
-  breaking: 500,
+  fastball: 400,
+  breaking: 525,
 }
 
 // 스트라이크는 존 경계 안쪽, 볼은 공 전체가 경계 바깥에 오게 (화면의 공 반지름 0.15m).
