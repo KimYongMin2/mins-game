@@ -1,5 +1,5 @@
 import type { RealtimeChannel, SupabaseClient } from '@supabase/supabase-js'
-import { getSupabase } from './supabase'
+import { getRealtimeClient } from './supabase'
 
 // 친구 대전(PvP)용 방. Supabase Realtime 채널 하나 = 방 하나.
 // 방장이 4자리 코드로 방을 만들고, 친구가 그 코드로 들어온다. 둘이 메시지를 주고받는다.
@@ -13,8 +13,8 @@ export type Peer = { nickname: string }
 const CODE_CHARS = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'
 export const CODE_LENGTH = 4
 
-/** 친구가 이만큼 기다려도 방장이 안 보이면 '방이 없음' */
-const JOIN_TIMEOUT_MS = 5000
+/** 친구가 이만큼 기다려도 방장이 안 보이면 '방이 없음' (모바일 데이터는 느릴 수 있어 넉넉히) */
+const JOIN_TIMEOUT_MS = 8000
 
 export function makeRoomCode(random: () => number = Math.random): string {
   return Array.from({ length: CODE_LENGTH }, () => CODE_CHARS[Math.floor(random() * CODE_CHARS.length)]).join('')
@@ -59,11 +59,13 @@ export interface Room<M> {
 
 function subscribe(channel: RealtimeChannel, meta: Meta): Promise<void> {
   return new Promise((resolve, reject) => {
-    channel.subscribe(async (status) => {
+    channel.subscribe(async (status, err) => {
       if (status === 'SUBSCRIBED') {
         await channel.track(meta)
         resolve()
       } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+        // 원인을 나중에 확인할 수 있게 콘솔에 남긴다
+        console.warn('[room] 채널 접속 실패', status, err?.message)
         reject(new RoomError('offline'))
       }
     })
@@ -74,7 +76,7 @@ function subscribe(channel: RealtimeChannel, meta: Meta): Promise<void> {
 async function open<M>(gameId: string, code: string, meta: Meta, client?: SupabaseClient): Promise<Room<M>> {
   const supabase =
     client ??
-    (await getSupabase().catch(() => {
+    (await getRealtimeClient().catch(() => {
       throw new RoomError('offline')
     }))
   const myKey = `${meta.role}-${Math.random().toString(36).slice(2, 10)}`

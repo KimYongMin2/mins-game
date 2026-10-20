@@ -51,6 +51,7 @@ export function PvpLobby<M>({ gameId, nickname, onConnected, onBack }: Props<M>)
   }
 
   function fail(e: unknown) {
+    if (!(e instanceof RoomError)) console.warn('[room] 방 접속 오류', e)
     setView({ kind: 'error', text: e instanceof RoomError ? ERROR_TEXT[e.reason] : ERROR_TEXT.offline })
   }
 

@@ -22,6 +22,23 @@ export function getSupabase(): Promise<SupabaseClient> {
   return clientPromise
 }
 
+let realtimePromise: Promise<SupabaseClient> | null = null
+
+/**
+ * 친구 대전(실시간 방) 전용 연결. 로그인 정보를 쓰지 않는다.
+ * 기기에 저장된 익명 로그인 토큰이 만료돼 있으면 실시간 채널 접속이 거부되는데(JWT 오류),
+ * 방에는 사용자 구분이 필요 없어서 공개 키만으로 접속한다.
+ */
+export function getRealtimeClient(): Promise<SupabaseClient> {
+  if (!URL || !KEY) return Promise.reject(new Error('Supabase 설정이 없습니다'))
+  realtimePromise ??= import('@supabase/supabase-js').then(({ createClient }) =>
+    createClient(URL, KEY, {
+      auth: { persistSession: false, autoRefreshToken: false, storageKey: 'mins-game:realtime' },
+    }),
+  )
+  return realtimePromise
+}
+
 /** 이미 로그인된 사용자 ID. 없으면 null (새로 만들지 않는다) */
 export async function currentPlayerId(): Promise<string | null> {
   const supabase = await getSupabase()
