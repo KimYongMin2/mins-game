@@ -11,7 +11,7 @@ import { FRESH, type Fighter, type Pair, type Stance, type TurnResult, type Winn
 /** 자세를 고르는 주체. remote = 방에 들어온 친구 */
 export type Controller = 'user' | 'bot' | 'remote'
 
-export type SoundName = 'charge' | 'guard' | 'block' | 'hit' | 'clash' | 'win' | 'lose' | 'tick'
+export type SoundName = 'charge' | 'guard' | 'block' | 'hit' | 'smash' | 'clash' | 'win' | 'lose' | 'tick'
 
 export type Phase =
   | { kind: 'intro'; until: number }
@@ -115,6 +115,7 @@ function startChoosing(state: MatchState): MatchState {
 
 function turnSounds(result: TurnResult): SoundName[] {
   const e = result.events
+  if (e.includes('smash-hit')) return ['smash']
   if (e.includes('strike')) return ['hit']
   if (e.includes('clash')) return ['clash']
   if (e.includes('block')) return ['block']

@@ -135,6 +135,27 @@
   opacity: 0.6;
 }
 
+.ft-view .ft-shield--broken {
+  stroke: var(--accent);
+  stroke-dasharray: 6 8;
+  opacity: 1;
+}
+
+.ft-view .ft-smash {
+  stroke: var(--accent);
+  stroke-width: 4;
+}
+
+.ft-pad__button--smash:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.ft-pad__button--smash[aria-pressed='true'] {
+  color: var(--paper);
+  background: var(--accent);
+}
+
 .ft-view .ft-shield--hit {
   opacity: 1;
   stroke-width: 6;
@@ -224,7 +245,7 @@
 
 .ft-pad {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: 8px;
 }
 

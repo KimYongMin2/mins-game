@@ -1,4 +1,4 @@
-import { DIFFICULTY_LABEL, type Difficulty, MAX_LIFE, MAX_STACKS } from '../constants'
+import { DIFFICULTY_LABEL, type Difficulty, MAX_LIFE, MAX_STACKS, SMASH_COST } from '../constants'
 import { type FightRecord, winRate } from '../records'
 
 type Props = {
@@ -34,7 +34,10 @@ export function StartScreen({ record, onDifficulty, onStart, onPvp, onRanking }:
         <li>
           <strong>타격</strong> 스택 1개를 써서 공격. 준비 중인 상대는 생명력 −1
         </li>
-        <li>타격끼리 부딪히면 상쇄</li>
+        <li>
+          <strong>강타</strong> 스택 {SMASH_COST}개를 모두 써서 공격. 방어를 뚫고 타격도 이김
+        </li>
+        <li>같은 공격끼리 부딪히면 상쇄</li>
       </ul>
 
       <div className="ft-start__options" role="group" aria-label="난이도">

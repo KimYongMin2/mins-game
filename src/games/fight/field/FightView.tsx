@@ -1,4 +1,4 @@
-import type { Stance, TurnEvent } from '../rules/turn'
+import { type Stance, type TurnEvent, isHurt } from '../rules/turn'
 
 // 옆에서 본 두 졸라맨. 왼쪽이 나, 오른쪽이 상대. 흰 바탕 선화.
 
@@ -20,7 +20,7 @@ type Pose = {
   fists: readonly [Point, Point]
 }
 
-const POSES: Record<'idle' | 'ready' | 'guard' | 'attack' | 'hurt', Pose> = {
+const POSES: Record<'idle' | 'ready' | 'guard' | 'attack' | 'smash' | 'hurt', Pose> = {
   // 주먹을 들고 선 자세
   idle: {
     head: [2, 102],
@@ -61,6 +61,16 @@ const POSES: Record<'idle' | 'ready' | 'guard' | 'attack' | 'hurt', Pose> = {
     elbows: [[36, 82], [2, 66]],
     fists: [[56, 84], [8, 78]],
   },
+  // 두 주먹을 모아 크게 내지르는 강타
+  smash: {
+    head: [26, 96],
+    neck: [20, 83],
+    hip: [6, 44],
+    knees: [[-8, 22], [26, 24]],
+    feet: [[-26, 0], [34, 0]],
+    elbows: [[40, 86], [36, 78]],
+    fists: [[62, 88], [60, 80]],
+  },
   // 맞고 뒤로 젖혀짐
   hurt: {
     head: [-20, 94],
@@ -91,7 +101,7 @@ type Props = {
 
 function poseOf(f: FighterShow): keyof typeof POSES {
   if (f.hidden || !f.stance) return 'idle'
-  if (f.event === 'hurt') return 'hurt'
+  if (f.event && isHurt(f.event)) return 'hurt'
   return f.stance
 }
 
@@ -100,6 +110,9 @@ const EVENT_TEXT: Partial<Record<TurnEvent, { text: string; tone: 'good' | 'bad'
   charge: { text: '+1', tone: 'good' },
   'charge-full': { text: '꽉 참', tone: 'plain' },
   hurt: { text: '−1', tone: 'bad' },
+  pierced: { text: '뚫림! −1', tone: 'bad' },
+  overpowered: { text: '밀림! −1', tone: 'bad' },
+  'smash-hit': { text: '강타!', tone: 'good' },
   block: { text: '막음!', tone: 'good' },
   strike: { text: '명중!', tone: 'good' },
   blocked: { text: '막힘', tone: 'plain' },
@@ -111,12 +124,15 @@ function Fighter({ show, side, reveal, now, name }: { show: FighterShow; side: 0
   const p = reveal ?? 0
   // 공개 순간 동작: 타격은 앞으로 뛰어들고, 맞으면 뒤로 밀린다
   let shift = 0
-  if (reveal !== null && show.stance === 'attack' && !show.hidden) {
-    // 막히거나 부딪히면 상대 앞(방패·주먹)에서 멈춘다
-    const reach = show.event === 'strike' ? 40 : show.event === 'clash' ? 6 : 10
+  if (reveal !== null && (show.stance === 'attack' || show.stance === 'smash') && !show.hidden) {
+    // 막히거나 부딪히면 상대 앞(방패·주먹)에서 멈춘다. 강타는 상대를 밀어내며 더 깊이
+    const reach = show.event === 'strike' ? 40 : show.event === 'smash-hit' ? 34 : show.event === 'clash' ? 6 : 10
     shift = reach * Math.min(1, p / 0.15)
   }
-  if (reveal !== null && show.event === 'hurt') shift = -14 * Math.min(1, p / 0.2)
+  // 맞으면 뒤로 밀린다. 강타에 맞으면 더 멀리
+  if (reveal !== null && show.event && isHurt(show.event)) {
+    shift = (show.event === 'hurt' ? -14 : -30) * Math.min(1, p / 0.2)
+  }
   const bob = reveal === null ? Math.sin(now / 160 + side * 1.3) * 1.5 : 0
   const ox = FIGHTER_X[side] + shift * dir
   const at = ([x, y]: Point) => `${ox + x * dir} ${GROUND_Y - y + (y > 30 ? bob : 0)}`
@@ -124,7 +140,11 @@ function Fighter({ show, side, reveal, now, name }: { show: FighterShow; side: 0
   const limb = (a: Point, b: Point, c: Point) => `M${at(a)}L${at(b)}L${at(c)}`
   const ev = !show.hidden && show.event ? EVENT_TEXT[show.event] : undefined
   return (
-    <g className={`ft-fighter${show.event === 'hurt' ? ' ft-fighter--hurt' : ''}`}>
+    <g className={`ft-fighter${show.event && isHurt(show.event) ? ' ft-fighter--hurt' : ''}`}>
+      {/* 강타: 주먹 앞에 터지는 충격 */}
+      {!show.hidden && show.event === 'smash-hit' && (
+        <circle className="ft-smash" cx={ox + 64 * dir} cy={GROUND_Y - 84} r={10 + 26 * p} opacity={1 - p} />
+      )}
       {/* 기 모으기: 몸 주위로 퍼지는 동그라미 */}
       {!show.hidden && (show.event === 'charge' || show.event === 'charge-full') && (
         <circle className="ft-aura" cx={ox} cy={GROUND_Y - 55} r={40 + 18 * p} opacity={1 - p} />
@@ -132,7 +152,9 @@ function Fighter({ show, side, reveal, now, name }: { show: FighterShow; side: 0
       {/* 방어: 앞에 방패 호 */}
       {!show.hidden && show.stance === 'guard' && (
         <path
-          className={show.event === 'block' ? 'ft-shield ft-shield--hit' : 'ft-shield'}
+          className={
+            show.event === 'block' ? 'ft-shield ft-shield--hit' : show.event === 'pierced' ? 'ft-shield ft-shield--broken' : 'ft-shield'
+          }
           d={`M${ox + 34 * dir} ${GROUND_Y - 120}Q${ox + 52 * dir} ${GROUND_Y - 70} ${ox + 34 * dir} ${GROUND_Y - 20}`}
         />
       )}

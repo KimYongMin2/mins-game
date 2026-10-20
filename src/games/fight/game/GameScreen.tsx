@@ -2,11 +2,11 @@ import { useEffect, useReducer, useRef, useState } from 'react'
 import type { Room } from '../../../shared/online/room'
 import { loadNickname } from '../../../shared/storage/nickname'
 import { randomSeed } from '../../../shared/random'
-import { CHOOSE_MS, DONE_MS, type Difficulty, MAX_LIFE, MAX_STACKS, MAX_TURNS, REVEAL_MS } from '../constants'
+import { CHOOSE_MS, DONE_MS, type Difficulty, MAX_LIFE, MAX_STACKS, MAX_TURNS, REVEAL_MS, SMASH_COST } from '../constants'
 import { FightView, type FighterShow } from '../field/FightView'
 import { type MatchState, type MatchSummary, createMatch, matchReducer, summarizeMatch } from '../play/matchState'
 import { type FightMsg, guestActionOf, guestPickMsg, hostActionOf, hostOutbox } from '../play/pvp'
-import { type Fighter, STANCES, STANCE_LABEL, type Stance, canChoose } from '../rules/turn'
+import { type Fighter, STANCES, STANCE_COST, STANCE_LABEL, type Stance, canChoose } from '../rules/turn'
 import { playSound } from '../sounds'
 
 type Props = {
@@ -21,7 +21,8 @@ type Props = {
 const STANCE_DESC: Record<Stance, string> = {
   ready: '스택 +1',
   guard: '타격을 막음',
-  attack: '스택 1개 써서 공격',
+  attack: '스택 1개',
+  smash: `스택 ${SMASH_COST}개 · 방어 뚫음`,
 }
 
 function Status({ fighter, name, side }: { fighter: Fighter; name: string; side: 0 | 1 }) {
@@ -194,12 +195,12 @@ export function GameScreen({ difficulty, pvp, onFinish, onQuit }: Props) {
               onClick={() => choose(s)}
             >
               <span className="ft-pad__label">{STANCE_LABEL[s]}</span>
-              <span className="ft-pad__desc">{s === 'attack' && !allowed ? '스택 필요' : STANCE_DESC[s]}</span>
+              <span className="ft-pad__desc">{allowed ? STANCE_DESC[s] : `스택 ${STANCE_COST[s]}개 필요`}</span>
             </button>
           )
         })}
       </div>
-      <p className="ft-hint">2초 안에 고르기 · 안 고르면 준비 · 준비 중에 맞으면 생명력 −1</p>
+      <p className="ft-hint">2초 안에 고르기 · 안 고르면 준비 · 준비 중에 맞으면 생명력 −1 · 강타는 방어로 못 막음</p>
       {peerGone && !done && (
         <div className="pvp-gone" role="alert">
           <strong>{pvp?.peerName}님이 나갔어요</strong>

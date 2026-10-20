@@ -25,6 +25,13 @@ const RECIPES: Record<SoundName, () => void> = {
     tone({ freq: 180, to: 60, type: 'triangle', duration: 0.18, gain: 0.4 })
   },
 
+  // 강타: 낮고 길게 울리는 쾅
+  smash: () => {
+    noise({ filter: 'lowpass', freq: 900, duration: 0.25, gain: 0.7 })
+    tone({ freq: 120, to: 40, type: 'triangle', duration: 0.4, gain: 0.5 })
+    tone({ freq: 60, to: 30, type: 'sine', duration: 0.5, gain: 0.4, delay: 0.03 })
+  },
+
   // 상쇄: 두 번 부딪히는 소리
   clash: () => {
     noise({ filter: 'bandpass', freq: 2000, q: 2, duration: 0.1, gain: 0.4 })

@@ -1,38 +1,46 @@
 import { type Rng, pickWeighted } from '../../../shared/random'
-import { MAX_STACKS, type Difficulty } from '../constants'
+import { type Difficulty, MAX_STACKS } from '../constants'
 import { type Fighter, type Stance, sanitize } from '../rules/turn'
 
 // 봇의 자세 고르기. 상대가 고른 것은 모르고, 지금까지 공개된 것만 본다.
 
 type Weights = Record<Stance, number>
 
-/** 일반: 내 스택만 보고 대충 고른다 */
+const w = (ready: number, guard: number, attack: number, smash = 0): Weights => ({ ready, guard, attack, smash })
+
+/** 일반: 내 스택만 보고 대충 고른다. 꽉 차면 강타를 자주 */
 function normalWeights(self: Fighter): Weights {
-  if (self.stacks === 0) return { ready: 70, guard: 30, attack: 0 }
-  if (self.stacks < MAX_STACKS) return { ready: 40, guard: 25, attack: 35 }
-  return { ready: 0, guard: 30, attack: 70 }
+  if (self.stacks === 0) return w(70, 30, 0)
+  if (self.stacks < MAX_STACKS) return w(40, 25, 35)
+  return w(0, 15, 25, 60)
 }
 
 /** 어려움: 상대 스택과 상대가 고른 자세의 흐름을 읽는다 */
 function hardWeights(self: Fighter, foe: Fighter, foeHistory: readonly Stance[]): Weights {
-  let w: Weights
+  const full = self.stacks >= MAX_STACKS
+  let weights: Weights
   if (foe.stacks === 0) {
     // 상대가 칠 수 없으니 방어는 낭비. 모으거나, 상대가 준비할 때 친다
-    if (self.stacks === 0) w = { ready: 100, guard: 0, attack: 0 }
-    else if (self.stacks < MAX_STACKS) w = { ready: 45, guard: 0, attack: 55 }
-    else w = { ready: 35, guard: 0, attack: 65 }
-  } else if (self.stacks === 0) w = { ready: 50, guard: 50, attack: 0 }
-  else if (self.stacks < MAX_STACKS) w = { ready: 25, guard: 40, attack: 35 }
-  else w = { ready: 0, guard: 40, attack: 60 }
+    if (self.stacks === 0) weights = w(100, 0, 0)
+    else if (!full) weights = w(45, 0, 55)
+    else weights = w(0, 0, 25, 75)
+  } else if (foe.stacks >= MAX_STACKS) {
+    // 상대 강타는 막을 수 없다. 같이 강타하거나, 상대가 망설일 때 친다
+    if (full) weights = w(0, 10, 10, 80)
+    else if (self.stacks > 0) weights = w(30, 30, 40)
+    else weights = w(50, 50, 0)
+  } else if (self.stacks === 0) weights = w(50, 50, 0)
+  else if (!full) weights = w(25, 40, 35)
+  else weights = w(0, 20, 10, 70)
 
   // 상대가 같은 자세를 두 번 연속 하면 또 할 거라고 보고 노린다
   const [last, before] = [foeHistory.at(-1), foeHistory.at(-2)]
   if (last && last === before) {
-    if (last === 'ready' && self.stacks > 0) w = { ...w, attack: w.attack + 40 }
-    if (last === 'guard') w = { ...w, ready: w.ready + 40 }
-    if (last === 'attack') w = { ...w, guard: w.guard + 40 }
+    if (last === 'ready' && self.stacks > 0) weights = { ...weights, attack: weights.attack + 40 }
+    if (last === 'guard') weights = full ? { ...weights, smash: weights.smash + 40 } : { ...weights, ready: weights.ready + 40 }
+    if (last === 'attack') weights = { ...weights, guard: weights.guard + 40 }
   }
-  return w
+  return weights
 }
 
 export function chooseBotStance(opts: {
@@ -44,7 +52,7 @@ export function chooseBotStance(opts: {
   foeHistory: readonly Stance[]
 }): Stance {
   const { rng, difficulty, self, foe, foeHistory } = opts
-  const w = difficulty === 'hard' ? hardWeights(self, foe, foeHistory) : normalWeights(self)
-  // 스택이 꽉 찼을 때 준비는 의미가 없지만, 가중치가 전부 0이 되는 일은 없게 둔다
-  return sanitize(self, pickWeighted(rng, w))
+  const weights = difficulty === 'hard' ? hardWeights(self, foe, foeHistory) : normalWeights(self)
+  // 스택이 모자란 공격이 뽑히면 준비로 바뀐다
+  return sanitize(self, pickWeighted(rng, weights))
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { CHOOSE_MS, INTRO_MS, MAX_TURNS, REVEAL_MS } from '../constants'
+import { CHOOSE_MS, INTRO_MS, REVEAL_MS } from '../constants'
 import type { Stance } from '../rules/turn'
 import { type MatchState, createMatch, matchReducer, summarizeMatch } from './matchState'
 
@@ -57,11 +57,12 @@ describe('경기 진행', () => {
     expect(summarizeMatch(s)).toMatchObject({ outcome: 'lose', life: [0, 3] })
   })
 
-  it('방어만 하면 안 지지만 턴 제한에 걸린다', () => {
+  it('방어만 하면 봇이 강타로 뚫어서 진다', () => {
     const s = play(6, () => 'guard', 'hard')
-    expect(s.turns).toHaveLength(MAX_TURNS)
-    expect(summarizeMatch(s).life[0]).toBe(3)
+    expect(summarizeMatch(s).outcome).toBe('lose')
+    expect(s.turns.some((t) => t.events[0] === 'pierced')).toBe(true)
   })
+
 
   it('봇의 고른 것을 보고 이기는 자세를 고르면 이긴다', () => {
     const s = play(7, (st) => {

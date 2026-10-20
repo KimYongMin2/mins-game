@@ -1,12 +1,15 @@
-import { MAX_LIFE, MAX_STACKS, MAX_TURNS } from '../constants'
+import { MAX_LIFE, MAX_STACKS, MAX_TURNS, SMASH_COST } from '../constants'
 
 // 한 턴의 판정. 둘이 동시에 고른 자세로 생명력·준비 스택이 바뀐다.
 
-export type Stance = 'ready' | 'guard' | 'attack'
+export type Stance = 'ready' | 'guard' | 'attack' | 'smash'
 
-export const STANCES: readonly Stance[] = ['ready', 'guard', 'attack']
+export const STANCES: readonly Stance[] = ['ready', 'guard', 'attack', 'smash']
 
-export const STANCE_LABEL: Record<Stance, string> = { ready: '준비', guard: '방어', attack: '타격' }
+export const STANCE_LABEL: Record<Stance, string> = { ready: '준비', guard: '방어', attack: '타격', smash: '강타' }
+
+/** 자세마다 쓰는 스택 */
+export const STANCE_COST: Record<Stance, number> = { ready: 0, guard: 0, attack: 1, smash: SMASH_COST }
 
 export type Fighter = { life: number; stacks: number }
 
@@ -27,44 +30,55 @@ export type TurnEvent =
   | 'block'
   /** 방어했지만 상대가 안 침 */
   | 'guard'
+  /** 방어했는데 강타에 뚫림 (생명력 −1) */
+  | 'pierced'
   /** 타격 명중 */
   | 'strike'
   /** 타격이 막힘 */
   | 'blocked'
-  /** 타격끼리 부딪힘 (둘 다 스택만 소모) */
+  /** 타격했는데 상대 강타에 밀려 맞음 (생명력 −1) */
+  | 'overpowered'
+  /** 강타 명중 (방어도 뚫고, 타격도 이긴다) */
+  | 'smash-hit'
+  /** 같은 공격끼리 부딪힘 (둘 다 스택만 소모) */
   | 'clash'
 
-export function canChoose(fighter: Fighter, stance: Stance): boolean {
-  return stance !== 'attack' || fighter.stacks > 0
+/** 생명력이 깎이는 일 */
+const HURT_EVENTS: readonly TurnEvent[] = ['hurt', 'pierced', 'overpowered']
+
+export function isHurt(event: TurnEvent): boolean {
+  return HURT_EVENTS.includes(event)
 }
 
-/** 고를 수 없는 자세(스택 없이 타격)는 준비로 바꾼다 */
+export function canChoose(fighter: Fighter, stance: Stance): boolean {
+  return fighter.stacks >= STANCE_COST[stance]
+}
+
+/** 고를 수 없는 자세(스택이 모자란 공격)는 준비로 바꾼다 */
 export function sanitize(fighter: Fighter, stance: Stance): Stance {
   return canChoose(fighter, stance) ? stance : 'ready'
 }
 
 function eventOf(mine: Stance, theirs: Stance, me: Fighter): TurnEvent {
+  if (mine === 'smash') return theirs === 'smash' ? 'clash' : 'smash-hit'
   if (mine === 'attack') {
+    if (theirs === 'smash') return 'overpowered'
     if (theirs === 'attack') return 'clash'
     return theirs === 'guard' ? 'blocked' : 'strike'
   }
-  if (mine === 'guard') return theirs === 'attack' ? 'block' : 'guard'
-  if (theirs === 'attack') return 'hurt'
+  if (mine === 'guard') {
+    if (theirs === 'smash') return 'pierced'
+    return theirs === 'attack' ? 'block' : 'guard'
+  }
+  if (theirs === 'attack' || theirs === 'smash') return 'hurt'
   return me.stacks >= MAX_STACKS ? 'charge-full' : 'charge'
 }
 
-function apply(f: Fighter, event: TurnEvent): Fighter {
-  switch (event) {
-    case 'charge':
-      return { ...f, stacks: f.stacks + 1 }
-    case 'hurt':
-      return { ...f, life: Math.max(0, f.life - 1) }
-    case 'strike':
-    case 'blocked':
-    case 'clash':
-      return { ...f, stacks: f.stacks - 1 }
-    default:
-      return f
+function apply(f: Fighter, stance: Stance, event: TurnEvent): Fighter {
+  const gained = event === 'charge' ? 1 : 0
+  return {
+    life: Math.max(0, f.life - (isHurt(event) ? 1 : 0)),
+    stacks: f.stacks - STANCE_COST[stance] + gained,
   }
 }
 
@@ -77,7 +91,11 @@ export type TurnResult = {
 export function resolveTurn(fighters: Pair<Fighter>, chosen: Pair<Stance>): TurnResult {
   const stances = [sanitize(fighters[0], chosen[0]), sanitize(fighters[1], chosen[1])] as const
   const events = [eventOf(stances[0], stances[1], fighters[0]), eventOf(stances[1], stances[0], fighters[1])] as const
-  return { stances, events, fighters: [apply(fighters[0], events[0]), apply(fighters[1], events[1])] }
+  return {
+    stances,
+    events,
+    fighters: [apply(fighters[0], stances[0], events[0]), apply(fighters[1], stances[1], events[1])],
+  }
 }
 
 /** 0·1 = 그 선수 승리, 'draw' = 무승부, null = 계속 */

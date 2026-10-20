@@ -6,8 +6,10 @@ export const DIFFICULTY_LABEL: Record<Difficulty, string> = { normal: '일반', 
 
 /** 처음 생명력 */
 export const MAX_LIFE = 3
-/** 준비 스택 최대 */
-export const MAX_STACKS = 2
+/** 준비 스택 최대 (처음 2에서 강타를 넣으며 3으로) */
+export const MAX_STACKS = 3
+/** 강타에 드는 스택 (모은 걸 전부) */
+export const SMASH_COST = 3
 /** 이 턴이 지나도 안 끝나면 생명력으로 승부 (방어만 계속하는 경우 대비) */
 export const MAX_TURNS = 30
 

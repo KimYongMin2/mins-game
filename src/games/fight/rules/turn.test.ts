@@ -16,9 +16,9 @@ describe('canChoose', () => {
 describe('resolveTurn', () => {
   const turn = (a: Fighter, sa: Stance, b: Fighter, sb: Stance) => resolveTurn([a, b], [sa, sb])
 
-  it('준비는 스택 +1, 최대 2', () => {
-    const r = turn(f(3, 0), 'ready', f(3, 2), 'ready')
-    expect(r.fighters).toEqual([f(3, 1), f(3, 2)])
+  it('준비는 스택 +1, 최대 3', () => {
+    const r = turn(f(3, 0), 'ready', f(3, 3), 'ready')
+    expect(r.fighters).toEqual([f(3, 1), f(3, 3)])
     expect(r.events).toEqual(['charge', 'charge-full'])
   })
 
@@ -55,6 +55,42 @@ describe('resolveTurn', () => {
 
   it('생명력은 0 밑으로 안 내려간다', () => {
     expect(turn(f(0, 0), 'ready', f(3, 1), 'attack').fighters[0].life).toBe(0)
+  })
+})
+
+describe('강타', () => {
+  const turn = (a: Fighter, sa: Stance, b: Fighter, sb: Stance) => resolveTurn([a, b], [sa, sb])
+
+  it('스택 3개가 있어야 고를 수 있고, 3개를 모두 쓴다', () => {
+    expect(canChoose(f(3, 2), 'smash')).toBe(false)
+    expect(canChoose(f(3, 3), 'smash')).toBe(true)
+    expect(turn(f(3, 3), 'smash', f(3, 0), 'ready').fighters[0].stacks).toBe(0)
+  })
+
+  it('방어를 뚫는다', () => {
+    const r = turn(f(3, 3), 'smash', f(3, 1), 'guard')
+    expect(r.events).toEqual(['smash-hit', 'pierced'])
+    expect(r.fighters).toEqual([f(3, 0), f(2, 1)])
+  })
+
+  it('타격과 부딪히면 강타가 이긴다 (타격한 쪽도 스택은 씀)', () => {
+    const r = turn(f(3, 3), 'smash', f(3, 2), 'attack')
+    expect(r.events).toEqual(['smash-hit', 'overpowered'])
+    expect(r.fighters).toEqual([f(3, 0), f(2, 1)])
+  })
+
+  it('준비 중인 상대도 맞는다', () => {
+    expect(turn(f(3, 3), 'smash', f(3, 2), 'ready').fighters[1]).toEqual(f(2, 2))
+  })
+
+  it('강타끼리는 상쇄 (둘 다 스택 3개만 날아감)', () => {
+    const r = turn(f(2, 3), 'smash', f(3, 3), 'smash')
+    expect(r.events).toEqual(['clash', 'clash'])
+    expect(r.fighters).toEqual([f(2, 0), f(3, 0)])
+  })
+
+  it('스택이 모자라면 준비로 바뀐다', () => {
+    expect(turn(f(3, 2), 'smash', f(3, 0), 'guard').stances[0]).toBe('ready')
   })
 })
 
