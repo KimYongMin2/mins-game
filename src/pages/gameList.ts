@@ -43,6 +43,14 @@ export const GAMES: GameEntry[] = [
     play: 'pvp',
   },
   {
+    id: 'bomb',
+    title: '폭탄 돌리기',
+    description: '2~6명. 폭탄을 들면 얼른 넘겨라! 터질 때 들고 있으면 탈락',
+    path: '/games/bomb',
+    ready: true,
+    play: 'pvp',
+  },
+  {
     id: 'batting',
     title: '배팅',
     description: '정면에서 날아오는 직구·슬라이더·커브. 칸을 터치해 홈런을 노려라!',
