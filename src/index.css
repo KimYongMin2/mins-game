@@ -372,6 +372,33 @@ a.game-card:hover {
   color: var(--ink-soft);
 }
 
+/* 여럿이 하는 대기실 (shared/ui/GroupLobby) */
+.group-lobby__members {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 6px;
+  width: 100%;
+}
+
+.group-lobby__member {
+  padding: 8px 12px;
+  border: 1.5px solid var(--muted-line);
+  border-radius: 10px;
+  font-weight: 700;
+  text-align: left;
+}
+
+.group-lobby__member span {
+  font-weight: 500;
+  color: var(--ink-soft);
+}
+
+.group-lobby__member--me {
+  border-color: var(--line);
+}
+
 .pvp-lobby__code {
   font-size: 3rem;
   font-weight: 900;
