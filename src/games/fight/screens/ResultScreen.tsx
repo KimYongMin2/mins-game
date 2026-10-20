@@ -1,4 +1,4 @@
-import type { UploadStatus } from '../../../shared/online/uploadQueue'
+import { type UploadStatus, lastUploadError } from '../../../shared/online/uploadQueue'
 import { DIFFICULTY_LABEL } from '../constants'
 import type { MatchSummary } from '../play/matchState'
 import { type FightRecord, winRate } from '../records'
@@ -40,6 +40,7 @@ export function ResultScreen({ summary, record, upload, onRetry, onRanking, onMe
 
       <p className={`ft-result__upload ft-result__upload--${upload}`} aria-live="polite">
         {UPLOAD_TEXT[upload]}
+        {upload === 'queued' && lastUploadError() && <span className="upload-error"> ({lastUploadError()})</span>}
       </p>
 
       <div className="ft-result__buttons">

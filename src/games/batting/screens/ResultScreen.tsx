@@ -1,4 +1,4 @@
-import type { UploadStatus } from '../../../shared/online/uploadQueue'
+import { type UploadStatus, lastUploadError } from '../../../shared/online/uploadQueue'
 import { DIFFICULTY_LABEL, HAND_LABEL, TOTAL_PITCHES } from '../constants'
 import { timingText } from '../game/describe'
 import { PITCH_LABEL } from '../play/pitch'
@@ -80,6 +80,7 @@ export function ResultScreen({ summary, record, newBest, upload, onRetry, onRank
 
       <p className={`bt-result__upload bt-result__upload--${upload}`} aria-live="polite">
         {UPLOAD_TEXT[upload]}
+        {upload === 'queued' && lastUploadError() && <span className="upload-error"> ({lastUploadError()})</span>}
       </p>
 
       <div className="bt-result__buttons">

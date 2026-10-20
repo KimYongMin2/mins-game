@@ -1,4 +1,4 @@
-import type { UploadStatus } from '../../../shared/online/uploadQueue'
+import { type UploadStatus, lastUploadError } from '../../../shared/online/uploadQueue'
 import { ROUNDS } from '../constants'
 import type { RoundSummary } from '../play/roundState'
 import { type ArcheryRecord, averageOf } from '../records'
@@ -67,6 +67,7 @@ export function ResultScreen({ summary, record, newBest, upload, onRetry, onRank
 
       <p className={`ar-result__upload ar-result__upload--${upload}`} aria-live="polite">
         {UPLOAD_TEXT[upload]}
+        {upload === 'queued' && lastUploadError() && <span className="upload-error"> ({lastUploadError()})</span>}
       </p>
 
       <div className="ar-result__buttons">

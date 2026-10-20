@@ -8,6 +8,25 @@ import { ensurePlayerId, getSupabase, isAuthError, isOnlineConfigured, recoverSe
 /** 결과 화면에 보여줄 업로드 상태. 'queued'면 기기에 보관해 두었다가 나중에 다시 보낸다. */
 export type UploadStatus = 'saving' | 'saved' | 'queued'
 
+let lastError: string | null = null
+
+/**
+ * 마지막으로 기록 올리기에 실패한 이유 (짧게). 결과 화면에 작게 보여줘서
+ * 콘솔을 열기 어려운 휴대폰에서도 원인을 알 수 있게 한다
+ */
+export function lastUploadError(): string | null {
+  return lastError
+}
+
+function describeError(e: unknown): string {
+  if (e && typeof e === 'object') {
+    const { code, message } = e as { code?: string; message?: string }
+    const text = [code, message].filter(Boolean).join(' ')
+    if (text) return text.slice(0, 120)
+  }
+  return String(e).slice(0, 120)
+}
+
 /**
  * 기록마다 붙이는 고유 id (UUID v4). crypto.randomUUID는 https·localhost에서만 있어서
  * 같은 와이파이의 http 주소(휴대폰 테스트 등)에서는 getRandomValues로 직접 만든다.
@@ -68,10 +87,12 @@ export function createUploadQueue<Row extends { id: string }>(table: string, sto
       }
       if (error) throw error
       save([])
+      lastError = null
       return 0
     } catch (e) {
-      // 원인을 나중에 확인할 수 있게 콘솔에 남긴다. 기록은 기기에 남아 다음에 다시 보낸다
+      // 원인을 나중에 확인할 수 있게 남긴다. 기록은 기기에 남아 다음에 다시 보낸다
       console.warn('[upload] 기록 올리기 실패', table, e)
+      lastError = describeError(e)
       return pending.length
     }
   }

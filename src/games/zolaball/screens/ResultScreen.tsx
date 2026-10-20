@@ -1,4 +1,5 @@
 import type { MatchSummary } from '../match/matchState'
+import { lastUploadError } from '../../../shared/online/uploadQueue'
 import type { UploadStatus } from '../ranking/online'
 import { type ZolaballRecord, formatAverage, formatEra, formatInnings } from '../records'
 import { INNINGS, type Side } from '../rules/game'
@@ -102,6 +103,7 @@ export function ResultScreen({ summary, record, upload, onRematch, onRanking, on
 
       <p className={`zb-result__upload zb-result__upload--${upload}`} aria-live="polite">
         {UPLOAD_TEXT[upload]}
+        {upload === 'queued' && lastUploadError() && <span className="upload-error"> ({lastUploadError()})</span>}
       </p>
 
       <div className="zb-result__buttons">
