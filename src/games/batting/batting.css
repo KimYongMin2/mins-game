@@ -1,0 +1,443 @@
+/* 졸라 타격왕 전용 스타일. 모든 클래스는 bt- 접두사를 쓴다. */
+.bt-page {
+  max-width: 560px;
+}
+
+.bt-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.bt-header .title {
+  flex: 1;
+  min-width: 0;
+}
+
+/* 정면 화면 */
+.bt-view-wrap {
+  position: relative;
+  width: 100%;
+  max-width: min(100%, calc((100dvh - 230px) * 0.9));
+  margin: 0 auto;
+  border: 2px solid var(--line);
+  border-radius: 14px;
+  overflow: hidden;
+  background: var(--paper);
+}
+
+.bt-view {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 360 / 400;
+  color: var(--ink);
+  cursor: pointer;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+
+.bt-view path,
+.bt-view circle,
+.bt-view ellipse,
+.bt-view rect {
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.bt-ground path,
+.bt-ground ellipse {
+  stroke-width: 1.2;
+  stroke: var(--muted-line);
+}
+
+.bt-ground .bt-faint {
+  stroke-width: 1;
+}
+
+.bt-view .bt-fan {
+  stroke: var(--muted-line);
+  stroke-width: 1;
+}
+
+.bt-figure path {
+  stroke-width: 2;
+}
+
+.bt-batter path {
+  stroke-width: 4;
+}
+
+.bt-view .bt-head {
+  fill: var(--paper);
+  stroke-width: 2;
+}
+
+.bt-batter .bt-head {
+  stroke-width: 4;
+}
+
+.bt-view .bt-bat {
+  stroke-width: 9;
+  stroke: #8a5a2b;
+}
+
+.bt-zone rect {
+  stroke-width: 2.5;
+}
+
+.bt-zone .bt-zone__grid {
+  stroke-width: 1;
+  stroke: var(--ink-soft);
+  stroke-dasharray: 4 4;
+}
+
+.bt-view .bt-zone__touched {
+  fill: rgba(0, 0, 0, 0.12);
+  stroke: none;
+}
+
+.bt-zone__num {
+  font-size: 11px;
+  fill: var(--muted-line);
+  font-weight: 700;
+}
+
+.bt-view .bt-ball {
+  fill: var(--paper);
+  stroke-width: 1.5;
+}
+
+.bt-view .bt-mark {
+  stroke: var(--muted-line);
+  stroke-width: 2;
+}
+
+.bt-view .bt-mark--latest {
+  stroke: var(--accent);
+  stroke-width: 3;
+}
+
+/* 경기 화면 */
+.bt-game {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.bt-hud {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-soft);
+}
+
+.bt-hud strong {
+  font-size: 1.25rem;
+  font-weight: 900;
+  color: var(--ink);
+}
+
+.bt-banner {
+  position: absolute;
+  inset: 3% 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  pointer-events: none;
+}
+
+.bt-banner__title {
+  font-size: clamp(2rem, 9vw, 3rem);
+  font-weight: 900;
+  line-height: 1.1;
+  background: var(--paper);
+  padding: 0 10px;
+  border-radius: 10px;
+}
+
+.bt-banner__title--hr {
+  color: var(--accent);
+}
+
+.bt-banner__points {
+  font-size: 0.6em;
+}
+
+.bt-banner__sub {
+  font-size: 0.9375rem;
+  color: var(--ink-soft);
+  background: var(--paper);
+  padding: 0 6px;
+  font-variant-numeric: tabular-nums;
+}
+
+.bt-strip {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(10, 1fr);
+  gap: 4px;
+}
+
+.bt-strip__cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 32px;
+  font-size: 0.75rem;
+  font-weight: 800;
+  border: 1.5px solid var(--muted-line);
+  border-radius: 6px;
+  white-space: nowrap;
+}
+
+.bt-strip__cell--current {
+  border-color: var(--line);
+  border-width: 2px;
+}
+
+.bt-strip__cell--hit {
+  background: #eef6ff;
+  border-color: #3b82f6;
+}
+
+.bt-strip__cell--hr {
+  color: var(--paper);
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.bt-hint {
+  text-align: center;
+  font-size: 0.8125rem;
+  color: var(--ink-soft);
+}
+
+@media (hover: none) and (pointer: coarse) {
+  .bt-hint__pc {
+    display: none;
+  }
+}
+
+/* 시작 */
+.bt-start {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-width: 420px;
+  margin: 8px auto 0;
+  text-align: center;
+}
+
+.bt-choice {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+
+.bt-choice__legend {
+  padding: 0;
+  margin-bottom: 6px;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  color: var(--ink-soft);
+}
+
+.bt-choice__options {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.bt-choice__option {
+  flex-direction: column;
+  gap: 2px;
+  min-height: 0;
+  padding: 10px 8px;
+  border-color: var(--muted-line);
+  border-radius: 12px;
+}
+
+.bt-choice__option--on {
+  border-color: var(--line);
+  box-shadow: 3px 3px 0 var(--line);
+}
+
+.bt-choice__name {
+  font-size: 1.25rem;
+  font-weight: 900;
+}
+
+.bt-choice__desc {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--ink-soft);
+}
+
+.bt-start__record {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin: 0;
+}
+
+.bt-start__record div {
+  display: flex;
+  flex-direction: column;
+  padding: 12px;
+  border: 1.5px solid var(--muted-line);
+  border-radius: 12px;
+}
+
+.bt-start__record dt {
+  font-size: 0.8125rem;
+  color: var(--ink-soft);
+}
+
+.bt-start__record dd {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+}
+
+.bt-start__record span {
+  font-size: 0.75rem;
+  color: var(--ink-soft);
+}
+
+.bt-start__button {
+  min-height: 64px;
+  font-size: 1.25rem;
+}
+
+.bt-start__how {
+  font-size: 0.8125rem;
+  color: var(--ink-soft);
+}
+
+/* 결과 */
+.bt-result {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-width: 420px;
+  margin: 8px auto 0;
+}
+
+.bt-result__headline {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 16px;
+  border: 2px solid var(--line);
+  border-radius: 14px;
+  font-variant-numeric: tabular-nums;
+}
+
+.bt-result__headline strong {
+  font-size: 3rem;
+  font-weight: 900;
+  line-height: 1.1;
+}
+
+.bt-result__headline span {
+  color: var(--ink-soft);
+}
+
+.bt-result__headline .bt-result__mode {
+  font-size: 0.8125rem;
+}
+
+.bt-result__headline--best {
+  border-color: #d97706;
+  background: #fffbeb;
+}
+
+.bt-result__headline .bt-result__badge {
+  padding: 2px 10px;
+  font-size: 0.8125rem;
+  font-weight: 800;
+  color: var(--paper);
+  background: #d97706;
+  border-radius: 999px;
+}
+
+.bt-result__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.bt-result__table th,
+.bt-result__table td {
+  padding: 6px 4px;
+  text-align: left;
+  border-bottom: 1.5px solid var(--muted-line);
+  vertical-align: top;
+}
+
+.bt-result__table th {
+  font-weight: 700;
+  color: var(--ink-soft);
+}
+
+.bt-result__row--hit td {
+  background: #eef6ff;
+}
+
+.bt-result__row--hr td {
+  background: #fdecec;
+}
+
+.bt-result__detail {
+  display: block;
+  font-size: 0.75rem;
+  color: var(--ink-soft);
+}
+
+.bt-result__career {
+  text-align: center;
+  font-size: 0.875rem;
+  color: var(--ink-soft);
+}
+
+.bt-result__buttons {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.bt-result__buttons .button--primary {
+  grid-column: 1 / -1;
+}
+
+.bt-result__upload {
+  text-align: center;
+  font-size: 0.8125rem;
+  color: var(--ink-soft);
+}
+
+.bt-result__upload--queued {
+  color: var(--accent);
+}
+
+.bt-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}

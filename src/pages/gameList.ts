@@ -22,4 +22,11 @@ export const GAMES: GameEntry[] = [
     path: '/games/archery',
     ready: true,
   },
+  {
+    id: 'batting',
+    title: '졸라 타격왕',
+    description: '정면에서 날아오는 직구·슬라이더·커브. 칸을 터치해 홈런을 노려라!',
+    path: '/games/batting',
+    ready: true,
+  },
 ]
