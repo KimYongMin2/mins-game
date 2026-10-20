@@ -179,3 +179,99 @@ $$;
 
 revoke all on function public.archery_leaderboard() from public;
 grant execute on function public.archery_leaderboard() to anon, authenticated;
+
+
+-- ───────────────────────────────────────────────────────────────
+-- 졸라 타격왕 온라인 랭킹
+-- - batting_games: 경기 한 판(10구)의 결과 한 줄. 본인 기록만 쓰고 읽을 수 있다.
+-- - batting_leaderboard(난이도): 선수별 최고 점수·한 경기 최다 홈런. 이 합계만 공개한다.
+
+create table if not exists public.batting_games (
+  id uuid primary key default gen_random_uuid(),
+  player_id uuid not null default auth.uid() references auth.users (id) on delete cascade,
+  nickname text not null check (char_length(btrim(nickname)) between 1 and 10),
+  difficulty text not null check (difficulty in ('normal', 'hard')),
+  hand text not null check (hand in ('right', 'left')),
+  -- 점수 = 비거리 합(m). 한 공 최대 140m × 10구
+  points int not null check (points between 0 and 1400),
+  homeruns int not null check (homeruns between 0 and 10),
+  hits int not null check (hits between homeruns and 10),
+  created_at timestamptz not null default now(),
+  -- 홈런은 115m 이상이라 홈런이 n개면 최소 115n점 (조작 방지용 최소한의 검사)
+  constraint batting_points_cover_homeruns check (points >= homeruns * 115)
+);
+
+create index if not exists batting_games_difficulty_player_idx
+  on public.batting_games (difficulty, player_id);
+
+alter table public.batting_games enable row level security;
+
+drop policy if exists "본인 기록 추가" on public.batting_games;
+create policy "본인 기록 추가" on public.batting_games
+  for insert to authenticated
+  with check (player_id = (select auth.uid()));
+
+drop policy if exists "본인 기록 보기" on public.batting_games;
+create policy "본인 기록 보기" on public.batting_games
+  for select to authenticated
+  using (player_id = (select auth.uid()));
+
+drop policy if exists "본인 기록 삭제" on public.batting_games;
+create policy "본인 기록 삭제" on public.batting_games
+  for delete to authenticated
+  using (player_id = (select auth.uid()));
+
+revoke all on public.batting_games from anon;
+grant select, insert, delete on public.batting_games to authenticated;
+
+-- 선수별 합계. 닉네임은 가장 최근 경기의 것.
+-- 최고 점수 경기: 점수 → 홈런 → 안타 이상이 높고, 같으면 먼저 세운 기록
+-- 최다 홈런 경기: 홈런 → 점수가 높고, 같으면 먼저 세운 기록
+create or replace function public.batting_leaderboard(p_difficulty text)
+returns table (
+  player_id uuid,
+  nickname text,
+  games int,
+  best_points int,
+  best_homeruns int,
+  best_hits int,
+  best_at timestamptz,
+  most_hr int,
+  most_hr_points int,
+  most_hr_at timestamptz
+)
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  with mine as (
+    select * from public.batting_games g where g.difficulty = p_difficulty
+  ),
+  agg as (
+    select m.player_id,
+           (array_agg(m.nickname order by m.created_at desc))[1] as nickname,
+           count(*)::int as games
+    from mine m
+    group by m.player_id
+  ),
+  best as (
+    select distinct on (m.player_id) m.player_id, m.points, m.homeruns, m.hits, m.created_at
+    from mine m
+    order by m.player_id, m.points desc, m.homeruns desc, m.hits desc, m.created_at asc
+  ),
+  most_hr as (
+    select distinct on (m.player_id) m.player_id, m.homeruns, m.points, m.created_at
+    from mine m
+    order by m.player_id, m.homeruns desc, m.points desc, m.created_at asc
+  )
+  select a.player_id, a.nickname, a.games,
+         b.points, b.homeruns, b.hits, b.created_at,
+         h.homeruns, h.points, h.created_at
+  from agg a
+  join best b on b.player_id = a.player_id
+  join most_hr h on h.player_id = a.player_id
+$$;
+
+revoke all on function public.batting_leaderboard(text) from public;
+grant execute on function public.batting_leaderboard(text) to anon, authenticated;

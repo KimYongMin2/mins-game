@@ -444,3 +444,33 @@
   clip-path: inset(50%);
   white-space: nowrap;
 }
+
+/* 랭킹 */
+.bt-ranking {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-width: 480px;
+  margin: 0 auto;
+}
+
+.bt-ranking__tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+
+.bt-ranking__tabs .button[aria-pressed='true'] {
+  color: var(--paper);
+  background: var(--ink);
+}
+
+.bt-ranking__status {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  text-align: center;
+  font-size: 0.875rem;
+  color: var(--ink-soft);
+}

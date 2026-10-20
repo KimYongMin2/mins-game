@@ -11,10 +11,9 @@ type Props = {
   summary: SessionSummary
   record: BattingRecord
   newBest: boolean
-  /** 온라인 랭킹을 붙이기 전에는 없음 */
-  upload?: UploadStatus
+  upload: UploadStatus
   onRetry: () => void
-  onRanking?: () => void
+  onRanking: () => void
   onMenu: () => void
 }
 
@@ -79,21 +78,17 @@ export function ResultScreen({ summary, record, newBest, upload, onRetry, onRank
         {avg === null ? '-' : avg.toFixed(1)}점 · {level.games}경기
       </p>
 
-      {upload && (
-        <p className={`bt-result__upload bt-result__upload--${upload}`} aria-live="polite">
-          {UPLOAD_TEXT[upload]}
-        </p>
-      )}
+      <p className={`bt-result__upload bt-result__upload--${upload}`} aria-live="polite">
+        {UPLOAD_TEXT[upload]}
+      </p>
 
       <div className="bt-result__buttons">
         <button type="button" className="button button--primary" onClick={onRetry}>
           다시 하기
         </button>
-        {onRanking && (
-          <button type="button" className="button" onClick={onRanking}>
-            랭킹
-          </button>
-        )}
+        <button type="button" className="button" onClick={onRanking}>
+          랭킹
+        </button>
         <button type="button" className="button" onClick={onMenu}>
           처음으로
         </button>

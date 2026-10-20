@@ -5,7 +5,7 @@ type Props = {
   record: BattingRecord
   onChange: (choice: { difficulty: Difficulty; hand: Hand }) => void
   onStart: () => void
-  onRanking?: () => void
+  onRanking: () => void
 }
 
 const DIFFICULTY_DESC: Record<Difficulty, string> = {
@@ -96,11 +96,9 @@ export function StartScreen({ record, onChange, onStart, onRanking }: Props) {
       <button type="button" className="button button--primary bt-start__button" onClick={onStart}>
         시작
       </button>
-      {onRanking && (
-        <button type="button" className="button" onClick={onRanking}>
-          랭킹
-        </button>
-      )}
+      <button type="button" className="button" onClick={onRanking}>
+        랭킹
+      </button>
       <p className="bt-start__how">
         멀리 칠수록 점수가 높아요 (비거리 1m = 1점). 공 위치 + 정확한 타이밍 = 홈런. 배트 끝 너머는 헛스윙, 손잡이 쪽은 빗맞아요.
         <br />
