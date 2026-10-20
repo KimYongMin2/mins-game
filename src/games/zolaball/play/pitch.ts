@@ -30,20 +30,20 @@ const BALL_MIN_Y = 0.2 // 땅에 박히지 않게 (공 반지름)
 export const STRIKE_ZONE = { bottom: 0.8, top: 1.9 }
 
 const FLIGHT_MS: Record<PitchType, number> = {
-  fastball: 410,
-  breaking: 540,
+  fastball: 380,
+  breaking: 500,
 }
 
 // 스트라이크는 존 경계 안쪽, 볼은 공 전체가 경계 바깥에 오게 (화면의 공 반지름 0.15m).
-// 높은 직구 볼은 떠오르듯 더 높게, 낮은 변화구 볼은 떨어지듯 더 낮게 빠진다.
+// 볼은 스트라이크와 50cm 넘게 떨어뜨려 구분되게 한다. 높은 직구 볼은 떠오르듯, 낮은 변화구 볼은 떨어지듯 더 빠진다.
 const PLATE_HEIGHT: Record<PitchType, Record<'strike' | 'ball', Record<PitchHeight, number>>> = {
   fastball: {
     strike: { high: 1.75, low: 0.95 },
-    ball: { high: 2.35, low: 0.58 },
+    ball: { high: 2.35, low: 0.45 },
   },
   breaking: {
     strike: { high: 1.75, low: 0.95 },
-    ball: { high: 2.12, low: 0.35 },
+    ball: { high: 2.3, low: 0.35 },
   },
 }
 
