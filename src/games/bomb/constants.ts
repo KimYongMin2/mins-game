@@ -5,6 +5,8 @@ export const MAX_PLAYERS = 6
 
 /** 폭탄이 터지기까지 (판마다 이 사이에서 무작위, 아무도 모름) */
 export const FUSE_MS: readonly [number, number] = [7000, 16000]
+/** 폭탄을 받으면 적어도 이만큼은 들고 있어야 다시 던질 수 있다 (받자마자 튕겨 보내지 못하게) */
+export const MIN_HOLD_MS = 200
 /** 던진 폭탄이 날아가는 시간. 그동안은 아무도 못 던진다 */
 export const FLIGHT_MS = 300
 /** 판 시작 전 3·2·1 */

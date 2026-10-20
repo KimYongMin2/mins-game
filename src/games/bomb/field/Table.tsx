@@ -1,5 +1,5 @@
 import { neighborsOf } from '../play/engine'
-import { myIndex, type ScreenState } from '../play/view'
+import { canThrowNow, myIndex, type ScreenState } from '../play/view'
 
 // 둥근 탁자에 둘러앉은 졸라맨들. 나는 항상 맨 아래. 폭탄은 든 사람 앞에, 던지면 포물선으로 날아간다.
 // 바로 옆(왼쪽·오른쪽) 사람을 누르면 그 사람에게 던진다 (내가 들고 있을 때만).
@@ -54,7 +54,7 @@ export function Table({ screen, onPick }: Props) {
   // 나를 맨 아래(자리 0)로 돌린다. 내가 없으면(구경) 그대로
   const seatOf = (i: number) => (me < 0 ? i : (i - me + n) % n)
   const pos = v.players.map((_, i) => seatAt(seatOf(i), n))
-  const canThrow = v.phase === 'play' && !screen.flight && v.holder === me && me >= 0
+  const canThrow = canThrowNow(screen)
   const side = canThrow ? neighborsOf(v.alive, me) : null
 
   let bomb: { x: number; y: number; lift: number } | null = null

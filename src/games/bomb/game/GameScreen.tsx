@@ -5,7 +5,7 @@ import { loadNickname } from '../../../shared/storage/nickname'
 import { Table } from '../field/Table'
 import { type EngineAction, type EngineState, type Player, createEngine, engineReducer, neighborsOf } from '../play/engine'
 import type { BombMsg } from '../play/pvp'
-import { type BombView, type ScreenState, createScreen, myIndex, screenReducer, toView, viewChanged } from '../play/view'
+import { type BombView, type ScreenState, canThrowNow, createScreen, myIndex, screenReducer, toView, viewChanged } from '../play/view'
 import type { GameSummary } from '../records'
 import { playSound } from '../sounds'
 
@@ -196,7 +196,7 @@ export function GameScreen(props: Props) {
   const watching = screen.view !== null && myIndex(screen) < 0
   const v = screen.view
   const me = myIndex(screen)
-  const canThrow = !!v && v.phase === 'play' && !screen.flight && v.holder === me && me >= 0
+  const canThrow = canThrowNow(screen)
   const side = v && me >= 0 && v.alive[me] ? neighborsOf(v.alive, me) : null
 
   // PC: ← → 방향키로 왼쪽·오른쪽에 던지기

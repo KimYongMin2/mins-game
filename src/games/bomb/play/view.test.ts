@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { COUNTDOWN_MS, FLIGHT_MS } from '../constants'
+import { COUNTDOWN_MS, FLIGHT_MS, MIN_HOLD_MS } from '../constants'
 import { createEngine, engineReducer } from './engine'
 import { createScreen, screenReducer, tickGap, toView, viewChanged } from './view'
 
@@ -25,6 +25,7 @@ describe('screenReducer', () => {
     let sc = createScreen('b', 5000)
     sc = screenReducer(sc, { type: 'view', view: toView(e) })
     expect(sc.sounds.map((x) => x.name)).toEqual(['go'])
+    e = engineReducer(e, { type: 'tick', now: COUNTDOWN_MS + MIN_HOLD_MS })
     e = engineReducer(e, { type: 'pass', from: e.holder, to: 1 - e.holder })
     sc = screenReducer(sc, { type: 'view', view: toView(e) })
     expect(sc.flight?.landAt).toBe(5000 + FLIGHT_MS)
@@ -33,6 +34,8 @@ describe('screenReducer', () => {
     sc = screenReducer(sc, { type: 'view', view: toView(e) })
     expect(sc.flight).toBeNull()
     expect(sc.sounds.at(-1)?.name).toBe('catch')
+    // 받은 사람은 내 시계로 MIN_HOLD_MS 뒤부터 던질 수 있다
+    expect(sc.holdUntil).toBe(5000 + MIN_HOLD_MS)
   })
 
   it('째깍은 점점 빨라진다', () => {
