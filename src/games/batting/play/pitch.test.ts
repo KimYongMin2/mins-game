@@ -105,6 +105,13 @@ describe('project', () => {
     expect(project(RELEASE).y).toBeLessThan(zoneRect().y)
   })
 
+  it.each(PITCH_TYPES)('%s는 어느 칸으로 와도 화면 위로 나가지 않는다', (type) => {
+    for (const cell of CELLS) {
+      const p = pitch(type, cell)
+      for (let t = 0; t <= 600; t += 4) expect(project(ballPosition(p, t)!).y).toBeGreaterThan(0)
+    }
+  })
+
   it('공은 다가올수록 커진다', () => {
     const p = pitch('curve')
     let last = 0

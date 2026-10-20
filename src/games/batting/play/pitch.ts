@@ -40,8 +40,8 @@ export const FLIGHT_JITTER_MS = 25
  */
 const SHAPE: Record<PitchType, { breakX: number; breakY: number; power: number }> = {
   fastball: { breakX: 0, breakY: -0.12, power: 2 },
-  slider: { breakX: 0.4, breakY: -0.12, power: 3.2 },
-  curve: { breakX: 0.15, breakY: -1.0, power: 2.4 },
+  slider: { breakX: 0.75, breakY: -0.2, power: 3 },
+  curve: { breakX: 0.35, breakY: -1.5, power: 2.4 },
 }
 
 export type Pitch = {
