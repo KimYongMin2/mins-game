@@ -124,8 +124,15 @@
 }
 
 .aw-view .aw-pad {
-  stroke: var(--muted-line);
-  stroke-width: 4;
+  stroke-width: 5;
+}
+
+.aw-view .aw-pad--win {
+  stroke: #93c5fd;
+}
+
+.aw-view .aw-pad--lose {
+  stroke: #fca5a5;
 }
 
 .aw-view .aw-grip {
@@ -133,8 +140,16 @@
   stroke-width: 3;
 }
 
+.aw-wrestler--me {
+  color: #2563eb;
+}
+
+.aw-wrestler--foe {
+  color: var(--accent);
+}
+
 .aw-wrestler--lost {
-  color: var(--ink-soft);
+  opacity: 0.45;
 }
 
 .aw-view text {
@@ -182,12 +197,59 @@
 }
 
 /* 위치 막대 */
+.aw-lead {
+  text-align: center;
+  font-size: 1.125rem;
+  font-weight: 900;
+  color: var(--ink-soft);
+}
+
+.aw-lead--me {
+  color: #2563eb;
+}
+
+.aw-lead--foe {
+  color: var(--accent);
+}
+
+/* 위치 막대: 왼쪽 끝(빨강) = 짐, 오른쪽 끝(파랑) = 이김 */
 .aw-bar {
   position: relative;
-  height: 16px;
+  height: 28px;
   border: 2px solid var(--line);
   border-radius: 999px;
   overflow: hidden;
+  background: linear-gradient(90deg, #fee2e2 0 12%, var(--paper) 12% 88%, #dbeafe 88%);
+}
+
+.aw-bar__end {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 0.75rem;
+  font-weight: 800;
+  z-index: 1;
+}
+
+.aw-bar__end--lose {
+  left: 8px;
+  color: var(--accent);
+}
+
+.aw-bar__end--win {
+  right: 8px;
+  color: #2563eb;
+}
+
+.aw-bar__knob {
+  position: absolute;
+  top: 2px;
+  bottom: 2px;
+  width: 10px;
+  margin-left: -5px;
+  border-radius: 999px;
+  background: var(--ink);
+  z-index: 2;
 }
 
 .aw-bar__fill {
@@ -197,11 +259,11 @@
 }
 
 .aw-bar__fill--me {
-  background: #2563eb;
+  background: #93c5fd;
 }
 
 .aw-bar__fill--foe {
-  background: var(--accent);
+  background: #fca5a5;
 }
 
 .aw-bar__mid {

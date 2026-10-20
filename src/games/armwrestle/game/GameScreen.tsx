@@ -7,7 +7,7 @@ import { DONE_MS, type Difficulty, type Event, ROUND_MS, WINS_NEEDED } from '../
 import { ArmView } from '../field/ArmView'
 import { type MatchState, type MatchSummary, createMatch, matchReducer, phaseLeft, summarizeMatch } from '../play/matchState'
 import { type ArmMsg, guestActionOf, guestPressOut, hostActionOf, hostSync, phaseChanged } from '../play/pvp'
-import { GRADES, GRADE_LABEL, markerAt } from '../rules/timing'
+import { GRADES, GRADE_LABEL, markerAt, zoneCenter } from '../rules/timing'
 import { playSound } from '../sounds'
 
 type Props = {
@@ -55,16 +55,32 @@ function Banner({ state }: { state: MatchState }) {
   return null
 }
 
+/** 지금 누가 앞서는지 한 줄로 */
+function Lead({ pos, pulling }: { pos: number; pulling: boolean }) {
+  if (!pulling) return <p className="aw-lead">&nbsp;</p>
+  if (pos >= 0.6) return <p className="aw-lead aw-lead--me">거의 다 넘겼어요!</p>
+  if (pos >= 0.12) return <p className="aw-lead aw-lead--me">내가 앞서요</p>
+  if (pos <= -0.6) return <p className="aw-lead aw-lead--foe">넘어가기 직전!</p>
+  if (pos <= -0.12) return <p className="aw-lead aw-lead--foe">밀리고 있어요</p>
+  return <p className="aw-lead">팽팽해요</p>
+}
+
 /** 타이밍전 게이지: 가운데로 갈수록 좋은 판정, 막대가 왔다 갔다 */
 function Gauge({ state }: { state: MatchState }) {
   const { phase } = state
-  const x = phase.kind === 'pull' ? markerAt(state.now - phase.start).x : 0
+  const { pass, x } = phase.kind === 'pull' ? markerAt(state.now - phase.start) : { pass: 0, x: 0 }
+  // 과녁은 이번 지나감의 자리에 (지나갈 때마다 바뀜)
+  const center = phase.kind === 'pull' ? zoneCenter(state.zoneSeed, pass) : 0
   const mine = state.lastGrade[0]
   const showGrade = mine && state.now - mine.at < GRADE_SHOW_MS ? mine.grade : null
   return (
     <div className="aw-gauge" aria-hidden>
       {[...GRADES].reverse().map((g) => (
-        <span key={g.grade} className={`aw-gauge__zone aw-gauge__zone--${g.grade}`} style={{ width: `${g.within * 100}%` }} />
+        <span
+          key={g.grade}
+          className={`aw-gauge__zone aw-gauge__zone--${g.grade}`}
+          style={{ left: `${50 + center * 50}%`, width: `${g.within * 100}%` }}
+        />
       ))}
       <span className="aw-gauge__marker" style={{ left: `${50 + x * 50}%`, opacity: phase.kind === 'pull' ? 1 : 0.3 }} />
       {showGrade && <span className={`aw-gauge__grade aw-gauge__grade--${showGrade}`}>{GRADE_LABEL[showGrade]}</span>}
@@ -210,13 +226,17 @@ export function GameScreen({ event, difficulty, pvp, onFinish, onQuit }: Props) 
         )}
       </div>
 
-      {/* 위치 막대: 가운데에서 내 쪽(파랑)·상대 쪽(빨강)으로 */}
-      <div className="aw-bar" aria-label="위치">
+      <Lead pos={shownPos} pulling={pulling} />
+      {/* 위치 막대: 손이 오른쪽(상대 쪽) 끝까지 가면 내가 이김. 손 그림과 같은 방향 */}
+      <div className="aw-bar" role="meter" aria-valuemin={-1} aria-valuemax={1} aria-valuenow={shownPos} aria-label="손 위치">
+        <span className="aw-bar__end aw-bar__end--lose">◀ 짐</span>
+        <span className="aw-bar__end aw-bar__end--win">이김 ▶</span>
         <span
           className={`aw-bar__fill aw-bar__fill--${shownPos >= 0 ? 'me' : 'foe'}`}
           style={{ left: `${50 - Math.max(0, -shownPos) * 50}%`, width: `${Math.abs(shownPos) * 50}%` }}
         />
         <span className="aw-bar__mid" />
+        <span className="aw-bar__knob" style={{ left: `${50 + shownPos * 50}%` }} />
       </div>
       <div className="aw-timer" aria-hidden>
         <div className="aw-timer__fill" style={{ transform: `scaleX(${pulling ? phaseLeft(state) / ROUND_MS : 0})` }} />
@@ -234,12 +254,12 @@ export function GameScreen({ event, difficulty, pvp, onFinish, onQuit }: Props) 
           pull(eventTime(e))
         }}
       >
-        {event === 'mash' ? '연타!' : '가운데서 누르기!'}
+        {event === 'mash' ? '연타!' : '노란 곳에서 누르기!'}
       </button>
       <p className="aw-hint">
         {event === 'mash'
           ? '빠르게 많이 누를수록 내 쪽으로 넘어가요 · PC는 스페이스바'
-          : '가운데 올 때 누르기 · 지나갈 때 한 번만 · PC는 스페이스바'}
+          : '노란 곳은 지나갈 때마다 바뀌어요 · 한 번에 한 번만 · PC는 스페이스바'}
       </p>
 
       {peerGone && !done && (

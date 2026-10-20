@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { COUNTDOWN_MS, type Event, PASS_MS, ROUND_END_MS, ROUND_MS, TAP_PUSH } from '../constants'
+import { elapsedAt, zoneCenter } from '../rules/timing'
 import { type Controller, type MatchState, type Pair, createMatch, matchReducer, summarizeMatch } from './matchState'
 
 const at = (s: MatchState, now: number) => matchReducer(s, { type: 'tick', now })
@@ -64,18 +65,29 @@ describe('연타전', () => {
 })
 
 describe('타이밍전', () => {
-  it('지나갈 때 한 번만 누를 수 있고, 가운데일수록 많이 민다', () => {
+  it('지나갈 때 한 번만 누를 수 있고, 과녁 한가운데일수록 많이 민다', () => {
     let s = pulling('timing', ['user', 'remote'])
     const start = COUNTDOWN_MS
-    s = matchReducer(s, { type: 'press', at: start + PASS_MS / 2 })
+    const hit = start + elapsedAt(0, zoneCenter(s.zoneSeed, 0))
+    s = matchReducer(s, { type: 'press', at: hit })
     expect(s.lastGrade[0]?.grade).toBe('perfect')
     const after = s.pos
     expect(after).toBeGreaterThan(0.1)
-    expect(matchReducer(s, { type: 'press', at: start + PASS_MS / 2 + 10 })).toBe(s)
-    // 다음 지나감에 끝 쪽에서 누르면 놓침
-    s = matchReducer(s, { type: 'press', at: start + PASS_MS + 20 })
+    expect(matchReducer(s, { type: 'press', at: hit + 10 })).toBe(s)
+    // 다음 지나감에 과녁에서 먼 쪽에서 누르면 놓침
+    const c1 = zoneCenter(s.zoneSeed, 1)
+    s = matchReducer(s, { type: 'press', at: start + elapsedAt(1, c1 > 0 ? -1 : 1) })
     expect(s.lastGrade[0]?.grade).toBe('miss')
     expect(s.pos).toBe(after)
+  })
+
+  it('판마다 과녁 시드가 바뀐다', () => {
+    let s = pulling('mash', ['user', 'remote'])
+    const first = s.zoneSeed
+    while (s.phase.kind === 'pull') s = matchReducer(s, { type: 'tap' })
+    s = at(at(s, s.now + ROUND_END_MS), s.now + ROUND_END_MS + COUNTDOWN_MS)
+    expect(s.phase.kind).toBe('pull')
+    expect(s.zoneSeed).not.toBe(first)
   })
 
   it('연타는 타이밍전에서 안 먹힌다', () => {

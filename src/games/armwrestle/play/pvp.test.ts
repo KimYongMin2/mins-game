@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { type Event, PASS_MS } from '../constants'
+import { elapsedAt, zoneCenter } from '../rules/timing'
 import { type MatchAction, type MatchState, createMatch, matchReducer } from './matchState'
 import { type ArmMsg, guestActionOf, guestPressOut, hostActionOf, hostSync, phaseChanged } from './pvp'
 
@@ -16,7 +17,7 @@ function simulate(event: Event, latencyMs: number, rate: { host: number; guest: 
   let lastSync = 0
   let sentTaps = 0
   const next = { host: 0, guest: 0 }
-  // 연타: 초당 rate번 / 타이밍: 지나갈 때마다 가운데에서 rate만큼 벗어나 누름 (0 = 완벽)
+  // 연타: 초당 rate번 / 타이밍: 지나갈 때마다 과녁 한가운데보다 rate ms 늦게 누름 (0 = 완벽)
   const act = (s: MatchState, who: 'host' | 'guest', now: number): MatchState => {
     if (s.phase.kind !== 'pull') return s
     if (event === 'mash') {
@@ -26,7 +27,7 @@ function simulate(event: Event, latencyMs: number, rate: { host: number; guest: 
     }
     const elapsed = now - s.phase.start
     const pass = Math.floor(elapsed / PASS_MS)
-    if (pass <= s.pressed[0] || elapsed % PASS_MS < PASS_MS / 2 + rate[who]) return s
+    if (pass <= s.pressed[0] || elapsed < elapsedAt(pass, zoneCenter(s.zoneSeed, pass)) + rate[who]) return s
     return matchReducer(s, { type: 'press', at: now })
   }
   const deliver = (inbox: Inbox, s: MatchState, now: number, toAction: (m: ArmMsg) => MatchAction | null) => {

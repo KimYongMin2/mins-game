@@ -11,7 +11,7 @@ type Props = {
 
 const EVENT_DESC: Record<Event, string> = {
   mash: '빠르게 많이 누르기',
-  timing: '막대가 가운데 올 때 누르기',
+  timing: '막대가 노란 곳에 올 때 누르기',
 }
 
 const DIFFICULTY_DESC: Record<Difficulty, string> = {

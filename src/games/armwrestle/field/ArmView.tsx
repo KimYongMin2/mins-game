@@ -32,7 +32,7 @@ function Wrestler({ side, hand, lean, shake, name, lost }: { side: 0 | 1; hand: 
   const elbow: Point = [PIVOT_X - 18, TABLE_Y - 2]
   const shoulder: Point = [neck[0] + 4, neck[1] + 8]
   return (
-    <g className={`aw-wrestler${lost ? ' aw-wrestler--lost' : ''}`}>
+    <g className={`aw-wrestler aw-wrestler--${side === 0 ? 'me' : 'foe'}${lost ? ' aw-wrestler--lost' : ''}`}>
       {/* 의자 */}
       <path className="aw-chair" d={`M${p([70, 132])}L${p([112, 132])}M${p([76, 132])}L${p([76, 196])}M${p([106, 132])}L${p([106, 196])}`} />
       <path d={`M${p(neck)}L${p(hip)}`} />
@@ -64,8 +64,9 @@ export function ArmView({ pos, straining, now, names, winner }: Props) {
       <Wrestler side={1} hand={hand} lean={-pos * 8} shake={shake(1)} name={names[1]} lost={winner === 0} />
       {/* 맞잡은 손 */}
       <circle className="aw-grip" cx={hand[0]} cy={hand[1]} r={7} />
-      {/* 넘어가는 쪽 탁자에 닿는 자리 */}
-      <path className="aw-pad" d={`M${PIVOT_X - FOREARM - 6} ${TABLE_Y - 1}h12M${PIVOT_X + FOREARM - 6} ${TABLE_Y - 1}h12`} />
+      {/* 손이 닿으면 지는 자리: 왼쪽(내 쪽)은 빨강, 오른쪽(상대 쪽)은 파랑 */}
+      <path className="aw-pad aw-pad--lose" d={`M${PIVOT_X - FOREARM - 8} ${TABLE_Y - 1}h16`} />
+      <path className="aw-pad aw-pad--win" d={`M${PIVOT_X + FOREARM - 8} ${TABLE_Y - 1}h16`} />
     </svg>
   )
 }

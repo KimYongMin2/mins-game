@@ -61,6 +61,8 @@ export type MatchState = {
   phase: Phase
   /** 경기 전체 누른 횟수 (친구 것은 친구가 보낸 총 횟수) */
   taps: Pair<number>
+  /** 타이밍전: 이번 판 과녁 위치를 정하는 시드 (방장·친구가 각자 정함) */
+  zoneSeed: number
   /** 타이밍전: 이번 판에서 마지막으로 누른 지나감 번호 (−1 = 아직) */
   pressed: Pair<number>
   /** 타이밍전: 마지막 판정 (화면에 잠깐 띄움) */
@@ -132,6 +134,7 @@ export function createMatch(opts: {
     shownPos: 0,
     phase: { kind: 'countdown', until: 0, shown: 3 },
     taps: [0, 0],
+    zoneSeed: 0,
     pressed: [-1, -1],
     lastGrade: [null, null],
     perfects: [0, 0],
@@ -172,10 +175,17 @@ function afterRound(state: MatchState): MatchState {
   return countdown({ ...state, round: state.round + 1, pos: 0 })
 }
 
+/** 이번 판 과녁 시드를 새로 뽑는다 */
+function newZones(state: MatchState): MatchState {
+  const rng = createRng(state.seed)
+  const zoneSeed = Math.floor(rng.next() * 2 ** 32)
+  return { ...state, seed: rng.seed(), zoneSeed }
+}
+
 function startPull(state: MatchState): MatchState {
   return withSounds(
     {
-      ...state,
+      ...newZones(state),
       pressed: [-1, -1],
       lastGrade: [null, null],
       botNextAt: state.now + 250,
@@ -260,7 +270,7 @@ function tap(state: MatchState): MatchState {
 function press(state: MatchState, at: number): MatchState {
   const { phase } = state
   if (state.event !== 'timing' || phase.kind !== 'pull') return state
-  const { pass, grade } = gradeAt(at - phase.start)
+  const { pass, grade } = gradeAt(at - phase.start, state.zoneSeed)
   if (pass <= state.pressed[0]) return state
   return applyGrade(state, 0, pass, grade)
 }
@@ -309,7 +319,7 @@ function sync(state: MatchState, s: Sync): MatchState {
   if (s.foeGrade && s.foeGrade.pass > state.pressed[1]) {
     next = { ...next, pressed: set(next.pressed, 1, s.foeGrade.pass), lastGrade: set(next.lastGrade, 1, { grade: s.foeGrade.grade, at: now }) }
   }
-  if (changed && s.phase === 'pull') next = { ...next, pressed: [-1, -1], lastGrade: [null, null] }
+  if (changed && s.phase === 'pull') next = { ...newZones(next), pressed: [-1, -1], lastGrade: [null, null] }
   if (!changed) {
     if (phase.kind === 'countdown' && prev.kind === 'countdown' && phase.shown < prev.shown) return withSounds(next, 'count')
     return next
