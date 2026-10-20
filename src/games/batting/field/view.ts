@@ -11,7 +11,7 @@ const CAMERA = { x: 0, y: 1.5, z: -2.4 }
 const PLATE_SCALE = 300
 const FOCAL = PLATE_SCALE * -CAMERA.z
 /** 존 가운데가 화면에서 놓이는 높이 */
-const ZONE_CENTER_Y = VIEW_H * 0.62
+const ZONE_CENTER_Y = VIEW_H * 0.6
 /** 지평선(카메라 높이)의 화면 높이. 존 가운데가 ZONE_CENTER_Y에 오도록 맞춘다 */
 export const HORIZON_Y = ZONE_CENTER_Y - (CAMERA.y - (ZONE.top + ZONE.bottom) / 2) * PLATE_SCALE
 
