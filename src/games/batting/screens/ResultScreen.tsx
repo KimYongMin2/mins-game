@@ -5,7 +5,7 @@ import { PITCH_LABEL } from '../play/pitch'
 import type { SessionSummary } from '../play/session'
 import { type BattingRecord, averageOf } from '../records'
 import { CONTACT_LABEL, OUTCOME_LABEL, nearestCell } from '../rules/judge'
-import { OUTCOME_POINTS, isHit } from '../rules/scoring'
+import { isHit } from '../rules/scoring'
 
 type Props = {
   summary: SessionSummary
@@ -32,6 +32,7 @@ export function ResultScreen({ summary, record, newBest, upload, onRetry, onRank
       <div className={`bt-result__headline${newBest ? ' bt-result__headline--best' : ''}`}>
         {newBest && <span className="bt-result__badge">개인 최고 기록!</span>}
         <strong>{summary.points}점</strong>
+        <span>총 비거리 {summary.points}m</span>
         <span>
           홈런 {summary.homeruns}개 · 안타 이상 {summary.hits}/{TOTAL_PITCHES}
         </span>
@@ -60,7 +61,7 @@ export function ResultScreen({ summary, record, newBest, upload, onRetry, onRank
               <td>{r.touched ? nearestCell(r.touched) : '-'}</td>
               <td>
                 <strong>{OUTCOME_LABEL[r.outcome]}</strong>
-                {isHit(r.outcome) && ` +${OUTCOME_POINTS[r.outcome]}`}
+                {r.distance !== null && ` ${r.distance}m`}
                 {r.offsetMs !== null && r.contact !== 'miss' && (
                   <span className="bt-result__detail">
                     {r.contact && r.contact !== 'sweet' && `${CONTACT_LABEL[r.contact]} · `}

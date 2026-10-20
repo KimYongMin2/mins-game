@@ -102,7 +102,7 @@ export function StartScreen({ record, onChange, onStart, onRanking }: Props) {
         </button>
       )}
       <p className="bt-start__how">
-        공 위치 + 정확한 타이밍 = 홈런. 배트 끝 너머는 헛스윙, 손잡이 쪽은 빗맞아요.
+        멀리 칠수록 점수가 높아요 (비거리 1m = 1점). 공 위치 + 정확한 타이밍 = 홈런. 배트 끝 너머는 헛스윙, 손잡이 쪽은 빗맞아요.
         <br />
         화면 아무 곳이나 터치(PC는 클릭)
       </p>

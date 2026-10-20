@@ -11,10 +11,17 @@ export const HAND_LABEL: Record<Hand, string> = { right: '우타', left: '좌타
 export const TOTAL_PITCHES = 10
 
 /**
- * 타이밍 구간(일반): |터치 시각 − 도착 시각|이 이 안이면 그 등급.
- * 순서대로 정타 기준 홈런 · 3루타 · 2루타 · 안타 · 범타 · 파울. 밖이면 헛스윙
+ * 타이밍 구간(일반, |터치 시각 − 도착 시각|).
+ * fair 안이면 앞으로 날아가고(가까울수록 멀리), foul 안이면 파울, 밖이면 헛스윙.
+ * perfect는 '딱 맞았어요' 표시용
  */
-export const TIMING_WINDOWS_MS = [20, 35, 55, 80, 110, 160] as const
+export const TIMING_MS = { perfect: 20, fair: 130, foul: 180 } as const
+
+/** 비거리(m): 가장 약하게 맞아도 MIN, 완벽하면 MAX */
+export const MIN_DISTANCE = 15
+export const MAX_DISTANCE = 140
+/** 펜스. 이보다 멀리 가면 홈런 */
+export const FENCE_DISTANCE = 115
 
 /** 어려움은 모든 구간 폭을 이 비율로 줄인다 */
 export const HARD_WINDOW_SCALE = 0.7

@@ -16,7 +16,7 @@ import {
   summarizeSession,
 } from '../play/session'
 import { CONTACT_LABEL, OUTCOME_LABEL } from '../rules/judge'
-import { OUTCOME_POINTS, isHit, totalOf } from '../rules/scoring'
+import { isHit, totalOf } from '../rules/scoring'
 import { playSound } from '../sounds'
 import { timingText } from './describe'
 
@@ -46,12 +46,12 @@ const TOUCH_FLASH_MS = 180
 function Banner({ state }: { state: SessionState }) {
   const { phase } = state
   if (phase.kind === 'done') {
-    const total = totalOf(state.records.map((r) => r.outcome))
+    const total = totalOf(state.records)
     return (
       <div className="bt-banner bt-banner--done" aria-live="polite">
         <strong className="bt-banner__title">경기 끝!</strong>
         <span className="bt-banner__sub">
-          {total.points}점 · 홈런 {total.homeruns}개
+          {total.points}점(m) · 홈런 {total.homeruns}개
         </span>
         <span className="bt-banner__sub">결과 화면으로 넘어가요…</span>
       </div>
@@ -59,13 +59,13 @@ function Banner({ state }: { state: SessionState }) {
   }
   if (phase.kind !== 'result') return null
   const r = phase.record
-  const hit = isHit(r.outcome)
   return (
     <div className="bt-banner" aria-live="polite">
       <strong className={`bt-banner__title${r.outcome === 'homerun' ? ' bt-banner__title--hr' : ''}`}>
         {OUTCOME_LABEL[r.outcome]}
-        {hit && <span className="bt-banner__points"> +{OUTCOME_POINTS[r.outcome]}</span>}
+        {r.distance !== null && <span className="bt-banner__points"> {r.distance}m</span>}
       </strong>
+      {r.distance !== null && <span className="bt-banner__sub">+{r.distance}점</span>}
       <span className="bt-banner__sub">
         {PITCH_LABEL[r.pitch.type]} · {r.pitch.cell}번 칸
       </span>
@@ -103,7 +103,7 @@ function ScoreStrip({ state }: { state: SessionState }) {
         if (r?.outcome === 'homerun') cls.push('bt-strip__cell--hr')
         return (
           <li key={i} className={cls.join(' ')}>
-            {r ? SHORT[r.outcome] : ''}
+            {r ? (r.distance ?? SHORT[r.outcome]) : ''}
           </li>
         )
       })}
@@ -170,7 +170,7 @@ export function GameScreen({ difficulty, hand, onFinish }: Props) {
     marks.push({ at: { x: c.x, y: c.y, z: 0 }, latest: true })
   }
 
-  const total = totalOf(state.records.map((r) => r.outcome))
+  const total = totalOf(state.records)
 
   return (
     <div className="bt-game">

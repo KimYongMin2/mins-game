@@ -21,15 +21,16 @@ const BOUNCE = 0.4
 
 type Range = readonly [number, number]
 
-/** 앞으로 나가는 속도 · 위로 뜨는 속도 · 보여주는 시간 */
-const PROFILES: Record<'homerun' | 'triple' | 'double' | 'single' | 'fly' | 'grounder', { forward: Range; up: Range; duration: number }> = {
-  homerun: { forward: [36, 40], up: [20, 24], duration: 2000 },
-  triple: { forward: [33, 36], up: [12, 15], duration: 1700 },
-  double: { forward: [30, 33], up: [9, 12], duration: 1500 },
-  single: { forward: [26, 30], up: [3, 6], duration: 1200 },
-  fly: { forward: [12, 18], up: [22, 26], duration: 1700 },
-  grounder: { forward: [18, 24], up: [-4, -2], duration: 1200 },
+/** 결과별 띄우는 각도(도). 범타는 땅볼 */
+const LAUNCH_DEG: Record<'homerun' | 'triple' | 'double' | 'single', Range> = {
+  homerun: [27, 32],
+  triple: [20, 24],
+  double: [15, 19],
+  single: [8, 12],
 }
+
+/** 길게 날아가도 이만큼만 보여준다 */
+const MAX_SHOW_MS = 2200
 
 /** 페어 타구의 최대 좌우 각도 */
 const MAX_FAIR_ANGLE = (38 * Math.PI) / 180
@@ -44,19 +45,21 @@ export function createBattedBall(opts: {
   hand: Hand
   /** 터치 시각 − 도착 시각 */
   offsetMs: number
+  /** 비거리(m). 페어 타구만 */
+  distance: number | null
   /** 가장 넓은 판정 구간(파울) */
-  maxWindowMs: number
+  foulWindowMs: number
   start: Vec3
   startAt: number
   rng: Rng
 }): BattedBall | null {
-  const { outcome, contact, hand, offsetMs, maxWindowMs, start, startAt, rng } = opts
+  const { outcome, contact, hand, offsetMs, distance, foulWindowMs, start, startAt, rng } = opts
   if (outcome === 'whiff' || outcome === 'looking') return null
   /** 우타 기준 +면 밀어 친 쪽(오른쪽) */
   const handSign = hand === 'right' ? 1 : -1
-  const lateness = Math.max(-1, Math.min(1, offsetMs / maxWindowMs))
+  const lateness = Math.max(-1, Math.min(1, offsetMs / foulWindowMs))
 
-  if (outcome === 'foul') {
+  if (outcome === 'foul' || distance === null) {
     // 스침은 뒤로 높이 뜨고, 타이밍이 어긋난 파울은 옆으로 빠진다
     if (contact === 'graze') {
       return { startAt, duration: 1100, start, velocity: { x: (rng.next() - 0.5) * 4, y: within(rng, [11, 14]), z: within(rng, [-9, -6]) } }
@@ -66,15 +69,22 @@ export function createBattedBall(opts: {
     return { startAt, duration: 1300, start, velocity: { x: Math.sin(angle) * speed, y: within(rng, [6, 10]), z: Math.cos(angle) * speed } }
   }
 
-  const kind = outcome === 'out' ? (rng.next() < 0.5 ? 'fly' : 'grounder') : outcome
-  const p = PROFILES[kind]
-  const angle = lateness * handSign * MAX_FAIR_ANGLE + (rng.next() - 0.5) * 0.1
-  const forward = within(rng, p.forward)
+  const spray = lateness * handSign * MAX_FAIR_ANGLE + (rng.next() - 0.5) * 0.1
+  if (outcome === 'out') {
+    // 땅볼: 1.2초 동안 비거리만큼 굴러간다
+    const forward = distance / 1.2
+    return { startAt, duration: 1200, start, velocity: { x: Math.sin(spray) * forward, y: -3, z: Math.cos(spray) * forward } }
+  }
+  // 포물선이 비거리에 떨어지도록 속도를 정한다: 거리 = v²·sin2θ / g
+  const launch = (within(rng, LAUNCH_DEG[outcome]) * Math.PI) / 180
+  const speed = Math.sqrt((distance * GRAVITY) / Math.sin(2 * launch))
+  const forward = speed * Math.cos(launch)
+  const flightMs = ((2 * speed * Math.sin(launch)) / GRAVITY) * 1000
   return {
     startAt,
-    duration: p.duration,
+    duration: Math.min(MAX_SHOW_MS, flightMs + 300),
     start,
-    velocity: { x: Math.sin(angle) * forward, y: within(rng, p.up), z: Math.cos(angle) * forward },
+    velocity: { x: Math.sin(spray) * forward, y: speed * Math.sin(launch), z: Math.cos(spray) * forward },
   }
 }
 

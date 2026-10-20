@@ -18,6 +18,8 @@ export type PitchRecord = {
   contact: Contact | null
   /** 터치 시각 − 도착 시각. 안 쳤으면 null */
   offsetMs: number | null
+  /** 비거리(m) = 점수. 앞으로 안 갔으면 null */
+  distance: number | null
 }
 
 export type Swing = { point: ZonePoint; at: number }
@@ -100,7 +102,8 @@ function showResult(state: SessionState, pitch: Pitch, swing: Swing | null, reco
           contact: record.contact,
           hand: state.hand,
           offsetMs: record.offsetMs,
-          maxWindowMs: timingWindows(state.difficulty).at(-1)!,
+          distance: record.distance,
+          foulWindowMs: timingWindows(state.difficulty).foul,
           start: ballPosition(pitch, swing.at) ?? { x: 0, y: 1, z: 0 },
           startAt: swing.at,
           rng,
@@ -153,6 +156,7 @@ function tick(state: SessionState): SessionState {
         outcome: 'looking',
         contact: null,
         offsetMs: null,
+        distance: null,
       }
       return withSounds(showResult(state, phase.pitch, phase.swing, record), 'mitt')
     }
@@ -187,7 +191,7 @@ export function summarizeSession(state: SessionState): SessionSummary {
     difficulty: state.difficulty,
     hand: state.hand,
     records: state.records,
-    ...totalOf(state.records.map((r) => r.outcome)),
+    ...totalOf(state.records),
   }
 }
 

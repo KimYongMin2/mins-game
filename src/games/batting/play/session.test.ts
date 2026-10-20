@@ -35,13 +35,13 @@ describe('10구 경기', () => {
     expect(summarizeSession(s).points).toBe(0)
   })
 
-  it('들어오는 칸을 정확한 타이밍에 치면 모두 홈런, 100점', () => {
+  it('들어오는 칸을 정확한 타이밍에 치면 모두 140m 홈런, 1400점', () => {
     const s = play(2, (st) => {
       const p = pitchOf(st)!
       return { point: cellMiddle(p.cell), at: p.arriveAt }
     })
     expect(s.records.map((r) => r.outcome)).toEqual(Array(TOTAL_PITCHES).fill('homerun'))
-    expect(summarizeSession(s)).toMatchObject({ points: 100, homeruns: 10, hits: 10 })
+    expect(summarizeSession(s)).toMatchObject({ points: 1400, homeruns: 10, hits: 10 })
   })
 
   it('좌타도 같은 칸을 맞히면 홈런', () => {
@@ -57,7 +57,8 @@ describe('10구 경기', () => {
 
   it('늦게 치면 기록에 늦은 만큼 남는다', () => {
     const s = play(5, (st) => ({ point: cellMiddle(pitchOf(st)!.cell), at: pitchOf(st)!.arriveAt + 45 }))
-    expect(s.records.every((r) => r.outcome === 'double' && r.offsetMs === 45)).toBe(true)
+    expect(s.records.every((r) => r.offsetMs === 45 && r.distance === s.records[0].distance)).toBe(true)
+    expect(s.records[0].distance).toBeLessThan(140)
   })
 
   it('와인드업 중 터치와 두 번째 스윙은 무시', () => {

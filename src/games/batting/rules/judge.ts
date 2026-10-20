@@ -1,6 +1,14 @@
-import { type Difficulty, HARD_WINDOW_SCALE, type Hand, TIMING_WINDOWS_MS } from '../constants'
+import {
+  type Difficulty,
+  FENCE_DISTANCE,
+  HARD_WINDOW_SCALE,
+  type Hand,
+  MAX_DISTANCE,
+  MIN_DISTANCE,
+  TIMING_MS,
+} from '../constants'
 
-// 타격 판정: 맞은 위치(터치한 곳 vs 공이 들어온 칸) × 타이밍.
+// 타격 판정: 맞은 위치(터치한 곳 vs 공이 들어온 칸) × 타이밍 → 비거리 → 결과.
 // 칸은 포수 시점 키패드 번호 1~9 (1 2 3 / 4 5 6 / 7 8 9).
 // 터치는 칸 경계와 상관없이 아무 곳이나 되고, 칸 단위 거리로 판정한다.
 
@@ -81,16 +89,31 @@ export const OUTCOME_LABEL: Record<Outcome, string> = {
   looking: '스트라이크',
 }
 
-/** 타이밍 구간 순서(홈런 구간 … 파울 구간)별 결과 */
-const BY_CONTACT: Record<Exclude<Contact, 'miss'>, readonly Outcome[]> = {
-  sweet: ['homerun', 'triple', 'double', 'single', 'out', 'foul'],
-  off: ['single', 'single', 'single', 'out', 'out', 'foul'],
-  graze: ['foul', 'foul', 'foul', 'foul', 'foul', 'foul'],
+/** 비거리별 결과 (멀리 간 것부터) */
+export const DISTANCE_TIERS: readonly { min: number; outcome: Outcome }[] = [
+  { min: FENCE_DISTANCE, outcome: 'homerun' },
+  { min: 95, outcome: 'triple' },
+  { min: 70, outcome: 'double' },
+  { min: 30, outcome: 'single' },
+  { min: 0, outcome: 'out' },
+]
+
+export function outcomeByDistance(distance: number): Outcome {
+  return DISTANCE_TIERS.find((t) => distance >= t.min)!.outcome
 }
 
-export function timingWindows(difficulty: Difficulty): number[] {
+/** 빗맞으면 힘이 이만큼만 실린다 (완벽한 타이밍이어도 3루타 정도까지) */
+const OFF_POWER = 0.65
+/** 정타라도 공 가운데에서 1칸 벗어날 때마다 힘이 이만큼 줄어든다 */
+const SWEET_FALLOFF = 0.2
+/** 힘 → 비거리 곡선. 1보다 작으면 조금만 맞아도 꽤 날아간다 */
+const DISTANCE_CURVE = 0.8
+
+export type Windows = { perfect: number; fair: number; foul: number }
+
+export function timingWindows(difficulty: Difficulty): Windows {
   const scale = difficulty === 'hard' ? HARD_WINDOW_SCALE : 1
-  return TIMING_WINDOWS_MS.map((ms) => ms * scale)
+  return { perfect: TIMING_MS.perfect * scale, fair: TIMING_MS.fair * scale, foul: TIMING_MS.foul * scale }
 }
 
 export type SwingResult = {
@@ -98,6 +121,8 @@ export type SwingResult = {
   contact: Contact
   /** 터치 시각 − 도착 시각. 음수면 빨랐다 */
   offsetMs: number
+  /** 앞으로 날아간 거리(m). 파울·헛스윙이면 null */
+  distance: number | null
 }
 
 export function judgeSwing(opts: {
@@ -108,11 +133,18 @@ export function judgeSwing(opts: {
   swingAt: number
   arriveAt: number
 }): SwingResult {
-  const contact = contactAt(opts.hand, opts.touch, cellMiddle(opts.ball))
+  const ball = cellMiddle(opts.ball)
+  const contact = contactAt(opts.hand, opts.touch, ball)
   const offsetMs = opts.swingAt - opts.arriveAt
-  if (contact === 'miss') return { outcome: 'whiff', contact, offsetMs }
+  const windows = timingWindows(opts.difficulty)
   const diff = Math.abs(offsetMs)
-  const tier = timingWindows(opts.difficulty).findIndex((ms) => diff <= ms)
-  const outcome = tier === -1 ? 'whiff' : BY_CONTACT[contact][tier]
-  return { outcome, contact, offsetMs }
+  if (contact === 'miss' || diff > windows.foul) return { outcome: 'whiff', contact, offsetMs, distance: null }
+  if (contact === 'graze' || diff > windows.fair) return { outcome: 'foul', contact, offsetMs, distance: null }
+
+  const timing = 1 - diff / windows.fair
+  const miss = Math.hypot(ball.col - opts.touch.col, ball.row - opts.touch.row)
+  const position = contact === 'sweet' ? Math.max(0, 1 - SWEET_FALLOFF * miss) : OFF_POWER
+  const power = timing * position
+  const distance = Math.round(MIN_DISTANCE + (MAX_DISTANCE - MIN_DISTANCE) * power ** DISTANCE_CURVE)
+  return { outcome: outcomeByDistance(distance), contact, offsetMs, distance }
 }

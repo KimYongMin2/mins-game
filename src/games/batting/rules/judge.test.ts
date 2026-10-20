@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { type Cell, CELLS, cellAt, cellMiddle, cellPosition, contactAt, contactOf, judgeSwing, nearestCell } from './judge'
+import { type Cell, CELLS, cellAt, cellMiddle, cellPosition, contactAt, contactOf, judgeSwing, nearestCell, outcomeByDistance } from './judge'
 
 describe('칸 번호', () => {
   it('키패드 배치: 1 2 3 / 4 5 6 / 7 8 9', () => {
@@ -61,44 +61,67 @@ describe('contactOf (맞은 위치)', () => {
   })
 })
 
-describe('judgeSwing (타이밍)', () => {
+describe('judgeSwing (타이밍 → 비거리 → 결과)', () => {
   const swing = (offset: number, touched: Cell = 5, ball: Cell = 5, difficulty: 'normal' | 'hard' = 'normal') =>
     judgeSwing({ difficulty, hand: 'right', touch: cellMiddle(touched), ball, swingAt: 1000 + offset, arriveAt: 1000 })
 
+  it('공 가운데를 완벽한 타이밍에 치면 최대 비거리 140m 홈런', () => {
+    expect(swing(0)).toMatchObject({ outcome: 'homerun', distance: 140 })
+  })
+
+  it('타이밍이 어긋날수록 덜 날아간다 (빠르든 늦든 같음)', () => {
+    const d = [0, 20, 40, 60, 90, 120].map((o) => swing(o).distance!)
+    for (let i = 1; i < d.length; i++) expect(d[i]).toBeLessThan(d[i - 1])
+    expect(swing(-40).distance).toBe(swing(40).distance)
+  })
+
   it.each([
     [0, 'homerun'],
-    [-20, 'homerun'],
-    [21, 'triple'],
-    [-35, 'triple'],
-    [50, 'double'],
-    [-80, 'single'],
-    [100, 'out'],
-    [-150, 'foul'],
-    [161, 'whiff'],
+    [30, 'homerun'],
+    [40, 'triple'],
+    [60, 'double'],
+    [100, 'single'],
+    [128, 'out'],
+    [150, 'foul'],
+    [181, 'whiff'],
   ])('정타 %ims → %s', (offset, outcome) => {
     expect(swing(offset).outcome).toBe(outcome)
   })
 
-  it('빗맞음은 좋은 타이밍이어도 안타까지', () => {
-    expect(swing(0, 5, 4).outcome).toBe('single')
-    expect(swing(60, 5, 4).outcome).toBe('out')
-    expect(swing(-130, 5, 2).outcome).toBe('foul')
-    expect(swing(200, 5, 2).outcome).toBe('whiff')
+  it('비거리별 결과: 115m↑ 홈런, 95m↑ 3루타, 70m↑ 2루타, 30m↑ 안타, 그 밑은 범타', () => {
+    expect(outcomeByDistance(115)).toBe('homerun')
+    expect(outcomeByDistance(114)).toBe('triple')
+    expect(outcomeByDistance(95)).toBe('triple')
+    expect(outcomeByDistance(70)).toBe('double')
+    expect(outcomeByDistance(30)).toBe('single')
+    expect(outcomeByDistance(29)).toBe('out')
+  })
+
+  it('빗맞으면 완벽한 타이밍이어도 홈런은 안 나온다 (3루타까지)', () => {
+    expect(swing(0, 5, 4)).toMatchObject({ contact: 'off', outcome: 'triple' })
+    expect(swing(70, 5, 2).outcome).toBe('single')
+  })
+
+  it('정타라도 공 가운데에서 벗어나 맞으면 조금 덜 날아간다', () => {
+    const center = swing(10).distance!
+    const edge = judgeSwing({ difficulty: 'normal', hand: 'right', touch: { col: 1.9, row: 1.9 }, ball: 5, swingAt: 1010, arriveAt: 1000 })
+    expect(edge.contact).toBe('sweet')
+    expect(edge.distance!).toBeLessThan(center)
   })
 
   it('스침은 파울, 타이밍이 너무 어긋나면 헛스윙', () => {
-    expect(swing(0, 6, 4).outcome).toBe('foul')
-    expect(swing(-170, 6, 4).outcome).toBe('whiff')
+    expect(swing(0, 6, 4)).toMatchObject({ outcome: 'foul', distance: null })
+    expect(swing(-190, 6, 4).outcome).toBe('whiff')
   })
 
   it('배트 끝 너머는 타이밍이 완벽해도 헛스윙', () => {
-    expect(swing(0, 4, 6)).toMatchObject({ outcome: 'whiff', contact: 'miss' })
+    expect(swing(0, 4, 6)).toMatchObject({ outcome: 'whiff', contact: 'miss', distance: null })
   })
 
-  it('어려움은 구간 폭 70% (홈런 ±14ms)', () => {
-    expect(swing(14, 5, 5, 'hard').outcome).toBe('homerun')
-    expect(swing(15, 5, 5, 'hard').outcome).toBe('triple')
-    expect(swing(113, 5, 5, 'hard').outcome).toBe('whiff')
+  it('어려움은 구간 폭 70%', () => {
+    expect(swing(95, 5, 5, 'hard').outcome).toBe('foul')
+    expect(swing(127, 5, 5, 'hard').outcome).toBe('whiff')
+    expect(swing(20, 5, 5, 'hard').distance!).toBeLessThan(swing(20).distance!)
   })
 
   it('타이밍 차이는 부호 그대로 (빠르면 음수)', () => {

@@ -1,21 +1,16 @@
 import type { Outcome } from './judge'
 
-/** 결과별 점수. 최대 10구 × 10점 = 100점 */
-export const OUTCOME_POINTS: Record<Outcome, number> = {
-  homerun: 10,
-  triple: 6,
-  double: 4,
-  single: 2,
-  out: 0,
-  foul: 0,
-  whiff: 0,
-  looking: 0,
-}
+// 점수 = 앞으로 날아간 거리(m). 파울·헛스윙·스트라이크는 0점
 
 const HITS: readonly Outcome[] = ['homerun', 'triple', 'double', 'single']
 
 export function isHit(outcome: Outcome): boolean {
   return HITS.includes(outcome)
+}
+
+/** 공 하나의 점수 */
+export function pointsOf(r: { distance: number | null }): number {
+  return r.distance ?? 0
 }
 
 export type Totals = {
@@ -25,11 +20,11 @@ export type Totals = {
   hits: number
 }
 
-export function totalOf(outcomes: readonly Outcome[]): Totals {
+export function totalOf(records: readonly { outcome: Outcome; distance: number | null }[]): Totals {
   return {
-    points: outcomes.reduce((sum, o) => sum + OUTCOME_POINTS[o], 0),
-    homeruns: outcomes.filter((o) => o === 'homerun').length,
-    hits: outcomes.filter(isHit).length,
+    points: records.reduce((sum, r) => sum + pointsOf(r), 0),
+    homeruns: records.filter((r) => r.outcome === 'homerun').length,
+    hits: records.filter((r) => isHit(r.outcome)).length,
   }
 }
 

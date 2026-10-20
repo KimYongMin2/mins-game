@@ -3,7 +3,8 @@ import type { Difficulty, Hand } from './constants'
 import type { SessionSummary } from './play/session'
 import { type Totals, isBetter } from './rules/scoring'
 
-const GAME_ID = 'batting'
+/** 점수가 비거리 합으로 바뀌면서 예전(결과별 점수) 기록과 섞이지 않게 새 키를 쓴다 */
+const GAME_ID = 'batting-distance'
 
 /** 난이도 하나의 기기 기록 */
 export type LevelRecord = {
