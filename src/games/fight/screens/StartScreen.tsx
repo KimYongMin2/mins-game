@@ -5,6 +5,7 @@ type Props = {
   record: FightRecord
   onDifficulty: (d: Difficulty) => void
   onStart: () => void
+  onPvp: () => void
   onRanking: () => void
 }
 
@@ -16,7 +17,7 @@ const DIFFICULTY_DESC: Record<Difficulty, string> = {
 const DIFFICULTIES: readonly Difficulty[] = ['normal', 'hard']
 
 /** 시작 화면: 규칙, 난이도, 전적 */
-export function StartScreen({ record, onDifficulty, onStart, onRanking }: Props) {
+export function StartScreen({ record, onDifficulty, onStart, onPvp, onRanking }: Props) {
   const level = record[record.difficulty]
   const rate = winRate(level)
   return (
@@ -65,9 +66,15 @@ export function StartScreen({ record, onDifficulty, onStart, onRanking }: Props)
           <span>지금 {level.streak}연승</span>
         </div>
       </dl>
+      <p className="ft-start__pvp-record">
+        친구 대전 {record.pvp.wins}승 {record.pvp.losses}패 {record.pvp.draws}무
+      </p>
 
       <button type="button" className="button button--primary ft-start__button" onClick={onStart}>
-        시작
+        봇과 대결
+      </button>
+      <button type="button" className="button ft-start__pvp" onClick={onPvp}>
+        친구 대전 <span>(방 코드로 초대)</span>
       </button>
       <button type="button" className="button" onClick={onRanking}>
         랭킹

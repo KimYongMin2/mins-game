@@ -39,7 +39,7 @@ describe('최다 연승', () => {
 
 describe('toGameRow', () => {
   it('이긴 경기만 연승을 남긴다', () => {
-    const s = { difficulty: 'hard' as const, turns: 9, life: [1, 0] as const, strikes: 3 }
+    const s = { mode: 'bot' as const, difficulty: 'hard' as const, turns: 9, life: [1, 0] as const, strikes: 3 }
     expect(toGameRow({ ...s, outcome: 'win' }, 3, ' 민 ', 'x')).toEqual({
       id: 'x',
       nickname: '민',

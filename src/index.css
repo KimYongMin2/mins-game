@@ -300,3 +300,80 @@ a.game-card:hover {
   font-size: 0.75rem;
   color: var(--ink-soft);
 }
+
+/* 친구 대전 대기실 (shared/ui/PvpLobby) */
+.pvp-lobby {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-width: 360px;
+  margin: 16px auto 0;
+  text-align: center;
+}
+
+.pvp-lobby__big {
+  min-height: 64px;
+  font-size: 1.25rem;
+}
+
+.pvp-lobby__join {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+}
+
+.pvp-lobby__input {
+  text-transform: uppercase;
+  letter-spacing: 0.2em;
+  text-align: center;
+}
+
+.pvp-lobby__code-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 20px 16px;
+  border: 2px solid var(--line);
+  border-radius: 14px;
+}
+
+.pvp-lobby__label,
+.pvp-lobby__wait,
+.pvp-lobby__status {
+  font-size: 0.9375rem;
+  color: var(--ink-soft);
+}
+
+.pvp-lobby__code {
+  font-size: 3rem;
+  font-weight: 900;
+  letter-spacing: 0.2em;
+  font-variant-numeric: tabular-nums;
+}
+
+.pvp-lobby__error {
+  text-align: center;
+}
+
+.pvp-lobby__back {
+  align-self: center;
+}
+
+/* 친구 대전 중 상대가 나갔을 때 */
+.pvp-gone {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  background: rgba(255, 255, 255, 0.92);
+  text-align: center;
+  z-index: 2;
+}
+
+.pvp-gone strong {
+  font-size: 1.25rem;
+}

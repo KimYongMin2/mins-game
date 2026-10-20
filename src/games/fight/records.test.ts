@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest'
 import type { MatchSummary } from './play/matchState'
 import { EMPTY_RECORD, addGame, winRate } from './records'
 
-const game = (outcome: MatchSummary['outcome'], difficulty: 'normal' | 'hard' = 'normal'): MatchSummary => ({
+const game = (outcome: MatchSummary['outcome'], difficulty: 'normal' | 'hard' = 'normal', mode: 'bot' | 'pvp' = 'bot'): MatchSummary => ({
+  mode,
   difficulty,
   outcome,
   turns: 8,
@@ -23,5 +24,12 @@ describe('addGame', () => {
     for (const o of ['win', 'lose', 'draw', 'win'] as const) r = addGame(r, game(o, 'hard'))
     expect(winRate(r.hard)).toBeCloseTo(2 / 3)
     expect(winRate(r.normal)).toBeNull()
+  })
+
+  it('친구 대전은 봇전 전적과 섞지 않고 따로 센다', () => {
+    let r = EMPTY_RECORD
+    for (const o of ['win', 'lose', 'win'] as const) r = addGame(r, game(o, 'normal', 'pvp'))
+    expect(r.pvp).toEqual({ wins: 2, losses: 1, draws: 0 })
+    expect(r.normal).toEqual(EMPTY_RECORD.normal)
   })
 })

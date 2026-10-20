@@ -1,15 +1,21 @@
-import { useEffect, useReducer, useRef } from 'react'
+import { useEffect, useReducer, useRef, useState } from 'react'
+import type { Room } from '../../../shared/online/room'
 import { loadNickname } from '../../../shared/storage/nickname'
 import { randomSeed } from '../../../shared/random'
 import { CHOOSE_MS, DONE_MS, type Difficulty, MAX_LIFE, MAX_STACKS, MAX_TURNS, REVEAL_MS } from '../constants'
 import { FightView, type FighterShow } from '../field/FightView'
 import { type MatchState, type MatchSummary, createMatch, matchReducer, summarizeMatch } from '../play/matchState'
+import { type FightMsg, guestActionOf, guestPickMsg, hostActionOf, hostOutbox } from '../play/pvp'
 import { type Fighter, STANCES, STANCE_LABEL, type Stance, canChoose } from '../rules/turn'
 import { playSound } from '../sounds'
 
 type Props = {
   difficulty: Difficulty
+  /** 친구 대전이면 방과 상대 이름 */
+  pvp?: { room: Room<FightMsg>; peerName: string }
   onFinish: (summary: MatchSummary) => void
+  /** 친구 대전 중 상대가 나갔을 때 '나가기' */
+  onQuit?: () => void
 }
 
 const STANCE_DESC: Record<Stance, string> = {
@@ -65,11 +71,52 @@ function showOf(state: MatchState, side: 0 | 1): FighterShow {
   return { stance: null, event: null, hidden: false }
 }
 
-export function GameScreen({ difficulty, onFinish }: Props) {
+export function GameScreen({ difficulty, pvp, onFinish, onQuit }: Props) {
   const [state, dispatch] = useReducer(matchReducer, undefined, () =>
-    createMatch({ now: performance.now(), seed: randomSeed(), difficulty }),
+    createMatch({
+      now: performance.now(),
+      seed: randomSeed(),
+      difficulty,
+      controllers: ['user', pvp ? 'remote' : 'bot'],
+      follow: pvp?.room.role === 'guest',
+    }),
   )
   const done = state.phase.kind === 'done'
+  const [peerGone, setPeerGone] = useState(false)
+
+  // 친구 대전: 받은 메시지를 경기에 넣고, 상대가 나가면 알린다
+  useEffect(() => {
+    if (!pvp) return
+    const { room } = pvp
+    const toAction = room.role === 'host' ? hostActionOf : guestActionOf
+    const offMsg = room.onMessage((msg) => {
+      const action = toAction(msg)
+      if (action) dispatch(action)
+    })
+    const offPeer = room.onPeer((peer) => {
+      if (!peer) setPeerGone(true)
+    })
+    return () => {
+      offMsg()
+      offPeer()
+    }
+  }, [pvp])
+
+  // 방장: 턴 시작·공개를 친구에게 보낸다
+  const sentRef = useRef(state)
+  useEffect(() => {
+    if (pvp?.room.role !== 'host') return
+    for (const msg of hostOutbox(sentRef.current, state)) pvp.room.send(msg)
+    sentRef.current = state
+  }, [pvp, state])
+
+  function choose(stance: Stance) {
+    dispatch({ type: 'pick', side: 0, stance })
+    if (pvp?.room.role === 'guest') {
+      const msg = guestPickMsg(stateRef.current, stance)
+      if (msg) pvp.room.send(msg)
+    }
+  }
 
   const playedRef = useRef(0)
   useEffect(() => {
@@ -96,10 +143,10 @@ export function GameScreen({ difficulty, onFinish }: Props) {
     stateRef.current = state
   })
   useEffect(() => {
-    if (!done) return
+    if (!done || peerGone) return
     const timer = setTimeout(() => finishRef.current(summarizeMatch(stateRef.current)), DONE_MS)
     return () => clearTimeout(timer)
-  }, [done])
+  }, [done, peerGone])
 
   const { phase, now } = state
   const me = state.fighters[0]
@@ -107,7 +154,7 @@ export function GameScreen({ difficulty, onFinish }: Props) {
   const myPick = choosing ? phase.picks[0] : null
   const left = choosing ? Math.max(0, phase.until - now) : 0
   const reveal = phase.kind === 'reveal' ? Math.min(1, 1 - (phase.until - now) / REVEAL_MS) : null
-  const names = [loadNickname() ?? '나', '봇'] as const
+  const names = [loadNickname() ?? '나', pvp?.peerName ?? '봇'] as const
 
   return (
     <div className="ft-game">
@@ -141,10 +188,10 @@ export function GameScreen({ difficulty, onFinish }: Props) {
               onPointerDown={(e) => {
                 // 터치하자마자 고르도록 (click은 손을 뗄 때라 늦다)
                 e.preventDefault()
-                dispatch({ type: 'pick', side: 0, stance: s })
+                choose(s)
               }}
               // 키보드(Enter·Space)로도 고를 수 있게. 같은 자세를 다시 고르는 건 무시된다
-              onClick={() => dispatch({ type: 'pick', side: 0, stance: s })}
+              onClick={() => choose(s)}
             >
               <span className="ft-pad__label">{STANCE_LABEL[s]}</span>
               <span className="ft-pad__desc">{s === 'attack' && !allowed ? '스택 필요' : STANCE_DESC[s]}</span>
@@ -153,6 +200,15 @@ export function GameScreen({ difficulty, onFinish }: Props) {
         })}
       </div>
       <p className="ft-hint">2초 안에 고르기 · 안 고르면 준비 · 준비 중에 맞으면 생명력 −1</p>
+      {peerGone && !done && (
+        <div className="pvp-gone" role="alert">
+          <strong>{pvp?.peerName}님이 나갔어요</strong>
+          <span>이 경기는 기록되지 않아요</span>
+          <button type="button" className="button" onClick={onQuit}>
+            나가기
+          </button>
+        </div>
+      )}
     </div>
   )
 }

@@ -14,18 +14,35 @@ export type LevelRecord = {
   bestStreak: number
 }
 
+/** 친구 대전 전적 (봇전과 따로) */
+export type PvpRecord = { wins: number; losses: number; draws: number }
+
 export type FightRecord = {
   normal: LevelRecord
   hard: LevelRecord
+  pvp: PvpRecord
   /** 시작 화면에서 마지막으로 고른 난이도 */
   difficulty: Difficulty
 }
 
 const EMPTY_LEVEL: LevelRecord = { wins: 0, losses: 0, draws: 0, streak: 0, bestStreak: 0 }
 
-export const EMPTY_RECORD: FightRecord = { normal: EMPTY_LEVEL, hard: EMPTY_LEVEL, difficulty: 'normal' }
+export const EMPTY_PVP: PvpRecord = { wins: 0, losses: 0, draws: 0 }
+
+export const EMPTY_RECORD: FightRecord = { normal: EMPTY_LEVEL, hard: EMPTY_LEVEL, pvp: EMPTY_PVP, difficulty: 'normal' }
 
 export function addGame(record: FightRecord, summary: MatchSummary): FightRecord {
+  if (summary.mode === 'pvp') {
+    const p = record.pvp
+    return {
+      ...record,
+      pvp: {
+        wins: p.wins + (summary.outcome === 'win' ? 1 : 0),
+        losses: p.losses + (summary.outcome === 'lose' ? 1 : 0),
+        draws: p.draws + (summary.outcome === 'draw' ? 1 : 0),
+      },
+    }
+  }
   const l = record[summary.difficulty]
   const streak = summary.outcome === 'win' ? l.streak + 1 : 0
   return {

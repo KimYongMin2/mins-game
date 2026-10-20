@@ -17,6 +17,7 @@
 
 /* 경기 화면 */
 .ft-game {
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -461,5 +462,30 @@
   gap: 8px;
   text-align: center;
   font-size: 0.875rem;
+  color: var(--ink-soft);
+}
+
+/* 친구 대전 */
+.ft-pvp-wait {
+  margin-top: 24px;
+  text-align: center;
+  color: var(--ink-soft);
+}
+
+.ft-result__note {
+  text-align: center;
+  font-size: 0.875rem;
+  color: var(--ink-soft);
+}
+
+.ft-start__pvp span {
+  margin-left: 4px;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--ink-soft);
+}
+
+.ft-start__pvp-record {
+  font-size: 0.8125rem;
   color: var(--ink-soft);
 }
