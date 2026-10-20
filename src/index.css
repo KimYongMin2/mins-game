@@ -155,6 +155,25 @@ p {
   color: var(--ink);
 }
 
+.game-section + .game-section {
+  margin-top: 28px;
+}
+
+.game-section__title {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 0 0 10px;
+  font-size: 1.125rem;
+  font-weight: 900;
+}
+
+.game-section__note {
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--ink-soft);
+}
+
 .game-list {
   list-style: none;
   margin: 0;
@@ -204,6 +223,14 @@ a.game-card:hover {
   padding: 2px 8px;
   border: 1.5px solid currentColor;
   border-radius: 999px;
+}
+
+.badge--pvp {
+  color: #2563eb;
+}
+
+.badge--solo {
+  color: var(--ink-soft);
 }
 
 /* 랭킹 표 (shared/ui/RankingBoard) */
