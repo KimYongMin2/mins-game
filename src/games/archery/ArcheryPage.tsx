@@ -52,7 +52,7 @@ export function ArcheryPage() {
   return (
     <main className="page ar-page">
       <header className="ar-header">
-        <h1 className="title">졸라 양궁</h1>
+        <h1 className="title">양궁</h1>
         <SoundToggle />
         {screen.kind === 'game' ? (
           <button type="button" className="button button--small" onClick={toStart}>

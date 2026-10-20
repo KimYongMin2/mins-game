@@ -3,7 +3,7 @@ import type { RoundSummary } from './play/roundState'
 
 const GAME_ID = 'archery'
 
-/** 졸라 양궁 기기 기록 */
+/** 양궁 기기 기록 */
 export type ArcheryRecord = {
   games: number
   /** 평균 계산용 누적 점수 */

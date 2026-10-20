@@ -1,7 +1,7 @@
 import { noise, tone } from '../../shared/audio/synth'
 import type { SoundName } from './match/matchState'
 
-// 졸라볼 효과음 레시피. 모두 Web Audio로 합성한다.
+// 야구 효과음 레시피. 모두 Web Audio로 합성한다.
 const RECIPES: Record<SoundName, () => void> = {
   // 공이 바람을 가르는 소리
   pitch: () => noise({ filter: 'bandpass', freq: 500, to: 1800, q: 1.2, duration: 0.28, gain: 0.12, attack: 0.04 }),

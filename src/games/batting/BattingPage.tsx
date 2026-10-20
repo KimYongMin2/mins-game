@@ -58,7 +58,7 @@ export function BattingPage() {
   return (
     <main className="page bt-page">
       <header className="bt-header">
-        <h1 className="title">졸라 타격왕</h1>
+        <h1 className="title">배팅</h1>
         <SoundToggle />
         {screen.kind === 'game' ? (
           <button type="button" className="button button--small" onClick={toStart}>

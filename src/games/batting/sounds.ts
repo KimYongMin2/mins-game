@@ -1,7 +1,7 @@
 import { noise, tone } from '../../shared/audio/synth'
 import type { SoundName } from './play/session'
 
-// 졸라 타격왕 효과음 레시피. 모두 Web Audio로 합성한다.
+// 배팅 효과음 레시피. 모두 Web Audio로 합성한다.
 
 const RECIPES: Record<SoundName, () => void> = {
   // 투구: 공이 공기를 가르는 소리

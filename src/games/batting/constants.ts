@@ -1,4 +1,4 @@
-// 졸라 타격왕 수치. 시간은 ms.
+// 배팅 수치. 시간은 ms.
 
 export type Difficulty = 'normal' | 'hard'
 /** 우타는 포수 시점 왼쪽 타석, 좌타는 오른쪽 타석 */

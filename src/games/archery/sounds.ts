@@ -1,7 +1,7 @@
 import { noise, tone } from '../../shared/audio/synth'
 import type { SoundName } from './play/roundState'
 
-// 졸라 양궁 효과음 레시피. 모두 Web Audio로 합성한다.
+// 양궁 효과음 레시피. 모두 Web Audio로 합성한다.
 
 function thud() {
   noise({ filter: 'lowpass', freq: 700, duration: 0.09, gain: 0.5 })

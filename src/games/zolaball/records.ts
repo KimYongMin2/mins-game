@@ -6,7 +6,7 @@ const GAME_ID = 'zolaball'
 
 export type WinLossDraw = { wins: number; losses: number; draws: number }
 
-/** 졸라볼 통산 전적 */
+/** 야구 통산 전적 */
 export type ZolaballRecord = Record<Difficulty, WinLossDraw> & {
   homeruns: number
   atBats: number

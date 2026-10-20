@@ -40,7 +40,7 @@ export function Field({ camera, ball = null, swing = null, mark = null }: Props)
       className="zb-field"
       viewBox={viewBoxOf(camera)}
       role="img"
-      aria-label="졸라볼 경기장: 홈에서 120m 거리에 펜스와 관중석이 있다"
+      aria-label="야구 경기장: 홈에서 120m 거리에 펜스와 관중석이 있다"
     >
       <Clouds />
       <Stands />

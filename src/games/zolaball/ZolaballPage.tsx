@@ -56,7 +56,7 @@ export function ZolaballPage() {
     <main className="page zb-page">
       <header className="zb-header">
         <h1 className="title">
-          졸라볼{screen.kind === 'practice' && ' · 타격 연습'}
+          야구{screen.kind === 'practice' && ' · 타격 연습'}
           {screen.kind === 'ranking' && ' · 랭킹'}
         </h1>
         <SoundToggle />
