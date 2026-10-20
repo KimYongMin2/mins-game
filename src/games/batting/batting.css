@@ -19,7 +19,7 @@
 .bt-view-wrap {
   position: relative;
   width: 100%;
-  max-width: min(100%, calc((100dvh - 230px) * 0.9));
+  max-width: min(100%, calc((100dvh - 230px) * 360 / 430));
   margin: 0 auto;
   border: 2px solid var(--line);
   border-radius: 14px;
@@ -31,7 +31,7 @@
   display: block;
   width: 100%;
   height: auto;
-  aspect-ratio: 360 / 400;
+  aspect-ratio: 360 / 430;
   color: var(--ink);
   cursor: pointer;
   touch-action: none;
@@ -94,6 +94,12 @@
 .bt-zone .bt-zone__grid {
   stroke-width: 1;
   stroke: #eee;
+}
+
+/* 높낮이 구분선은 좀 더 진하게 */
+.bt-zone .bt-zone__rows {
+  stroke-width: 1.5;
+  stroke: #bbb;
 }
 
 .bt-view .bt-zone__touched {

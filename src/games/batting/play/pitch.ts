@@ -13,8 +13,8 @@ export const PITCH_LABEL: Record<PitchType, string> = { fastball: '직구', slid
 
 export type Vec3 = { x: number; y: number; z: number }
 
-/** 스트라이크 존(m). 한 칸은 가로 0.2 × 세로 0.24 */
-export const ZONE = { left: -0.3, right: 0.3, bottom: 0.5, top: 1.22 }
+/** 스트라이크 존(m). 한 칸은 가로 0.2 × 세로 0.28 (위아래가 잘 구분되게 세로를 길게) */
+export const ZONE = { left: -0.3, right: 0.3, bottom: 0.45, top: 1.29 }
 export const CELL_WIDTH = (ZONE.right - ZONE.left) / 3
 export const CELL_HEIGHT = (ZONE.top - ZONE.bottom) / 3
 

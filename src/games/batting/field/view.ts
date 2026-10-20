@@ -4,14 +4,14 @@ import { CELL_HEIGHT, CELL_WIDTH, type Vec3, ZONE } from '../play/pitch'
 // 화면 좌표는 SVG viewBox(VIEW_W × VIEW_H) 기준, y는 아래가 +.
 
 export const VIEW_W = 360
-export const VIEW_H = 400
+export const VIEW_H = 430
 
-const CAMERA = { x: 0, y: 1.5, z: -4 }
+const CAMERA = { x: 0, y: 1.6, z: -4 }
 /** 홈플레이트(z=0)에서 1m가 화면 몇 단위인지. 존이 터치하기 좋은 크기가 되게 정했다 */
 const PLATE_SCALE = 300
 const FOCAL = PLATE_SCALE * -CAMERA.z
 /** 존 가운데가 화면에서 놓이는 높이 */
-const ZONE_CENTER_Y = VIEW_H * 0.6
+const ZONE_CENTER_Y = VIEW_H * 0.62
 /** 지평선(카메라 높이)의 화면 높이. 존 가운데가 ZONE_CENTER_Y에 오도록 맞춘다 */
 export const HORIZON_Y = ZONE_CENTER_Y - (CAMERA.y - (ZONE.top + ZONE.bottom) / 2) * PLATE_SCALE
 

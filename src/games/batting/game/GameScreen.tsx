@@ -163,11 +163,12 @@ export function GameScreen({ difficulty, hand, onFinish }: Props) {
   const swing = swingOf ? { point: swingOf.point, progress: Math.min(1, Math.max(0, (now - swingOf.at) / SWING_MS)) } : null
   const touched = swingOf && now - swingOf.at < TOUCH_FLASH_MS ? swingOf.point : null
 
-  // 지나간 공 자리. 이번 공은 결과가 나온 뒤에 진하게
-  const marks: Mark[] = state.records.map((r, i) => {
-    const c = cellCenter(r.pitch.cell)
-    return { at: { x: c.x, y: c.y, z: 0 }, latest: phase.kind === 'result' && i === state.records.length - 1 }
-  })
+  // 방금 공이 지나간 자리. 결과를 보여주는 동안만, 다음 공에선 지운다
+  const marks: Mark[] = []
+  if (phase.kind === 'result') {
+    const c = cellCenter(phase.pitch.cell)
+    marks.push({ at: { x: c.x, y: c.y, z: 0 }, latest: true })
+  }
 
   const total = totalOf(state.records.map((r) => r.outcome))
 

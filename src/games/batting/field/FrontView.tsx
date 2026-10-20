@@ -126,12 +126,11 @@ function Zone({ touched }: { touched: ZonePoint | null }) {
       <rect x={ZONE.x} y={ZONE.y} width={ZONE.width} height={ZONE.height} />
       <path
         className="bt-zone__grid"
-        d={[1, 2]
-          .map(
-            (i) =>
-              `M${ZONE.x + i * CELL_SIZE.width} ${ZONE.y}V${ZONE.y + ZONE.height}M${ZONE.x} ${ZONE.y + i * CELL_SIZE.height}H${ZONE.x + ZONE.width}`,
-          )
-          .join('')}
+        d={[1, 2].map((i) => `M${ZONE.x + i * CELL_SIZE.width} ${ZONE.y}V${ZONE.y + ZONE.height}`).join('')}
+      />
+      <path
+        className="bt-zone__rows"
+        d={[1, 2].map((i) => `M${ZONE.x} ${ZONE.y + i * CELL_SIZE.height}H${ZONE.x + ZONE.width}`).join('')}
       />
       {t && <circle className="bt-zone__touched" cx={t.x} cy={t.y} r={16} />}
     </g>
