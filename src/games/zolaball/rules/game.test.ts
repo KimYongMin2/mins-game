@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { type GameState, type PitchOutcome, applyPitch, createGame, totalRuns } from './game'
+import { type GameState, INNINGS, type PitchOutcome, applyPitch, createGame, totalRuns } from './game'
 
 function play(game: GameState, ...outcomes: PitchOutcome[]): GameState {
   return outcomes.reduce((g, o) => applyPitch(g, o).game, game)
@@ -105,11 +105,11 @@ describe('타점과 투수 기록', () => {
     expect(g.pitching.home).toEqual({ outs: 3, runsAllowed: 1 })
   })
 
-  it('3이닝을 다 던지면 9아웃', () => {
+  it(`${INNINGS}이닝을 다 던지면 ${INNINGS * 3}아웃`, () => {
     let g = createGame()
-    for (let i = 0; i < 6; i++) g = play(g, ...threeOuts)
-    expect(g.pitching.home.outs).toBe(9)
-    expect(g.pitching.away.outs).toBe(9)
+    for (let i = 0; i < INNINGS * 2; i++) g = play(g, ...threeOuts)
+    expect(g.pitching.home.outs).toBe(INNINGS * 3)
+    expect(g.pitching.away.outs).toBe(INNINGS * 3)
   })
 })
 
@@ -136,25 +136,26 @@ describe('이닝과 경기 종료', () => {
     expect(totalRuns(g, 'away')).toBe(3)
   })
 
-  it('3이닝을 다 하고 동점이면 무승부로 끝난다', () => {
+  it(`${INNINGS}이닝을 다 하고 동점이면 무승부로 끝난다`, () => {
     let g = createGame()
-    for (let i = 0; i < 6; i++) g = play(g, ...threeOuts)
+    for (let i = 0; i < INNINGS * 2; i++) g = play(g, ...threeOuts)
     expect(g.final).toBe(true)
     expect(totalRuns(g, 'away')).toBe(totalRuns(g, 'home'))
-    expect(g.linescore).toEqual({ away: [0, 0, 0], home: [0, 0, 0] })
+    expect(g.linescore).toEqual({ away: Array(INNINGS).fill(0), home: Array(INNINGS).fill(0) })
   })
 
   it('마지막 이닝 초가 끝났을 때 후공이 앞서면 말 공격 없이 종료', () => {
     let g = play(createGame(), ...threeOuts, 'homerun', ...threeOuts) // 1회 말 1점
-    for (let i = 0; i < 3; i++) g = play(g, ...threeOuts) // 2회 초·말, 3회 초
+    // 2회 초·말 … 마지막 이닝 초
+    for (let i = 0; i < (INNINGS - 1) * 2 - 1; i++) g = play(g, ...threeOuts)
     expect(g.final).toBe(true)
-    expect(g.linescore.home).toEqual([1, 0])
+    expect(g.linescore.home).toEqual([1, ...Array(INNINGS - 2).fill(0)])
   })
 
   it('마지막 이닝 말에 앞서는 순간 끝내기', () => {
     let g = play(createGame(), 'homerun', ...threeOuts) // 1회 초 1점
-    for (let i = 0; i < 4; i++) g = play(g, ...threeOuts) // 1회 말 ~ 3회 초
-    expect([g.inning, g.half]).toEqual([3, 'bottom'])
+    for (let i = 0; i < INNINGS * 2 - 2; i++) g = play(g, ...threeOuts) // 1회 말 ~ 마지막 이닝 초
+    expect([g.inning, g.half]).toEqual([INNINGS, 'bottom'])
     g = play(g, 'homerun')
     expect(g.final).toBe(false) // 동점
     const r = applyPitch(g, 'homerun')
@@ -171,7 +172,7 @@ describe('이닝과 경기 종료', () => {
 
   it('끝난 경기에는 더 던질 수 없다', () => {
     let g = createGame()
-    for (let i = 0; i < 6; i++) g = play(g, ...threeOuts)
+    for (let i = 0; i < INNINGS * 2; i++) g = play(g, ...threeOuts)
     expect(() => applyPitch(g, 'ball')).toThrow()
   })
 })

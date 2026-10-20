@@ -1,4 +1,5 @@
 import { type ZolaballRecord, formatAverage } from '../records'
+import { INNINGS } from '../rules/game'
 import type { Difficulty } from '../rules/judge'
 
 type Props = {
@@ -17,7 +18,7 @@ const OPTIONS: { value: Difficulty; label: string; desc: string }[] = [
 export function MenuScreen({ record, onStart, onPractice, onRanking }: Props) {
   return (
     <section className="zb-menu">
-      <p className="subtitle">봇과 3이닝 대결! 선공·후공은 무작위예요.</p>
+      <p className="subtitle">봇과 {INNINGS}이닝 대결! 선공·후공은 무작위예요.</p>
       <div className="zb-menu__options">
         {OPTIONS.map((o) => {
           const wld = record[o.value]

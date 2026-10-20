@@ -1,6 +1,6 @@
 // 경기 규칙: 볼카운트·아웃·주자·점수·이닝. 화면·입력과 무관한 순수 함수만 둔다.
 
-export const INNINGS = 3
+export const INNINGS = 2
 
 /** away = 선공(초), home = 후공(말) */
 export type Side = 'away' | 'home'
