@@ -171,6 +171,18 @@ export function GameScreen({ event, difficulty, pvp, onFinish, onQuit }: Props) 
     dispatch(event === 'mash' ? { type: 'tap' } : { type: 'press', at })
   }
 
+  // 지금 버튼을 누르고 있는 손가락(포인터). 버튼 밖에서 떼도 알 수 있게 창 전체에서 듣는다
+  const pressedRef = useRef(new Set<number>())
+  useEffect(() => {
+    const release = (e: PointerEvent) => pressedRef.current.delete(e.pointerId)
+    window.addEventListener('pointerup', release)
+    window.addEventListener('pointercancel', release)
+    return () => {
+      window.removeEventListener('pointerup', release)
+      window.removeEventListener('pointercancel', release)
+    }
+  }, [])
+
   // PC: 스페이스바 (꾹 누르고 있을 때 나오는 반복 입력은 안 침)
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
@@ -196,6 +208,10 @@ export function GameScreen({ event, difficulty, pvp, onFinish, onQuit }: Props) 
 
   const { phase } = state
   const pulling = phase.kind === 'pull'
+  // 판이 바뀌면 누르던 손가락 기록을 비운다 (버튼이 꺼진 사이에 뗀 건 못 들을 수 있어서)
+  useEffect(() => {
+    pressedRef.current.clear()
+  }, [pulling])
   const names = [loadNickname() ?? '나', pvp?.peerName ?? '봇'] as const
   const winner = phase.kind === 'roundEnd' || phase.kind === 'done' ? phase.winner : null
   const foeGrade = state.lastGrade[1]
@@ -252,7 +268,10 @@ export function GameScreen({ event, difficulty, pvp, onFinish, onQuit }: Props) 
         onPointerDown={(e) => {
           // 터치하자마자 (click은 손을 뗄 때라 늦다)
           e.preventDefault()
-          pull(eventTime(e))
+          // 손가락 여러 개로 번갈아 누르기 막기: 이미 누르고 있는 손가락이 있으면 안 친다 (다 떼야 다음 한 번)
+          const first = pressedRef.current.size === 0
+          pressedRef.current.add(e.pointerId)
+          if (first) pull(eventTime(e))
         }}
       >
         {event === 'mash' ? '연타!' : '노란 곳에서 누르기!'}
