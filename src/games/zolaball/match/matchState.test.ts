@@ -65,7 +65,7 @@ describe('경기 진행', () => {
     if (s.phase.kind !== 'result') return
     expect(s.phase.event.plateResult).toBe('homerun')
     expect(s.phase.userDiffMs).toBe(0)
-    expect(s.sounds.map((x) => x.name)).toEqual(['pitch', 'hit', 'cheer'])
+    expect(s.sounds.map((x) => x.name)).toEqual(['swing', 'pitch', 'crack', 'fly', 'cheer'])
     expect(s.game.linescore.away[0]).toBe(1)
     // 홈런 타구는 관중석으로 날아가고, 떨어진 뒤에야 다음으로 넘어간다
     expect(s.phase.batted?.kind).toBe('homerun')

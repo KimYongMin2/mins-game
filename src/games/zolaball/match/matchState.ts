@@ -44,7 +44,8 @@ export type MatchConfig = {
 /** 친구가 보낸 투구 (내 쪽이 아직 받을 준비가 안 됐으면 맡아 둔다) */
 type RemotePitch = { n: number; call: PitchCall; windupMs: number }
 
-export type SoundName = 'pitch' | 'mitt' | 'hit' | 'cheer' | 'strikeout' | 'walk' | 'gameEnd'
+/** swing: 휘두르는 소리 · foul/hit/crack: 맞은 정도별 타격음(파울 < 범타·안타 < 2루타·홈런) · fly: 홈런 타구 날아감 */
+export type SoundName = 'pitch' | 'mitt' | 'swing' | 'foul' | 'hit' | 'crack' | 'fly' | 'cheer' | 'strikeout' | 'walk' | 'gameEnd'
 
 export type Phase =
   /** 경기 시작·공수 교대 안내 */
@@ -232,9 +233,11 @@ function resolvePitch(state: MatchState, contactAt: number | null, forced?: Pitc
   )
 
   const sounds: SoundName[] = []
-  if (contactAt !== null) sounds.push('hit')
+  // 친구 타자는 휘두른 순간을 모르니 판정과 함께 휘두르는 소리
+  if (forced && outcome !== 'ball' && outcome !== 'calledStrike') sounds.push('swing')
+  if (contactAt !== null) sounds.push(outcome === 'foul' ? 'foul' : outcome === 'homerun' || outcome === 'double' ? 'crack' : 'hit')
   else if (forced) sounds.push('mitt')
-  if (event.plateResult === 'homerun') sounds.push('cheer')
+  if (event.plateResult === 'homerun') sounds.push('fly', 'cheer')
   if (event.plateResult === 'strikeout') sounds.push('strikeout')
   if (event.plateResult === 'walk') sounds.push('walk')
   if (event.gameEnded) sounds.push('gameEnd')
@@ -297,7 +300,7 @@ function tick(state: MatchState): MatchState {
         const at = pitch.arriveAt + botSwing.diffMs
         const result = judgeSwing({ diffMs: botSwing.diffMs, difficulty: 'normal', pitchIsBall: pitch.isBall })
         p = { ...p, swing: { at, result } }
-        next = { ...next, phase: p, swingAt: at }
+        next = withSounds({ ...next, phase: p, swingAt: at }, 'swing')
       }
 
       const contact = p.swing !== null && p.swing.result !== 'miss'
@@ -349,7 +352,7 @@ function swing(state: MatchState, at: number): MatchState {
   if (!isUserBatting(state) || state.phase.kind === 'final') return state
   if (state.swingAt !== null && at < state.swingAt + SWING_DURATION_MS) return state
 
-  const next = { ...state, swingAt: at }
+  const next = withSounds({ ...state, swingAt: at }, 'swing')
   const { phase } = state
   if (phase.kind !== 'pitching' || phase.swing || at < phase.pitch.releaseAt) return next
 

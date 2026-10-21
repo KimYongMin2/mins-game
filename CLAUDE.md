@@ -218,7 +218,7 @@ src/
   - 타점 = 볼넷·안타·홈런 타석에서 들어온 점수(홈런은 본인 포함). 실책이 없어 실점 = 자책점
   - 올리기 실패 시 기기에 보관 후 다음 접속 때 재전송(경기별 uuid로 중복 방지)
   - 접속 정보는 `.env`(공개용 publishable 키). secret/service_role 키는 절대 저장소에 두지 않는다
-- **효과음**: 음원 없이 Web Audio로 합성 (`shared/audio/synth.ts`, 레시피는 `games/zolaball/sounds.ts`)
+- **효과음**: 음원 없이 Web Audio로 합성 (`shared/audio/synth.ts`, 레시피는 `games/zolaball/sounds.ts`). 진짜 야구처럼 들리게 다시 만듦: 휘두를 때마다 '휙'(사람·봇·친구 모두), 타격음은 맞은 정도별로 파울 '틱' < 범타·안타 '딱' < 2루타·홈런 '빡!'(메아리), 홈런은 공이 멀어지는 바람 소리 뒤로 함성과 박수가 차오름
 - **테스트**: `npm test` (vitest). 규칙·판정·봇 확률·경기 시뮬레이션은 단위 테스트로 확인
 
 ---
