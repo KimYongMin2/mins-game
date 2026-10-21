@@ -432,3 +432,37 @@
   font-weight: 500;
   color: var(--ink-soft);
 }
+
+.yt-target text {
+  fill: var(--ink);
+  stroke: none;
+  font-size: 12px;
+  font-weight: 900;
+  text-anchor: middle;
+}
+
+.yt-target {
+  pointer-events: none;
+  animation: yt-blink 0.6s ease-in-out infinite alternate;
+}
+
+/* 고른 말: 굵은 테두리로 멈춰 있고, 나머지 고를 수 있는 말은 깜빡임 없이 테두리만 */
+.yt-piece--picked circle {
+  stroke: #f59e0b;
+  stroke-width: 4;
+}
+
+.yt-piece--can circle {
+  stroke: var(--ink);
+  stroke-width: 2;
+}
+
+.yt-board {
+  touch-action: manipulation;
+}
+
+.yt-new--on {
+  border-color: #f59e0b;
+  background: #fef3c7;
+  font-size: 1.05rem;
+}

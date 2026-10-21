@@ -8,6 +8,7 @@ import { Sticks } from '../field/Sticks'
 import { type EngineAction, type EngineState, type Player, createEngine, engineReducer } from '../play/engine'
 import type { YutMsg } from '../play/pvp'
 import { type ScreenAction, type ScreenState, type YutView, createScreen, myIndex, myMove, myThrow, screenReducer, toView, viewChanged } from '../play/view'
+import { nodeOf } from '../rules/board'
 import { type From, movesFor } from '../rules/moves'
 import { THROW_LABEL } from '../rules/throw'
 import type { GameSummary } from '../records'
@@ -186,6 +187,14 @@ export function GameScreen(props: Props) {
   const canMoveNow = myMove(screen)
   const pick = v && chosen < v.pending.length ? chosen : 0
   const moves = v && canMoveNow ? movesFor(v.pieces, me, v.pending).filter((m) => m.throwIdx === v.pending.indexOf(v.pending[pick])) : []
+  // 옮길 말은 두 번에: 말(또는 새 말)을 고르고 → 갈 칸을 눌러야 옮긴다. 고른 말이 이 결과로 못 가면 풀림
+  // 판이 바뀌면(옮김·시간 초과·다음 사람) 고른 건 저절로 풀린다
+  const boardKey = v ? `${v.turn}:${v.lastMove?.seq ?? 0}:${v.pending.length}` : ''
+  const [picked, setPicked] = useState<{ from: From; key: string } | null>(null)
+  const selected = picked && picked.key === boardKey ? picked.from : null
+  const setSelected = (from: From | null) => setPicked(from === null ? null : { from, key: boardKey })
+  const chosenMove = selected === null ? undefined : moves.find((m) => m.from === selected)
+  const target = chosenMove ? (chosenMove.to === 'out' ? 'out' : nodeOf(chosenMove.to)) : null
 
   function doThrow() {
     if (!myThrow(screen)) return
@@ -199,6 +208,7 @@ export function GameScreen(props: Props) {
     if (props.mode === 'guest') props.room.send({ t: 'move', from: props.room.myId, throwIdx: m.throwIdx, piece: from })
     else hostDispatch({ type: 'move', player: me, throwIdx: m.throwIdx, from })
     setChosen(0)
+    setSelected(null)
   }
 
   // PC: 스페이스바로 던지기
@@ -230,6 +240,7 @@ export function GameScreen(props: Props) {
   else if (v.phase === 'done') tip = v.winner === me ? '내가 우승!' : `${v.players[v.winner ?? 0].name} 우승!`
   else if (!myTurn) tip = `${turnName} 차례…`
   else if (v.throwsLeft > 0) tip = v.pending.length > 0 ? '한 번 더 던져요!' : '윷을 던져요!'
+  else if (chosenMove) tip = chosenMove.to === 'out' ? "점선 '나가기'를 누르면 나가요" : '점선 칸을 누르면 옮겨요'
   else tip = '쓸 결과를 고르고, 옮길 말을 눌러요'
 
   return (
@@ -237,7 +248,16 @@ export function GameScreen(props: Props) {
       <PlayerBar v={v} me={me} />
 
       <div className="yt-board-wrap">
-        <Board pieces={v.pieces} moves={moves} me={me} lastTo={v.lastMove?.to ?? null} onPick={doMove} />
+        <Board
+          pieces={v.pieces}
+          movable={moves.flatMap((m) => (m.from === 'home' ? [] : [m.from]))}
+          selected={chosenMove ? selected : null}
+          target={target}
+          me={me}
+          lastTo={v.lastMove?.to ?? null}
+          onSelect={setSelected}
+          onConfirm={() => chosenMove && doMove(chosenMove.from)}
+        />
       </div>
 
       <div className="yt-status">
@@ -291,14 +311,14 @@ export function GameScreen(props: Props) {
         ) : (
           <button
             type="button"
-            className="button yt-new"
+            className={`button yt-new${homeMove && selected === 'home' ? ' yt-new--on' : ''}`}
             disabled={!homeMove}
-            onPointerDown={(e) => {
-              e.preventDefault()
-              doMove('home')
-            }}
+            aria-pressed={homeMove ? selected === 'home' : undefined}
+            onClick={() => setSelected(selected === 'home' ? null : 'home')}
           >
-            새 말 올리기 {canMoveNow && v.pending[pick] ? `(${THROW_LABEL[v.pending[pick]]})` : ''}
+            {homeMove && selected === 'home'
+              ? '새 말 고름 · 점선 칸을 눌러요'
+              : `새 말 올리기 ${canMoveNow && v.pending[pick] ? `(${THROW_LABEL[v.pending[pick]]})` : ''}`}
           </button>
         )}
       </div>
