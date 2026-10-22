@@ -76,6 +76,15 @@ export const GAMES: GameEntry[] = [
     players: '2~4인',
   },
   {
+    id: 'numbaseball',
+    title: '숫자야구',
+    description: '숨긴 숫자 3·4자리를 번갈아 불러 맞혀라! 스트라이크·볼로 추리',
+    path: '/games/numbaseball',
+    ready: true,
+    play: 'pvp',
+    players: '2인',
+  },
+  {
     id: 'batting',
     title: '배팅',
     description: '정면에서 날아오는 직구·슬라이더·커브. 칸을 터치해 홈런을 노려라!',
