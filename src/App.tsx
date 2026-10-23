@@ -8,6 +8,7 @@ import { FightPage } from './games/fight/FightPage'
 import { MemoryPage } from './games/memory/MemoryPage'
 import { NumbaseballPage } from './games/numbaseball/NumbaseballPage'
 import { OmokPage } from './games/omok/OmokPage'
+import { RoulettePage } from './games/roulette/RoulettePage'
 import { SurvivalPage } from './games/survival/SurvivalPage'
 import { NunchiPage } from './games/nunchi/NunchiPage'
 import { YutPage } from './games/yut/YutPage'
@@ -76,6 +77,10 @@ function App() {
         <Route
           path="/games/survival"
           element={nickname ? <SurvivalPage /> : <Navigate to="/nickname" replace />}
+        />
+        <Route
+          path="/games/roulette"
+          element={nickname ? <RoulettePage /> : <Navigate to="/nickname" replace />}
         />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

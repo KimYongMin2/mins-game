@@ -77,6 +77,15 @@ export const GAMES: GameEntry[] = [
     players: '2~6인',
   },
   {
+    id: 'roulette',
+    title: '러시안룰렛',
+    description: '한 발은 진짜, 누구를 쏠까',
+    path: '/games/roulette',
+    ready: true,
+    play: 'pvp',
+    players: '2~6인',
+  },
+  {
     id: 'yut',
     title: '윷놀이',
     description: '윷·모면 한 번 더, 업고 잡기',

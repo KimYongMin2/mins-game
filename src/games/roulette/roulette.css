@@ -1,0 +1,473 @@
+/* 러시안룰렛(roulette) 전용 스타일. 모든 클래스는 rl- 접두사를 쓴다. */
+
+.rl-page {
+  max-width: 560px;
+}
+
+.rl-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.rl-header .title {
+  flex: 1;
+  min-width: 0;
+}
+
+.rl-start__rules {
+  margin: 0;
+  padding: 12px 16px;
+  list-style: none;
+  text-align: left;
+  font-size: 0.875rem;
+  border: 1.5px solid var(--muted-line);
+  border-radius: 12px;
+  display: grid;
+  gap: 4px;
+}
+
+.rl-start__button {
+  flex-direction: column;
+  min-height: 64px;
+  font-size: 1.25rem;
+}
+
+.rl-start__button span {
+  font-size: 0.8125rem;
+  font-weight: 500;
+  opacity: 0.8;
+}
+
+.rl-start__record {
+  font-size: 0.8125rem;
+  color: var(--ink-soft);
+}
+
+.rl-start__bots {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border: 1.5px solid var(--muted-line);
+  border-radius: 12px;
+}
+
+.rl-start__label {
+  font-weight: 800;
+}
+
+.rl-start__counts {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 6px;
+}
+
+.rl-start__count--on {
+  color: var(--paper);
+  background: var(--ink);
+}
+
+.rl-result__headline {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 20px 16px;
+  border: 2px solid var(--line);
+  border-radius: 14px;
+  text-align: center;
+}
+
+.rl-result__headline strong {
+  font-size: 3rem;
+  font-weight: 900;
+  line-height: 1.1;
+}
+
+.rl-result__headline span {
+  color: var(--ink-soft);
+  font-size: 0.875rem;
+}
+
+.rl-result__headline--win {
+  border-color: #d97706;
+  background: #fffbeb;
+}
+
+.rl-result__headline--win strong {
+  color: var(--accent);
+}
+
+.rl-result__ranking {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 6px;
+}
+
+.rl-result__ranking li {
+  padding: 8px 12px;
+  border: 1.5px solid var(--muted-line);
+  border-radius: 10px;
+  font-weight: 700;
+}
+
+.rl-result__ranking li span {
+  display: inline-block;
+  width: 2.5em;
+  color: var(--ink-soft);
+}
+
+.rl-result__ranking .rl-result__me {
+  border-color: #2563eb;
+  color: #2563eb;
+}
+
+.rl-result__career,
+.rl-result__note {
+  text-align: center;
+  font-size: 0.875rem;
+  color: var(--ink-soft);
+}
+
+.rl-result__buttons {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+}
+
+.rl-timer {
+  height: 6px;
+  border: 2px solid var(--line);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.rl-timer__fill {
+  height: 100%;
+  background: var(--ink);
+  transform-origin: left;
+}
+
+.rl-result__ranking li em {
+  float: right;
+  font-style: normal;
+  color: var(--accent);
+}
+
+.rl-start {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-width: 420px;
+  margin: 8px auto 0;
+  text-align: center;
+}
+
+.rl-result {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-width: 420px;
+  margin: 8px auto 0;
+}
+
+.rl-table {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  max-height: 70dvh;
+  margin: 0 auto;
+  border: 2px solid var(--line);
+  border-radius: 18px;
+  background: var(--paper);
+  overflow: hidden;
+  touch-action: manipulation;
+}
+
+.rl-table--empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ink-soft);
+}
+
+.rl-table__top {
+  position: absolute;
+  left: 26%;
+  top: 28%;
+  width: 48%;
+  height: 44%;
+  border: 3px solid #92400e;
+  border-radius: 50%;
+  background: #fffbeb;
+}
+
+.rl-seat {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0;
+  width: 25%;
+  padding: 4px 0;
+  border: 2px solid transparent;
+  border-radius: 14px;
+  background: none;
+  color: var(--ink);
+  font: inherit;
+  transform: translate(-50%, -50%);
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+
+.rl-seat:disabled {
+  cursor: default;
+  color: var(--ink);
+  opacity: 1;
+}
+
+.rl-seat--me {
+  color: #2563eb;
+}
+
+.rl-seat--me:disabled {
+  color: #2563eb;
+}
+
+.rl-seat--out,
+.rl-seat--out:disabled {
+  color: var(--muted-line);
+}
+
+.rl-stick {
+  width: 56%;
+  height: auto;
+}
+
+.rl-stick circle,
+.rl-stick path {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.rl-seat__name {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.8125rem;
+  font-weight: 800;
+}
+
+.rl-bubble {
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 2px 10px;
+  border: 2px solid var(--line);
+  border-radius: 999px;
+  background: var(--paper);
+  font-size: 1.125rem;
+  font-weight: 900;
+  white-space: nowrap;
+  animation: rl-pop 0.2s ease-out;
+}
+
+.rl-bubble--clash {
+  border-color: var(--accent);
+  color: var(--paper);
+  background: var(--accent);
+  font-size: 0.875rem;
+}
+
+.rl-bubble--wait {
+  font-size: 0.8125rem;
+  color: var(--ink-soft);
+  border-color: var(--muted-line);
+}
+
+.rl-bubble--hand {
+  font-size: 0.9375rem;
+}
+
+
+@keyframes rl-pop {
+  from { transform: translateX(-50%) scale(0.4); }
+  to { transform: translateX(-50%) scale(1); }
+}
+
+/* 경기 화면 */
+.rl-game {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.rl-status {
+  min-height: 1.5em;
+  text-align: center;
+  font-weight: 900;
+  font-size: 1.0625rem;
+}
+
+.rl-status--mine {
+  color: #2563eb;
+}
+
+.rl-status--bad {
+  color: var(--accent);
+}
+
+.rl-status--win {
+  color: #d97706;
+}
+
+/* 내 차례 아닐 땐 자리를 못 누르지만 색은 그대로 */
+.rl-seat:disabled {
+  cursor: default;
+  opacity: 1;
+}
+
+.rl-seat--out,
+.rl-seat--out:disabled {
+  color: var(--muted-line);
+}
+
+.rl-seat--me .rl-seat__name {
+  text-decoration: underline;
+}
+
+.rl-seat--turn {
+  border-color: currentColor;
+}
+
+.rl-seat--pickable {
+  pointer-events: auto;
+  cursor: pointer;
+  background: rgba(37, 99, 235, 0.06);
+}
+
+.rl-seat--target {
+  border-color: var(--accent);
+  border-style: dashed;
+  border-width: 3px;
+}
+
+.rl-seat__name em {
+  font-style: normal;
+  color: var(--accent);
+}
+
+.rl-bubble--bang {
+  border-color: var(--accent);
+  color: var(--paper);
+  background: var(--accent);
+}
+
+/* 가운데 권총: 겨눈 사람 쪽으로 돈다 */
+.rl-gun {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 26%;
+  transition: transform 0.35s ease-out;
+  pointer-events: none;
+}
+
+.rl-gun__svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  fill: #374151;
+}
+
+.rl-gun__guard {
+  fill: none;
+  stroke: #374151;
+  stroke-width: 1.5;
+}
+
+.rl-gun__cyl {
+  fill: #6b7280;
+}
+
+.rl-gun__flash {
+  fill: #f59e0b;
+}
+
+/* 방아쇠 당기기 직전 떨림 */
+.rl-gun--tense .rl-gun__svg {
+  animation: rl-shake 0.12s linear infinite;
+}
+
+@keyframes rl-shake {
+  0%, 100% { transform: translate(0, 0); }
+  25% { transform: translate(1px, -1px); }
+  75% { transform: translate(-1px, 1px); }
+}
+
+/* 탄창 6칸: 당긴 칸은 비움 */
+.rl-cylinder {
+  position: absolute;
+  left: 50%;
+  top: 64%;
+  display: flex;
+  gap: 4px;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+.rl-cylinder__slot {
+  width: 12px;
+  height: 12px;
+  border: 2px solid #374151;
+  border-radius: 50%;
+  background: #9ca3af;
+}
+
+.rl-cylinder__slot--used {
+  background: var(--paper);
+  border-color: var(--muted-line);
+}
+
+.rl-odds {
+  text-align: center;
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: var(--ink-soft);
+}
+
+.rl-pull {
+  min-height: 72px;
+  font-size: 1.25rem;
+  font-weight: 900;
+  border-radius: 16px;
+  touch-action: manipulation;
+}
+
+.rl-pull:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.rl-pull--on {
+  border-color: var(--accent);
+  color: var(--paper);
+  background: var(--accent);
+}
+
+.rl-hint {
+  text-align: center;
+  font-size: 0.75rem;
+  color: var(--ink-soft);
+}
