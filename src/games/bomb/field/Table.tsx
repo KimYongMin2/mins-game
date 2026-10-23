@@ -1,7 +1,8 @@
+import { Person } from '../../../shared/art/Person'
 import { neighborsOf } from '../play/engine'
 import { canThrowNow, myIndex, type ScreenState } from '../play/view'
 
-// 둥근 탁자에 둘러앉은 졸라맨들. 나는 항상 맨 아래. 폭탄은 든 사람 앞에, 던지면 포물선으로 날아간다.
+// 둥근 나무 탁자에 둘러앉은 만화풍 사람들 (처음엔 졸라맨). 나는 항상 맨 아래. 폭탄은 든 사람 앞에, 던지면 포물선으로 날아간다.
 // 바로 옆(왼쪽·오른쪽) 사람을 누르면 그 사람에게 던진다 (내가 들고 있을 때만).
 
 type Props = {
@@ -21,26 +22,16 @@ function bombAt(p: { x: number; y: number }): { x: number; y: number } {
   return { x: p.x + (50 - p.x) * 0.5, y: p.y + (50 - p.y) * 0.5 }
 }
 
-function Stick({ out, hurt }: { out: boolean; hurt: boolean }) {
-  return (
-    <svg className="bm-stick" viewBox="0 0 40 44" aria-hidden>
-      <circle cx="20" cy="9" r="6" />
-      {out ? (
-        // 탈락: 눈이 X
-        <path d="M17 7l2 2M19 7l-2 2M21 7l2 2M23 7l-2 2" />
-      ) : null}
-      <path d={hurt ? 'M20 15v14M20 19l-10-6M20 19l10-6M20 29l-7 11M20 29l7 11' : 'M20 15v14M20 19l-9 6M20 19l9 6M20 29l-7 11M20 29l7 11'} />
-    </svg>
-  )
-}
-
 function Bomb({ x, y, lift }: { x: number; y: number; lift: number }) {
   return (
     <div className="bm-bomb" style={{ left: `${x}%`, top: `${y}%`, transform: `translate(-50%, calc(-50% - ${lift}px))` }} aria-hidden>
       <svg viewBox="0 0 40 40">
+        <path className="bm-bomb__fuse" d="M25 14q4 -6 9 -5" />
         <circle className="bm-bomb__body" cx="18" cy="24" r="12" />
-        <path className="bm-bomb__fuse" d="M26 14q4 -6 9 -5" />
-        <circle className="bm-bomb__spark" cx="35" cy="8" r="3" />
+        {/* 심지 꽂는 마개 + 반짝이 */}
+        <rect className="bm-bomb__cap" x="21" y="11" width="7" height="5" rx="1" transform="rotate(40 24.5 13.5)" />
+        <ellipse cx="13" cy="19" rx="4" ry="2.6" fill="#fff" opacity="0.55" transform="rotate(-35 13 19)" />
+        <path className="bm-bomb__spark" d="M35 3l1.4 3.4 3.4-1-2 3 3 2-3.6.4.4 3.6-2.6-2.4-2.6 2.4.4-3.6-3.6-.4 3-2-2-3 3.4 1z" />
       </svg>
     </div>
   )
@@ -101,7 +92,14 @@ export function Table({ screen, onPick }: Props) {
             onClick={() => target && onPick(i)}
             aria-label={target ? `${p.name}에게 던지기` : p.name}
           >
-            <Stick out={out} hurt={v.victim === i} />
+            {/* 폭탄을 들면 겁먹고, 터지면 ✕ */}
+            <Person
+              className="bm-stick"
+              shirt={i}
+              out={out}
+              pose={holding ? 'hold' : v.victim === i ? 'scared' : 'idle'}
+              mood={out || v.victim === i ? 'ko' : holding ? 'scared' : 'calm'}
+            />
             <span className="bm-seat__name">
               {p.name}
               {i === me && ' (나)'}

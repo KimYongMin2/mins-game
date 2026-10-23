@@ -312,7 +312,7 @@
 
 .nb-cell__score {
   font-weight: 800;
-  color: #2563eb;
+  color: var(--ink);
   white-space: nowrap;
 }
 
@@ -585,4 +585,65 @@
   margin-top: 24px;
   text-align: center;
   color: var(--ink-soft);
+}
+
+/* S·B·O 불빛과 판정 색: 스트라이크 노랑 · 볼 초록 · 아웃 빨강 (전광판처럼 검은 바탕도 해 봤는데 하얀 바탕이 나아서 되돌림) */
+.nb-lamps {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.nb-lamps__row {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.nb-lamps__row b {
+  width: 1em;
+  font-size: 0.75rem;
+  color: var(--ink);
+}
+
+.nb-lamp {
+  width: 13px;
+  height: 13px;
+  border: 1.5px solid #d1d5db;
+  border-radius: 50%;
+  background: #f3f4f6;
+}
+
+.nb-lamp--s.nb-lamp--on {
+  border-color: #ca8a04;
+  background: #facc15;
+}
+
+.nb-lamp--b.nb-lamp--on {
+  border-color: #15803d;
+  background: #22c55e;
+}
+
+.nb-lamp--o.nb-lamp--on {
+  border-color: #b91c1c;
+  background: #ef4444;
+}
+
+.nb-mark {
+  margin-left: 4px;
+  padding: 0 4px;
+  border-radius: 4px;
+  color: var(--ink);
+}
+
+.nb-mark--s {
+  background: #fde047;
+}
+
+.nb-mark--b {
+  background: #86efac;
+}
+
+.nb-mark--o {
+  background: #fca5a5;
 }

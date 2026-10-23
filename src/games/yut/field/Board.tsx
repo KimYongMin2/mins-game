@@ -3,6 +3,7 @@ import { CORNERS, NODE_XY, nodeOf } from '../rules/board'
 import type { From, Piece } from '../rules/moves'
 
 // 윷판: 바깥 네모 + 대각선 두 줄, 칸 29개. 말은 사람 색 동그라미, 업힌 수는 숫자로.
+// 나무 바닥에 펼친 천 윷판처럼 (처음엔 흰 바탕 선화였는데 실물처럼 바꿈): 먹선, 그림자 진 반짝이는 말.
 // 두 번에 나눠 옮긴다: 깜빡이는 말을 눌러 고르면 갈 칸이 점선으로 뜨고, 그 칸을 눌러야 옮긴다.
 // 다른 데를 누르면 고른 게 풀린다 (말을 잘못 눌러 바로 옮겨지지 않게).
 
@@ -72,15 +73,32 @@ export function Board({ pieces, movable, selected, target, me, lastTo, onSelect,
         tap(nodeNear(e))
       }}
     >
+      <defs>
+        {PLAYER_COLORS.map((c, i) => (
+          <radialGradient key={c} id={`yt-piece-${i}`} cx="35%" cy="30%" r="75%">
+            <stop offset="0%" stopColor="#fff" stopOpacity={0.75} />
+            <stop offset="35%" stopColor={c} />
+            <stop offset="100%" stopColor={c} stopOpacity={1} />
+          </radialGradient>
+        ))}
+      </defs>
+      {/* 천 윷판: 바느질 테두리 */}
+      <rect x={6} y={6} width={288} height={288} rx={6} className="yt-cloth" />
+      <rect x={12} y={12} width={276} height={276} rx={4} className="yt-cloth__stitch" />
       {LINES.map((d) => (
         <path key={d} className="yt-board__line" d={d} />
       ))}
       {Object.entries(NODE_XY).map(([n, [x, y]]) => {
         const node = Number(n)
         const corner = CORNERS.includes(node)
-        return <circle key={n} className={`yt-node${corner ? ' yt-node--corner' : ''}`} cx={x} cy={y} r={corner ? 13 : 8} />
+        return (
+          <g key={n}>
+            <circle className={`yt-node${corner ? ' yt-node--corner' : ''}`} cx={x} cy={y} r={corner ? 13 : 8} />
+            {corner && <circle className="yt-node__inner" cx={x} cy={y} r={8} />}
+          </g>
+        )
       })}
-      <text className="yt-board__label" x={270} y={296}>
+      <text className="yt-board__label" x={228} y={285}>
         출발 · 끝
       </text>
       {lastTo !== null && lastTo !== 'out' && (
@@ -96,7 +114,9 @@ export function Board({ pieces, movable, selected, target, me, lastTo, onSelect,
           const cls = picked ? ' yt-piece--picked' : canPick && selected === null ? ' yt-piece--movable' : canPick ? ' yt-piece--can' : ''
           return (
             <g key={`${player}-${node}`} className={`yt-piece${cls}`}>
-              <circle cx={x} cy={y} r={canPick ? 14 : 12} fill={PLAYER_COLORS[player]} />
+              {/* 판 위에 놓인 말: 아래 그림자 + 빛 받은 면 */}
+              <ellipse className="yt-piece__shadow" cx={x + 2} cy={y + 4} rx={canPick ? 14 : 12} ry={(canPick ? 14 : 12) * 0.8} />
+              <circle cx={x} cy={y} r={canPick ? 14 : 12} fill={`url(#yt-piece-${player})`} />
               {count > 1 && (
                 <text x={x} y={y + 5}>
                   {count}

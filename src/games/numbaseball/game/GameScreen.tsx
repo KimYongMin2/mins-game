@@ -5,7 +5,7 @@ import { loadNickname } from '../../../shared/storage/nickname'
 import { DONE_MS, type Difficulty, type Length, MAX_TRIES, SOLO_MAX_TRIES, TURN_MS } from '../constants'
 import { type MatchState, type MatchSummary, type Mode, type Side, createMatch, matchReducer, summarizeMatch } from '../play/matchState'
 import { type NumbaseballMsg, actionOf, outbox } from '../play/pvp'
-import { type Digits, isSolved, scoreText } from '../rules/numbers'
+import { type Digits, type Score, isSolved, scoreText } from '../rules/numbers'
 import { playSound } from '../sounds'
 import { Keypad } from './Keypad'
 
@@ -55,6 +55,40 @@ function TurnInfo({ state, foe }: { state: MatchState; foe: string }) {
 
 type Column = { title: string; sub: React.ReactNode; guesses: MatchState['guesses'][0]; active: boolean }
 
+/** 전광판 불빛: S(초록)·B(노랑)는 자리 수만큼, 하나도 없으면 O(빨강) */
+function Lamps({ score, length }: { score: Score; length: Length }) {
+  const out = score.strike + score.ball === 0
+  const rows = [
+    { label: 'S', on: score.strike, kind: 's', count: length },
+    { label: 'B', on: score.ball, kind: 'b', count: length },
+    { label: 'O', on: out ? 1 : 0, kind: 'o', count: 1 },
+  ]
+  return (
+    <span className="nb-lamps" aria-label={scoreText(score, length)}>
+      {rows.map((r) => (
+        <span key={r.label} className="nb-lamps__row">
+          <b>{r.label}</b>
+          {Array.from({ length: r.count }, (_, i) => (
+            <i key={i} className={`nb-lamp nb-lamp--${r.kind}${i < r.on ? ' nb-lamp--on' : ''}`} />
+          ))}
+        </span>
+      ))}
+    </span>
+  )
+}
+
+/** 기록표의 판정 글자: S 초록 · B 노랑 · OUT 빨강 */
+function ScoreMark({ score, length }: { score: Score; length: Length }) {
+  if (score.strike + score.ball === 0) return <span className="nb-mark nb-mark--o">OUT</span>
+  if (isSolved(score, length)) return <span className="nb-mark nb-mark--s">{length}S</span>
+  return (
+    <>
+      {score.strike > 0 && <span className="nb-mark nb-mark--s">{score.strike}S</span>}
+      {score.ball > 0 && <span className="nb-mark nb-mark--b">{score.ball}B</span>}
+    </>
+  )
+}
+
 /** 부른 숫자 한 칸 */
 function GuessCell({ g, length }: { g: MatchState['guesses'][0][number] | undefined; length: Length }) {
   if (!g) return <span className="nb-cell" />
@@ -63,7 +97,7 @@ function GuessCell({ g, length }: { g: MatchState['guesses'][0][number] | undefi
   return (
     <span className={`nb-cell${solved ? ' nb-cell--solved' : ''}`}>
       <span className="nb-cell__digits">{g.digits.join('')}</span>
-      <span className={`nb-cell__score${out ? ' nb-cell__score--out' : ''}`}>{g.score ? scoreText(g.score, length) : '…'}</span>
+      <span className={`nb-cell__score${out ? ' nb-cell__score--out' : ''}`}>{g.score ? <ScoreMark score={g.score} length={length} /> : '…'}</span>
     </span>
   )
 }
@@ -243,7 +277,7 @@ export function GameScreen({ mode, difficulty, length, pvp, onFinish, onQuit }: 
                 <span className="nb-flash__who">
                   {flashSide === 0 ? '나' : foe} {flash.digits.join('')}
                 </span>
-                <strong>{isSolved(flash.score, length) ? '정답!' : scoreText(flash.score, length)}</strong>
+                {isSolved(flash.score, length) ? <strong>정답!</strong> : <Lamps score={flash.score} length={length} />}
               </>
             ) : done ? (
               <span className="nb-flash__who">

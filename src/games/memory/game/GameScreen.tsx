@@ -128,41 +128,44 @@ export function GameScreen({ difficulty, pvp, onFinish, onQuit }: Props) {
         <div className="mm-timer__fill" style={{ transform: `scaleX(${left / PICK_MS})` }} />
       </div>
 
-      <div className={`mm-board${myTurn ? ' mm-board--mine' : ''}`} role="grid" aria-label={`카드 ${CARD_COUNT}장`}>
-        {state.cards.map((card, i) => {
-          const isOpen = state.open.includes(i)
-          const faceUp = isOpen || card.owner !== null
-          const cls = [
-            'mm-card',
-            faceUp && 'mm-card--up',
-            card.owner !== null && !isOpen && `mm-card--taken mm-card--by${card.owner}`,
-            isOpen && showing && `mm-card--${showing}`,
-          ]
-            .filter(Boolean)
-            .join(' ')
-          return (
-            <button
-              key={i}
-              type="button"
-              className={cls}
-              disabled={!myTurn || !canFlip(state, i)}
-              aria-label={faceUp ? undefined : `${i + 1}번 카드`}
-              onPointerDown={(e) => {
-                // 터치하자마자 열리도록 (click은 손을 뗄 때라 늦다)
-                e.preventDefault()
-                dispatch({ type: 'pick', index: i })
-              }}
-              // 키보드(Enter·Space)로도 열 수 있게. 이미 연 카드는 무시된다
-              onClick={() => dispatch({ type: 'pick', index: i })}
-            >
-              <span className="mm-card__inner">
-                <span className="mm-card__back" />
-                {/* 덮인 카드는 그림을 아예 그리지 않는다 (화면 읽기 프로그램에 그림 이름이 새지 않게) */}
-                <span className="mm-card__front">{faceUp && <CardFace face={card.face} />}</span>
-              </span>
-            </button>
-          )
-        })}
+      {/* 초록 펠트 카드 테이블 위에 카드 */}
+      <div className="mm-felt">
+        <div className={`mm-board${myTurn ? ' mm-board--mine' : ''}`} role="grid" aria-label={`카드 ${CARD_COUNT}장`}>
+          {state.cards.map((card, i) => {
+            const isOpen = state.open.includes(i)
+            const faceUp = isOpen || card.owner !== null
+            const cls = [
+              'mm-card',
+              faceUp && 'mm-card--up',
+              card.owner !== null && !isOpen && `mm-card--taken mm-card--by${card.owner}`,
+              isOpen && showing && `mm-card--${showing}`,
+            ]
+              .filter(Boolean)
+              .join(' ')
+            return (
+              <button
+                key={i}
+                type="button"
+                className={cls}
+                disabled={!myTurn || !canFlip(state, i)}
+                aria-label={faceUp ? undefined : `${i + 1}번 카드`}
+                onPointerDown={(e) => {
+                  // 터치하자마자 열리도록 (click은 손을 뗄 때라 늦다)
+                  e.preventDefault()
+                  dispatch({ type: 'pick', index: i })
+                }}
+                // 키보드(Enter·Space)로도 열 수 있게. 이미 연 카드는 무시된다
+                onClick={() => dispatch({ type: 'pick', index: i })}
+              >
+                <span className="mm-card__inner">
+                  <span className="mm-card__back" />
+                  {/* 덮인 카드는 그림을 아예 그리지 않는다 (화면 읽기 프로그램에 그림 이름이 새지 않게) */}
+                  <span className="mm-card__front">{faceUp && <CardFace face={card.face} />}</span>
+                </span>
+              </button>
+            )
+          })}
+        </div>
       </div>
       <p className="mm-hint">두 장씩 열어 같은 그림이면 가져가고 한 번 더 · 한 장에 10초</p>
 

@@ -144,29 +144,38 @@
   cursor: pointer;
 }
 
+.om-board {
+  filter: drop-shadow(0 3px 4px rgba(0, 0, 0, 0.35));
+}
+
 .om-board__bg {
-  fill: #f1d9a6;
-  stroke: #111;
-  stroke-width: 0.8;
+  stroke: #8a5a24;
+  stroke-width: 1;
+}
+
+.om-board__grain {
+  fill: none;
+  stroke: #b7803a;
+  stroke-width: 0.5;
+  opacity: 0.45;
 }
 
 .om-board__line line {
-  stroke: #6b4e1f;
+  stroke: #3b2a14;
   stroke-width: 0.45;
 }
 
 .om-board__star {
-  fill: #6b4e1f;
+  fill: #3b2a14;
 }
 
-.om-stone--black {
-  fill: #111;
+.om-stone__shadow {
+  fill: rgba(0, 0, 0, 0.35);
 }
 
 .om-stone--white {
-  fill: #fff;
-  stroke: #111;
-  stroke-width: 0.6;
+  stroke: #9ca3af;
+  stroke-width: 0.3;
 }
 
 .om-stone--ghost {
@@ -302,11 +311,13 @@
 }
 
 .om-card__stone--black {
-  background: #111;
+  background: radial-gradient(circle at 35% 30%, #6b7280, #1f2937 45%, #030712);
+  box-shadow: 2px 3px 3px rgba(0, 0, 0, 0.35);
 }
 
 .om-card__stone--white {
-  background: #fff;
+  background: radial-gradient(circle at 35% 30%, #fff, #f3f4f6 60%, #c7cbd1);
+  box-shadow: 2px 3px 3px rgba(0, 0, 0, 0.35);
 }
 
 .om-card__owner {

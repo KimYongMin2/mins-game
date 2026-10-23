@@ -25,11 +25,25 @@ function toWorld(e: PointerEvent<SVGSVGElement>): Vec {
 
 const lerp = (a: number, b: number, t: number) => a + (b - a) * Math.max(0, Math.min(1, t))
 
-function Piece({ at, color, me, dead, label }: { at: Vec; color: string; me: boolean; dead?: boolean; label: string }) {
+/** 위에서 내려다본 병사: 어깨(팀 색) + 헬멧 + 총구가 겨눈 쪽 (처음엔 그냥 동그라미 말이었음) */
+function Piece({ at, angle, color, me, dead, label }: { at: Vec; angle: number | null; color: string; me: boolean; dead?: boolean; label: string }) {
+  const deg = angle === null ? -90 : (angle * 180) / Math.PI
+  const ink = '#1f2937'
+  const body = dead ? '#d1d5db' : color
   return (
     <g className={`sv-piece${dead ? ' sv-piece--dead' : ''}`} transform={`translate(${at.x} ${at.y})`}>
-      <circle r={PIECE_R} fill={dead ? '#e5e7eb' : color} stroke={me ? '#111827' : '#fff'} strokeWidth={me ? 1 : 0.6} />
-      {dead && <path d="M-2.4 -2.4L2.4 2.4M2.4 -2.4L-2.4 2.4" stroke="#111827" strokeWidth={1} strokeLinecap="round" />}
+      <g transform={`rotate(${deg})`}>
+        {/* 총: 겨눈 쪽으로 */}
+        {!dead && <rect x={0} y={-0.55} width={PIECE_R * 1.75} height={1.1} rx={0.3} fill={ink} />}
+        {/* 어깨 */}
+        <ellipse rx={PIECE_R * 0.72} ry={PIECE_R} fill={body} stroke={ink} strokeWidth={me ? 0.9 : 0.5} />
+        {/* 총 잡은 손 */}
+        {!dead && <circle cx={PIECE_R * 0.75} cy={0} r={0.9} fill="#f6c7a0" stroke={ink} strokeWidth={0.35} />}
+        {/* 헬멧 */}
+        <circle r={PIECE_R * 0.55} fill={dead ? '#9ca3af' : '#4d7c0f'} stroke={ink} strokeWidth={0.45} />
+        <circle cx={-0.5} cy={-0.6} r={0.6} fill="#fff" opacity={0.35} />
+      </g>
+      {dead && <path d="M-2.4 -2.4L2.4 2.4M2.4 -2.4L-2.4 2.4" stroke="#dc2626" strokeWidth={1.1} strokeLinecap="round" />}
       <text y={-PIECE_R - 1.4} textAnchor="middle" className="sv-piece__name">
         {label}
       </text>
@@ -120,7 +134,7 @@ export function Arena({ screen, onPointer }: Props) {
             />
           )}
           <g opacity={draft.locked ? 1 : 0.75}>
-            <Piece at={draft.pos} color={PLAYER_COLORS[me % PLAYER_COLORS.length]} me label="나" />
+            <Piece at={draft.pos} angle={draft.angle} color={PLAYER_COLORS[me % PLAYER_COLORS.length]} me label="나" />
           </g>
         </>
       )}
@@ -141,18 +155,23 @@ export function Arena({ screen, onPointer }: Props) {
               </g>
             )
           })}
-          {r.positions.map((p, i) =>
-            p ? (
+          {r.positions.map((p, i) => {
+            if (!p) return null
+            // 총구 방향 = 쏜 레이저 방향
+            const sh = r.shots.find((x) => x.from === i)
+            const angle = sh ? Math.atan2(sh.end.y - sh.pos.y, sh.end.x - sh.pos.x) : null
+            return (
               <Piece
                 key={`p${i}`}
                 at={p}
+                angle={angle}
                 color={PLAYER_COLORS[i % PLAYER_COLORS.length]}
                 me={i === me}
                 dead={isHit(i)}
                 label={nameOf(i)}
               />
-            ) : null,
-          )}
+            )
+          })}
         </>
       )}
     </svg>

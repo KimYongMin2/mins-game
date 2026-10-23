@@ -1,7 +1,8 @@
+import { Person } from '../../../shared/art/Person'
 import type { Hand, OutReason } from '../play/engine'
 import { type ScreenState, myIndex } from '../play/view'
 
-// 둥근 탁자에 둘러앉은 졸라맨들. 나는 항상 맨 아래. 외친 사람 머리 위에 숫자, 동시에 누르면 '겹침!'.
+// 둥근 나무 탁자에 둘러앉은 만화풍 사람들 (처음엔 졸라맨). 나는 항상 맨 아래. 외친 사람 머리 위에 숫자, 동시에 누르면 '겹침!'.
 
 export const HAND_LABEL: Record<Hand, string> = { rock: '✊ 바위', paper: '✋ 보', scissors: '✌️ 가위' }
 
@@ -17,16 +18,6 @@ const REASON_LABEL: Record<OutReason, string> = {
 function seatAt(seat: number, count: number): { x: number; y: number } {
   const a = Math.PI / 2 + (seat / count) * Math.PI * 2
   return { x: 50 + Math.cos(a) * 38, y: 50 + Math.sin(a) * 34 }
-}
-
-function Stick({ raised }: { raised: boolean }) {
-  return (
-    <svg className="nc-stick" viewBox="0 0 40 44" aria-hidden>
-      <circle cx="20" cy="9" r="6" />
-      {/* 외치면 한 팔을 번쩍 */}
-      <path d={raised ? 'M20 15v14M20 19l-9 6M20 19l8-14M20 29l-7 11M20 29l7 11' : 'M20 15v14M20 19l-9 6M20 19l9 6M20 29l-7 11M20 29l7 11'} />
-    </svg>
-  )
 }
 
 export function Table({ screen }: { screen: ScreenState }) {
@@ -66,7 +57,14 @@ export function Table({ screen }: { screen: ScreenState }) {
             {lost && !press?.collided && <span className="nc-bubble nc-bubble--clash">{REASON_LABEL[lost.reason]}</span>}
             {finalist && v.phase === 'rps' && <span className="nc-bubble nc-bubble--wait">{v.picked.includes(i) ? '골랐음' : '…'}</span>}
             {hand && <span className="nc-bubble nc-bubble--hand">{HAND_LABEL[hand]}</span>}
-            <Stick raised={!!press} />
+            {/* 외치면 손을 번쩍, 겹치거나 탈락하면 ✕, 우승은 만세 */}
+            <Person
+              className="nc-stick"
+              shirt={i}
+              out={out}
+              pose={v.winner === i ? 'cheer' : press && !press.collided ? 'raise' : lost ? 'scared' : 'idle'}
+              mood={out || lost ? 'ko' : v.winner === i || (press && !press.collided) ? 'happy' : 'calm'}
+            />
             <span className="nc-seat__name">
               {p.name}
               {i === me && ' (나)'}

@@ -35,7 +35,7 @@
   margin: 0 auto;
   border: 2px solid var(--line);
   border-radius: 18px;
-  background: var(--paper);
+  background: radial-gradient(circle at 50% 50%, #fff7ed 0%, #fed7aa 100%);
   overflow: hidden;
   touch-action: manipulation;
 }
@@ -66,9 +66,10 @@
   top: 28%;
   width: 48%;
   height: 44%;
-  border: 3px solid #92400e;
+  border: 4px solid #451a03;
   border-radius: 50%;
-  background: #fffbeb;
+  background: radial-gradient(circle at 40% 35%, #d97706, #92400e 75%);
+  box-shadow: 0 6px 0 #451a03, inset 0 0 0 6px rgba(255, 255, 255, 0.12);
 }
 
 .bm-seat {
@@ -130,17 +131,8 @@
 }
 
 .bm-stick {
-  width: 56%;
+  width: 70%;
   height: auto;
-}
-
-.bm-stick circle,
-.bm-stick path {
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 3;
-  stroke-linecap: round;
-  stroke-linejoin: round;
 }
 
 .bm-seat__name {
@@ -175,8 +167,21 @@
   stroke-linecap: round;
 }
 
+.bm-bomb__body {
+  stroke: #000;
+  stroke-width: 1.5;
+}
+
+.bm-bomb__cap {
+  fill: #4b5563;
+  stroke: #111;
+  stroke-width: 1;
+}
+
 .bm-bomb__spark {
-  fill: #f59e0b;
+  fill: #fbbf24;
+  stroke: #ea580c;
+  stroke-width: 0.6;
   animation: bm-spark 0.15s linear infinite alternate;
 }
 
@@ -442,4 +447,21 @@
   display: grid;
   grid-template-columns: 1fr;
   gap: 10px;
+}
+
+/* 나무 탁자 위 글자: 밝은 글자 + 진한 그림자 */
+.bm-view .bm-banner strong,
+.bm-view .bm-banner span,
+.bm-view .bm-tip {
+  color: #fff7ed;
+  text-shadow: 0 1px 0 #451a03, 0 0 4px #451a03, 0 0 8px #451a03;
+}
+
+.bm-view .bm-banner--boom strong,
+.bm-view .bm-tip--hot {
+  color: #fca5a5;
+}
+
+.bm-view .bm-banner__win {
+  color: #fde047;
 }

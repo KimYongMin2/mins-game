@@ -87,8 +87,14 @@
   pointer-events: none;
 }
 
-.aw-clock--low {
-  color: var(--accent);
+.aw-view-wrap .aw-clock {
+  /* 어두운 나무 벽 위에서 잘 보이게 */
+  color: #fef3c7;
+  text-shadow: 0 2px 0 #451a03, 0 0 6px #451a03;
+}
+
+.aw-view-wrap .aw-clock--low {
+  color: #fca5a5;
 }
 
 .aw-view-wrap {
@@ -104,66 +110,102 @@
   width: 100%;
   height: auto;
   aspect-ratio: 360 / 210;
-  color: var(--ink);
+  background: #7c2d12;
 }
 
-.aw-view path,
-.aw-view circle {
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 3;
-  stroke-linecap: round;
-  stroke-linejoin: round;
+.aw-plank {
+  stroke: #7c2d12;
+  stroke-width: 2;
+  opacity: 0.5;
 }
 
-.aw-view .aw-head {
-  fill: var(--paper);
+.aw-floor {
+  fill: #78350f;
 }
 
-.aw-view .aw-floor,
-.aw-view .aw-chair {
-  stroke: var(--muted-line);
+.aw-cord {
+  stroke: #1f2937;
   stroke-width: 2;
 }
 
-.aw-view .aw-table {
-  stroke: #92400e;
+.aw-lamp {
+  fill: #1f2937;
+}
+
+.aw-light {
+  fill: #fef3c7;
+  opacity: 0.18;
+}
+
+.aw-chair {
+  fill: none;
+  stroke: #451a03;
   stroke-width: 4;
+  stroke-linecap: round;
 }
 
-.aw-view .aw-pad {
-  stroke-width: 5;
+.aw-table {
+  fill: #a16207;
+  stroke: #422006;
+  stroke-width: 2;
 }
 
-.aw-view .aw-pad--win {
-  stroke: #93c5fd;
+.aw-table-leg {
+  stroke: #422006;
+  stroke-width: 6;
+  stroke-linecap: round;
 }
 
-.aw-view .aw-pad--lose {
-  stroke: #fca5a5;
+.aw-pad--win {
+  fill: #93c5fd;
+  stroke: #1e3a8a;
+  stroke-width: 1;
 }
 
-.aw-view .aw-grip {
-  fill: var(--paper);
-  stroke-width: 3;
+.aw-pad--lose {
+  fill: #fca5a5;
+  stroke: #7f1d1d;
+  stroke-width: 1;
 }
 
-.aw-wrestler--me {
-  color: #2563eb;
+.aw-spark {
+  stroke: #fde047;
+  stroke-width: 2.5;
+  stroke-linecap: round;
 }
 
-.aw-wrestler--foe {
-  color: var(--accent);
+.aw-sweat {
+  fill: #7dd3fc;
+  stroke: #0369a1;
+  stroke-width: 0.8;
+}
+
+.aw-vein path {
+  fill: none;
+  stroke: #ef4444;
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+
+.aw-slam {
+  fill: #fde047;
+  stroke: #f97316;
+  stroke-width: 1.5;
+}
+
+.aw-slam__core {
+  fill: #fff;
 }
 
 .aw-wrestler--lost {
-  opacity: 0.45;
+  opacity: 0.6;
 }
 
 .aw-view text {
   text-anchor: middle;
   font-size: 12px;
-  fill: var(--ink-soft);
+  font-weight: 800;
+  fill: #fef3c7;
 }
 
 .aw-banner {

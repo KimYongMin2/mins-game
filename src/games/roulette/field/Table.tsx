@@ -1,32 +1,14 @@
+import { Person } from '../../../shared/art/Person'
 import { CHAMBERS, PLAYER_COLORS } from '../constants'
 import { type ScreenState, fired, isMyTurn, myIndex } from '../play/view'
 
-// 둥근 탁자에 둘러앉은 졸라맨들. 나는 항상 맨 아래. 가운데 권총이 차례인 사람이 고른 사람 쪽으로 돈다.
+// 둥근 나무 탁자에 둘러앉은 만화풍 사람들 (처음엔 졸라맨). 나는 항상 맨 아래. 가운데 권총이 차례인 사람이 고른 사람 쪽으로 돈다.
 // 내 차례면 사람(나 포함)을 눌러 고른다.
 
 /** 자리 위치(%): 나를 맨 아래에 두고 시계 방향으로 고르게 */
 function seatAt(seat: number, count: number): { x: number; y: number } {
   const a = Math.PI / 2 + (seat / count) * Math.PI * 2
   return { x: 50 + Math.cos(a) * 38, y: 50 + Math.sin(a) * 36 }
-}
-
-function Stick({ down }: { down: boolean }) {
-  return (
-    <svg className="rl-stick" viewBox="0 0 40 44" aria-hidden>
-      {down ? (
-        // 쓰러짐
-        <>
-          <circle cx="8" cy="36" r="6" />
-          <path d="M14 36h14M18 36l4-7M18 36l4 6M28 36l8-5M28 36l9 3" />
-        </>
-      ) : (
-        <>
-          <circle cx="20" cy="9" r="6" />
-          <path d="M20 15v14M20 19l-9 6M20 19l9 6M20 29l-7 11M20 29l7 11" />
-        </>
-      )}
-    </svg>
-  )
 }
 
 /** 옆에서 본 리볼버 (오른쪽을 겨눔) */
@@ -101,7 +83,14 @@ export function Table({ screen, onPick }: { screen: ScreenState; onPick: (i: num
             }}
           >
             {f && f.target === i && shown && <span className={`rl-bubble${f.bang ? ' rl-bubble--bang' : ''}`}>{f.bang ? '탕!' : '찰칵'}</span>}
-            <Stick down={dead || !!hitNow} />
+            {/* 겨눠지면 겁먹고, 맞으면 ✕ */}
+            <Person
+              className="rl-stick"
+              shirt={i}
+              out={dead || !!hitNow}
+              pose={isTarget && !dead && !hitNow ? 'scared' : 'idle'}
+              mood={dead || hitNow ? 'ko' : isTarget ? 'scared' : 'calm'}
+            />
             <span className="rl-seat__name">
               {i === me ? '나' : p.name}
               {v.kills[i] > 0 && <em> {v.kills[i]}킬</em>}

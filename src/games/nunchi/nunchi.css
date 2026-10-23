@@ -35,7 +35,7 @@
   margin: 0 auto;
   border: 2px solid var(--line);
   border-radius: 18px;
-  background: var(--paper);
+  background: radial-gradient(circle at 50% 50%, #fff7ed 0%, #fed7aa 100%);
   overflow: hidden;
   touch-action: manipulation;
 }
@@ -54,9 +54,10 @@
   top: 28%;
   width: 48%;
   height: 44%;
-  border: 3px solid #92400e;
+  border: 4px solid #451a03;
   border-radius: 50%;
-  background: #fffbeb;
+  background: radial-gradient(circle at 40% 35%, #d97706, #92400e 75%);
+  box-shadow: 0 6px 0 #451a03, inset 0 0 0 6px rgba(255, 255, 255, 0.12);
 }
 
 .nc-seat {
@@ -98,17 +99,8 @@
 }
 
 .nc-stick {
-  width: 56%;
+  width: 70%;
   height: auto;
-}
-
-.nc-stick circle,
-.nc-stick path {
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 3;
-  stroke-linecap: round;
-  stroke-linejoin: round;
 }
 
 .nc-seat__name {
@@ -440,4 +432,24 @@
 
 .nc-hands__button:disabled {
   opacity: 0.45;
+}
+
+/* 나무 탁자 위 글자: 밝은 글자 + 진한 그림자 */
+.nc-view .nc-banner strong,
+.nc-view .nc-banner span,
+.nc-view .nc-tip {
+  color: #fff7ed;
+  text-shadow: 0 1px 0 #451a03, 0 0 4px #451a03, 0 0 8px #451a03;
+}
+
+.nc-view .nc-banner__num {
+  color: #93c5fd;
+}
+
+.nc-view .nc-banner__bad {
+  color: #fca5a5;
+}
+
+.nc-view .nc-banner__win {
+  color: #fde047;
 }

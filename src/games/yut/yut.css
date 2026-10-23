@@ -73,7 +73,10 @@
 .yt-board-wrap {
   border: 2px solid var(--line);
   border-radius: 14px;
-  background: #fffbeb;
+  /* 나무 마룻바닥 */
+  background:
+    repeating-linear-gradient(90deg, rgba(0, 0, 0, 0.08) 0 2px, transparent 2px 46px),
+    linear-gradient(#b7834d, #9a6a3a);
 }
 
 .yt-board {
@@ -85,25 +88,54 @@
   margin: 0 auto;
 }
 
+.yt-cloth {
+  fill: #f3e3c3;
+  stroke: #7f1d1d;
+  stroke-width: 4;
+  filter: drop-shadow(0 3px 3px rgba(0, 0, 0, 0.35));
+}
+
+.yt-cloth__stitch {
+  fill: none;
+  stroke: #b91c1c;
+  stroke-width: 1.2;
+  stroke-dasharray: 5 3;
+}
+
+/* 먹선 */
 .yt-board__line {
   fill: none;
-  stroke: #92400e;
-  stroke-width: 2;
+  stroke: #3f2a1a;
+  stroke-width: 2.4;
+  stroke-linecap: round;
 }
 
 .yt-node {
-  fill: var(--paper);
-  stroke: #92400e;
+  fill: #fbf3e2;
+  stroke: #3f2a1a;
   stroke-width: 2;
 }
 
 .yt-node--corner {
-  stroke-width: 3;
+  fill: #f8e7c4;
+  stroke-width: 2.5;
+}
+
+.yt-node__inner {
+  fill: none;
+  stroke: #3f2a1a;
+  stroke-width: 1.2;
+}
+
+.yt-piece__shadow {
+  fill: rgba(0, 0, 0, 0.3);
+  stroke: none;
 }
 
 .yt-board__label {
   font-size: 9px;
-  fill: var(--ink-soft);
+  font-weight: 800;
+  fill: #7f1d1d;
   text-anchor: middle;
 }
 
@@ -122,8 +154,8 @@
 }
 
 .yt-piece circle {
-  stroke: var(--paper);
-  stroke-width: 2.5;
+  stroke: #1f2937;
+  stroke-width: 1.8;
 }
 
 .yt-piece text {
@@ -173,19 +205,25 @@
 }
 
 .yt-stick {
-  width: 12px;
-  height: 46px;
-  border: 2px solid #78350f;
-  border-radius: 6px;
-  background: #b45309;
+  width: 14px;
+  height: 54px;
+  border: 1.5px solid #5b3410;
+  border-radius: 7px;
+  /* 둥근 등: 가장자리가 어두운 나무 + 나뭇결 */
+  background:
+    repeating-linear-gradient(180deg, rgba(0, 0, 0, 0.1) 0 1px, transparent 1px 7px),
+    linear-gradient(90deg, #6b3f17, #a86a2f 40%, #c58a48 55%, #7a4a1d);
+  box-shadow: 1px 2px 2px rgba(0, 0, 0, 0.35);
 }
 
 /* 배(평평한 면): 밝게 X 무늬 */
 .yt-stick--flat {
+  /* 평평한 배: 밝은 나무에 ✕ 낙인 */
   background:
-    linear-gradient(45deg, transparent 45%, #78350f 45% 55%, transparent 55%) center / 10px 10px no-repeat,
-    linear-gradient(-45deg, transparent 45%, #78350f 45% 55%, transparent 55%) center / 10px 10px no-repeat,
-    #fde68a;
+    linear-gradient(45deg, transparent 44%, #5b3410 44% 56%, transparent 56%) center / 10px 10px no-repeat,
+    linear-gradient(-45deg, transparent 44%, #5b3410 44% 56%, transparent 56%) center / 10px 10px no-repeat,
+    repeating-linear-gradient(180deg, rgba(120, 70, 20, 0.12) 0 1px, transparent 1px 7px),
+    linear-gradient(90deg, #e7c48c, #f6dfb0 50%, #e2bb7f);
 }
 
 /* 빽도 표시 */

@@ -251,20 +251,23 @@
 }
 
 .sv-arena__floor {
-  fill: #fff;
-  stroke: #111827;
-  stroke-width: 0.6;
+  /* 모래땅 */
+  fill: #fdf0d5;
+  stroke: #78350f;
+  stroke-width: 0.7;
 }
 
 .sv-arena__grid line {
-  stroke: #e5e7eb;
+  stroke: #ecd9b4;
   stroke-width: 0.3;
 }
 
+/* 엄폐물: 모래주머니 벽 */
 .sv-wall {
-  fill: #78716c;
-  stroke: #44403c;
+  fill: #c8a165;
+  stroke: #6b4f1d;
   stroke-width: 0.5;
+  stroke-dasharray: 2.4 0.6;
 }
 
 .sv-aim {
