@@ -85,6 +85,15 @@ export const GAMES: GameEntry[] = [
     players: '2인',
   },
   {
+    id: 'omok',
+    title: '오목',
+    description: '렌주룰 오목. 카드로 흑·백을 정하고 다섯 개를 먼저 이어라!',
+    path: '/games/omok',
+    ready: true,
+    play: 'pvp',
+    players: '2인',
+  },
+  {
     id: 'batting',
     title: '배팅',
     description: '정면에서 날아오는 직구·슬라이더·커브. 칸을 터치해 홈런을 노려라!',

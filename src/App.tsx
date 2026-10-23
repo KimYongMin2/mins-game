@@ -7,6 +7,7 @@ import { BombPage } from './games/bomb/BombPage'
 import { FightPage } from './games/fight/FightPage'
 import { MemoryPage } from './games/memory/MemoryPage'
 import { NumbaseballPage } from './games/numbaseball/NumbaseballPage'
+import { OmokPage } from './games/omok/OmokPage'
 import { NunchiPage } from './games/nunchi/NunchiPage'
 import { YutPage } from './games/yut/YutPage'
 import { ZolaballPage } from './games/zolaball/ZolaballPage'
@@ -66,6 +67,10 @@ function App() {
         <Route
           path="/games/numbaseball"
           element={nickname ? <NumbaseballPage /> : <Navigate to="/nickname" replace />}
+        />
+        <Route
+          path="/games/omok"
+          element={nickname ? <OmokPage /> : <Navigate to="/nickname" replace />}
         />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

@@ -1,0 +1,499 @@
+/* 오목(omok) 전용 스타일. 모든 클래스는 om- 접두사를 쓴다. */
+.om-page {
+  max-width: 560px;
+}
+
+.om-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.om-header .title {
+  flex: 1;
+  min-width: 0;
+}
+
+/* 경기 화면 */
+.om-game {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.om-hud {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 8px;
+}
+
+.om-score {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding: 4px 10px;
+  border: 2px solid transparent;
+  border-radius: 12px;
+}
+
+.om-score--foe {
+  align-items: flex-end;
+}
+
+.om-score--me.om-score--active {
+  border-color: #2563eb;
+}
+
+.om-score--foe.om-score--active {
+  border-color: var(--accent);
+}
+
+.om-score__name {
+  font-size: 0.8125rem;
+  color: var(--ink-soft);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
+
+.om-score__stone {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 1.25rem;
+  font-weight: 900;
+}
+
+.om-dot {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 1.5px solid #111;
+}
+
+.om-dot--black {
+  background: #111;
+}
+
+.om-dot--white {
+  background: #fff;
+}
+
+.om-turn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  font-weight: 800;
+  color: var(--ink-soft);
+  text-align: center;
+}
+
+.om-turn--mine {
+  color: #2563eb;
+}
+
+.om-turn--done {
+  font-size: 1.375rem;
+  color: var(--ink);
+}
+
+.om-turn--win {
+  color: var(--accent);
+}
+
+.om-turn__time {
+  font-size: 0.8125rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.om-turn__time--low {
+  color: var(--accent);
+}
+
+.om-timer {
+  height: 6px;
+  border: 2px solid var(--line);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.om-timer__fill {
+  height: 100%;
+  background: #2563eb;
+  transform-origin: left;
+}
+
+.om-timer__fill--foe {
+  background: var(--accent);
+}
+
+/* 오목판: 폰에서도 아래 착수하기 버튼까지 한 화면에 들어오게 화면 높이에 맞춰 줄인다 */
+.om-board {
+  display: block;
+  width: 100%;
+  max-width: calc(100vh - 250px);
+  max-width: calc(100dvh - 250px);
+  margin: 0 auto;
+  touch-action: manipulation;
+  user-select: none;
+  -webkit-user-select: none;
+  cursor: pointer;
+}
+
+.om-board__bg {
+  fill: #f1d9a6;
+  stroke: #111;
+  stroke-width: 0.8;
+}
+
+.om-board__line line {
+  stroke: #6b4e1f;
+  stroke-width: 0.45;
+}
+
+.om-board__star {
+  fill: #6b4e1f;
+}
+
+.om-stone--black {
+  fill: #111;
+}
+
+.om-stone--white {
+  fill: #fff;
+  stroke: #111;
+  stroke-width: 0.6;
+}
+
+.om-stone--ghost {
+  opacity: 0.45;
+  stroke: #2563eb;
+  stroke-width: 0.9;
+  stroke-dasharray: 1.5 1;
+}
+
+.om-last {
+  fill: var(--accent);
+}
+
+.om-forbidden {
+  stroke: var(--accent);
+  stroke-width: 0.7;
+  stroke-linecap: round;
+}
+
+.om-winline {
+  stroke: var(--accent);
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  opacity: 0.85;
+}
+
+.om-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.om-hint {
+  margin: 0;
+  min-height: 1.4em;
+  font-size: 0.8125rem;
+  color: var(--ink-soft);
+  text-align: center;
+}
+
+.om-hint--warn {
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.om-place {
+  min-height: 56px;
+  font-size: 1.25rem;
+}
+
+/* 흑·백 카드 */
+.om-cards {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 24px 12px;
+  border: 1.5px solid var(--muted-line);
+  border-radius: 12px;
+  text-align: center;
+}
+
+.om-cards__title {
+  margin: 0;
+  font-size: 1.125rem;
+  font-weight: 800;
+}
+
+.om-cards__hint {
+  margin: 0;
+  font-size: 0.8125rem;
+  color: var(--ink-soft);
+}
+
+.om-cards__row {
+  display: flex;
+  gap: 16px;
+}
+
+.om-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 110px;
+  height: 150px;
+  font: inherit;
+  color: var(--ink);
+  background: #eef2ff;
+  border: 2px solid var(--line);
+  border-radius: 12px;
+  box-shadow: 3px 3px 0 var(--line);
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.om-card:disabled {
+  cursor: default;
+}
+
+.om-card:active:not(:disabled) {
+  transform: translate(2px, 2px);
+  box-shadow: 1px 1px 0 var(--line);
+}
+
+.om-card__back {
+  font-size: 2.5rem;
+  font-weight: 900;
+  color: #6366f1;
+}
+
+.om-card--open {
+  background: var(--paper);
+  animation: om-flip 0.35s ease-out;
+}
+
+.om-card--picked {
+  border-color: #2563eb;
+  box-shadow: 3px 3px 0 #2563eb;
+}
+
+.om-card strong {
+  font-size: 1.5rem;
+  font-weight: 900;
+}
+
+.om-card__stone {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 2px solid #111;
+}
+
+.om-card__stone--black {
+  background: #111;
+}
+
+.om-card__stone--white {
+  background: #fff;
+}
+
+.om-card__owner {
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: var(--ink-soft);
+}
+
+@keyframes om-flip {
+  from {
+    transform: rotateY(90deg);
+  }
+  to {
+    transform: rotateY(0);
+  }
+}
+
+/* 시작 */
+.om-start {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-width: 420px;
+  margin: 8px auto 0;
+  text-align: center;
+}
+
+.om-start__rules {
+  margin: 0;
+  padding: 12px 16px;
+  list-style: none;
+  text-align: left;
+  font-size: 0.875rem;
+  border: 1.5px solid var(--muted-line);
+  border-radius: 12px;
+  display: grid;
+  gap: 4px;
+}
+
+.om-start__options {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.om-start__option {
+  flex-direction: column;
+  gap: 2px;
+  min-height: 0;
+  padding: 10px 8px;
+  border-color: var(--muted-line);
+  border-radius: 12px;
+}
+
+.om-start__option--on {
+  border-color: var(--line);
+  box-shadow: 3px 3px 0 var(--line);
+}
+
+.om-start__name {
+  font-size: 1.25rem;
+  font-weight: 900;
+}
+
+.om-start__desc {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--ink-soft);
+}
+
+.om-start__record {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin: 0;
+}
+
+.om-start__record div {
+  display: flex;
+  flex-direction: column;
+  padding: 12px;
+  border: 1.5px solid var(--muted-line);
+  border-radius: 12px;
+}
+
+.om-start__record dt {
+  font-size: 0.8125rem;
+  color: var(--ink-soft);
+}
+
+.om-start__record dd {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+}
+
+.om-start__record span {
+  font-size: 0.75rem;
+  color: var(--ink-soft);
+}
+
+.om-start__button {
+  min-height: 64px;
+  font-size: 1.25rem;
+}
+
+.om-start__sub {
+  flex-wrap: wrap;
+}
+
+.om-start__sub span {
+  margin-left: 4px;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--ink-soft);
+}
+
+/* 결과 */
+.om-result {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-width: 420px;
+  margin: 8px auto 0;
+}
+
+.om-result__headline {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 20px 16px;
+  border: 2px solid var(--line);
+  border-radius: 14px;
+  text-align: center;
+}
+
+.om-result__headline strong {
+  font-size: 3rem;
+  font-weight: 900;
+  line-height: 1.1;
+}
+
+.om-result__headline span {
+  color: var(--ink-soft);
+  font-size: 0.875rem;
+}
+
+.om-result__headline--win {
+  border-color: #d97706;
+  background: #fffbeb;
+}
+
+.om-result__headline--win strong {
+  color: var(--accent);
+}
+
+.om-result__headline .om-result__badge {
+  padding: 2px 10px;
+  font-weight: 800;
+  color: var(--paper);
+  background: #d97706;
+  border-radius: 999px;
+}
+
+.om-result__career,
+.om-result__note {
+  margin: 0;
+  text-align: center;
+  font-size: 0.875rem;
+  color: var(--ink-soft);
+}
+
+.om-result__buttons {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.om-result__buttons .button--primary {
+  grid-column: 1 / -1;
+}
+
+/* 친구 대전 */
+.om-pvp-wait {
+  margin-top: 24px;
+  text-align: center;
+  color: var(--ink-soft);
+}
