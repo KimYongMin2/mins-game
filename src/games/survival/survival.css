@@ -261,6 +261,12 @@
   stroke-width: 0.3;
 }
 
+.sv-wall {
+  fill: #78716c;
+  stroke: #44403c;
+  stroke-width: 0.5;
+}
+
 .sv-aim {
   stroke-width: 0.7;
   stroke-dasharray: 2 1.5;

@@ -1,13 +1,17 @@
-// 맵과 총알 계산. 맵은 가운데가 (0,0)인 원, 라운드마다 반지름이 줄어든다 (처음엔 네모였는데 원으로 바꿈).
+// 맵과 총알 계산. 맵은 가운데가 (0,0)인 원, 남은 사람 수에 맞춰 반지름이 줄어든다 (처음엔 네모였는데 원으로 바꿈).
 // 이름은 네모 때 그대로 half(= 반지름).
-// 총알은 쏜 사람 자리에서 고른 방향으로 일자로 나가 처음 맞은 한 명에서 멈춘다. 아무도 없으면 맵 끝까지.
+// 총알은 쏜 사람 자리에서 고른 방향으로 일자로 나가 처음 맞은 한 명에서 멈춘다. 엄폐물(벽)에 먼저 닿으면 거기서 멈추고,
+// 아무도 없으면 맵 끝까지.
 import type { Rng } from '../../../shared/random'
-import { ARENA_HALF, PIECE_R } from '../constants'
+import { ARENA_BY_PLAYERS, MAX_ARENA, PIECE_R, WALL_GAP, WALL_LEN, WALL_THICK } from '../constants'
 
 export type Vec = { x: number; y: number }
 
-/** n라운드(1부터) 맵 반지름 */
-export const halfOf = (round: number) => ARENA_HALF[Math.min(round, ARENA_HALF.length) - 1]
+/** 엄폐물: 가운데(x, y), 길이 w, 두께 h, 기울기 angle(라디안)인 직사각형 */
+export type Wall = { x: number; y: number; w: number; h: number; angle: number }
+
+/** 남은 사람 수에 맞는 맵 반지름 */
+export const halfFor = (alive: number) => ARENA_BY_PLAYERS[Math.max(2, Math.min(6, alive))] ?? MAX_ARENA
 
 /** 말이 맵 밖으로 나가지 않게 (말 반지름만큼 안쪽) */
 export function clampToArena(p: Vec, half: number): Vec {
@@ -16,11 +20,93 @@ export function clampToArena(p: Vec, half: number): Vec {
   return d <= m ? p : { x: (p.x / d) * m, y: (p.y / d) * m }
 }
 
+/** 벽 기준 좌표 (벽 가운데가 0, 길이 방향이 x) */
+function toLocal(p: Vec, w: Wall): Vec {
+  const c = Math.cos(w.angle)
+  const s = Math.sin(w.angle)
+  const dx = p.x - w.x
+  const dy = p.y - w.y
+  return { x: dx * c + dy * s, y: -dx * s + dy * c }
+}
+
+function fromLocal(q: Vec, w: Wall): Vec {
+  const c = Math.cos(w.angle)
+  const s = Math.sin(w.angle)
+  return { x: w.x + q.x * c - q.y * s, y: w.y + q.x * s + q.y * c }
+}
+
+/** 말이 벽에 걸치면 가까운 쪽 바깥으로 밀어낸다 */
+export function pushOutOfWalls(p: Vec, walls: readonly Wall[]): Vec {
+  let out = p
+  for (const w of walls) {
+    const q = toLocal(out, w)
+    const ex = w.w / 2 + PIECE_R
+    const ey = w.h / 2 + PIECE_R
+    if (Math.abs(q.x) >= ex || Math.abs(q.y) >= ey) continue
+    const px = ex - Math.abs(q.x)
+    const py = ey - Math.abs(q.y)
+    const pushed = px < py ? { x: Math.sign(q.x || 1) * ex, y: q.y } : { x: q.x, y: Math.sign(q.y || 1) * ey }
+    out = fromLocal(pushed, w)
+  }
+  return out
+}
+
+/** 말을 놓을 수 있는 자리로: 맵 안, 벽 밖 (밀어낸 뒤 다시 맵 안으로) */
+export function placeAt(p: Vec, half: number, walls: readonly Wall[]): Vec {
+  let out = clampToArena(p, half)
+  for (let k = 0; k < 3; k++) out = clampToArena(pushOutOfWalls(out, walls), half)
+  return out
+}
+
+/** 앞으로 나가는 선이 벽에 닿는 거리 (안 닿으면 null) */
+function rayWall(from: Vec, dx: number, dy: number, w: Wall): number | null {
+  const o = toLocal(from, w)
+  const c = Math.cos(w.angle)
+  const s = Math.sin(w.angle)
+  const d = { x: dx * c + dy * s, y: -dx * s + dy * c }
+  let tMin = -Infinity
+  let tMax = Infinity
+  for (const [oo, dd, e] of [
+    [o.x, d.x, w.w / 2],
+    [o.y, d.y, w.h / 2],
+  ] as const) {
+    if (Math.abs(dd) < 1e-9) {
+      if (Math.abs(oo) > e) return null
+      continue
+    }
+    const t1 = (-e - oo) / dd
+    const t2 = (e - oo) / dd
+    tMin = Math.max(tMin, Math.min(t1, t2))
+    tMax = Math.min(tMax, Math.max(t1, t2))
+  }
+  if (tMax < Math.max(0, tMin)) return null
+  return Math.max(0, tMin)
+}
+
+/** 라운드마다 엄폐물 짓기: 맵이 클수록 많이(5~6명 3개 · 3~4명 2개 · 2명 1개, 처음 5~3개는 너무 많아 줄임), 서로 떨어지게, 맵 안에 다 들어오게 */
+export function makeWalls(rng: Rng, half: number): Wall[] {
+  const count = Math.max(1, Math.min(3, Math.round((half - 20) / 10)))
+  const walls: Wall[] = []
+  for (let tries = 0; walls.length < count && tries < 200; tries++) {
+    const w = WALL_LEN[0] + rng.next() * (WALL_LEN[1] - WALL_LEN[0])
+    const r = Math.sqrt(rng.next()) * (half - w / 2 - 3)
+    const a = rng.next() * Math.PI * 2
+    const wall = { x: Math.cos(a) * r, y: Math.sin(a) * r, w, h: WALL_THICK, angle: rng.next() * Math.PI }
+    if (walls.every((o) => Math.hypot(o.x - wall.x, o.y - wall.y) >= Math.min(WALL_GAP, half * 0.45))) walls.push(wall)
+  }
+  return walls
+}
+
 /** 맵 안 아무 곳 (넓이 고르게) */
 export function randomInArena(rng: Rng, half: number): Vec {
   const r = Math.sqrt(rng.next()) * (half - PIECE_R)
   const a = rng.next() * Math.PI * 2
   return { x: Math.cos(a) * r, y: Math.sin(a) * r }
+}
+
+/** 맵 안, 벽 밖 아무 곳 */
+export function randomSpot(rng: Rng, half: number, walls: readonly Wall[]): Vec {
+  return placeAt(randomInArena(rng, half), half, walls)
 }
 
 /** 쏜 자리에서 그 방향으로 맵 끝에 닿는 곳 */
@@ -38,10 +124,20 @@ export function edgeOf(from: Vec, angle: number, half: number): Vec {
  * 총알: 처음 맞는 사람과 총알이 멈춘 곳.
  * 말(반지름 PIECE_R)에 닿는 첫 지점까지 거리로 가장 가까운 사람. 쏜 사람 뒤쪽은 안 맞는다
  */
-export function shoot(from: Vec, angle: number, targets: readonly { player: number; pos: Vec }[], half: number): { hit: number | null; end: Vec } {
+export function shoot(
+  from: Vec,
+  angle: number,
+  targets: readonly { player: number; pos: Vec }[],
+  half: number,
+  walls: readonly Wall[] = [],
+): { hit: number | null; end: Vec } {
   const dx = Math.cos(angle)
   const dy = Math.sin(angle)
-  let best: { player: number; t: number } | null = null
+  let best: { player: number | null; t: number } | null = null
+  for (const w of walls) {
+    const t = rayWall(from, dx, dy, w)
+    if (t !== null && (!best || t < best.t)) best = { player: null, t }
+  }
   for (const { player, pos } of targets) {
     const vx = pos.x - from.x
     const vy = pos.y - from.y

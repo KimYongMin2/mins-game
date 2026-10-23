@@ -1,4 +1,4 @@
-import { MAX_PLAYERS, MIN_PLAYERS, PLAN_MS, ROUNDS } from '../constants'
+import { MAX_PLAYERS, MIN_PLAYERS, PLAN_MS } from '../constants'
 import type { SurvivalRecord } from '../records'
 
 type Props = {
@@ -24,7 +24,10 @@ export function StartScreen({ record, onBots, onBot, onPvp }: Props) {
         </li>
         <li>고르는 동안 다른 사람 자리는 안 보여요</li>
         <li>모두 고르면 공개! 총알이 일자로 나가 <strong>처음 맞은 한 명</strong>이 탈락</li>
-        <li>{ROUNDS}라운드까지 라운드마다 맵이 줄어들고, 그 뒤엔 한 명 남을 때까지</li>
+        <li>
+          라운드마다 <strong>엄폐물</strong>이 새로 생겨요. 벽에 닿으면 레이저가 막혀요
+        </li>
+        <li>탈락자가 나오면 남은 사람 수만큼 맵이 줄어요 (둘이 남아도 적당히 넓게), 한 명 남을 때까지</li>
         <li>남은 사람이 모두 맞으면 그 라운드는 무효</li>
       </ul>
 

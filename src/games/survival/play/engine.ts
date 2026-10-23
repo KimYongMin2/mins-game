@@ -4,7 +4,7 @@
 import { type Rng, createRng } from '../../../shared/random'
 import { chooseBotPlan } from '../bot/survivalBot'
 import { AFTER_SHOT_MS, BOT_PLAN_MS, COUNTDOWN_MS, DONE_MS, LASER_SPEED, PLAN_MS, SHOT_AT } from '../constants'
-import { type Vec, clampToArena, halfOf, randomInArena, shoot } from '../rules/geometry'
+import { type Vec, type Wall, halfFor, makeWalls, placeAt, randomSpot, shoot } from '../rules/geometry'
 
 /** user = 이 기기, bot = 봇, remote = 방에 들어온 친구 */
 export type PlayerKind = 'user' | 'bot' | 'remote'
@@ -46,6 +46,10 @@ export type EngineState = {
   out: number[][]
   kills: number[]
   round: number
+  /** 이번 라운드 맵 반지름 (라운드 시작 때 남은 사람 수로 정함, 중간에 누가 나가도 그대로) */
+  half: number
+  /** 이번 라운드 엄폐물 (모두에게 보임) */
+  walls: Wall[]
   plans: Partial<Record<number, Plan>>
   /** 봇이 정할 시각 */
   botAt: Partial<Record<number, number>>
@@ -62,8 +66,16 @@ export type EngineAction =
 
 export const aliveIndexes = (s: { alive: boolean[] }) => s.alive.flatMap((a, i) => (a ? [i] : []))
 
+/** 라운드 준비: 남은 사람 수로 맵 크기를 정하고 엄폐물을 새로 짓는다 */
+function buildWalls(s: EngineState): EngineState {
+  const rng = createRng(s.seed)
+  const half = halfFor(aliveIndexes(s).length)
+  const walls = makeWalls(rng, half)
+  return { ...s, seed: rng.seed(), half, walls }
+}
+
 export function createEngine(opts: { now: number; seed: number; players: Player[] }): EngineState {
-  return {
+  return buildWalls({
     now: opts.now,
     seed: opts.seed,
     players: opts.players,
@@ -71,11 +83,13 @@ export function createEngine(opts: { now: number; seed: number; players: Player[
     out: [],
     kills: opts.players.map(() => 0),
     round: 1,
+    half: 0,
+    walls: [],
     plans: {},
     botAt: {},
     lastReveal: null,
     phase: { kind: 'countdown', until: opts.now + COUNTDOWN_MS },
-  }
+  })
 }
 
 const within = (rng: Rng, [min, max]: readonly [number, number]) => min + rng.next() * (max - min)
@@ -98,7 +112,7 @@ function bots(s: EngineState): EngineState {
     const lastSeen = aliveIndexes(next)
       .filter((j) => j !== i)
       .map((j) => next.lastReveal?.positions[j] ?? null)
-    const { pos, angle } = chooseBotPlan(rng, halfOf(next.round), lastSeen)
+    const { pos, angle } = chooseBotPlan(rng, next.half, next.walls, lastSeen)
     next = { ...next, seed: rng.seed(), botAt: rest, plans: { ...next.plans, [i]: { pos, angle, locked: true } } }
   }
   return next
@@ -106,26 +120,26 @@ function bots(s: EngineState): EngineState {
 
 function plan(s: EngineState, player: number, p: Plan): EngineState {
   if (s.phase.kind !== 'plan' || !s.alive[player] || s.plans[player]?.locked) return s
-  const half = halfOf(s.round)
-  const pos = p.pos && clampToArena(p.pos, half)
+  const half = s.half
+  const pos = p.pos && placeAt(p.pos, half, s.walls)
   return { ...s, plans: { ...s.plans, [player]: { pos, angle: p.angle, locked: p.locked && pos !== null && p.angle !== null } } }
 }
 
 /** 공개: 안 고른 건 무작위로 채우고 모두 동시에 쏜다 */
 function reveal(s: EngineState): EngineState {
   const rng = createRng(s.seed)
-  const half = halfOf(s.round)
+  const half = s.half
   const alive = aliveIndexes(s)
   const positions: (Vec | null)[] = s.players.map(() => null)
   const angles: number[] = s.players.map(() => 0)
   for (const i of alive) {
     const p = s.plans[i]
-    positions[i] = p?.pos ?? randomInArena(rng, half)
+    positions[i] = p?.pos ?? randomSpot(rng, half, s.walls)
     angles[i] = p?.angle ?? rng.next() * Math.PI * 2
   }
   const shots: Shot[] = alive.map((i) => {
     const targets = alive.filter((j) => j !== i).map((j) => ({ player: j, pos: positions[j]! }))
-    const { hit, end } = shoot(positions[i]!, angles[i], targets, half)
+    const { hit, end } = shoot(positions[i]!, angles[i], targets, half, s.walls)
     return { from: i, pos: positions[i]!, end, hit }
   })
   const hits = [...new Set(shots.flatMap((sh) => (sh.hit === null ? [] : [sh.hit])))].sort((a, b) => a - b)
@@ -148,7 +162,7 @@ function afterReveal(s: EngineState): EngineState {
     ? { ...s, kills, alive: s.alive.map((a, i) => a && !r.dead.includes(i)), out: [...s.out, r.dead] }
     : { ...s, kills }
   if (aliveIndexes(next).length <= 1) return { ...next, phase: { kind: 'done', until: s.now + DONE_MS } }
-  return { ...next, round: next.round + 1, plans: {}, phase: { kind: 'countdown', until: s.now + COUNTDOWN_MS } }
+  return buildWalls({ ...next, round: next.round + 1, plans: {}, phase: { kind: 'countdown', until: s.now + COUNTDOWN_MS } })
 }
 
 function drop(s: EngineState, player: number): EngineState {

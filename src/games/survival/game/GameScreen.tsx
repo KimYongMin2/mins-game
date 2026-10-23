@@ -2,7 +2,7 @@ import { useEffect, useReducer, useRef, useState } from 'react'
 import type { Member, Room } from '../../../shared/online/room'
 import { randomSeed } from '../../../shared/random'
 import { loadNickname } from '../../../shared/storage/nickname'
-import { PIECE_R, PLAN_MS, PLAYER_COLORS, ROUNDS } from '../constants'
+import { PIECE_R, PLAN_MS, PLAYER_COLORS } from '../constants'
 import { Arena } from '../field/Arena'
 import { type EngineAction, type EngineState, type Player, createEngine, engineReducer, lasersDoneAt } from '../play/engine'
 import type { SurvivalMsg } from '../play/pvp'
@@ -88,8 +88,7 @@ function statusOf(screen: ScreenState): { text: string; tone?: 'bad' | 'win' } {
   const alive = v.alive.filter(Boolean).length
   switch (v.phase) {
     case 'countdown':
-      if (v.round > ROUNDS) return { text: `${v.round}라운드 · 마지막 크기, 한 명 남을 때까지!` }
-      return { text: `${v.round}라운드${v.round > 1 ? ' · 맵이 줄어요!' : ''} (${alive}명)` }
+      return { text: `${v.round}라운드${v.half < v.prevHalf ? ' · 맵이 줄어요!' : ''} (${alive}명)` }
     case 'plan':
       return { text: `${v.round}라운드 · 몰래 자리와 방향 고르기 ${Math.ceil(left / 1000)}초` }
     case 'reveal':

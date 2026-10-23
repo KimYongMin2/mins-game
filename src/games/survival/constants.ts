@@ -3,9 +3,16 @@
 export const MIN_PLAYERS = 2
 export const MAX_PLAYERS = 6
 
-/** 라운드별 맵 반지름. 5라운드 뒤로는 마지막 크기 그대로 한 명 남을 때까지 */
-export const ARENA_HALF: readonly number[] = [50, 41, 33, 26, 20]
-export const ROUNDS = ARENA_HALF.length
+/** 남은 사람 수별 맵 반지름 (2명 → 30 … 6명 → 50). 누가 탈락하면 다음 라운드에 줄어든다.
+ *  처음엔 5라운드까지 라운드마다 줄였는데(50→20), 사람 수에 맞추고 둘이면 적당히 넓게 두기로 바꿈 */
+export const ARENA_BY_PLAYERS: Readonly<Record<number, number>> = { 2: 30, 3: 35, 4: 40, 5: 45, 6: 50 }
+export const MAX_ARENA = ARENA_BY_PLAYERS[6]
+
+/** 엄폐물(벽): 길이·두께. 라운드마다 무작위로 새로 짓는다 */
+export const WALL_LEN: readonly [number, number] = [10, 18]
+export const WALL_THICK = 3
+/** 벽끼리 가운데 사이 최소 거리 (작은 맵에선 맵 크기에 맞춰 좁힘) */
+export const WALL_GAP = 16
 
 /** 말 반지름 = 총알에 맞는 반경 */
 export const PIECE_R = 4

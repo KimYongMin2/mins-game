@@ -1,13 +1,12 @@
 import type { PointerEvent } from 'react'
-import { ARENA_HALF, COUNTDOWN_MS, PIECE_R, PLAYER_COLORS, SHOT_AT } from '../constants'
-import { type Vec, edgeOf } from '../rules/geometry'
+import { COUNTDOWN_MS, PIECE_R, PLAYER_COLORS, SHOT_AT } from '../constants'
+import { type Vec, shoot } from '../rules/geometry'
 import { hitAtOf, laserMs } from '../play/engine'
 import { type ScreenState, myIndex } from '../play/view'
 
-// 위에서 내려다본 둥근 맵. 가운데가 (0,0), 처음 반지름 50. 줄어든 바깥은 빗금(못 들어감).
+// 위에서 내려다본 둥근 맵. 가운데가 (0,0), 화면 틀은 이 경기 처음 맵 크기. 줄어든 바깥은 빗금(못 들어감).
 // 고르는 동안엔 내 말·내 조준선만, 공개 때 모두의 말과 총알 실선을 그린다.
 
-const FULL = ARENA_HALF[0]
 const PAD = 4
 
 type Props = {
@@ -42,6 +41,7 @@ export function Arena({ screen, onPointer }: Props) {
   const v = screen.view
   if (!v) return <div className="sv-arena sv-arena--empty">시작하는 중…</div>
   const me = myIndex(screen)
+  const FULL = v.startHalf
   const t = screen.now - screen.phaseStart
   // 라운드 안내 동안 맵이 줄어드는 모습
   const half = v.phase === 'countdown' ? lerp(v.prevHalf, v.half, t / (COUNTDOWN_MS * 0.6)) : v.half
@@ -82,7 +82,7 @@ export function Arena({ screen, onPointer }: Props) {
         <circle r={half} />
       </clipPath>
       <g className="sv-arena__grid" clipPath="url(#sv-floor)">
-        {Array.from({ length: 9 }, (_, i) => -FULL + (i + 1) * 10).map((g) => (
+        {Array.from({ length: 9 }, (_, i) => (i - 4) * 10).map((g) => (
           <g key={g}>
             <line x1={g} y1={-half} x2={g} y2={half} />
             <line x1={-half} y1={g} x2={half} y2={g} />
@@ -90,16 +90,32 @@ export function Arena({ screen, onPointer }: Props) {
         ))}
       </g>
 
+      {/* 엄폐물: 라운드 안내 땐 맵이 다 줄어든 뒤에 나타남 */}
+      {(v.phase !== 'countdown' || half <= v.half + 0.01) &&
+        v.walls.map((w, k) => (
+          <rect
+            key={k}
+            className="sv-wall"
+            x={-w.w / 2}
+            y={-w.h / 2}
+            width={w.w}
+            height={w.h}
+            rx={0.8}
+            transform={`translate(${w.x} ${w.y}) rotate(${(w.angle * 180) / Math.PI})`}
+          />
+        ))}
+
       {/* 고르는 중: 내 조준선과 내 말 */}
       {showDraft && draft.pos && (
         <>
           {draft.angle !== null && (
+            // 조준선은 벽이나 맵 끝까지
             <line
               className="sv-aim"
               x1={draft.pos.x}
               y1={draft.pos.y}
-              x2={edgeOf(draft.pos, draft.angle, half).x}
-              y2={edgeOf(draft.pos, draft.angle, half).y}
+              x2={shoot(draft.pos, draft.angle, [], half, v.walls).end.x}
+              y2={shoot(draft.pos, draft.angle, [], half, v.walls).end.y}
               stroke={PLAYER_COLORS[me % PLAYER_COLORS.length]}
             />
           )}

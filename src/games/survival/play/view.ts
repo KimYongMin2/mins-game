@@ -2,7 +2,7 @@
 // 고르는 동안엔 다른 사람 자리·방향을 아예 안 보낸다 (확정했는지만). 공개 때 한꺼번에 보낸다.
 // 내가 고르는 것(draft)은 각 기기가 들고 있다가 심판에게 보낸다.
 import { SHOT_AT } from '../constants'
-import { type Vec, clampToArena, halfOf } from '../rules/geometry'
+import { type Vec, type Wall, halfFor, placeAt } from '../rules/geometry'
 import { type EngineState, type Plan, type Reveal, aliveIndexes, hitAtOf, ranksOf } from './engine'
 
 export type PhaseKind = EngineState['phase']['kind']
@@ -15,6 +15,10 @@ export type SurvivalView = {
   /** 이번 라운드 맵 반지름, 지난 라운드 맵 반지름 (줄어드는 그림용) */
   half: number
   prevHalf: number
+  /** 이 경기 처음 맵 반지름 (화면 틀 크기) */
+  startHalf: number
+  /** 이번 라운드 엄폐물 */
+  walls: Wall[]
   phase: PhaseKind
   /** 지금 단계가 끝나기까지 */
   leftMs: number
@@ -33,8 +37,10 @@ export function toView(s: EngineState): SurvivalView {
     alive: s.alive,
     kills: s.kills,
     round: s.round,
-    half: halfOf(s.round),
-    prevHalf: halfOf(Math.max(1, s.round - 1)),
+    half: s.half,
+    prevHalf: s.lastReveal?.half ?? s.half,
+    startHalf: halfFor(s.players.length),
+    walls: s.walls,
     phase: phase.kind,
     leftMs: Math.max(0, phase.until - now),
     locked: phase.kind === 'plan' ? aliveIndexes(s).filter((i) => s.plans[i]?.locked) : [],
@@ -148,7 +154,7 @@ export function screenReducer(s: ScreenState, action: ScreenAction): ScreenState
       return receive(s, action.view)
     case 'place':
       if (!canPlan(s)) return s
-      return { ...s, draft: { ...s.draft, pos: clampToArena(action.pos, s.view!.half) } }
+      return { ...s, draft: { ...s.draft, pos: placeAt(action.pos, s.view!.half, s.view!.walls) } }
     case 'aim':
       if (!canPlan(s) || !s.draft.pos) return s
       return { ...s, draft: { ...s.draft, angle: action.angle } }
