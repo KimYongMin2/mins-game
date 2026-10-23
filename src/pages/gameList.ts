@@ -95,6 +95,15 @@ export const GAMES: GameEntry[] = [
     players: '2인',
   },
   {
+    id: 'alkkagi',
+    title: '알까기',
+    description: '돌을 튕겨 상대 돌을 판 밖으로!',
+    path: '/games/alkkagi',
+    ready: true,
+    play: 'pvp',
+    players: '2인',
+  },
+  {
     id: 'batting',
     title: '배팅',
     description: '공 10개 비거리 도전',
