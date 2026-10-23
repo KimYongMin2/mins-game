@@ -7,6 +7,7 @@ type Props = {
   onDifficulty: (d: Difficulty) => void
   onStart: () => void
   onPvp: () => void
+  onCalibrate: () => void
 }
 
 const EVENT_DESC: Record<Event, string> = {
@@ -23,7 +24,7 @@ const EVENTS: readonly Event[] = ['mash', 'timing']
 const DIFFICULTIES: readonly Difficulty[] = ['normal', 'hard']
 
 /** 시작 화면: 종목, 난이도, 전적 */
-export function StartScreen({ record, onEvent, onDifficulty, onStart, onPvp }: Props) {
+export function StartScreen({ record, onEvent, onDifficulty, onStart, onPvp, onCalibrate }: Props) {
   const level = record[record.event][record.difficulty]
   const rate = winRate(level)
   return (
@@ -86,6 +87,11 @@ export function StartScreen({ record, onEvent, onDifficulty, onStart, onPvp }: P
       <button type="button" className="button aw-start__pvp" onClick={onPvp}>
         친구 대전 <span>(방 코드로 초대 · 방장이 고른 종목)</span>
       </button>
+      {record.event === 'timing' && (
+        <button type="button" className="button aw-start__pvp" onClick={onCalibrate}>
+          타이밍 맞추기 <span>(누른 게 늦거나 빠르게 잡힐 때)</span>
+        </button>
+      )}
     </section>
   )
 }

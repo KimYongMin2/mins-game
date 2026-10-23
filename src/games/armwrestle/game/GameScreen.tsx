@@ -7,8 +7,8 @@ import { DONE_MS, type Difficulty, type Event, ROUND_MS, WINS_NEEDED } from '../
 import { ArmView } from '../field/ArmView'
 import { type MatchState, type MatchSummary, createMatch, matchReducer, phaseLeft, summarizeMatch, zoneOf } from '../play/matchState'
 import { type ArmMsg, guestActionOf, guestPressOut, hostActionOf, hostSync, phaseChanged } from '../play/pvp'
-import { type InputKind, inputKindOf, learnLatency, loadLatency, saveLatency } from '../input/latency'
-import { GRADES, GRADE_LABEL, elapsedAt, markerAt } from '../rules/timing'
+import { type InputKind, inputKindOf, loadLatency } from '../input/latency'
+import { GRADES, GRADE_LABEL, markerAt } from '../rules/timing'
 import { playSound } from '../sounds'
 
 type Props = {
@@ -168,32 +168,13 @@ export function GameScreen({ event, difficulty, pvp, onFinish, onQuit }: Props) 
     return () => cancelAnimationFrame(id)
   }, [])
 
-  // 타이밍전 입력 지연 보정값 (기기에 저장, 누를 때마다 조금씩 맞춰 감)
+  // 타이밍전 입력 지연 보정값 ('타이밍 맞추기'에서 잰 것, 기기에 저장)
   const latencyRef = useRef(loadLatency())
 
   function pull(at: number, kind: InputKind) {
-    if (event === 'mash') {
-      dispatch({ type: 'tap' })
-      return
-    }
-    const s = stateRef.current
-    const fixed = at - latencyRef.current[kind]
-    // 보정하고도 과녁 한가운데를 지난 순간과 얼마나 어긋났는지 배워 둔다 (이번 지나감에 처음 누른 것만)
-    if (s.phase.kind === 'pull') {
-      const elapsed = fixed - s.phase.start
-      const { pass } = markerAt(elapsed)
-      if (pass > s.pressed[0]) {
-        const center = zoneOf(s)
-        const residual = [pass - 1, pass, pass + 1]
-          .filter((p) => p >= 0)
-          .map((p) => elapsed - elapsedAt(p, center))
-          .reduce((a, b) => (Math.abs(b) < Math.abs(a) ? b : a))
-        latencyRef.current = { ...latencyRef.current, [kind]: learnLatency(latencyRef.current[kind], residual) }
-        saveLatency(latencyRef.current)
-      }
-    }
-    dispatch({ type: 'press', at: fixed })
+    dispatch(event === 'mash' ? { type: 'tap' } : { type: 'press', at: at - latencyRef.current[kind] })
   }
+
   // 키보드 리스너가 최신 pull을 부르도록
   const pullRef = useRef(pull)
   useEffect(() => {

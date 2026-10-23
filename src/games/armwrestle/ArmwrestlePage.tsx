@@ -11,6 +11,7 @@ import type { MatchSummary } from './play/matchState'
 import type { ArmMsg } from './play/pvp'
 import { type ArmRecord, addGame, loadRecord, saveRecord } from './records'
 import { ResultScreen } from './screens/ResultScreen'
+import { CalibrateScreen } from './screens/CalibrateScreen'
 import { StartScreen } from './screens/StartScreen'
 import './armwrestle.css'
 
@@ -19,6 +20,8 @@ import './armwrestle.css'
 // - 친구 대전: 시작 → 대기실(방 만들기·코드 입력) → 경기 → 결과 → 다시 하기(방장) / 나가기
 type Screen =
   | { kind: 'start' }
+  /** 타이밍 맞추기 (터치 지연 보정) */
+  | { kind: 'calibrate' }
   | { kind: 'game'; key: number }
   | { kind: 'result'; summary: MatchSummary }
   | { kind: 'lobby' }
@@ -136,8 +139,10 @@ export function ArmwrestlePage() {
           onDifficulty={(difficulty) => update({ ...record, difficulty })}
           onStart={start}
           onPvp={() => setScreen({ kind: 'lobby' })}
+          onCalibrate={() => setScreen({ kind: 'calibrate' })}
         />
       )}
+      {screen.kind === 'calibrate' && <CalibrateScreen onDone={toStart} />}
       {screen.kind === 'lobby' && (
         <PvpLobby<ArmMsg> gameId="armwrestle" nickname={loadNickname() ?? '익명'} onConnected={connected} onBack={toStart} />
       )}
