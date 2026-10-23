@@ -1,6 +1,8 @@
 import { useEffect, useReducer, useState } from 'react'
 import { SWING_DURATION_MS } from '../constants'
 import { Field } from '../field/Field'
+import type { Impact } from '../field/impact'
+import { trailOf } from '../field/trail'
 import { CAMERA_PITCH } from '../field/camera'
 import { eventTime } from '../../../shared/input/eventTime'
 import { useSpaceSwing } from '../input/swingInput'
@@ -120,6 +122,19 @@ export function BattingPractice() {
   const { pitch, now, swingAt } = state
   const ballHidden = !pitch || (state.contact && now >= pitch.arriveAt)
   const ball = ballHidden ? null : ballPosition(pitch, now)
+  const trail = ballHidden ? [] : trailOf((t) => ballPosition(pitch, t), now)
+  // 투수 동작(공 놓는 순간 기준)과 맞은 순간 효과
+  const shown = pitch ?? state.lastPitch
+  const throwT = shown ? now - shown.releaseAt : null
+  const hit = state.contact && state.lastPitch && state.outcome?.kind === 'swing' ? state.outcome.result : null
+  const impact: Impact | null =
+    hit && state.lastPitch
+      ? {
+          ms: now - state.lastPitch.arriveAt,
+          at: { x: 0, y: state.lastPitch.plateHeight },
+          power: hit === 'homerun' ? 'homerun' : hit === 'double' ? 'strong' : 'weak',
+        }
+      : null
   const swingProgress =
     swingAt !== null && isSwinging(state) ? Math.max(0, now - swingAt) / SWING_DURATION_MS : null
   const outcome = state.outcome && describeOutcome(state.outcome)
@@ -132,7 +147,7 @@ export function BattingPractice() {
   return (
     <>
       <div className="zb-field-wrap">
-        <Field camera={CAMERA_PITCH} ball={ball} swing={swingProgress} mark={mark} />
+        <Field camera={CAMERA_PITCH} ball={ball} trail={trail} swing={swingProgress} throwT={throwT} mark={mark} impact={impact} now={now} />
       </div>
 
       <div className="zb-practice-result" aria-live="polite">

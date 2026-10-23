@@ -26,75 +26,162 @@
   width: 100%;
   height: auto;
   aspect-ratio: 16 / 10;
-  background: var(--paper);
-  color: var(--ink);
+  /* 하늘: 위는 진하고 지평선 쪽은 옅게 (카메라가 움직여도 화면 기준) */
+  background: linear-gradient(#0ea5e9, #7dd3fc);
+  color: #1f2937;
 }
 
-/* 선 굵기는 줌과 상관없이 화면 픽셀 기준으로 유지한다. */
-.zb-field path,
-.zb-field circle {
+/* 만화풍 선수·관중: 굵기는 월드 단위(가까이 보면 굵게) */
+.zb-toon path,
+.zb-toon circle {
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* 색을 따로 준 얼굴·헬멧은 채우고, 팔다리 선은 비움 */
+.zb-toon path:not([fill]) {
   fill: none;
-  stroke: currentColor;
+}
+
+/* 아래 선들은 줌과 상관없이 화면 픽셀 기준 굵기 */
+.zb-ground,
+.zb-tick,
+.zb-plate,
+.zb-chalk,
+.zb-fence__top,
+.zb-tower,
+.zb-stands,
+.zb-stands__seat,
+.zb-stands__rail,
+.zb-mound,
+.zb-cloud path,
+.zb-impact__line,
+.zb-ball,
+.zb-ball__stitch,
+.zb-ball-trail,
+.zb-zone,
+.zb-mark {
   stroke-linecap: round;
   stroke-linejoin: round;
   vector-effect: non-scaling-stroke;
 }
 
-.zb-line {
-  stroke-width: 2px;
+.zb-grass {
+  fill: #4ade80;
 }
 
-.zb-field .zb-fill-paper {
-  fill: var(--paper);
+.zb-mound {
+  fill: #d6a26c;
 }
 
-.zb-field .zb-fill-ink {
-  fill: currentColor;
+.zb-mound {
+  stroke: #a16207;
+  stroke-width: 1.5px;
 }
 
 .zb-ground {
-  stroke-width: 2.5px;
+  fill: none;
+  stroke: #15803d;
+  stroke-width: 2px;
 }
 
 .zb-tick {
-  stroke-width: 1.5px;
-  opacity: 0.5;
+  stroke: #fff;
+  stroke-width: 2px;
 }
 
 .zb-plate {
+  stroke: #fff;
   stroke-width: 6px;
 }
 
+.zb-chalk {
+  stroke: #fff;
+  stroke-width: 2px;
+  opacity: 0.9;
+}
+
 .zb-fence {
-  stroke-width: 5px;
+  fill: #166534;
 }
 
-.zb-figure path,
-.zb-figure circle {
-  stroke-width: 2.5px;
+.zb-fence__top {
+  stroke: #facc15;
+  stroke-width: 4px;
 }
 
-.zb-figure .zb-bat {
-  stroke-width: 5px;
+.zb-stands {
+  fill: #94a3b8;
+  stroke: #475569;
+  stroke-width: 1.5px;
 }
 
-.zb-spectator path,
-.zb-spectator circle {
-  stroke-width: 1.25px;
+.zb-stands__seat {
+  stroke: #1e40af;
+  stroke-width: 3px;
+  opacity: 0.6;
+}
+
+.zb-stands__rail {
+  fill: none;
+  stroke: #475569;
+  stroke-width: 2px;
+}
+
+.zb-tower {
+  stroke: #64748b;
+  stroke-width: 3px;
+}
+
+.zb-tower__head {
+  fill: #475569;
+}
+
+.zb-tower__lamp {
+  fill: #fef9c3;
 }
 
 .zb-cloud path {
+  fill: #fff;
+  stroke: #e0f2fe;
   stroke-width: 1.5px;
-  opacity: 0.35;
+  opacity: 0.9;
 }
 
 .zb-label {
-  fill: var(--ink-soft);
-  font-weight: 700;
+  fill: #fff;
+  font-weight: 800;
+  paint-order: stroke;
+  stroke: #15803d;
 }
 
 .zb-label--fence {
-  fill: var(--ink);
+  fill: #166534;
+  stroke: #fff;
+}
+
+/* 타격 순간 */
+.zb-impact__star {
+  fill: #fde047;
+  stroke: #f97316;
+  stroke-width: 0.06;
+}
+
+.zb-impact__core {
+  fill: #fff;
+}
+
+.zb-impact__line {
+  stroke: #fff;
+  stroke-width: 3px;
+}
+
+.zb-impact__word {
+  fill: #fff;
+  font-weight: 900;
+  paint-order: stroke;
+  stroke: #dc2626;
+  stroke-width: 0.12;
 }
 
 /* 타격 연습 */
@@ -176,22 +263,40 @@
 }
 
 .zb-field .zb-zone {
-  fill: rgba(0, 0, 0, 0.04);
-  stroke: currentColor;
+  fill: rgba(255, 255, 255, 0.25);
+  stroke: #fff;
   stroke-width: 1.5px;
   stroke-dasharray: 4 3;
-  vector-effect: non-scaling-stroke;
-  opacity: 0.55;
+  opacity: 0.8;
 }
 
 .zb-field .zb-mark {
-  stroke: var(--accent);
-  stroke-width: 2.5px;
+  fill: none;
+  stroke: #dc2626;
+  stroke-width: 3px;
 }
 
 .zb-field .zb-ball {
-  fill: var(--paper);
-  stroke-width: 2px;
+  fill: #fff;
+  stroke: #111827;
+  stroke-width: 2.5px;
+}
+
+.zb-field .zb-ball-halo {
+  fill: #facc15;
+  opacity: 0.8;
+  stroke: none;
+}
+
+.zb-field .zb-ball__stitch {
+  fill: none;
+  stroke: #dc2626;
+  stroke-width: 1.2px;
+}
+
+.zb-field .zb-ball-trail {
+  fill: #f97316;
+  stroke: none;
 }
 
 /* 터치 기기에서는 키보드 안내를 숨긴다. */

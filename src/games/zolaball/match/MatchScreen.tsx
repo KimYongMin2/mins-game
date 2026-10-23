@@ -1,9 +1,11 @@
 import { useEffect, useReducer, useRef, useState } from 'react'
 import type { Room } from '../../../shared/online/room'
-import { SWING_DURATION_MS } from '../constants'
+import { SWING_DURATION_MS, TEAM_COLORS } from '../constants'
 import { Field } from '../field/Field'
+import type { Impact } from '../field/impact'
 import { CAMERA_PITCH, type Camera } from '../field/camera'
 import { followCamera } from '../field/followCamera'
+import { trailOf } from '../field/trail'
 import { usePitchKeys } from '../input/pitchKeys'
 import { eventTime } from '../../../shared/input/eventTime'
 import { useSpaceSwing } from '../input/swingInput'
@@ -168,6 +170,7 @@ export function MatchScreen({ config, pvp, onFinish, onQuit }: Props) {
 
   // 필드에 그릴 것: 투구 중에는 날아오는 공, 결과 중에는 타구와 그 공을 따라가는 카메라
   let ball: Point | null = null
+  let trail: Point[] = []
   let camera: Camera = CAMERA_PITCH
   // 공이 홈플레이트를 지난 뒤에는 지나간 자리를 표시
   const shownPitch = phase.kind === 'pitching' || phase.kind === 'result' ? phase.pitch : null
@@ -175,10 +178,26 @@ export function MatchScreen({ config, pvp, onFinish, onQuit }: Props) {
   if (phase.kind === 'pitching') {
     const contact = phase.swing && phase.swing.result !== 'miss'
     ball = contact && now >= phase.pitch.arriveAt ? null : ballPosition(phase.pitch, now)
+    if (ball) trail = trailOf((t) => ballPosition(phase.pitch, t), now)
   } else if (phase.kind === 'result' && phase.batted) {
-    ball = battedBallPosition(phase.batted, now)
+    const batted = phase.batted
+    ball = battedBallPosition(batted, now)
+    trail = trailOf((t) => (t >= batted.startAt ? battedBallPosition(batted, t) : null), now)
     camera = followCamera(ball)
   }
+  // 투수 동작은 공을 놓는 순간 기준, 맞으면 번쩍 + (장타면) 흔들림, 홈런이면 관중 환호
+  const throwT = phase.kind === 'pitching' || phase.kind === 'result' ? now - phase.pitch.releaseAt : null
+  const impact: Impact | null =
+    phase.kind === 'result' && phase.contact
+      ? {
+          ms: now - phase.pitch.arriveAt,
+          at: { x: 0, y: phase.pitch.plateHeight },
+          power: phase.batted?.kind === 'homerun' ? 'homerun' : phase.batted?.kind === 'double' ? 'strong' : 'weak',
+        }
+      : null
+  const celebrate = phase.kind === 'result' && phase.batted?.kind === 'homerun' && now >= phase.batted.startAt + phase.batted.duration * 0.6
+  // 내 팀은 파랑: 내가 치면 타자가 파랑, 내가 던지면 투수가 파랑
+  const colors = userPitching ? { batter: TEAM_COLORS.opponent, pitcher: TEAM_COLORS.me } : { batter: TEAM_COLORS.me, pitcher: TEAM_COLORS.opponent }
   const swingProgress =
     state.swingAt !== null && now < state.swingAt + SWING_DURATION_MS
       ? Math.max(0, now - state.swingAt) / SWING_DURATION_MS
@@ -202,7 +221,18 @@ export function MatchScreen({ config, pvp, onFinish, onQuit }: Props) {
       <Scoreboard game={state.game} userSide={config.userSide} opponentName={pvp?.peerName} />
 
       <div className="zb-field-wrap zb-field-wrap--match">
-        <Field camera={camera} ball={ball} swing={swingProgress} mark={mark} />
+        <Field
+          camera={camera}
+          ball={ball}
+          trail={trail}
+          swing={swingProgress}
+          throwT={throwT}
+          mark={mark}
+          impact={impact}
+          celebrate={celebrate}
+          colors={colors}
+          now={now}
+        />
         <Banner state={state} />
       </div>
 

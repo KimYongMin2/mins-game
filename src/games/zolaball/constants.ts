@@ -14,5 +14,8 @@ export const STANDS_STEPS = 10
 export const PLAYER_HEIGHT = 3
 export const BATTER_X = -0.7
 
-/** 스윙 애니메이션 전체 길이. 배트가 수평이 되는 시점은 field/StickMen의 SWING_CONTACT_RATIO. */
+/** 스윙 애니메이션 전체 길이. 배트가 수평이 되는 시점은 field/Players의 SWING_CONTACT_RATIO. */
 export const SWING_DURATION_MS = 280
+
+/** 유니폼 색: 내 팀은 파랑, 상대는 빨강 */
+export const TEAM_COLORS = { me: '#2563eb', opponent: '#dc2626' } as const
