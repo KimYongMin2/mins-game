@@ -1,0 +1,346 @@
+/* 서바이벌(survival) 전용 스타일. 모든 클래스는 sv- 접두사를 쓴다. */
+.sv-page {
+  max-width: 560px;
+}
+
+.sv-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.sv-header .title {
+  flex: 1;
+  min-width: 0;
+}
+
+.sv-start__rules {
+  margin: 0;
+  padding: 12px 16px;
+  list-style: none;
+  text-align: left;
+  font-size: 0.875rem;
+  border: 1.5px solid var(--muted-line);
+  border-radius: 12px;
+  display: grid;
+  gap: 4px;
+}
+
+.sv-start__button {
+  flex-direction: column;
+  min-height: 64px;
+  font-size: 1.25rem;
+}
+
+.sv-start__button span {
+  font-size: 0.8125rem;
+  font-weight: 500;
+  opacity: 0.8;
+}
+
+.sv-start__record {
+  font-size: 0.8125rem;
+  color: var(--ink-soft);
+}
+
+.sv-start__bots {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border: 1.5px solid var(--muted-line);
+  border-radius: 12px;
+}
+
+.sv-start__label {
+  font-weight: 800;
+}
+
+.sv-start__counts {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 6px;
+}
+
+.sv-start__count--on {
+  color: var(--paper);
+  background: var(--ink);
+}
+
+.sv-result__headline {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 20px 16px;
+  border: 2px solid var(--line);
+  border-radius: 14px;
+  text-align: center;
+}
+
+.sv-result__headline strong {
+  font-size: 3rem;
+  font-weight: 900;
+  line-height: 1.1;
+}
+
+.sv-result__headline span {
+  color: var(--ink-soft);
+  font-size: 0.875rem;
+}
+
+.sv-result__headline--win {
+  border-color: #d97706;
+  background: #fffbeb;
+}
+
+.sv-result__headline--win strong {
+  color: var(--accent);
+}
+
+.sv-result__ranking {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 6px;
+}
+
+.sv-result__ranking li {
+  padding: 8px 12px;
+  border: 1.5px solid var(--muted-line);
+  border-radius: 10px;
+  font-weight: 700;
+}
+
+.sv-result__ranking li span {
+  display: inline-block;
+  width: 2.5em;
+  color: var(--ink-soft);
+}
+
+.sv-result__ranking .sv-result__me {
+  border-color: #2563eb;
+  color: #2563eb;
+}
+
+.sv-result__career,
+.sv-result__note {
+  text-align: center;
+  font-size: 0.875rem;
+  color: var(--ink-soft);
+}
+
+.sv-result__buttons {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+}
+
+.sv-timer {
+  height: 6px;
+  border: 2px solid var(--line);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.sv-timer__fill {
+  height: 100%;
+  background: var(--ink);
+  transform-origin: left;
+}
+
+/* 경기 화면 */
+.sv-game {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sv-players {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  justify-content: center;
+}
+
+.sv-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border: 1.5px solid var(--muted-line);
+  border-radius: 999px;
+  font-size: 0.8125rem;
+  font-weight: 700;
+}
+
+.sv-chip--me {
+  border-color: var(--ink);
+}
+
+.sv-chip--out {
+  opacity: 0.4;
+  text-decoration: line-through;
+}
+
+.sv-chip__dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+.sv-chip__name {
+  max-width: 6em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sv-chip__kills {
+  color: var(--accent);
+}
+
+.sv-chip__state {
+  color: var(--ink-soft);
+}
+
+.sv-status {
+  min-height: 1.5em;
+  text-align: center;
+  font-weight: 900;
+  font-size: 1.0625rem;
+}
+
+.sv-status--bad {
+  color: var(--accent);
+}
+
+.sv-status--win {
+  color: #d97706;
+}
+
+/* 맵: 화면 높이에 맞춰 줄여 폰에서도 버튼까지 한 화면 */
+.sv-arena {
+  display: block;
+  width: min(100%, 100dvh - 330px);
+  min-width: 240px;
+  aspect-ratio: 1 / 1;
+  margin: 0 auto;
+  background: var(--paper);
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+
+.sv-arena--empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ink-soft);
+}
+
+.sv-arena--active {
+  cursor: crosshair;
+}
+
+.sv-arena__floor {
+  fill: #fff;
+  stroke: #111827;
+  stroke-width: 0.6;
+}
+
+.sv-arena__grid line {
+  stroke: #e5e7eb;
+  stroke-width: 0.3;
+}
+
+.sv-aim {
+  stroke-width: 0.7;
+  stroke-dasharray: 2 1.5;
+  stroke-linecap: round;
+}
+
+.sv-shot {
+  stroke-width: 0.9;
+  stroke-linecap: round;
+}
+
+/* 레이저 빛 번짐 */
+.sv-shot__glow {
+  stroke-width: 3;
+  stroke-linecap: round;
+  opacity: 0.25;
+}
+
+.sv-shot__tip {
+  stroke: #fff;
+  stroke-width: 0.5;
+}
+
+.sv-piece__name {
+  font-size: 3.4px;
+  font-weight: 800;
+  fill: #111827;
+  paint-order: stroke;
+  stroke: #fff;
+  stroke-width: 0.8px;
+}
+
+.sv-piece--dead .sv-piece__name {
+  fill: #9ca3af;
+}
+
+.sv-tip {
+  min-height: 1.4em;
+  text-align: center;
+  font-weight: 800;
+  color: var(--ink-soft);
+}
+
+.sv-buttons {
+  display: grid;
+  grid-template-columns: 1fr 2fr;
+  gap: 8px;
+}
+
+.sv-buttons .button {
+  min-height: 52px;
+  white-space: nowrap;
+  font-size: 1.0625rem;
+}
+
+.sv-hint {
+  text-align: center;
+  font-size: 0.75rem;
+  color: var(--ink-soft);
+}
+
+.sv-result__ranking li em {
+  float: right;
+  font-style: normal;
+  color: var(--accent);
+}
+
+.sv-start {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-width: 420px;
+  margin: 8px auto 0;
+  text-align: center;
+}
+
+.sv-result {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-width: 420px;
+  margin: 8px auto 0;
+}

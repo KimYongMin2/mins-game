@@ -68,6 +68,15 @@ export const GAMES: GameEntry[] = [
     players: '3~6인',
   },
   {
+    id: 'survival',
+    title: '서바이벌',
+    description: '몰래 숨고 일자로 쏘기',
+    path: '/games/survival',
+    ready: true,
+    play: 'pvp',
+    players: '2~6인',
+  },
+  {
     id: 'yut',
     title: '윷놀이',
     description: '윷·모면 한 번 더, 업고 잡기',
