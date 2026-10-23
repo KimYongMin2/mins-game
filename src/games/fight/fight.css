@@ -99,51 +99,153 @@
   width: 100%;
   height: auto;
   aspect-ratio: 360 / 220;
-  color: var(--ink);
+  background: #1e1b4b;
 }
 
-.ft-view path,
-.ft-view circle {
-  fill: none;
-  stroke: currentColor;
+/* 링 */
+.ft-bg {
+  fill: #312e81;
+}
+
+.ft-light {
+  fill: #fef9c3;
+  opacity: 0.12;
+}
+
+.ft-crowd {
+  fill: #1e1b4b;
+}
+
+.ft-rope {
   stroke-width: 3;
   stroke-linecap: round;
-  stroke-linejoin: round;
 }
 
-.ft-view .ft-ground {
-  stroke: var(--muted-line);
+.ft-rope--0 {
+  stroke: #ef4444;
+}
+
+.ft-rope--1 {
+  stroke: #f8fafc;
+}
+
+.ft-rope--2 {
+  stroke: #3b82f6;
+}
+
+.ft-mat {
+  fill: #60a5fa;
+  stroke: #1e3a8a;
+  stroke-width: 1.5;
+}
+
+.ft-apron {
+  fill: #1e3a8a;
+}
+
+.ft-post {
+  fill: #e5e7eb;
+  stroke: #1f2937;
+  stroke-width: 1.5;
+}
+
+/* 효과 */
+.ft-aura {
+  /* 가운데는 비우고 가장자리만 빛나게 (꽉 채우면 어두운 배경과 섞여 탁해짐) */
+  fill: url(#ft-aura-glow);
+  stroke: #fef08a;
   stroke-width: 2;
 }
 
-.ft-view .ft-head {
-  fill: var(--paper);
+.ft-sparkle {
+  fill: #fef08a;
 }
 
-.ft-fighter--hurt {
-  color: var(--accent);
+.ft-speed path {
+  stroke: #fff;
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  opacity: 0.8;
 }
 
-.ft-view .ft-aura {
-  stroke: #f59e0b;
+.ft-shield {
+  fill: #60a5fa;
+  fill-opacity: 0.35;
+  stroke: #93c5fd;
   stroke-width: 2.5;
 }
 
-.ft-view .ft-shield {
-  stroke: #3b82f6;
+.ft-shield--hit {
+  fill-opacity: 0.7;
+  stroke: #fff;
   stroke-width: 4;
-  opacity: 0.6;
 }
 
-.ft-view .ft-shield--broken {
-  stroke: var(--accent);
-  stroke-dasharray: 6 8;
-  opacity: 1;
+.ft-shield--broken {
+  fill: #ef4444;
+  fill-opacity: 0.3;
+  stroke: #fca5a5;
+  stroke-dasharray: 6 6;
 }
 
-.ft-view .ft-smash {
-  stroke: var(--accent);
-  stroke-width: 4;
+.ft-hit {
+  fill: #fde047;
+  stroke: #f97316;
+  stroke-width: 2;
+}
+
+.ft-hit__core {
+  fill: #fff;
+}
+
+.ft-smash {
+  fill: none;
+  stroke: #fb923c;
+  stroke-width: 5;
+}
+
+.ft-clash path {
+  stroke: #fde047;
+  stroke-width: 3;
+  stroke-linecap: round;
+}
+
+.ft-view text {
+  text-anchor: middle;
+  font-weight: 900;
+}
+
+.ft-secret {
+  font-size: 30px;
+  fill: #e0e7ff;
+  paint-order: stroke;
+  stroke: #1e1b4b;
+  stroke-width: 4px;
+}
+
+.ft-pop {
+  font-size: 22px;
+  paint-order: stroke;
+  stroke: #1f2937;
+  stroke-width: 5px;
+}
+
+.ft-pop--good {
+  fill: #4ade80;
+}
+
+.ft-pop--bad {
+  fill: #f87171;
+}
+
+.ft-pop--plain {
+  fill: #fde047;
+}
+
+.ft-name {
+  font-size: 12px;
+  fill: #e0e7ff;
+  font-weight: 700;
 }
 
 .ft-pad__button--smash:not(:disabled) {
@@ -154,51 +256,6 @@
 .ft-pad__button--smash[aria-pressed='true'] {
   color: var(--paper);
   background: var(--accent);
-}
-
-.ft-view .ft-shield--hit {
-  opacity: 1;
-  stroke-width: 6;
-}
-
-.ft-view .ft-clash path {
-  stroke: #f59e0b;
-  stroke-width: 3;
-}
-
-.ft-view text {
-  text-anchor: middle;
-  font-weight: 900;
-}
-
-.ft-secret {
-  font-size: 28px;
-  fill: var(--muted-line);
-}
-
-.ft-pop {
-  font-size: 22px;
-  paint-order: stroke;
-  stroke: var(--paper);
-  stroke-width: 4px;
-}
-
-.ft-pop--good {
-  fill: #15803d;
-}
-
-.ft-pop--bad {
-  fill: var(--accent);
-}
-
-.ft-pop--plain {
-  fill: var(--ink-soft);
-}
-
-.ft-name {
-  font-size: 12px;
-  fill: var(--ink-soft);
-  font-weight: 700;
 }
 
 .ft-banner {

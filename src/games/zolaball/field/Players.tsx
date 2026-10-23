@@ -1,8 +1,10 @@
 // 만화풍 선수 (처음엔 선으로 그린 졸라맨이었는데 바꿈). 좌표는 월드(미터), SVG y는 아래가 +이므로 높이는 음수로 쓴다.
 // 관절 위치를 키(h)의 배수로 둔 자세(키프레임)를 시간에 따라 섞어 움직인다. 팔다리는 굵은 선 + 진한 외곽선.
+import { TOON_OUTLINE, TOON_SKIN } from '../../../shared/art/shapes'
+import { Bone as ToonBone } from '../../../shared/art/toon'
 
-const OUTLINE = '#1f2937'
-const SKIN = '#f6c7a0'
+const OUTLINE = TOON_OUTLINE
+const SKIN = TOON_SKIN
 const PANTS = '#f3f4f6'
 const SHOE = '#111827'
 const BAT = '#c08a4a'
@@ -40,14 +42,9 @@ function blend<T extends { t: number }>(keys: readonly T[], t: number): T {
   return out as T
 }
 
-/** 굵은 팔다리: 외곽선 먼저, 그 위에 색 */
-function Bone({ d, w, color }: { d: string; w: number; color: string }) {
-  return (
-    <>
-      <path d={d} stroke={OUTLINE} strokeWidth={w + O * 2} />
-      <path d={d} stroke={color} strokeWidth={w} />
-    </>
-  )
+/** 굵은 팔다리 (외곽선 두께는 야구 단위 미터로) */
+function Bone(props: { d: string; w: number; color: string }) {
+  return <ToonBone {...props} outline={O} />
 }
 
 /** 관절 위치 → SVG 좌표 문자열. dir = 바라보는 쪽(+1 오른쪽, −1 왼쪽) */

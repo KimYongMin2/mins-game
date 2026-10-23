@@ -1,4 +1,5 @@
 import type { Point } from '../play/pitch'
+import { starPath as star } from '../../../shared/art/shapes'
 import type { Impact, ImpactPower } from './impact'
 
 // 타격 순간 효과: 번쩍 터지는 별 + 사방으로 뻗는 선 + '딱!' 글자. power가 셀수록 크다.
@@ -6,16 +7,6 @@ import type { Impact, ImpactPower } from './impact'
 const DURATION = 320
 const SIZE: Record<ImpactPower, number> = { weak: 0.7, strong: 1.2, homerun: 1.7 }
 const WORD: Record<ImpactPower, string> = { weak: '틱', strong: '딱!', homerun: '빡!!' }
-
-function star(cx: number, cy: number, r: number, points = 10) {
-  let d = ''
-  for (let i = 0; i < points * 2; i++) {
-    const a = (i / (points * 2)) * Math.PI * 2 - Math.PI / 2
-    const rr = i % 2 === 0 ? r : r * 0.45
-    d += `${i === 0 ? 'M' : 'L'}${cx + Math.cos(a) * rr} ${cy + Math.sin(a) * rr}`
-  }
-  return d + 'Z'
-}
 
 export function ImpactBurst({ impact }: { impact: Impact }) {
   const k = impact.ms / DURATION
