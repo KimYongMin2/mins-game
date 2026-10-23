@@ -7,7 +7,8 @@ import { DONE_MS, type Difficulty, type Event, ROUND_MS, WINS_NEEDED } from '../
 import { ArmView } from '../field/ArmView'
 import { type MatchState, type MatchSummary, createMatch, matchReducer, phaseLeft, summarizeMatch, zoneOf } from '../play/matchState'
 import { type ArmMsg, guestActionOf, guestPressOut, hostActionOf, hostSync, phaseChanged } from '../play/pvp'
-import { GRADES, GRADE_LABEL, markerAt } from '../rules/timing'
+import { type InputKind, inputKindOf, learnLatency, loadLatency, saveLatency } from '../input/latency'
+import { GRADES, GRADE_LABEL, elapsedAt, markerAt } from '../rules/timing'
 import { playSound } from '../sounds'
 
 type Props = {
@@ -167,9 +168,37 @@ export function GameScreen({ event, difficulty, pvp, onFinish, onQuit }: Props) 
     return () => cancelAnimationFrame(id)
   }, [])
 
-  function pull(at: number) {
-    dispatch(event === 'mash' ? { type: 'tap' } : { type: 'press', at })
+  // 타이밍전 입력 지연 보정값 (기기에 저장, 누를 때마다 조금씩 맞춰 감)
+  const latencyRef = useRef(loadLatency())
+
+  function pull(at: number, kind: InputKind) {
+    if (event === 'mash') {
+      dispatch({ type: 'tap' })
+      return
+    }
+    const s = stateRef.current
+    const fixed = at - latencyRef.current[kind]
+    // 보정하고도 과녁 한가운데를 지난 순간과 얼마나 어긋났는지 배워 둔다 (이번 지나감에 처음 누른 것만)
+    if (s.phase.kind === 'pull') {
+      const elapsed = fixed - s.phase.start
+      const { pass } = markerAt(elapsed)
+      if (pass > s.pressed[0]) {
+        const center = zoneOf(s)
+        const residual = [pass - 1, pass, pass + 1]
+          .filter((p) => p >= 0)
+          .map((p) => elapsed - elapsedAt(p, center))
+          .reduce((a, b) => (Math.abs(b) < Math.abs(a) ? b : a))
+        latencyRef.current = { ...latencyRef.current, [kind]: learnLatency(latencyRef.current[kind], residual) }
+        saveLatency(latencyRef.current)
+      }
+    }
+    dispatch({ type: 'press', at: fixed })
   }
+  // 키보드 리스너가 최신 pull을 부르도록
+  const pullRef = useRef(pull)
+  useEffect(() => {
+    pullRef.current = pull
+  })
 
   // 지금 버튼을 누르고 있는 손가락(포인터). 버튼 밖에서 떼도 알 수 있게 창 전체에서 듣는다
   const pressedRef = useRef(new Set<number>())
@@ -188,11 +217,11 @@ export function GameScreen({ event, difficulty, pvp, onFinish, onQuit }: Props) 
     function onKeyDown(e: KeyboardEvent) {
       if (e.code !== 'Space') return
       e.preventDefault()
-      if (!e.repeat) dispatch(event === 'mash' ? { type: 'tap' } : { type: 'press', at: eventTime(e) })
+      if (!e.repeat) pullRef.current(eventTime(e), 'other')
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [event])
+  }, [])
 
   // 끝나면 잠깐 보여준 뒤 결과로. 상태는 매 프레임 바뀌므로 ref로 읽는다
   const finishRef = useRef(onFinish)
@@ -271,7 +300,7 @@ export function GameScreen({ event, difficulty, pvp, onFinish, onQuit }: Props) 
           // 손가락 여러 개로 번갈아 누르기 막기: 이미 누르고 있는 손가락이 있으면 안 친다 (다 떼야 다음 한 번)
           const first = pressedRef.current.size === 0
           pressedRef.current.add(e.pointerId)
-          if (first) pull(eventTime(e))
+          if (first) pull(eventTime(e), inputKindOf(e.pointerType))
         }}
       >
         {event === 'mash' ? '연타!' : '노란 곳에서 누르기!'}
