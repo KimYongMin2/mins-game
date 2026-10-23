@@ -26,10 +26,8 @@ export function StartScreen({ record, onDifficulty, onBot, onPvp }: Props) {
       <ul className="ak-start__rules">
         <li>각자 돌 {STONES}개. 카드 두 장 중 하나를 골라 흑·백을 정해요. 흑이 먼저</li>
         <li>내 돌을 누른 채 뒤로 당겼다 놓으면 반대쪽으로 튕겨요 (많이 당길수록 세게)</li>
-        <li>
-          상대 돌을 떨어뜨리고 튕긴 돌이 판에 남으면 <strong>한 번 더</strong>
-        </li>
-        <li>내 돌이 떨어져도 잃어요 · 한 번에 {TURN_MS / 1000}초</li>
+        <li>떨어뜨려도 한 번 더 없이 한 번씩 번갈아 · 내 돌이 떨어져도 잃어요</li>
+        <li>상대 돌을 먼저 다 떨어뜨리면 승리 · 한 번에 {TURN_MS / 1000}초</li>
       </ul>
 
       <div className="ak-start__options" role="group" aria-label="난이도">

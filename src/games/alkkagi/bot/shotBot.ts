@@ -1,6 +1,6 @@
 // 알까기 봇. 내 돌 × 상대 돌마다 그쪽을 겨눠 여러 힘으로 미리 튕겨 보고(물리 계산) 가장 좋은 수를 고른 뒤,
 // 난이도만큼 방향·힘을 흔들어 쏜다.
-// - 좋은 수: 상대 돌을 많이 떨어뜨림 > 내 돌은 안 떨어짐 > 튕긴 돌이 남아 한 번 더
+// - 좋은 수: 상대 돌을 많이 떨어뜨림, 내 돌은 안 떨어짐
 // - 일반: 힘을 몇 가지만 보고 상위 몇 개 중 아무거나, 조준이 많이 흔들림 / 어려움: 각도도 조금씩 바꿔 보고 거의 정확
 import { type Rng, pickOne } from '../../../shared/random'
 import { BOT_AIM, type Difficulty, MAX_SPEED } from '../constants'
@@ -25,8 +25,7 @@ function evaluate(stones: readonly Stone[], side: Side, shot: Shot): number {
   const foe = (1 - side) as Side
   const knocked = remaining(stones, foe) - remaining(final, foe)
   const lost = remaining(stones, side) - remaining(final, side)
-  const stays = final[shot.index].on
-  return knocked * 100 - lost * 120 + (knocked > 0 && stays ? 30 : 0)
+  return knocked * 100 - lost * 120
 }
 
 /** side 차례에 튕길 수 */

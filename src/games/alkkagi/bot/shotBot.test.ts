@@ -13,7 +13,7 @@ function botGame(seed: number, levels: [Difficulty, Difficulty]) {
   for (let n = 0; n < 200; n++) {
     const shot = chooseShot(rng, stones, turn, levels[turn])
     const { final } = simulate(stones, shot.index, shot.vx, shot.vy)
-    const outcome = judgeShot(stones, final, turn, shot.index)
+    const outcome = judgeShot(final, turn)
     stones = final
     if (outcome.kind === 'over') return { winner: outcome.winner, shots: n + 1 }
     if (outcome.kind === 'next') turn = (1 - turn) as Side

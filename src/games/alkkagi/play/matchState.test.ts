@@ -40,16 +40,15 @@ describe('경기 진행', () => {
     expect(s.stones[0].x).toBeGreaterThan(3)
   })
 
-  it('상대 돌을 떨어뜨리고 내 돌이 남으면 한 번 더', () => {
+  it('상대 돌을 떨어뜨려도 다음은 상대 차례', () => {
     let s = started(3, 'black')
-    // 0번 돌(아래 3, 11)에서 위쪽 같은 x의 상대 돌(3, 3)로 곧게: 맞은 돌이 밀려 떨어진다
-    const target = s.stones.findIndex((x) => x.side === 1 && x.x === s.stones[0].x)
-    expect(target).toBeGreaterThan(-1)
+    // 0번 돌(아래)에서 위쪽 같은 x의 상대 돌로 곧게: 맞은 돌이 밀려 떨어진다
+    expect(s.stones.some((x) => x.side === 1 && x.x === s.stones[0].x)).toBe(true)
     s = run(s, { type: 'shoot', index: 0, vx: 0, vy: -MAX_SPEED * 0.85 })
     if (s.phase.kind !== 'rolling') throw new Error('rolling')
-    expect(s.phase.outcome.kind).toBe('again')
     s = run(s, tick(REVEAL_MS + rollingMs(s.phase.result)))
-    expect(s.turn).toBe(0)
+    expect(s.stones.filter((x) => x.side === 1 && x.on)).toHaveLength(4)
+    expect(s.turn).toBe(1)
   })
 
   it('남의 돌이나 떨어진 돌은 못 튕긴다', () => {

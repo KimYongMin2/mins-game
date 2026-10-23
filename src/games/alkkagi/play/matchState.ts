@@ -119,7 +119,7 @@ function shoot(state: MatchState, side: Side, shot: Shot, final?: Stone[]): Matc
   if (!stone || stone.side !== side || !stone.on) return state
   const sim = simulate(state.stones, shot.index, shot.vx, shot.vy)
   const result = final ? { ...sim, final } : sim
-  const outcome = judgeShot(state.stones, result.final, side, shot.index)
+  const outcome = judgeShot(result.final, side)
   const lastShot: LastShot = { ...shot, n: state.shots, shooter: side, final: result.final }
   return withSounds(
     { ...state, shots: state.shots + 1, lastShot, phase: { kind: 'rolling', start: state.now, shooter: side, result, outcome, emitted: 0 } },
@@ -127,7 +127,7 @@ function shoot(state: MatchState, side: Side, shot: Shot, final?: Stone[]): Matc
   )
 }
 
-/** 다 굴러간 뒤: 판을 결과로 바꾸고 다음 차례 / 한 번 더 / 끝 */
+/** 다 굴러간 뒤: 판을 결과로 바꾸고 다음 차례 / 끝 */
 function settle(state: MatchState): MatchState {
   const { phase } = state
   if (phase.kind === 'reveal') return aiming(state, createRng(state.seed))
@@ -138,8 +138,7 @@ function settle(state: MatchState): MatchState {
     const sound: SoundName = outcome.winner === 'draw' ? 'draw' : outcome.winner === 0 ? 'win' : 'lose'
     return withSounds({ ...next, phase: { kind: 'done', winner: outcome.winner, until: state.now + DONE_MS } }, sound)
   }
-  const turn = outcome.kind === 'again' ? phase.shooter : ((1 - phase.shooter) as Side)
-  return aiming({ ...next, turn }, createRng(state.seed))
+  return aiming({ ...next, turn: (1 - phase.shooter) as Side }, createRng(state.seed))
 }
 
 /** 굴러가는 시간 (마지막 프레임 + 잠깐) */

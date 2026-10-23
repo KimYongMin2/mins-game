@@ -36,6 +36,26 @@ export function initialStones(): Stone[] {
 
 const offBoard = (s: { x: number; y: number }) => s.x < EDGE.min || s.x > EDGE.max || s.y < EDGE.min || s.y > EDGE.max
 
+/** 겹친 두 돌을 지금 속도 그대로 몇 초 되돌리면 딱 닿는지 (이번 한 걸음 안에서, 못 구하면 0) */
+function touchBack(a: { x: number; y: number; vx: number; vy: number }, b: { x: number; y: number; vx: number; vy: number }): number {
+  // |(b - a) - (vb - va)·s| = 2R 을 s에 대해 푼다
+  const rx = b.x - a.x
+  const ry = b.y - a.y
+  const wx = b.vx - a.vx
+  const wy = b.vy - a.vy
+  const qa = wx * wx + wy * wy
+  if (qa === 0) return 0
+  const qb = -2 * (rx * wx + ry * wy)
+  const qc = rx * rx + ry * ry - 4 * RADIUS * RADIUS
+  const disc = qb * qb - 4 * qa * qc
+  if (disc < 0) return 0
+  const s = (-qb - Math.sqrt(disc)) / (2 * qa)
+  const s2 = (-qb + Math.sqrt(disc)) / (2 * qa)
+  // 겹친 상태(qc < 0)라 근 하나는 음수, 하나는 양수. 양수 쪽이 되돌릴 시간
+  const back = Math.max(s, s2)
+  return back > 0 && back <= DT * 1.5 ? back : 0
+}
+
 /** index 돌을 (vx, vy) 칸/초로 튕긴다 */
 export function simulate(stones: readonly Stone[], index: number, vx: number, vy: number): ShotResult {
   const s = stones.map((st) => ({ ...st, vx: 0, vy: 0 }))
@@ -62,26 +82,45 @@ export function simulate(stones: readonly Stone[], index: number, vx: number, vy
         const a = s[i]
         const b = s[j]
         if (!a.on || !b.on) continue
+        if (Math.hypot(b.x - a.x, b.y - a.y) >= RADIUS * 2) continue
+        // 빠르면 한 번에 0.15칸씩 가서 겹친 뒤에야 알게 된다. 겹친 자리로 방향을 정하면 튕기는 각도가 몇 도씩 틀어지므로
+        // 딱 닿은 순간(back초 전)으로 되돌려서 부딪힌 뒤, 그만큼 다시 보낸다
+        const back = touchBack(a, b)
+        a.x -= a.vx * back
+        a.y -= a.vy * back
+        b.x -= b.vx * back
+        b.y -= b.vy * back
         const dx = b.x - a.x
         const dy = b.y - a.y
         const d = Math.hypot(dx, dy)
-        if (d >= RADIUS * 2 || d === 0) continue
+        if (d === 0) continue
         const nx = dx / d
         const ny = dy / d
-        // 겹친 만큼 밀어내기
-        const push = (RADIUS * 2 - d) / 2
+        // 되돌려도 겹쳐 있으면(멈춘 돌끼리 등) 밀어내기
+        const push = Math.max(0, RADIUS * 2 - d) / 2
         a.x -= nx * push
         a.y -= ny * push
         b.x += nx * push
         b.y += ny * push
         const closing = (a.vx - b.vx) * nx + (a.vy - b.vy) * ny
-        if (closing <= 0) continue
+        if (closing <= 0) {
+          a.x += a.vx * back
+          a.y += a.vy * back
+          b.x += b.vx * back
+          b.y += b.vy * back
+          continue
+        }
         const e = RESTITUTION.soft - (RESTITUTION.soft - RESTITUTION.hard) * Math.min(1, closing / RESTITUTION.hardAt)
         const imp = ((1 + e) * closing) / 2
         a.vx -= imp * nx
         a.vy -= imp * ny
         b.vx += imp * nx
         b.vy += imp * ny
+        // 되돌린 시간만큼 새 속도로 다시 보낸다
+        a.x += a.vx * back
+        a.y += a.vy * back
+        b.x += b.vx * back
+        b.y += b.vy * back
         events.push({ t, kind: 'hit', strength: closing })
       }
     }

@@ -19,14 +19,6 @@ type Props = {
   onQuit?: () => void
 }
 
-/** 굴러가는 중 '한 번 더'를 보여줄지: 상대 돌이 실제로 떨어진 뒤부터 (미리 알려주지 않게) */
-function showAgain(state: MatchState): boolean {
-  const { phase } = state
-  if (phase.kind !== 'rolling' || phase.outcome.kind !== 'again') return false
-  const lastFall = Math.max(0, ...phase.result.events.filter((e) => e.kind === 'fall').map((e) => e.t))
-  return (state.now - phase.start) / 1000 >= lastFall + 0.2
-}
-
 /** 가운데 안내: 누구 차례인지, 남은 시간 */
 function TurnInfo({ state, foe }: { state: MatchState; foe: string }) {
   const { phase } = state
@@ -53,7 +45,7 @@ function TurnInfo({ state, foe }: { state: MatchState; foe: string }) {
     case 'rolling':
       return (
         <span className={`ak-turn${phase.shooter === 0 ? ' ak-turn--mine' : ''}`}>
-          {showAgain(state) ? '한 번 더!' : phase.shooter === 0 ? '내 차례' : `${foe} 차례`}
+          {phase.shooter === 0 ? '내 차례' : `${foe} 차례`}
         </span>
       )
     case 'done': {
@@ -225,9 +217,7 @@ export function GameScreen({ mode, difficulty, pvp, onFinish, onQuit }: Props) {
                 ? '내 돌을 누른 채 뒤로 당겼다 놓으면 튕겨요 · 누른 곳으로 되돌리면 취소'
                 : phase.kind === 'aiming'
                   ? `${foe} 조준하는 중…`
-                  : showAgain(state)
-                    ? '떨어뜨리고 내 돌이 남아서 한 번 더!'
-                    : ''}
+                  : ''}
             </p>
           )}
         </>
