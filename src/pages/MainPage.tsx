@@ -7,10 +7,8 @@ const SECTIONS: { play: GameEntry['play']; title: string; note: string }[] = [
   { play: 'solo', title: '혼자 하기', note: '기록 도전 · 랭킹' },
 ]
 
-const PLAY_BADGES: Record<GameEntry['play'], string[]> = {
-  pvp: ['친구 대전', '봇'],
-  solo: ['혼자'],
-}
+/** 인원 표시 색: 혼자 / 둘 / 여럿 */
+const sizeOf = (players: string) => (players === '1인' ? 'solo' : players === '2인' ? 'duo' : 'group')
 
 function GameCard({ game }: { game: GameEntry }) {
   if (!game.ready) {
@@ -26,16 +24,9 @@ function GameCard({ game }: { game: GameEntry }) {
   }
   return (
     <Link className="game-card" to={game.path}>
-      <span className="game-card__title">
-        {game.title}
-        <span className="badge badge--count">{game.players}</span>
-        {PLAY_BADGES[game.play].map((b) => (
-          <span key={b} className={`badge badge--${game.play}`}>
-            {b}
-          </span>
-        ))}
-      </span>
+      <span className="game-card__title">{game.title}</span>
       <span className="game-card__desc">{game.description}</span>
+      <span className={`badge badge--count badge--${sizeOf(game.players)}`}>{game.players}</span>
     </Link>
   )
 }

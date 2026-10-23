@@ -2,6 +2,7 @@
 export type GameEntry = {
   id: string
   title: string
+  /** 메인 카드 한 줄 설명 (두 칸 타일이라 짧게) */
   description: string
   path: string
   ready: boolean
@@ -15,7 +16,7 @@ export const GAMES: GameEntry[] = [
   {
     id: 'zolaball',
     title: '야구',
-    description: '졸라맨 야구. 타이밍 맞춰 스윙하고 봇을 이겨라!',
+    description: '타이밍 맞춰 스윙, 홈런을 노려라',
     path: '/games/zolaball',
     ready: true,
     play: 'pvp',
@@ -24,7 +25,7 @@ export const GAMES: GameEntry[] = [
   {
     id: 'fight',
     title: '격투',
-    description: '2초마다 준비·방어·타격! 봇의 수를 읽고 먼저 쓰러뜨려라!',
+    description: '2초마다 준비·방어·타격 수 싸움',
     path: '/games/fight',
     ready: true,
     play: 'pvp',
@@ -33,7 +34,7 @@ export const GAMES: GameEntry[] = [
   {
     id: 'memory',
     title: '짝맞추기',
-    description: '카드 22장, 번갈아 두 장씩. 기억해 두고 짝을 더 많이 찾아라!',
+    description: '번갈아 뒤집어 짝을 더 많이',
     path: '/games/memory',
     ready: true,
     play: 'pvp',
@@ -42,7 +43,7 @@ export const GAMES: GameEntry[] = [
   {
     id: 'armwrestle',
     title: '팔씨름',
-    description: '연타전 또는 타이밍전. 손을 내 쪽으로 끝까지 당겨 3판 2선승!',
+    description: '연타·타이밍으로 3판 2선승',
     path: '/games/armwrestle',
     ready: true,
     play: 'pvp',
@@ -51,7 +52,7 @@ export const GAMES: GameEntry[] = [
   {
     id: 'bomb',
     title: '폭탄 돌리기',
-    description: '폭탄을 들면 얼른 옆 사람에게! 터질 때 들고 있으면 탈락',
+    description: '터지기 전에 옆 사람에게!',
     path: '/games/bomb',
     ready: true,
     play: 'pvp',
@@ -60,7 +61,7 @@ export const GAMES: GameEntry[] = [
   {
     id: 'nunchi',
     title: '눈치게임',
-    description: '눈치껏 1, 2, 3! 겹치거나 마지막이면 탈락, 결승은 가위바위보',
+    description: '겹치거나 마지막이면 탈락',
     path: '/games/nunchi',
     ready: true,
     play: 'pvp',
@@ -69,7 +70,7 @@ export const GAMES: GameEntry[] = [
   {
     id: 'yut',
     title: '윷놀이',
-    description: '말 2~4개, 윷·모면 한 번 더! 업고 잡으며 먼저 다 내보내라',
+    description: '윷·모면 한 번 더, 업고 잡기',
     path: '/games/yut',
     ready: true,
     play: 'pvp',
@@ -78,7 +79,7 @@ export const GAMES: GameEntry[] = [
   {
     id: 'numbaseball',
     title: '숫자야구',
-    description: '숨긴 숫자 3·4자리를 번갈아 불러 맞혀라! 스트라이크·볼로 추리',
+    description: '스트라이크·볼로 숫자 추리',
     path: '/games/numbaseball',
     ready: true,
     play: 'pvp',
@@ -87,7 +88,7 @@ export const GAMES: GameEntry[] = [
   {
     id: 'omok',
     title: '오목',
-    description: '렌주룰 오목. 카드로 흑·백을 정하고 다섯 개를 먼저 이어라!',
+    description: '렌주룰, 다섯 개 먼저 잇기',
     path: '/games/omok',
     ready: true,
     play: 'pvp',
@@ -96,7 +97,7 @@ export const GAMES: GameEntry[] = [
   {
     id: 'batting',
     title: '배팅',
-    description: '정면에서 날아오는 직구·슬라이더·커브. 칸을 터치해 홈런을 노려라!',
+    description: '공 10개 비거리 도전',
     path: '/games/batting',
     ready: true,
     play: 'solo',
@@ -105,7 +106,7 @@ export const GAMES: GameEntry[] = [
   {
     id: 'archery',
     title: '양궁',
-    description: '30m부터 100m까지 10발. 바람을 읽고 X를 노려라!',
+    description: '바람 읽고 X를 노려라',
     path: '/games/archery',
     ready: true,
     play: 'solo',

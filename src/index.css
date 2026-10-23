@@ -179,14 +179,23 @@ p {
   margin: 0;
   padding: 0;
   display: grid;
-  gap: 12px;
+  /* 게임이 많아져 폰에서도 두 칸 타일로 (어떻게 하는지는 묶음 제목에 적혀 있어 카드엔 인원만) */
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+@media (min-width: 640px) {
+  .game-list {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
 }
 
 .game-card {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  padding: 18px;
+  height: 100%;
+  padding: 12px 14px;
   border: 2px solid var(--line);
   border-radius: 14px;
   color: inherit;
@@ -206,15 +215,22 @@ a.game-card:hover {
 
 .game-card__title {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
-  font-size: 1.25rem;
+  gap: 4px 6px;
+  font-size: 1.0625rem;
   font-weight: 800;
+  word-break: keep-all;
 }
 
+
+
 .game-card__desc {
-  font-size: 0.9375rem;
+  font-size: 0.8125rem;
+  line-height: 1.35;
   color: var(--ink-soft);
+  word-break: keep-all;
+  margin-bottom: 8px;
 }
 
 .badge {
@@ -225,18 +241,31 @@ a.game-card:hover {
   border-radius: 999px;
 }
 
-.badge--pvp {
-  color: #2563eb;
-}
-
-.badge--solo {
-  color: var(--ink-soft);
-}
-
 .badge--count {
   color: var(--paper);
   background: var(--ink);
   border-color: var(--ink);
+}
+
+/* 메인 카드: 인원은 카드 맨 아래에 (설명 길이가 달라도 줄이 맞게) */
+.game-card .badge--count {
+  align-self: flex-start;
+  margin-top: auto;
+}
+
+.badge--duo {
+  background: #2563eb;
+  border-color: #2563eb;
+}
+
+.badge--group {
+  background: #ea580c;
+  border-color: #ea580c;
+}
+
+.badge--solo {
+  background: var(--ink-soft);
+  border-color: var(--ink-soft);
 }
 
 /* 랭킹 표 (shared/ui/RankingBoard) */
