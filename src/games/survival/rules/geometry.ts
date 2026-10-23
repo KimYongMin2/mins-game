@@ -11,7 +11,7 @@ export type Vec = { x: number; y: number }
 export type Wall = { x: number; y: number; w: number; h: number; angle: number }
 
 /** 남은 사람 수에 맞는 맵 반지름 */
-export const halfFor = (alive: number) => ARENA_BY_PLAYERS[Math.max(2, Math.min(6, alive))] ?? MAX_ARENA
+export const halfFor = (alive: number) => ARENA_BY_PLAYERS[Math.max(2, Math.min(8, alive))] ?? MAX_ARENA
 
 /** 말이 맵 밖으로 나가지 않게 (말 반지름만큼 안쪽) */
 export function clampToArena(p: Vec, half: number): Vec {
@@ -83,9 +83,9 @@ function rayWall(from: Vec, dx: number, dy: number, w: Wall): number | null {
   return Math.max(0, tMin)
 }
 
-/** 라운드마다 엄폐물 짓기: 맵이 클수록 많이(5~6명 3개 · 3~4명 2개 · 2명 1개, 처음 5~3개는 너무 많아 줄임), 서로 떨어지게, 맵 안에 다 들어오게 */
+/** 라운드마다 엄폐물 짓기: 맵이 클수록 많이(7~8명 4개 · 5~6명 3개 · 3~4명 2개 · 2명 1개, 처음 5~3개는 너무 많아 줄임), 서로 떨어지게, 맵 안에 다 들어오게 */
 export function makeWalls(rng: Rng, half: number): Wall[] {
-  const count = Math.max(1, Math.min(3, Math.round((half - 20) / 10)))
+  const count = Math.max(1, Math.min(4, Math.round((half - 20) / 10)))
   const walls: Wall[] = []
   for (let tries = 0; walls.length < count && tries < 200; tries++) {
     const w = WALL_LEN[0] + rng.next() * (WALL_LEN[1] - WALL_LEN[0])

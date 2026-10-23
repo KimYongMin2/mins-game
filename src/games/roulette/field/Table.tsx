@@ -75,7 +75,7 @@ export function Table({ screen, onPick }: { screen: ScreenState; onPick: (i: num
             key={p.id}
             type="button"
             className={`rl-seat${i === me ? ' rl-seat--me' : ''}${dead || hitNow ? ' rl-seat--out' : ''}${v.turn === i && v.phase === 'aim' ? ' rl-seat--turn' : ''}${isTarget && !dead ? ' rl-seat--target' : ''}${mine && !dead ? ' rl-seat--pickable' : ''}`}
-            style={{ left: `${x}%`, top: `${y}%`, color: dead || hitNow ? undefined : PLAYER_COLORS[i % PLAYER_COLORS.length] }}
+            style={{ left: `${x}%`, top: `${y}%`, width: n > 6 ? '20%' : undefined, color: dead || hitNow ? undefined : PLAYER_COLORS[i % PLAYER_COLORS.length] }}
             disabled={!mine || dead}
             onPointerDown={(e) => {
               e.preventDefault()

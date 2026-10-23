@@ -22,7 +22,7 @@ type Props =
 /** 방장이 친구들에게 화면을 보내는 최소 간격 (바뀌면 바로, 안 바뀌어도 이만큼마다) */
 const HEARTBEAT_MS = 1000
 
-const BOT_NAMES = ['봇 철수', '봇 영희', '봇 민수', '봇 지수', '봇 현우']
+const BOT_NAMES = ['봇 철수', '봇 영희', '봇 민수', '봇 지수', '봇 현우', '봇 수진', '봇 동현']
 
 type HostState = { engine: EngineState; screen: ScreenState }
 

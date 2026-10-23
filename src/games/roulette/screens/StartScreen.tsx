@@ -8,7 +8,7 @@ type Props = {
   onPvp: () => void
 }
 
-const BOT_COUNTS = [1, 2, 3, 4, 5]
+const BOT_COUNTS = [1, 2, 3, 4, 5, 6, 7]
 
 /** 시작 화면: 규칙, 친구 대전(방), 봇 연습 */
 export function StartScreen({ record, onBots, onBot, onPvp }: Props) {
@@ -42,7 +42,7 @@ export function StartScreen({ record, onBots, onBot, onPvp }: Props) {
       </p>
 
       <div className="rl-start__bots">
-        <span className="rl-start__label">봇이랑 연습</span>
+        <span className="rl-start__label">봇이랑 연습 · 봇 몇 명?</span>
         <div className="rl-start__counts" role="group" aria-label="봇 수">
           {BOT_COUNTS.map((n) => (
             <button
@@ -52,7 +52,7 @@ export function StartScreen({ record, onBots, onBot, onPvp }: Props) {
               aria-pressed={record.bots === n}
               onClick={() => onBots(n)}
             >
-              봇 {n}
+              {n}
             </button>
           ))}
         </div>

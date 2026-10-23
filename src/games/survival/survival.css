@@ -59,8 +59,13 @@
 
 .sv-start__counts {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: repeat(7, 1fr);
   gap: 6px;
+}
+
+.sv-start__counts .button {
+  padding-left: 0;
+  padding-right: 0;
 }
 
 .sv-start__count--on {

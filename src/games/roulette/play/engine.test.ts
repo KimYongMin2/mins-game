@@ -79,8 +79,8 @@ describe('차례', () => {
 })
 
 describe('봇끼리 끝까지', () => {
-  it('2~6명 모두 한 명이 우승', () => {
-    for (const n of [2, 3, 4, 5, 6]) {
+  it('2~8명 모두 한 명이 우승', () => {
+    for (const n of [2, 3, 4, 5, 6, 7, 8]) {
       for (let seed = 1; seed <= 20; seed++) {
         const players: Player[] = Array.from({ length: n }, (_, i) => ({ id: `b${i}`, name: '', kind: 'bot' }))
         let s = createEngine({ now: 0, seed, players })

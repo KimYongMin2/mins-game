@@ -15,4 +15,4 @@ export function starPath(cx: number, cy: number, r: number, points = 10, inner =
 }
 
 /** 사람 셔츠 색 (자리 번호로 돌려 씀) */
-export const PERSON_SHIRTS = ['#2563eb', '#dc2626', '#16a34a', '#d97706', '#9333ea', '#0891b2']
+export const PERSON_SHIRTS = ['#2563eb', '#dc2626', '#16a34a', '#d97706', '#9333ea', '#0891b2', '#db2777', '#1f2937']

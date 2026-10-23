@@ -6,6 +6,7 @@ import { clampToArena, edgeOf, halfFor, makeWalls, placeAt, randomInArena, rando
 describe('맵', () => {
   it('남은 사람이 적을수록 작고, 둘이면 적당히 넓게', () => {
     expect(halfFor(6)).toBe(50)
+    expect(halfFor(8)).toBe(60)
     expect(halfFor(5)).toBeGreaterThan(halfFor(4))
     expect(halfFor(3)).toBeGreaterThan(halfFor(2))
     expect(halfFor(2)).toBe(30)

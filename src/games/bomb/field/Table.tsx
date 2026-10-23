@@ -82,7 +82,7 @@ export function Table({ screen, onPick }: Props) {
             ]
               .filter(Boolean)
               .join(' ')}
-            style={{ left: `${pos[i].x}%`, top: `${pos[i].y}%` }}
+            style={{ left: `${pos[i].x}%`, top: `${pos[i].y}%`, width: n > 6 ? '20%' : undefined }}
             disabled={!target}
             onPointerDown={(e) => {
               // 터치하자마자 던지도록 (click은 손을 뗄 때라 늦다)

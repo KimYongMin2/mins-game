@@ -36,7 +36,7 @@ const HEARTBEAT_MS = 1000
 /** 친구가 고르는 중인 걸 방장에게 보내는 간격 (끄는 동안 너무 자주 안 보내게) */
 const SEND_PLAN_MS = 150
 
-const BOT_NAMES = ['봇 철수', '봇 영희', '봇 민수', '봇 지수', '봇 현우']
+const BOT_NAMES = ['봇 철수', '봇 영희', '봇 민수', '봇 지수', '봇 현우', '봇 수진', '봇 동현']
 
 type HostState = { engine: EngineState; screen: ScreenState }
 type HostAction = EngineAction | Exclude<ScreenAction, { type: 'view' | 'tick' }>

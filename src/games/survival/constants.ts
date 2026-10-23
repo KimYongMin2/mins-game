@@ -1,12 +1,12 @@
 // 서바이벌 수치. 시간은 ms, 길이는 맵 단위(처음 맵이 지름 100인 원, 가운데가 0,0).
 
 export const MIN_PLAYERS = 2
-export const MAX_PLAYERS = 6
+export const MAX_PLAYERS = 8
 
-/** 남은 사람 수별 맵 반지름 (2명 → 30 … 6명 → 50). 누가 탈락하면 다음 라운드에 줄어든다.
+/** 남은 사람 수별 맵 반지름 (2명 → 30 … 8명 → 60). 누가 탈락하면 다음 라운드에 줄어든다.
  *  처음엔 5라운드까지 라운드마다 줄였는데(50→20), 사람 수에 맞추고 둘이면 적당히 넓게 두기로 바꿈 */
-export const ARENA_BY_PLAYERS: Readonly<Record<number, number>> = { 2: 30, 3: 35, 4: 40, 5: 45, 6: 50 }
-export const MAX_ARENA = ARENA_BY_PLAYERS[6]
+export const ARENA_BY_PLAYERS: Readonly<Record<number, number>> = { 2: 30, 3: 35, 4: 40, 5: 45, 6: 50, 7: 55, 8: 60 }
+export const MAX_ARENA = ARENA_BY_PLAYERS[8]
 
 /** 엄폐물(벽): 길이·두께. 라운드마다 무작위로 새로 짓는다 */
 export const WALL_LEN: readonly [number, number] = [10, 18]
@@ -34,4 +34,4 @@ export const DONE_MS = 2500
 export const BOT_PLAN_MS: readonly [number, number] = [1500, 6000]
 
 /** 참가 순서별 말 색 (모든 기기에서 같게) */
-export const PLAYER_COLORS = ['#2563eb', '#dc2626', '#16a34a', '#d97706', '#9333ea', '#0891b2']
+export const PLAYER_COLORS = ['#2563eb', '#dc2626', '#16a34a', '#d97706', '#9333ea', '#0891b2', '#db2777', '#1f2937']

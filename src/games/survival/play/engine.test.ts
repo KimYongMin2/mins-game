@@ -120,8 +120,8 @@ describe('엄폐물', () => {
 })
 
 describe('봇끼리 끝까지', () => {
-  it('2~6명 모두 한 명이 우승한다', () => {
-    for (const n of [1, 2, 3, 4, 5]) {
+  it('2~8명 모두 한 명이 우승한다', () => {
+    for (const n of [1, 2, 3, 4, 5, 6, 7]) {
       for (let seed = 1; seed <= 20; seed++) {
         // 나도 봇처럼: 아무것도 안 고르면 무작위로 채워진다
         let s = createEngine({ now: 0, seed, players: bots(n) })

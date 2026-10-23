@@ -1,7 +1,7 @@
 // 폭탄 돌리기 수치. 시간은 ms.
 
 export const MIN_PLAYERS = 2
-export const MAX_PLAYERS = 6
+export const MAX_PLAYERS = 8
 
 /** 폭탄이 터지기까지 (판마다 이 사이에서 무작위, 아무도 모름) */
 export const FUSE_MS: readonly [number, number] = [7000, 16000]

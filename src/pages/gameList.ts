@@ -56,7 +56,7 @@ export const GAMES: GameEntry[] = [
     path: '/games/bomb',
     ready: true,
     play: 'pvp',
-    players: '2~6인',
+    players: '2~8인',
   },
   {
     id: 'nunchi',
@@ -74,7 +74,7 @@ export const GAMES: GameEntry[] = [
     path: '/games/survival',
     ready: true,
     play: 'pvp',
-    players: '2~6인',
+    players: '2~8인',
   },
   {
     id: 'roulette',
@@ -83,7 +83,7 @@ export const GAMES: GameEntry[] = [
     path: '/games/roulette',
     ready: true,
     play: 'pvp',
-    players: '2~6인',
+    players: '2~8인',
   },
   {
     id: 'yut',
