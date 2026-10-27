@@ -21,7 +21,7 @@ type Screen =
   | { kind: 'bot-game'; key: number }
   | { kind: 'lobby' }
   /** 방장은 시작할 때 방에 있던 사람들을 넘긴다 */
-  | { kind: 'pvp-game'; key: number; members: Member[] }
+  | { kind: 'pvp-game'; key: number; members: Member[]; bots: number }
   | { kind: 'result'; summary: GameSummary }
 
 export function YutPage() {
@@ -29,6 +29,8 @@ export function YutPage() {
   const [record, setRecord] = useState<YutRecord>(() => loadRecord())
   const [room, setRoom] = useState<Room<YutMsg> | null>(null)
   const [members, setMembers] = useState<Member[]>([])
+  /** 방장이 대기실에서 채운 봇 수 (다시 하기 때 씀) */
+  const [pvpBots, setPvpBots] = useState(0)
   useEffect(installAudioUnlock, [])
 
   function update(next: YutRecord) {
@@ -48,7 +50,7 @@ export function YutPage() {
     if (!room) return
     const offMembers = room.onMembers(setMembers)
     const offMsg = room.onMessage((msg) => {
-      if (room.role === 'guest' && msg.t === 'start') setScreen({ kind: 'pvp-game', key: Date.now(), members: [] })
+      if (room.role === 'guest' && msg.t === 'start') setScreen({ kind: 'pvp-game', key: Date.now(), members: [], bots: 0 })
     })
     return () => {
       offMembers()
@@ -64,15 +66,19 @@ export function YutPage() {
   useEffect(() => () => roomRef.current?.leave(), [])
 
   /** 방장: 지금 방에 있는 사람들로 시작 */
-  function startPvp(r: Room<YutMsg>, with_: Member[]) {
+  function startPvp(r: Room<YutMsg>, with_: Member[], bots: number) {
+    // 그새 친구가 더 들어왔으면 봇을 그만큼 줄인다
+    const n = Math.max(0, Math.min(bots, MAX_PLAYERS - with_.length - 1))
+    setPvpBots(n)
     r.send({ t: 'start' })
-    setScreen({ kind: 'pvp-game', key: Date.now(), members: with_ })
+    setScreen({ kind: 'pvp-game', key: Date.now(), members: with_, bots: n })
   }
 
   function leaveRoom() {
     room?.leave()
     setRoom(null)
     setMembers([])
+    setPvpBots(0)
     toStart()
   }
 
@@ -111,7 +117,7 @@ export function YutPage() {
           capacity={MAX_PLAYERS}
           minPlayers={MIN_PLAYERS}
           onConnected={setRoom}
-          onStart={(with_) => room && startPvp(room, with_)}
+          onStart={(with_, bots) => room && startPvp(room, with_, bots)}
           onBack={() => {
             setRoom(null)
             toStart()
@@ -127,6 +133,7 @@ export function YutPage() {
             mode="host"
             room={room}
             members={screen.members}
+            bots={screen.bots}
             pieceCount={record.pieceCount}
             onFinish={finish}
             onQuit={leaveRoom}
@@ -139,10 +146,10 @@ export function YutPage() {
           summary={screen.summary}
           record={record}
           isHost={screen.summary.mode === 'bot' || isHost}
-          canRetry={screen.summary.mode === 'bot' || members.length + 1 >= MIN_PLAYERS}
+          canRetry={screen.summary.mode === 'bot' || Math.min(MAX_PLAYERS, members.length + 1 + pvpBots) >= MIN_PLAYERS}
           onRetry={() => {
             if (screen.summary.mode === 'bot') setScreen({ kind: 'bot-game', key: Date.now() })
-            else if (room) startPvp(room, members)
+            else if (room) startPvp(room, members, pvpBots)
           }}
           onMenu={screen.summary.mode === 'pvp' ? leaveRoom : toStart}
         />

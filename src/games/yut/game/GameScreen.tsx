@@ -19,7 +19,7 @@ import { playSound } from '../sounds'
 type Props =
   | { mode: 'bot'; bots: number; pieceCount: number; onFinish: (s: GameSummary) => void }
   /** 방장: 시작할 때 방에 있던 사람들로 경기 */
-  | { mode: 'host'; room: Room<YutMsg>; members: Member[]; pieceCount: number; onFinish: (s: GameSummary) => void; onQuit: () => void }
+  | { mode: 'host'; room: Room<YutMsg>; members: Member[]; bots: number; pieceCount: number; onFinish: (s: GameSummary) => void; onQuit: () => void }
   | { mode: 'guest'; room: Room<YutMsg>; onFinish: (s: GameSummary) => void; onQuit: () => void }
 
 /** 방장이 친구들에게 화면을 보내는 최소 간격 (바뀌면 바로, 안 바뀌어도 이만큼마다) */
@@ -51,7 +51,11 @@ function initHost(props: Props): HostState {
     players = [{ id: 'me', name: me, kind: 'user' }, ...BOT_NAMES.slice(0, props.bots).map((name, i) => ({ id: `bot${i}`, name, kind: 'bot' as const }))]
     pieceCount = props.pieceCount
   } else if (props.mode === 'host') {
-    players = [{ id: props.room.myId, name: me, kind: 'user' }, ...props.members.map((m) => ({ id: m.id, name: m.nickname, kind: 'remote' as const }))]
+    players = [
+      { id: props.room.myId, name: me, kind: 'user' },
+      ...props.members.map((m) => ({ id: m.id, name: m.nickname, kind: 'remote' as const })),
+      ...BOT_NAMES.slice(0, props.bots).map((name, i) => ({ id: `bot${i}`, name, kind: 'bot' as const })),
+    ]
     pieceCount = props.pieceCount
   }
   const engine = createEngine({ now, seed: randomSeed(), players, pieceCount })

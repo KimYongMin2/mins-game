@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { CODE_LENGTH, type Member, type Room, RoomError, createRoom, joinRoom, normalizeCode } from '../online/room'
 
 // 여럿이 하는 게임의 대기실: 방 만들기(코드 보여주기) 또는 코드 입력해서 들어가기 → 모인 사람 목록.
-// 방장이 [시작]을 누르면 onStart로 사람 목록을 넘긴다. 친구 쪽 시작은 게임이 메시지로 처리한다.
+// 방장은 빈자리에 봇을 채울 수 있다(사람이 모자랄 때). 방장이 [시작]을 누르면 onStart로 사람 목록과 봇 수를 넘긴다. 친구 쪽 시작은 게임이 메시지로 처리한다.
 // 연결되면 바로 onConnected로 방을 넘기고, 그 뒤로 방을 닫는 건 게임(페이지)이 한다. 게임 규칙은 모른다.
 
 type Props<M> = {
@@ -13,8 +13,8 @@ type Props<M> = {
   /** 이만큼 모여야 시작할 수 있다 (나 포함) */
   minPlayers: number
   onConnected: (room: Room<M>) => void
-  /** 방장이 시작함. 나 말고 방에 있는 사람들 (들어온 순서) */
-  onStart: (members: Member[]) => void
+  /** 방장이 시작함. 나 말고 방에 있는 사람들 (들어온 순서)과 채울 봇 수 */
+  onStart: (members: Member[], bots: number) => void
   /** 돌아가기 (연결된 방이 있으면 이미 닫은 뒤) */
   onBack: () => void
 }
@@ -36,6 +36,7 @@ export function GroupLobby<M>({ gameId, nickname, capacity, minPlayers, onConnec
   const [input, setInput] = useState('')
   const [room, setRoom] = useState<Room<M> | null>(null)
   const [members, setMembers] = useState<Member[]>([])
+  const [botsWanted, setBotsWanted] = useState(0)
   // 방에 들어가는 도중에 화면을 떠나면, 다 열린 방을 바로 닫는다
   const mountedRef = useRef(true)
   useEffect(() => {
@@ -96,7 +97,9 @@ export function GroupLobby<M>({ gameId, nickname, capacity, minPlayers, onConnec
   if (view.kind === 'waiting' && room) {
     const isHost = room.role === 'host'
     const hostGone = !isHost && !members.some((m) => m.role === 'host')
-    const count = members.length + 1
+    // 친구가 더 들어와 자리가 모자라면 봇을 그만큼 줄인다
+    const bots = Math.min(botsWanted, capacity - members.length - 1)
+    const count = members.length + 1 + bots
     return (
       <section className="pvp-lobby">
         <div className="pvp-lobby__code-box">
@@ -115,11 +118,34 @@ export function GroupLobby<M>({ gameId, nickname, capacity, minPlayers, onConnec
               {m.nickname} {m.role === 'host' && <span>(방장)</span>}
             </li>
           ))}
+          {Array.from({ length: bots }, (_, i) => (
+            <li key={`bot${i}`} className="group-lobby__member group-lobby__member--bot">
+              봇 {i + 1}
+            </li>
+          ))}
         </ul>
         {isHost ? (
-          <button type="button" className="button button--primary pvp-lobby__big" disabled={count < minPlayers} onClick={() => onStart(members)}>
-            {count < minPlayers ? `${minPlayers}명부터 시작할 수 있어요` : `${count}명으로 시작`}
-          </button>
+          <>
+            <div className="group-lobby__bots" role="group" aria-label="봇 수">
+              <span>빈자리에 봇</span>
+              <button type="button" className="button button--small" disabled={bots <= 0} onClick={() => setBotsWanted(bots - 1)} aria-label="봇 빼기">
+                −
+              </button>
+              <strong>{bots}</strong>
+              <button
+                type="button"
+                className="button button--small"
+                disabled={members.length + 1 + bots >= capacity}
+                onClick={() => setBotsWanted(bots + 1)}
+                aria-label="봇 더하기"
+              >
+                +
+              </button>
+            </div>
+            <button type="button" className="button button--primary pvp-lobby__big" disabled={count < minPlayers} onClick={() => onStart(members, bots)}>
+              {count < minPlayers ? `${minPlayers}명부터 시작할 수 있어요` : `${count}명으로 시작${bots > 0 ? ` (봇 ${bots})` : ''}`}
+            </button>
+          </>
         ) : (
           <p className="pvp-lobby__status">{hostGone ? '방장이 나갔어요' : '방장이 시작하길 기다리는 중…'}</p>
         )}

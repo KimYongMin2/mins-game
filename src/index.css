@@ -434,6 +434,25 @@ a.game-card:hover {
   border-color: var(--line);
 }
 
+.group-lobby__member--bot {
+  border-style: dashed;
+  color: var(--ink-soft);
+}
+
+.group-lobby__bots {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.9375rem;
+  color: var(--ink-soft);
+}
+
+.group-lobby__bots strong {
+  min-width: 1.5em;
+  color: var(--ink);
+  font-size: 1.125rem;
+}
+
 .pvp-lobby__code {
   font-size: 3rem;
   font-weight: 900;
