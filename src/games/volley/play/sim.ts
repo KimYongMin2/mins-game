@@ -8,8 +8,11 @@ import {
   BODY_BOUNCE,
   BODY_R,
   BODY_Y,
-  BUMP_PUSH,
+  BUMP_AIM,
+  BUMP_PUSH_MAX,
+  BUMP_PUSH_MIN,
   BUMP_UP,
+  SIDE_BUMP_MAX_SPEED,
   CARRY,
   CEILING,
   COURT_W,
@@ -282,6 +285,7 @@ function moveBall(b: Ball, players: [Player, Player]): BallStep {
       y = c.y + ny * (BALL_R + c.r)
       const rvx = vx - p.vx
       const rvy = vy - p.vy
+      const incoming = Math.hypot(rvx, rvy)
       const vn = rvx * nx + rvy * ny
       if (vn < 0) {
         vx -= (1 + BODY_BOUNCE) * vn * nx
@@ -295,9 +299,12 @@ function moveBall(b: Ball, players: [Player, Player]): BallStep {
         vx += (MIN_BUMP_SPEED - out) * nx
         vy += (MIN_BUMP_SPEED - out) * ny
       }
-      // 위쪽에 맞으면 받아 넘기기: 네트 쪽으로 밀고 높이 띄운다 (맞은 자리가 앞쪽일수록 더 앞으로)
-      if (ny > 0.3) {
-        vx += towardNet(side as Side) * BUMP_PUSH
+      // 받아 넘기기: 네트 쪽으로 밀고 높이 띄운다 (네트에서 멀수록 세게 밀어 넘어가게).
+      // 위쪽에 맞으면 늘, 몸 옆에 맞으면 느린 공만 (처음엔 위쪽만이라 서브가 옆에 맞으면 내 코트에 꽂혔고,
+      // 옆도 다 띄우니 빠른 스파이크까지 다 받아져서 랠리가 안 끝났음)
+      if (ny > 0.3 || (ny > -0.3 && incoming < SIDE_BUMP_MAX_SPEED)) {
+        const push = Math.min(BUMP_PUSH_MAX, Math.max(BUMP_PUSH_MIN, Math.abs(p.x - NET_X) * BUMP_AIM))
+        vx += towardNet(side as Side) * push
         vy = Math.max(vy, BUMP_UP)
       }
       hit = { kind: 'bump', player: side as Side }

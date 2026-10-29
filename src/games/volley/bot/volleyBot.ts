@@ -54,7 +54,7 @@ export function botInput(s: SimState, side: Side, level: BotLevel, mind: BotMind
     let target = home
     if (land && mySide(land.x)) {
       // 서브(머리 위에서 떨어지는 공)는 덜 틀린다
-      const err = (noise(s.tick, mind.salt + side * 7 + 1) * 2 - 1) * t.aimError * (s.phase.kind === 'serve' ? 0.3 : 1)
+      const err = (noise(s.tick, mind.salt + side * 7 + 1) * 2 - 1) * t.aimError * (s.phase.kind === 'serve' ? 0.1 : 1)
       // 공보다 조금 뒤에 서서 맞으면 네트 쪽으로 튄다
       target = land.x - net * 0.4 + err
     }
@@ -62,7 +62,9 @@ export function botInput(s: SimState, side: Side, level: BotLevel, mind: BotMind
   }
 
   const dx = next.target - me.x
-  const dir = Math.abs(dx) < 0.15 ? 0 : Math.sign(dx)
+  // 공이 머리 바로 위로 떨어지는 중이면 멈춰서 받는다 (달리면서 받으면 몸 속도가 더해져 낮게 꽂힘)
+  const bracing = me.y === 0 && s.ball.vy < 0 && Math.abs(s.ball.x - me.x) < 1 && s.ball.y - (me.y + HEAD_Y) < 1.6 && s.ball.y > me.y + HEAD_Y
+  const dir = bracing || Math.abs(dx) < 0.15 ? 0 : Math.sign(dx)
   const input: Input = { left: dir < 0, right: dir > 0, jump: false, down: false, hit: false }
   if (s.phase.kind !== 'rally') return { input, mind: next }
 

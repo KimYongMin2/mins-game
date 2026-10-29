@@ -18,8 +18,8 @@ export const BALL_DRAG = 0.08
 /** 벽·천장·네트에 튈 때 남는 속도 비율 */
 export const WALL_BOUNCE = 0.8
 export const NET_BOUNCE = 0.6
-/** 공이 이보다 빠르면 잘라 낸다 (터널링 방지) */
-export const BALL_MAX_SPEED = 24
+/** 공이 이보다 빠르면 잘라 낸다. 한 스텝에 0.5m라 몸(반지름 합 1.05m)·네트(0.6m)를 뚫지 않는다 */
+export const BALL_MAX_SPEED = 30
 
 /** 선수: 몸통 원 + 머리 원 (발 위치 기준 높이) */
 export const BODY_R = 0.6
@@ -31,13 +31,21 @@ export const MOVE_SPEED = 8.5
 /** 점프 높이 = JUMP_SPEED² / (2 × 중력) ≈ 3.3m (처음 9.5 ≈ 2.3m는 낮았음) */
 export const JUMP_SPEED = 11.5
 /** 몸에 맞고 튈 때 남는 속도 비율과 최소 튀는 속도 (받으면 늘 위로 떠오르게) */
-export const BODY_BOUNCE = 0.75
-export const MIN_BUMP_SPEED = 8
+export const BODY_BOUNCE = 0.55
+export const MIN_BUMP_SPEED = 6.5
 /** 받을 때 선수 속도를 공에 더하는 비율 */
-export const CARRY = 0.5
-/** 위쪽(머리·어깨)에 맞으면 네트 쪽으로 밀어 주는 속도와 최소 위로 뜨는 속도 (그냥 받아도 넘어가게) */
-export const BUMP_PUSH = 4
-export const BUMP_UP = 10
+export const CARRY = 0.35
+/**
+ * 위쪽(머리·어깨)에 맞으면 네트 쪽으로 밀어 주는 속도와 최소 위로 뜨는 속도 (그냥 받아도 넘어가게).
+ * 미는 속도는 네트에서 멀수록 크게: 1m당 BUMP_AIM, BUMP_PUSH_MIN~MAX 사이.
+ * 몸에 맞은 공은 느리게 (처음 반발 0.75·최소 8·밀기 4·위로 10은 빨라서 줄였는데, 뒤에서 받으면 네트를 못 넘어 거리별로)
+ */
+export const BUMP_AIM = 1
+export const BUMP_PUSH_MIN = 2.5
+export const BUMP_PUSH_MAX = 6
+export const BUMP_UP = 9
+/** 몸 옆에 맞은 공도 이보다 느리면 받아 넘긴다 (빠른 스파이크는 물리대로 튕겨서 받기 어렵게) */
+export const SIDE_BUMP_MAX_SPEED = 13
 /** 네트 꼭대기에 얹힌 공을 옆으로 미는 속도 (안 그러면 위에서 멈출 수 있음) */
 export const NET_TOP_NUDGE = 1.5
 
@@ -45,14 +53,14 @@ export const NET_TOP_NUDGE = 1.5
 export const SPIKE_REACH = 1.5
 /**
  * 방향키별 스파이크 속도 (x는 상대 쪽으로 +). 위(점프 키를 누른 채) = 위로 강타, 앞(상대 쪽) = 옆으로 빠르게,
- * 뒤(반대쪽) = 느리게, 아래 = 내리찍기, 없음 = 중간. 처음엔 앞·없음·뒤 셋뿐이었음
+ * 뒤(반대쪽) = 느리게, 아래 = 내리찍기, 없음 = 중간. 처음엔 앞·없음·뒤 셋뿐이었음. 더 빠르게 해 달라고 해서 약 1.3배로
  */
 export const SPIKE = {
-  up: { vx: 6, vy: 17 },
-  forward: { vx: 20, vy: -1.5 },
-  none: { vx: 14, vy: -5 },
-  back: { vx: 8, vy: 2 },
-  down: { vx: 12, vy: -13 },
+  up: { vx: 8, vy: 21 },
+  forward: { vx: 26, vy: -2 },
+  none: { vx: 18, vy: -6.5 },
+  back: { vx: 10, vy: 2.5 },
+  down: { vx: 15, vy: -17 },
 } as const
 /** 공중에서 누른 치기를 이만큼(초) 기억해 두고 그 사이 공이 손에 닿으면 친다 (조금 일찍 눌러도 되게) */
 export const HIT_BUFFER_S = 0.13
