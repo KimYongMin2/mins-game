@@ -23,16 +23,18 @@ const STEP_MS = 1000 / STEP_HZ
 const MAX_STEPS_PER_FRAME = 5
 const TRAIL = 7
 
-type Keys = { left: boolean; right: boolean; jump: boolean; hit: boolean }
-const NO_KEYS: Keys = { left: false, right: false, jump: false, hit: false }
+type Keys = { left: boolean; right: boolean; jump: boolean; down: boolean; hit: boolean }
+const NO_KEYS: Keys = { left: false, right: false, jump: false, down: false, hit: false }
 const KEY_OF: Record<string, keyof Keys> = {
   ArrowLeft: 'left',
   ArrowRight: 'right',
   ArrowUp: 'jump',
+  ArrowDown: 'down',
   Space: 'hit',
   KeyA: 'left',
   KeyD: 'right',
   KeyW: 'jump',
+  KeyS: 'down',
   Enter: 'hit',
 }
 
@@ -52,6 +54,9 @@ export function GameScreen(props: Props) {
   const [frame, setFrame] = useState<{ sim: SimState; trail: { x: number; y: number }[] }>({ sim: initial, trail: [] })
   const view = frame.sim
   const keysRef = useRef<Keys>(NO_KEYS)
+  // 치기를 아주 짧게 눌렀다 떼면 다음 스텝 전에 끝나 버려서, 누른 순간을 따로 잡아 한 스텝은 꼭 '누름'으로 넣는다
+  const hitTapRef = useRef(false)
+  const remoteTapRef = useRef(false)
   const [touchKeys, setTouchKeys] = useState<Keys>(NO_KEYS)
   const remoteRef = useRef<Input>(NO_INPUT)
   const trailRef = useRef<{ x: number; y: number }[]>([])
@@ -66,6 +71,7 @@ export function GameScreen(props: Props) {
       const k = KEY_OF[e.code]
       if (!k) return
       e.preventDefault()
+      if (k === 'hit' && down && !e.repeat) hitTapRef.current = true
       keysRef.current = { ...keysRef.current, [k]: down }
     }
     const down = (e: KeyboardEvent) => set(e, true)
@@ -98,7 +104,11 @@ export function GameScreen(props: Props) {
     const pings = new Map<number, number>()
     const off = room.onMessage((msg) => {
       if (room.role === 'host') {
-        if (msg.t === 'input') remoteRef.current = msg.i
+        if (msg.t === 'input') {
+          // 친구가 짧게 누른 것도 놓치지 않게 (누름·뗌이 한 프레임에 같이 와도)
+          if (msg.i.hit && !remoteRef.current.hit) remoteTapRef.current = true
+          remoteRef.current = msg.i
+        }
         if (msg.t === 'ping') room.send({ t: 'pong', id: msg.id })
       } else {
         if (msg.t === 'state') {
@@ -141,22 +151,35 @@ export function GameScreen(props: Props) {
       acc += Math.min(250, t - last)
       last = t
       const p = propsRef.current
-      const mine = toWorld(keysRef.current, mirror)
       let n = 0
+      // 이번 프레임에 누른 치기는 첫 스텝에 꼭 들어간다
+      let tap = hitTapRef.current
+      let remoteTap = remoteTapRef.current
+      let mine = toWorld(keysRef.current, mirror)
       while (acc >= STEP_MS && n < MAX_STEPS_PER_FRAME) {
         acc -= STEP_MS
         n++
+        mine = toWorld({ ...keysRef.current, hit: keysRef.current.hit || tap }, mirror)
+        const remote = remoteTap ? { ...remoteRef.current, hit: true } : remoteRef.current
+        if (tap) {
+          tap = false
+          hitTapRef.current = false
+        }
+        if (remoteTap && p.mode === 'pvp' && p.room.role === 'host') {
+          remoteTap = false
+          remoteTapRef.current = false
+        }
         if (p.mode === 'bot') {
           const b = botInput(simRef.current, 1, p.level, mind)
           mind = b.mind
           simRef.current = step(simRef.current, [mine, b.input])
         } else if (p.room.role === 'host') {
           if (p.peerGone) continue
-          simRef.current = step(simRef.current, [mine, remoteRef.current])
+          simRef.current = step(simRef.current, [mine, remote])
           // 끝난 뒤엔 스텝이 안 늘어서 한 번만 보낸다
           const s = simRef.current
           if (s.tick !== sentTick && (s.tick % (STEP_HZ / STATE_HZ) === 0 || s.phase.kind === 'done')) {
-            p.room.send({ t: 'state', s, i: [mine, remoteRef.current] })
+            p.room.send({ t: 'state', s, i: [mine, remote] })
             sentTick = s.tick
           }
         } else {
@@ -165,11 +188,14 @@ export function GameScreen(props: Props) {
         }
       }
       if (n === MAX_STEPS_PER_FRAME) acc = 0
+      // 스텝이 없던 프레임에 누른 것도 보낼 수 있게 (친구)
+      if (n === 0) mine = toWorld({ ...keysRef.current, hit: keysRef.current.hit || tap }, mirror)
       // 친구: 키가 바뀌면 바로, 아니어도 가끔
       if (p.mode === 'pvp' && p.room.role === 'guest' && (!sameInput(mine, sentInput) || t - sentAt > INPUT_RESEND_MS)) {
         p.room.send({ t: 'input', i: mine })
         sentInput = mine
         sentAt = t
+        if (mine.hit) hitTapRef.current = false
       }
       // 그릴 상태
       let shown = role === 'guest' ? guestRef.current.local : simRef.current
@@ -249,6 +275,7 @@ export function GameScreen(props: Props) {
       onPointerDown={(e) => {
         e.preventDefault()
         ;(e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId)
+        if (k === 'hit') hitTapRef.current = true
         touch(k, true)
       }}
       onPointerUp={() => touch(k, false)}
@@ -296,6 +323,7 @@ export function GameScreen(props: Props) {
       <div className="vb-pads" aria-label="조작">
         <div className="vb-pads__move">
           {pad('left', '◀', 'vb-pad--move')}
+          {pad('down', '▼', 'vb-pad--move vb-pad--down')}
           {pad('right', '▶', 'vb-pad--move')}
         </div>
         <div className="vb-pads__act">
@@ -304,7 +332,7 @@ export function GameScreen(props: Props) {
         </div>
       </div>
       <p className="vb-rotate">폰을 가로로 돌리면 코트가 더 크게 보여요</p>
-      <p className="vb-hint">PC: ← → 이동 · ↑ 점프 · 스페이스 치기 (공중 = 스파이크, 땅 = 몸 날리기)</p>
+      <p className="vb-hint">PC: ← → 이동 · ↑ 점프 · 스페이스 치기 · 스파이크 방향: ↑ 위로 강타 · 상대 쪽 빠르게 · 반대쪽 느리게 · ↓ 내리찍기</p>
 
       {props.mode === 'pvp' && props.peerGone && (
         <div className="pvp-gone" role="alert">

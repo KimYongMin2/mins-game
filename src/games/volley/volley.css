@@ -124,11 +124,23 @@
 .vb-pads__move,
 .vb-pads__act {
   display: flex;
-  gap: 10px;
+  gap: 8px;
+}
+
+/* 폭이 모자라면 버튼이 같이 줄어든다 (왼쪽 3개 : 오른쪽 2개) */
+.vb-pads__move {
+  flex: 3;
+  max-width: 260px;
+}
+
+.vb-pads__act {
+  flex: 2;
+  max-width: 176px;
 }
 
 .vb-pad {
-  width: 72px;
+  flex: 1;
+  min-width: 0;
   height: 64px;
   font: inherit;
   font-size: 1.125rem;
@@ -418,9 +430,15 @@
     grid-area: act;
   }
 
+  .vb-pads__move,
+  .vb-pads__act {
+    max-width: none;
+  }
+
   .vb-pad {
+    flex: none;
     width: 76px;
-    height: 72px;
+    height: 64px;
   }
 }
 

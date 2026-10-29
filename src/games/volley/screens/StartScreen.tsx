@@ -27,7 +27,7 @@ export function StartScreen({ record, onLevel, onBot, onPvp }: Props) {
           <strong>이동</strong> ← → · <strong>점프</strong> ↑ · <strong>치기</strong> 스페이스 (폰은 아래 버튼)
         </li>
         <li>
-          공중에서 치기 = <strong>스파이크</strong>. 앞 방향키면 낮고 빠르게, 뒤면 높이 넘기기
+          공중에서 치기 = <strong>스파이크</strong>. 같이 누른 방향키로: ↑ 위로 강타 · 상대 쪽 빠르게 · 반대쪽 느리게 · ↓ 내리찍기
         </li>
         <li>
           땅에서 치기 = <strong>몸 날리기</strong>. 멀리 떨어지는 낮은 공 살리기

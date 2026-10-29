@@ -43,18 +43,26 @@ export const NET_TOP_NUDGE = 1.5
 
 /** 스파이크: 공중에서 치기. 머리에서 이 거리 안의 공만 (점프 한 번에 한 번) */
 export const SPIKE_REACH = 1.5
-/** 방향별 스파이크 속도 (앞 = 상대 쪽). x는 보는 쪽으로 */
+/**
+ * 방향키별 스파이크 속도 (x는 상대 쪽으로 +). 위(점프 키를 누른 채) = 위로 강타, 앞(상대 쪽) = 옆으로 빠르게,
+ * 뒤(반대쪽) = 느리게, 아래 = 내리찍기, 없음 = 중간. 처음엔 앞·없음·뒤 셋뿐이었음
+ */
 export const SPIKE = {
-  forward: { vx: 17, vy: -7 },
-  none: { vx: 13, vy: -2.5 },
-  back: { vx: 6, vy: 9 },
+  up: { vx: 6, vy: 17 },
+  forward: { vx: 20, vy: -1.5 },
+  none: { vx: 14, vy: -5 },
+  back: { vx: 8, vy: 2 },
+  down: { vx: 12, vy: -13 },
 } as const
+/** 공중에서 누른 치기를 이만큼(초) 기억해 두고 그 사이 공이 손에 닿으면 친다 (조금 일찍 눌러도 되게) */
+export const HIT_BUFFER_S = 0.13
 
 /** 몸 날리기: 땅에서 치기 */
-export const DIVE_SPEED = 11
-export const DIVE_S = 0.35
+export const DIVE_SPEED = 9
+/** 약 2m (처음 11m/s × 0.35초 ≈ 3.9m는 너무 멀었음) */
+export const DIVE_S = 0.22
 /** 날린 뒤 못 움직이는 시간 */
-export const DIVE_RECOVER_S = 0.5
+export const DIVE_RECOVER_S = 0.3
 /** 날리는 동안 몸이 낮아지는 비율 (낮은 공 살리기) */
 export const DIVE_LOW = 0.45
 

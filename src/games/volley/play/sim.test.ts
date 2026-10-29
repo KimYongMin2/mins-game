@@ -88,12 +88,13 @@ describe('공', () => {
 })
 
 describe('스파이크', () => {
-  it('공중에서 공 근처에서 치면 상대 쪽으로 세게 내리꽂는다', () => {
+  it('공중에서 공 근처에서 ↓와 치면 상대 쪽으로 세게 내리꽂는다', () => {
     const base = createSim(0)
-    const me = { ...base.players[0], x: NET_X - 1.5, y: 1.5, vy: 0 }
+    // 점프 꼭대기쯤 (네트에 붙어서 낮게 내리찍으면 네트에 걸린다)
+    const me = { ...base.players[0], x: NET_X - 1.2, y: 3, vy: 0 }
     const head = { x: me.x + 0.3, y: me.y + 1.6 + 0.6 }
     let s = rally({ ...head, vx: 0, vy: 0 }, { players: [me, base.players[1]] })
-    s = step(s, [inp({ hit: true, right: true }), NO_INPUT])
+    s = step(s, [inp({ hit: true, down: true }), NO_INPUT])
     expect(s.lastHit?.kind).toBe('spike')
     expect(s.ball.vx).toBeGreaterThan(10)
     expect(s.ball.vy).toBeLessThan(0)
@@ -107,6 +108,62 @@ describe('스파이크', () => {
     const me = { ...base.players[0], x: 4, y: 1.5, prevHit: true }
     const s = step(rally({ x: 4.3, y: 3.7, vx: 0, vy: 0 }, { players: [me, base.players[1]] }), [inp({ hit: true }), NO_INPUT])
     expect(s.lastHit?.kind).not.toBe('spike')
+  })
+})
+
+describe('스파이크 방향', () => {
+  // 오른쪽 선수(1번)로도 해 본다: 상대 쪽이 왼쪽(-x)
+  function spikeWith(side: 0 | 1, input: Partial<Input>) {
+    const base = createSim(0)
+    const x = side === 0 ? NET_X - 2 : NET_X + 2
+    const me = { ...base.players[side], x, y: 1.5 }
+    const players = side === 0 ? ([me, base.players[1]] as const) : ([base.players[0], me] as const)
+    const s = rally({ x: x + 0.2, y: me.y + 1.6 + 0.6, vx: 0, vy: 0 }, { players: [...players] as SimState['players'] })
+    const inputs: [Input, Input] = side === 0 ? [inp({ hit: true, ...input }), NO_INPUT] : [NO_INPUT, inp({ hit: true, ...input })]
+    const after = step(s, inputs)
+    expect(after.lastHit?.kind).toBe('spike')
+    // 상대 쪽 기준으로 돌려서 비교
+    return { vx: after.ball.vx * (side === 0 ? 1 : -1), vy: after.ball.vy }
+  }
+
+  for (const side of [0, 1] as const) {
+    const toward = side === 0 ? { right: true } : { left: true }
+    const away = side === 0 ? { left: true } : { right: true }
+    it(`${side === 0 ? '왼쪽' : '오른쪽'} 선수: ↑ 위로 강타 · 상대 쪽 빠르게 · 반대쪽 느리게 · ↓ 내리찍기`, () => {
+      const up = spikeWith(side, { jump: true })
+      const fwd = spikeWith(side, toward)
+      const back = spikeWith(side, away)
+      const down = spikeWith(side, { down: true })
+      const none = spikeWith(side, {})
+      expect(up.vy).toBeGreaterThan(12)
+      expect(fwd.vx).toBeGreaterThan(none.vx)
+      expect(Math.abs(fwd.vy)).toBeLessThan(3)
+      expect(back.vx).toBeLessThan(none.vx)
+      expect(back.vx).toBeGreaterThan(0)
+      expect(down.vy).toBeLessThan(-12)
+      // 모두 상대 쪽으로
+      for (const v of [up, fwd, back, down, none]) expect(v.vx).toBeGreaterThan(0)
+    })
+  }
+
+  it('공중에서 조금 일찍 눌러도 공이 손에 닿으면 친다', () => {
+    const base = createSim(0)
+    const me = { ...base.players[0], x: 4, y: 1.5, vy: 0 }
+    // 공이 손보다 2m 위에서 떨어지는 중
+    let s = rally({ x: 4.2, y: me.y + 1.6 + 2.3, vx: 0, vy: -12 }, { players: [me, base.players[1]] })
+    s = step(s, [inp({ hit: true }), NO_INPUT])
+    expect(s.lastHit?.kind).not.toBe('spike')
+    for (let i = 0; i < 6 && s.lastHit?.kind !== 'spike'; i++) s = step(s, idle)
+    expect(s.lastHit?.kind).toBe('spike')
+  })
+
+  it('몸 날리기는 약 2m', () => {
+    let s: SimState = { ...createSim(0), phase: { kind: 'point', scorer: 0, t: 9999 } }
+    s = { ...s, players: [{ ...s.players[0], x: 1 }, s.players[1]] }
+    s = step(s, [inp({ hit: true }), NO_INPUT])
+    s = run(s, 60)
+    expect(s.players[0].x - 1).toBeGreaterThan(1.5)
+    expect(s.players[0].x - 1).toBeLessThan(2.5)
   })
 })
 
@@ -140,7 +197,7 @@ describe('경기', () => {
     let s = createSim(0)
     let seed = 1
     const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647)
-    const randomInput = (): Input => ({ left: rnd() < 0.3, right: rnd() < 0.3, jump: rnd() < 0.1, hit: rnd() < 0.1 })
+    const randomInput = (): Input => ({ left: rnd() < 0.3, right: rnd() < 0.3, jump: rnd() < 0.1, down: rnd() < 0.1, hit: rnd() < 0.1 })
     for (let i = 0; i < STEP_HZ * 600 && s.phase.kind !== 'done'; i++) {
       s = step(s, [randomInput(), randomInput()])
       expect(s.ball.x).toBeGreaterThanOrEqual(BALL_R - 1e-9)

@@ -63,7 +63,7 @@ export function botInput(s: SimState, side: Side, level: BotLevel, mind: BotMind
 
   const dx = next.target - me.x
   const dir = Math.abs(dx) < 0.15 ? 0 : Math.sign(dx)
-  const input: Input = { left: dir < 0, right: dir > 0, jump: false, hit: false }
+  const input: Input = { left: dir < 0, right: dir > 0, jump: false, down: false, hit: false }
   if (s.phase.kind !== 'rally') return { input, mind: next }
 
   const head = circlesOf(me)[1]
@@ -84,7 +84,7 @@ export function botInput(s: SimState, side: Side, level: BotLevel, mind: BotMind
 
   // 스파이크: 공중에서 손 닿으면, 상대 코트에 떨어지는 방향을 미리 굴려 보고 고른다 (센 것부터)
   if (me.y > 0.3 && Math.hypot(bx, by) < SPIKE_REACH * 0.9 && r < t.spikeChance) {
-    const order: SpikeKind[] = level === 'hard' ? ['forward', 'none', 'back'] : ['none', 'back', 'forward']
+    const order: SpikeKind[] = level === 'hard' ? ['down', 'forward', 'none', 'back', 'up'] : ['none', 'back', 'up', 'forward']
     const kind = order.find((k) => {
       const land = predictBall(spikeBall(s.ball, side, k), BALL_R, STEP_HZ * 3)
       return land !== null && (side === 0 ? land.x > NET_X : land.x < NET_X)
@@ -93,6 +93,8 @@ export function botInput(s: SimState, side: Side, level: BotLevel, mind: BotMind
       input.hit = true
       input.left = kind === 'forward' ? net < 0 : kind === 'back' ? net > 0 : false
       input.right = kind === 'forward' ? net > 0 : kind === 'back' ? net < 0 : false
+      input.down = kind === 'down'
+      input.jump = kind === 'up'
     }
   }
 

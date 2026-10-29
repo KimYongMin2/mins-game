@@ -29,7 +29,7 @@ export type VolleyMsg =
   | { t: 'ping'; id: number }
   | { t: 'pong'; id: number }
 
-export const sameInput = (a: Input, b: Input) => a.left === b.left && a.right === b.right && a.jump === b.jump && a.hit === b.hit
+export const sameInput = (a: Input, b: Input) => a.left === b.left && a.right === b.right && a.jump === b.jump && a.down === b.down && a.hit === b.hit
 
 /** 친구(1번 자리) 기기의 예측 상태 */
 export type Guest = {

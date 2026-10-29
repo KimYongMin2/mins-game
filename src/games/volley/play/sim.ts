@@ -19,6 +19,7 @@ import {
   DIVE_SPEED,
   DT,
   GRAVITY,
+  HIT_BUFFER_S,
   HEAD_R,
   HEAD_Y,
   JUMP_SPEED,
@@ -41,9 +42,10 @@ import {
 
 export type Side = 0 | 1
 
-export type Input = { left: boolean; right: boolean; jump: boolean; hit: boolean }
+/** jump = ↑(땅에서 점프, 공중에서 치면 위로 강타), down = ↓(공중에서 치면 내리찍기) */
+export type Input = { left: boolean; right: boolean; jump: boolean; down: boolean; hit: boolean }
 
-export const NO_INPUT: Input = { left: false, right: false, jump: false, hit: false }
+export const NO_INPUT: Input = { left: false, right: false, jump: false, down: false, hit: false }
 
 export type Player = {
   x: number
@@ -60,6 +62,8 @@ export type Player = {
   spiked: boolean
   /** 지난 스텝에 치기를 누르고 있었는지 (누르는 순간만 친다) */
   prevHit: boolean
+  /** 공중에서 누른 치기를 기억하는 남은 스텝 (그 사이 공이 손에 닿으면 스파이크) */
+  hitBuffer: number
   /** 같은 접촉에 여러 번 튀지 않게 (남은 스텝) */
   touchCool: number
 }
@@ -101,7 +105,7 @@ export function sideBounds(side: Side): [number, number] {
 export const towardNet = (side: Side): 1 | -1 => (side === 0 ? 1 : -1)
 
 function freshPlayer(side: Side): Player {
-  return { x: side === 0 ? COURT_W * 0.2 : COURT_W * 0.8, y: 0, vx: 0, vy: 0, facing: towardNet(side), dive: 0, recover: 0, spiked: false, prevHit: false, touchCool: 0 }
+  return { x: side === 0 ? COURT_W * 0.2 : COURT_W * 0.8, y: 0, vx: 0, vy: 0, facing: towardNet(side), dive: 0, recover: 0, spiked: false, prevHit: false, hitBuffer: 0, touchCool: 0 }
 }
 
 function serveBall(server: Side): Ball {
@@ -124,10 +128,19 @@ export function createSim(server: Side): SimState {
 
 export type SpikeKind = keyof typeof SPIKE
 
-/** 스파이크한 공 (방향은 누른 방향키: 앞·없음·뒤) */
+/** 스파이크한 공 (방향은 누른 방향키) */
 export function spikeBall(ball: Ball, side: Side, kind: SpikeKind): Ball {
   const net = towardNet(side)
   return { x: ball.x, y: ball.y, vx: SPIKE[kind].vx * net, vy: SPIKE[kind].vy }
+}
+
+/** 누른 방향키 → 스파이크 종류. 아래 > 위 > 상대 쪽 > 반대쪽 > 없음 */
+export function spikeKindOf(input: Input, side: Side): SpikeKind {
+  if (input.down) return 'down'
+  if (input.jump) return 'up'
+  const dir = (input.right ? 1 : 0) - (input.left ? 1 : 0)
+  if (dir === 0) return 'none'
+  return dir === towardNet(side) ? 'forward' : 'back'
 }
 
 /** 선수의 몸통·머리 원 (몸 날리는 중이면 낮게) */
@@ -142,7 +155,7 @@ export function circlesOf(p: Player): { x: number; y: number; r: number; head: b
 function movePlayer(p: Player, side: Side, input: Input, ball: Ball, canHit: boolean): { p: Player; spike: Ball | null } {
   const dir = (input.right ? 1 : 0) - (input.left ? 1 : 0)
   const pressed = input.hit && !p.prevHit
-  let { x, y, vx, vy, facing, dive, recover, spiked } = p
+  let { x, y, vx, vy, facing, dive, recover, spiked, hitBuffer } = p
   let spike: Ball | null = null
   // 날리는 중·회복 중엔 방향이 안 바뀐다
   if (dir !== 0 && dive === 0 && recover === 0) facing = dir as 1 | -1
@@ -154,30 +167,38 @@ function movePlayer(p: Player, side: Side, input: Input, ball: Ball, canHit: boo
     if (dive === 0) recover = steps(DIVE_RECOVER_S)
   } else if (recover > 0) {
     recover--
-    vx *= 0.8
+    // 날린 뒤엔 금방 멈춘다
+    vx *= 0.6
   } else {
     // 누르는 순간 바로 그 방향 최고 속도, 떼면 바로 멈춤
     vx = dir * MOVE_SPEED
     if (onGround && input.jump) vy = JUMP_SPEED
-    if (pressed && onGround) {
+    if (pressed && onGround && !input.jump) {
+      // 땅에서 치기 = 몸 날리기 (점프와 같이 누르면 점프)
       dive = steps(DIVE_S)
       vx = facing * DIVE_SPEED
-    } else if (pressed && !onGround && !spiked && canHit) {
+    } else if (pressed && !onGround) {
+      hitBuffer = steps(HIT_BUFFER_S)
+    }
+    // 공중에서 누른 치기: 기억하는 동안 공이 손에 닿으면 스파이크
+    if (hitBuffer > 0 && !onGround && !spiked && canHit) {
       const head = circlesOf(p)[1]
       if (Math.hypot(ball.x - head.x, ball.y - head.y) <= SPIKE_REACH) {
         spiked = true
-        const net = towardNet(side)
-        spike = spikeBall(ball, side, dir === 0 ? 'none' : dir === net ? 'forward' : 'back')
+        hitBuffer = 0
+        spike = spikeBall(ball, side, spikeKindOf(input, side))
       }
     }
   }
 
+  if (hitBuffer > 0) hitBuffer--
   vy -= GRAVITY * DT
   y += vy * DT
   if (y <= 0) {
     y = 0
     vy = 0
     spiked = false
+    hitBuffer = 0
   }
   x += vx * DT
   const [lo, hi] = sideBounds(side)
@@ -189,13 +210,13 @@ function movePlayer(p: Player, side: Side, input: Input, ball: Ball, canHit: boo
     vx = 0
   }
   return {
-    p: { ...p, x, y, vx, vy, facing, dive, recover, spiked, prevHit: input.hit, touchCool: Math.max(0, p.touchCool - 1) },
+    p: { ...p, x, y, vx, vy, facing, dive, recover, spiked, prevHit: input.hit, hitBuffer, touchCool: Math.max(0, p.touchCool - 1) },
     spike,
   }
 }
 
 /** 공만 굴려 볼 때 쓰는 빈 선수 (멀리 치워 둠) */
-const FAR: Player = { x: -100, y: -100, vx: 0, vy: 0, facing: 1, dive: 0, recover: 0, spiked: false, prevHit: false, touchCool: 0 }
+const FAR: Player = { x: -100, y: -100, vx: 0, vy: 0, facing: 1, dive: 0, recover: 0, spiked: false, prevHit: false, hitBuffer: 0, touchCool: 0 }
 const NO_PLAYERS: [Player, Player] = [FAR, FAR]
 
 type BallStep = { ball: Ball; hit: { kind: HitKind; player: Side | null } | null; touched: Side[] }
