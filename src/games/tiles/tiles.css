@@ -1,0 +1,499 @@
+/* 숫자 잇기(tiles) 전용 스타일. 모든 클래스는 nt- 접두사를 쓴다. */
+.nt-page {
+  max-width: 640px;
+}
+
+.nt-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.nt-header .title {
+  flex: 1;
+  min-width: 0;
+}
+
+/* 경기 화면 */
+.nt-game {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.nt-players {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  gap: 6px;
+}
+
+.nt-player {
+  display: flex;
+  flex-direction: column;
+  padding: 4px 8px;
+  border: 2px solid var(--muted-line);
+  border-radius: 10px;
+}
+
+.nt-player--turn {
+  border: 3px solid #2563eb;
+  background: #eff6ff;
+}
+
+.nt-player--left {
+  opacity: 0.4;
+}
+
+.nt-player__name {
+  font-weight: 800;
+  font-size: 0.875rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.nt-player__count {
+  font-size: 0.75rem;
+  color: var(--ink-soft);
+}
+
+/* 바닥: 나무 테두리 안의 초록 펠트 */
+.nt-felt {
+  position: relative;
+  min-height: 180px;
+  max-height: 46dvh;
+  overflow-y: auto;
+  padding: 26px 8px 10px;
+  border: 6px solid #8a5a2b;
+  border-radius: 16px;
+  background:
+    radial-gradient(circle at 50% 30%, rgba(255, 255, 255, 0.12), transparent 60%),
+    #2f7d4f;
+  box-shadow: inset 0 0 0 2px #111, 0 0 0 2px #111;
+}
+
+.nt-felt__pool {
+  position: absolute;
+  top: 4px;
+  right: 8px;
+  font-size: 0.75rem;
+  font-weight: 800;
+  color: #e8f5e9;
+}
+
+.nt-felt__empty {
+  margin: 40px 0 0;
+  text-align: center;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 0.875rem;
+}
+
+.nt-sets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.nt-set {
+  display: flex;
+  gap: 2px;
+  padding: 4px;
+  border: 2px solid transparent;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.18);
+}
+
+.nt-set--bad {
+  border-color: #ff6b6b;
+  background: rgba(255, 80, 80, 0.3);
+}
+
+.nt-set--target {
+  cursor: pointer;
+  border-style: dashed;
+  border-color: #ffe066;
+}
+
+.nt-set--new {
+  min-width: 70px;
+  min-height: 50px;
+  align-items: center;
+  justify-content: center;
+  font: inherit;
+  font-weight: 800;
+  color: #ffe066;
+  border: 2px dashed #ffe066;
+  cursor: pointer;
+}
+
+/* 타일 */
+.nt-tile {
+  position: relative;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 44px;
+  padding: 0;
+  font: inherit;
+  border: 2px solid #111;
+  border-radius: 6px;
+  background: linear-gradient(#fffaf0, #f1e6cf);
+  box-shadow: 0 2px 0 #111;
+  line-height: 1;
+  cursor: default;
+  touch-action: manipulation;
+  transition: transform 0.08s;
+}
+
+button.nt-tile {
+  cursor: pointer;
+}
+
+.nt-tile__num {
+  font-size: 1.125rem;
+  font-weight: 900;
+}
+
+.nt-tile__shape {
+  font-size: 0.5rem;
+  margin-top: 2px;
+}
+
+.nt-tile__face {
+  width: 22px;
+  height: 22px;
+}
+
+.nt-tile--small {
+  width: 26px;
+  height: 36px;
+}
+
+.nt-tile--small .nt-tile__num {
+  font-size: 0.9375rem;
+}
+
+.nt-tile--on {
+  transform: translateY(-6px);
+  background: linear-gradient(#fff3bf, #ffe066);
+  box-shadow: 0 6px 0 #111;
+}
+
+/* 이번에 올린 타일 */
+.nt-tile--fresh::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #f59f00;
+  border: 1px solid #111;
+}
+
+.nt-status {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.nt-status__tip {
+  text-align: center;
+  font-size: 0.875rem;
+  color: var(--ink-soft);
+  min-height: 1.3em;
+}
+
+.nt-status__tip--mine {
+  color: var(--ink);
+  font-weight: 800;
+}
+
+.nt-timer {
+  height: 6px;
+  border-radius: 3px;
+  background: var(--muted-line);
+  overflow: hidden;
+}
+
+.nt-timer__fill {
+  height: 100%;
+  background: #2563eb;
+  transform-origin: left;
+}
+
+.nt-timer__fill--hurry {
+  background: var(--accent);
+}
+
+/* 내 손패: 나무 받침대 */
+.nt-rack {
+  padding: 6px 8px 10px;
+  border: 2px solid #111;
+  border-radius: 12px;
+  background: linear-gradient(#c98f55, #a86f3b);
+}
+
+.nt-rack--target {
+  outline: 3px dashed #2563eb;
+  outline-offset: 2px;
+  cursor: pointer;
+}
+
+.nt-rack__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
+  font-size: 0.8125rem;
+  font-weight: 800;
+  color: #fff;
+  text-shadow: 0 1px 0 #111;
+}
+
+.nt-rack__sort {
+  display: flex;
+  gap: 4px;
+}
+
+.nt-rack__sort--on {
+  color: var(--paper);
+  background: var(--ink);
+}
+
+.nt-rack__tiles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  min-height: 46px;
+  padding-top: 6px;
+}
+
+.nt-actions {
+  display: grid;
+  grid-template-columns: 1fr 2fr;
+  gap: 8px;
+}
+
+.nt-actions .button {
+  min-height: 56px;
+  font-size: 1.0625rem;
+  font-weight: 900;
+  border-radius: 14px;
+}
+
+.nt-actions .button:disabled {
+  opacity: 0.4;
+}
+
+.nt-hint,
+.nt-tip {
+  text-align: center;
+  font-size: 0.8125rem;
+  color: var(--ink-soft);
+}
+
+/* 시작 */
+.nt-start__sample {
+  display: flex;
+  justify-content: center;
+  gap: 14px;
+}
+
+.nt-start__sample > span {
+  display: flex;
+  gap: 2px;
+}
+
+.nt-start {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-width: 420px;
+  margin: 8px auto 0;
+  text-align: center;
+}
+
+.nt-start__rules {
+  margin: 0;
+  padding: 12px 16px;
+  list-style: none;
+  text-align: left;
+  font-size: 0.875rem;
+  border: 1.5px solid var(--muted-line);
+  border-radius: 12px;
+  display: grid;
+  gap: 4px;
+}
+
+.nt-start__button {
+  flex-direction: column;
+  min-height: 64px;
+  font-size: 1.25rem;
+}
+
+.nt-start__button span {
+  font-size: 0.8125rem;
+  font-weight: 500;
+  opacity: 0.8;
+}
+
+.nt-start__record {
+  font-size: 0.8125rem;
+  color: var(--ink-soft);
+}
+
+.nt-start__bots {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border: 1.5px solid var(--muted-line);
+  border-radius: 12px;
+}
+
+.nt-start__label {
+  font-weight: 800;
+}
+
+.nt-start__counts {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 6px;
+}
+
+.nt-start__count--on {
+  color: var(--paper);
+  background: var(--ink);
+}
+
+/* 결과 */
+.nt-result {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-width: 420px;
+  margin: 8px auto 0;
+}
+
+.nt-result__headline {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 20px 16px;
+  border: 2px solid var(--line);
+  border-radius: 14px;
+  text-align: center;
+}
+
+.nt-result__headline strong {
+  font-size: 3rem;
+  font-weight: 900;
+  line-height: 1.1;
+}
+
+.nt-result__headline span {
+  color: var(--ink-soft);
+  font-size: 0.875rem;
+}
+
+.nt-result__headline--win {
+  border-color: #d97706;
+  background: #fffbeb;
+}
+
+.nt-result__headline--win strong {
+  color: var(--accent);
+}
+
+.nt-result__ranking {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 6px;
+}
+
+.nt-result__ranking li {
+  padding: 8px 12px;
+  border: 1.5px solid var(--muted-line);
+  border-radius: 10px;
+  font-weight: 700;
+}
+
+.nt-result__ranking li span {
+  display: inline-block;
+  width: 2.5em;
+  color: var(--ink-soft);
+}
+
+.nt-result__ranking .nt-result__me {
+  border-color: #2563eb;
+  color: #2563eb;
+}
+
+.nt-result__career,
+.nt-result__note {
+  text-align: center;
+  font-size: 0.875rem;
+  color: var(--ink-soft);
+}
+
+.nt-result__buttons {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+}
+
+.nt-start__row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+
+.nt-start__row .nt-start__counts {
+  grid-template-columns: repeat(3, 72px);
+}
+
+.nt-start__bots .nt-start__counts {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.nt-result__ranking em {
+  float: right;
+  font-style: normal;
+  font-weight: 500;
+  color: var(--ink-soft);
+}
+
+
+/* 줄 안에 끼울 자리 (타일을 고른 동안만) */
+.nt-slot {
+  align-self: stretch;
+  width: 16px;
+  margin: 0 -1px;
+  padding: 0;
+  font-size: 0.5rem;
+  color: #ffe066;
+  background: rgba(255, 224, 102, 0.15);
+  border: 1.5px dashed #ffe066;
+  border-radius: 4px;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.nt-slot:hover,
+.nt-slot:focus-visible {
+  background: rgba(255, 224, 102, 0.45);
+}

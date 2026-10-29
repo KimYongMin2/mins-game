@@ -11,6 +11,7 @@ import { OmokPage } from './games/omok/OmokPage'
 import { RoulettePage } from './games/roulette/RoulettePage'
 import { SurvivalPage } from './games/survival/SurvivalPage'
 import { NunchiPage } from './games/nunchi/NunchiPage'
+import { TilesPage } from './games/tiles/TilesPage'
 import { YutPage } from './games/yut/YutPage'
 import { ZolaballPage } from './games/zolaball/ZolaballPage'
 import { MainPage } from './pages/MainPage'
@@ -65,6 +66,10 @@ function App() {
         <Route
           path="/games/yut"
           element={nickname ? <YutPage /> : <Navigate to="/nickname" replace />}
+        />
+        <Route
+          path="/games/tiles"
+          element={nickname ? <TilesPage /> : <Navigate to="/nickname" replace />}
         />
         <Route
           path="/games/numbaseball"

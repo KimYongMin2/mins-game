@@ -95,6 +95,15 @@ export const GAMES: GameEntry[] = [
     players: '2~4인',
   },
   {
+    id: 'tiles',
+    title: '숫자 잇기',
+    description: '바닥을 다시 짜서 손패 털기',
+    path: '/games/tiles',
+    ready: true,
+    play: 'pvp',
+    players: '2~4인',
+  },
+  {
     id: 'numbaseball',
     title: '숫자야구',
     description: '스트라이크·볼로 숫자 추리',
