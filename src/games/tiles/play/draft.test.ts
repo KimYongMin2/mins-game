@@ -48,3 +48,46 @@ describe('작업판', () => {
     expect(d.selected).toEqual([])
   })
 })
+
+describe('끌어 놓기', () => {
+  it('고르지 않은 타일도 바로 옮기고, 고른 것은 그대로 풀린다', () => {
+    let d = createDraft([[r(4), r(6)]], [r(5), r(9)], true)
+    d = draftReducer(d, { type: 'place', set: 0, at: 1, tiles: [r(5)] })
+    expect(d.table).toEqual([[r(4), r(5), r(6)]])
+    d = draftReducer(d, { type: 'place', set: -1, tiles: [r(6)] })
+    expect(d.table).toEqual([[r(4), r(5)], [r(6)]])
+    d = draftReducer(d, { type: 'unplace', tiles: [r(5), r(4)] })
+    // 바닥 타일(4)은 손으로 안 감
+    expect(d.table).toEqual([[r(4)], [r(6)]])
+  })
+})
+
+describe('가운데 끼우면 저절로 끊기', () => {
+  const run = [3, 4, 5, 6, 7, 8].map((n) => r(n))
+
+  it('3~8의 5와 6 사이에 6 → 3·4·5·6 / 6·7·8', () => {
+    let d = createDraft([run], [r(6, 1)], true)
+    d = draftReducer(d, { type: 'place', set: 0, at: 3, tiles: [r(6, 1)] })
+    expect(d.table).toEqual([[r(3), r(4), r(5), r(6, 1)], [r(6), r(7), r(8)]])
+    expect(checkDraft(d).ok).toBe(true)
+  })
+
+  it('6과 7 사이에 6 → 3·4·5·6 / 6·7·8 (반대쪽으로 끊음)', () => {
+    let d = createDraft([run], [r(6, 1)], true)
+    d = draftReducer(d, { type: 'place', set: 0, at: 4, tiles: [r(6, 1)] })
+    expect(d.table).toEqual([[r(3), r(4), r(5), r(6)], [r(6, 1), r(7), r(8)]])
+  })
+
+  it('끊어도 한쪽이 3장이 안 되면 그대로 (틀린 줄)', () => {
+    let d = createDraft([run], [r(4, 1)], true)
+    d = draftReducer(d, { type: 'place', set: 0, at: 1, tiles: [r(4, 1)] })
+    expect(d.table).toEqual([[r(3), r(4, 1), r(4), r(5), r(6), r(7), r(8)]])
+    expect(checkDraft(d).ok).toBe(false)
+  })
+
+  it('맞는 자리에 끼우면 안 끊음', () => {
+    let d = createDraft([[r(4), r(6)]], [r(5)], true)
+    d = draftReducer(d, { type: 'place', set: 0, at: 1, tiles: [r(5)] })
+    expect(d.table).toEqual([[r(4), r(5), r(6)]])
+  })
+})

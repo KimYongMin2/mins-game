@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useReducer, useRef, useState } from 'react'
+import { useEffect, useReducer, useRef, useState } from 'react'
 import type { Member, Room } from '../../../shared/online/room'
 import { randomSeed } from '../../../shared/random'
 import { loadNickname } from '../../../shared/storage/nickname'
@@ -13,6 +13,7 @@ import { isValidSet } from '../rules/sets'
 import { handValue, sortByColor, sortByNumber } from '../rules/tiles'
 import { PROBLEM_TEXT } from '../rules/turn'
 import { playSound } from '../sounds'
+import { type DropTarget, useTileDrag } from './useTileDrag'
 
 // 경기 화면. 방장(봇 연습 포함)은 심판을 돌리고 그 화면을 친구들에게 보낸다. 친구는 받은 화면만 그린다.
 // 내 차례엔 작업판(draft)에서 바닥을 다시 짜고, [내려놓기]를 누르면 바닥 전체를 심판에게 낸다.
@@ -239,6 +240,24 @@ export function GameScreen(props: Props) {
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [])
 
+  // 끌어 놓기 (훅이라 아래 return 전에 둔다)
+  const feltRef = useRef<HTMLDivElement>(null)
+  const { drag, start } = useTileDrag({
+    feltRef,
+    idsFor: (tile) => (draft.selected.includes(tile) ? draft.selected : [tile]),
+    onTap: (tile) => {
+      sound('pick')
+      act({ type: 'toggle', tile })
+    },
+    onDrop: (tiles, target) => {
+      sound('drop')
+      if (target.kind === 'set') act({ type: 'place', set: target.set, at: target.at, tiles })
+      else if (target.kind === 'new') act({ type: 'place', set: -1, tiles })
+      else act({ type: 'unplace', tiles })
+    },
+  })
+  const target: DropTarget = drag?.target ?? null
+
   if (!v) return <p className="nt-tip">시작하는 중…</p>
 
   const table = mine ? draft.table : v.table
@@ -257,13 +276,16 @@ export function GameScreen(props: Props) {
     act({ type: 'toggle', tile: id })
   }
 
-  /** 고른 타일을 그 줄의 at번째 타일 앞에 (at이 없으면 맨 뒤, set -1이면 새 줄) */
-  function placeInto(set: number, at?: number) {
-    if (!mine || selected.length === 0) return
+  /** 고른 타일을 그 줄 맨 뒤에 (set -1이면 새 줄) */
+  function placeInto(set: number) {
+    if (!mine || selected.length === 0 || drag) return
     sound('drop')
-    act({ type: 'place', set, at })
+    act({ type: 'place', set })
   }
   const placing = mine && selected.length > 0
+  const dragging = (id: number) => drag?.ids.includes(id) ?? false
+  // 내 차례에만 끌 수 있다
+  const grab = (id: number) => (mine ? { onPointerDown: (e: React.PointerEvent) => start(e, id), onClick: () => toggle(id) } : {})
 
   let tip: string
   if (v.phase === 'intro') tip = `${v.players[v.turn].name} 먼저 시작해요`
@@ -278,15 +300,15 @@ export function GameScreen(props: Props) {
             : ''
         : ''
     tip = `${v.players[v.turn].name} 차례…${lastText}`
-  } else if (selected.length > 0) tip = '▼ 끼울 자리를 누르거나 [새 줄] · 연속은 작은 숫자부터 순서대로'
-  else if (!changed) tip = v.melded[me] ? '타일을 눌러 골라요. 바닥 타일도 옮길 수 있어요' : '첫 등록: 내 타일로 합 30 이상 줄을 만들어요'
+  } else if (selected.length > 0) tip = '끌어서 원하는 자리에 놓거나, 줄을 누르면 맨 뒤 · [새 줄]'
+  else if (!changed) tip = v.melded[me] ? '타일을 끌어 놓아요. 바닥 타일도 옮길 수 있어요' : '첫 등록: 내 타일로 합 30 이상 줄을 만들어요'
   else tip = check.ok ? '다 맞아요! [내려놓기]' : PROBLEM_TEXT[check.problem]
 
   return (
     <div className="nt-game">
       <PlayerBar v={v} me={me} />
 
-      <div className="nt-felt">
+      <div ref={feltRef} className={`nt-felt${target?.kind === 'new' ? ' nt-felt--drop' : ''}`}>
         <div className="nt-felt__pool">더미 {v.poolCount}장</div>
         {table.length === 0 && selected.length === 0 && <p className="nt-felt__empty">아직 바닥이 비어 있어요</p>}
         <div className="nt-sets">
@@ -295,31 +317,32 @@ export function GameScreen(props: Props) {
             return (
               <div
                 key={i}
-                className={`nt-set${ok ? '' : ' nt-set--bad'}${placing ? ' nt-set--target' : ''}`}
+                data-set={i}
+                className={`nt-set${ok ? '' : ' nt-set--bad'}${placing && !drag ? ' nt-set--target' : ''}${target?.kind === 'set' && target.set === i ? ' nt-set--drop' : ''}`}
                 onClick={() => placeInto(i)}
               >
-                {/* 놓인 순서 그대로 그린다 (연속은 순서가 규칙). 고르는 중이면 타일 사이사이에 끼울 자리 */}
-                {set.map((id, k) => (
-                  <Fragment key={id}>
-                    {placing && <Slot onPick={() => placeInto(i, k)} label={`${i + 1}번째 줄 ${k + 1}번째 자리에 끼우기`} />}
-                    <Tile
-                      id={id}
-                      selected={selected.includes(id)}
-                      fresh={placed.includes(id) || justPlaced.includes(id)}
-                      onClick={mine ? () => toggle(id) : undefined}
-                    />
-                  </Fragment>
+                {/* 놓인 순서 그대로 그린다 (연속은 순서가 규칙) */}
+                {set.map((id) => (
+                  <Tile
+                    key={id}
+                    id={id}
+                    selected={selected.includes(id)}
+                    fresh={placed.includes(id) || justPlaced.includes(id)}
+                    dragging={dragging(id)}
+                    {...grab(id)}
+                  />
                 ))}
-                {placing && <Slot onPick={() => placeInto(i)} label={`${i + 1}번째 줄 맨 뒤에 놓기`} />}
               </div>
             )
           })}
-          {placing && (
+          {placing && !drag && (
             <button type="button" className="nt-set nt-set--new" onClick={() => placeInto(-1)}>
               + 새 줄
             </button>
           )}
         </div>
+        {/* 끼울 자리: 겹쳐 그려서 타일이 안 움직인다 */}
+        {target?.kind === 'set' && <div className="nt-drop-bar" style={{ left: target.bar.left, top: target.bar.top, height: target.bar.height }} />}
       </div>
 
       <div className="nt-status">
@@ -332,9 +355,10 @@ export function GameScreen(props: Props) {
       </div>
 
       <div
-        className={`nt-rack${mine && selected.some((id) => placed.includes(id)) ? ' nt-rack--target' : ''}`}
+        data-rack
+        className={`nt-rack${(target?.kind === 'rack' && drag?.ids.some((id) => placed.includes(id))) || (!drag && mine && selected.some((id) => placed.includes(id))) ? ' nt-rack--target' : ''}`}
         onClick={() => {
-          if (mine && selected.length > 0) {
+          if (mine && selected.length > 0 && !drag) {
             sound('drop')
             act({ type: 'unplace' })
           }
@@ -363,7 +387,7 @@ export function GameScreen(props: Props) {
         </div>
         <div className="nt-rack__tiles">
           {rack.map((id) => (
-            <Tile key={id} id={id} selected={selected.includes(id)} onClick={mine ? () => toggle(id) : undefined} />
+            <Tile key={id} id={id} selected={selected.includes(id)} dragging={dragging(id)} {...grab(id)} />
           ))}
         </div>
       </div>
@@ -382,7 +406,16 @@ export function GameScreen(props: Props) {
           </button>
         )}
       </div>
-      <p className="nt-hint">타일을 눌러 고르고 → ▼ 자리를 누르면 거기 끼움 (줄을 누르면 맨 뒤) · 시간이 끝날 때 바닥이 다 맞으면 그대로 내려놓고, 아니면 되돌리고 1장 가져와요 · PC는 Enter 내려놓기, Esc 되돌리기</p>
+      <p className="nt-hint">타일을 끌어 원하는 자리에 놓기 (빈 바닥이면 새 줄, 손패 칸이면 손으로) · 여러 장은 눌러 고른 뒤 끌기 · 시간이 끝날 때 바닥이 다 맞으면 그대로 내려놓고, 아니면 되돌리고 1장 가져와요 · PC는 Enter 내려놓기, Esc 되돌리기</p>
+
+      {/* 끌고 있는 타일 (손가락에 가리지 않게 조금 위에) */}
+      {drag && (
+        <div className="nt-ghost" style={{ left: drag.x, top: drag.y }} aria-hidden>
+          {drag.ids.map((id) => (
+            <Tile key={id} id={id} />
+          ))}
+        </div>
+      )}
 
       {hostGone && props.mode === 'guest' && (
         <div className="pvp-gone" role="alert">
@@ -394,23 +427,6 @@ export function GameScreen(props: Props) {
         </div>
       )}
     </div>
-  )
-}
-
-/** 줄 안에 타일을 끼울 자리 */
-function Slot({ onPick, label }: { onPick: () => void; label: string }) {
-  return (
-    <button
-      type="button"
-      className="nt-slot"
-      aria-label={label}
-      onClick={(e) => {
-        e.stopPropagation()
-        onPick()
-      }}
-    >
-      ▼
-    </button>
   )
 }
 

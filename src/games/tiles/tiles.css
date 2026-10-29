@@ -478,22 +478,46 @@ button.nt-tile {
 }
 
 
-/* 줄 안에 끼울 자리 (타일을 고른 동안만) */
-.nt-slot {
-  align-self: stretch;
-  width: 16px;
-  margin: 0 -1px;
-  padding: 0;
-  font-size: 0.5rem;
-  color: #ffe066;
-  background: rgba(255, 224, 102, 0.15);
-  border: 1.5px dashed #ffe066;
-  border-radius: 4px;
-  cursor: pointer;
-  touch-action: manipulation;
+/* 끌어 놓기 */
+.nt-tile {
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
 }
 
-.nt-slot:hover,
-.nt-slot:focus-visible {
-  background: rgba(255, 224, 102, 0.45);
+button.nt-tile {
+  /* 끌 때 화면이 스크롤되지 않게 */
+  touch-action: none;
+}
+
+.nt-tile--dragging {
+  opacity: 0.3;
+}
+
+.nt-ghost {
+  position: fixed;
+  z-index: 50;
+  display: flex;
+  gap: 2px;
+  pointer-events: none;
+  transform: translate(-50%, -110%) rotate(-3deg);
+  filter: drop-shadow(0 6px 6px rgba(0, 0, 0, 0.35));
+}
+
+.nt-drop-bar {
+  position: absolute;
+  width: 4px;
+  border-radius: 2px;
+  background: #ffe066;
+  box-shadow: 0 0 0 2px #111;
+  pointer-events: none;
+}
+
+.nt-set--drop {
+  outline: 3px solid #ffe066;
+  outline-offset: 1px;
+}
+
+.nt-felt--drop {
+  box-shadow: inset 0 0 0 4px #ffe066, 0 0 0 2px #111;
 }
