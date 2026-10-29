@@ -1,0 +1,440 @@
+/* 점프 배구(volley) 전용 스타일. 모든 클래스는 vb- 접두사를 쓴다. */
+.vb-page {
+  max-width: 760px;
+}
+
+.vb-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.vb-header .title {
+  flex: 1;
+  min-width: 0;
+}
+
+/* 경기 화면 */
+.vb-game {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  /* 버튼을 오래 눌러도 글자 선택·메뉴가 안 뜨게 */
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+
+.vb-hud {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 8px;
+}
+
+.vb-hud__name {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  font-weight: 800;
+  font-size: 0.9375rem;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.vb-hud__name--me {
+  color: #2563eb;
+}
+
+.vb-hud__name--foe {
+  justify-content: flex-end;
+  color: #dc2626;
+}
+
+/* 서브 표시: 작은 공 */
+.vb-hud__name i {
+  flex: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #fff;
+  border: 2px solid #1f2937;
+  box-shadow: 0 0 0 2px #ffe066;
+}
+
+.vb-hud__score {
+  font-size: 1.75rem;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+}
+
+.vb-deuce {
+  margin: -4px 0 0;
+  text-align: center;
+  font-size: 0.8125rem;
+  font-weight: 800;
+  color: #d97706;
+}
+
+.vb-view {
+  position: relative;
+  /* 화면 높이가 모자라면 코트 비율(16:10)대로 폭을 줄여 양옆이 비지 않게 */
+  width: min(100%, calc((100dvh - 260px) * 1.6));
+  margin: 0 auto;
+  border: 3px solid #1f2937;
+  border-radius: 14px;
+  overflow: hidden;
+}
+
+.vb-court {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.vb-banner {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-size: clamp(2rem, 8vw, 3.5rem);
+  font-weight: 900;
+  color: #fff;
+  -webkit-text-stroke: 2px #1f2937;
+  text-shadow: 0 4px 0 #1f2937;
+  pointer-events: none;
+}
+
+.vb-banner--win {
+  color: #fde047;
+}
+
+/* 터치 버튼 (폰). PC는 키보드라 숨긴다 */
+.vb-pads {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  touch-action: none;
+}
+
+.vb-pads__move,
+.vb-pads__act {
+  display: flex;
+  gap: 10px;
+}
+
+.vb-pad {
+  width: 72px;
+  height: 64px;
+  font: inherit;
+  font-size: 1.125rem;
+  font-weight: 900;
+  color: #1f2937;
+  background: #fff;
+  border: 3px solid #1f2937;
+  border-radius: 16px;
+  box-shadow: 0 4px 0 #1f2937;
+  touch-action: none;
+}
+
+.vb-pad--jump {
+  background: #bfdbfe;
+}
+
+.vb-pad--hit {
+  background: #fde68a;
+}
+
+.vb-pad--on {
+  transform: translateY(3px);
+  box-shadow: 0 1px 0 #1f2937;
+  filter: brightness(0.92);
+}
+
+.vb-hint {
+  text-align: center;
+  font-size: 0.8125rem;
+  color: var(--ink-soft);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .vb-pads {
+    display: none;
+  }
+}
+
+@media (hover: none) {
+  .vb-hint {
+    display: none;
+  }
+}
+
+.vb-result__score {
+  font-size: 2rem;
+  font-weight: 900;
+  color: var(--ink) !important;
+}
+
+.vb-start {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-width: 420px;
+  margin: 8px auto 0;
+  text-align: center;
+}
+
+.vb-start__rules {
+  margin: 0;
+  padding: 12px 16px;
+  list-style: none;
+  text-align: left;
+  font-size: 0.875rem;
+  border: 1.5px solid var(--muted-line);
+  border-radius: 12px;
+  display: grid;
+  gap: 4px;
+}
+
+.vb-start__options {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.vb-start__option {
+  flex-direction: column;
+  gap: 2px;
+  min-height: 0;
+  padding: 10px 8px;
+  border-color: var(--muted-line);
+  border-radius: 12px;
+}
+
+.vb-start__option--on {
+  border-color: var(--line);
+  box-shadow: 3px 3px 0 var(--line);
+}
+
+.vb-start__name {
+  font-size: 1.25rem;
+  font-weight: 900;
+}
+
+.vb-start__desc {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--ink-soft);
+}
+
+.vb-start__record {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin: 0;
+}
+
+.vb-start__record div {
+  display: flex;
+  flex-direction: column;
+  padding: 12px;
+  border: 1.5px solid var(--muted-line);
+  border-radius: 12px;
+}
+
+.vb-start__record dt {
+  font-size: 0.8125rem;
+  color: var(--ink-soft);
+}
+
+.vb-start__record dd {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+}
+
+.vb-start__record span {
+  font-size: 0.75rem;
+  color: var(--ink-soft);
+}
+
+.vb-start__button {
+  min-height: 64px;
+  font-size: 1.25rem;
+}
+
+.vb-start__sub {
+  flex-wrap: wrap;
+}
+
+.vb-start__sub span {
+  margin-left: 4px;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--ink-soft);
+}
+
+/* 결과 */
+.vb-result {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-width: 420px;
+  margin: 8px auto 0;
+}
+
+.vb-result__headline {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 20px 16px;
+  border: 2px solid var(--line);
+  border-radius: 14px;
+  text-align: center;
+}
+
+.vb-result__headline strong {
+  font-size: 3rem;
+  font-weight: 900;
+  line-height: 1.1;
+}
+
+.vb-result__headline span {
+  color: var(--ink-soft);
+  font-size: 0.875rem;
+}
+
+.vb-result__headline--win {
+  border-color: #d97706;
+  background: #fffbeb;
+}
+
+.vb-result__headline--win strong {
+  color: var(--accent);
+}
+
+.vb-result__headline .vb-result__badge {
+  padding: 2px 10px;
+  font-weight: 800;
+  color: var(--paper);
+  background: #d97706;
+  border-radius: 999px;
+}
+
+.vb-result__career,
+.vb-result__note {
+  margin: 0;
+  text-align: center;
+  font-size: 0.875rem;
+  color: var(--ink-soft);
+}
+
+.vb-result__buttons {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.vb-result__buttons .button--primary {
+  grid-column: 1 / -1;
+}
+
+/* 친구 대전 */
+.vb-pvp-wait {
+  margin-top: 24px;
+  text-align: center;
+  color: var(--ink-soft);
+}
+
+/* 폰 가로: 버튼을 코트 양옆에 두고 코트를 화면 높이에 맞춘다 */
+@media (orientation: landscape) and (max-height: 540px) {
+  .vb-page {
+    max-width: none;
+    padding-top: 6px;
+    padding-bottom: 6px;
+  }
+
+  .vb-header {
+    margin-bottom: 4px;
+  }
+
+  .vb-header .title {
+    font-size: 1.125rem;
+  }
+
+  .vb-header .button--small {
+    padding: 4px 10px;
+    font-size: 0.8125rem;
+  }
+
+  .vb-game {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    grid-template-areas:
+      'hud hud hud'
+      'move view act';
+    align-items: center;
+    gap: 6px 10px;
+  }
+
+  .vb-hud {
+    grid-area: hud;
+  }
+
+  .vb-hud__score {
+    font-size: 1.25rem;
+  }
+
+  .vb-deuce {
+    display: none;
+  }
+
+  .vb-view {
+    grid-area: view;
+    justify-self: center;
+    width: min(100%, calc((100dvh - 100px) * 1.6));
+  }
+
+  .vb-pads {
+    display: contents;
+  }
+
+  .vb-pads__move,
+  .vb-pads__act {
+    flex-direction: column;
+  }
+
+  .vb-pads__move {
+    grid-area: move;
+  }
+
+  .vb-pads__act {
+    grid-area: act;
+  }
+
+  .vb-pad {
+    width: 76px;
+    height: 72px;
+  }
+}
+
+/* 폰 세로: 코트가 작으니 가로로 돌리라고 알려 준다 */
+.vb-rotate {
+  display: none;
+  margin: 0;
+  text-align: center;
+  font-size: 0.8125rem;
+  color: var(--ink-soft);
+}
+
+@media (orientation: portrait) and (hover: none) {
+  .vb-rotate {
+    display: block;
+  }
+}

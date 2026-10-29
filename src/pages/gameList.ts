@@ -23,6 +23,15 @@ export const GAMES: GameEntry[] = [
     players: '2인',
   },
   {
+    id: 'volley',
+    title: '점프 배구',
+    description: '점프·스파이크로 15점 먼저',
+    path: '/games/volley',
+    ready: true,
+    play: 'pvp',
+    players: '2인',
+  },
+  {
     id: 'fight',
     title: '격투',
     description: '2초마다 준비·방어·타격 수 싸움',
