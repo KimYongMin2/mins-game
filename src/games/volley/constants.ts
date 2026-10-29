@@ -26,9 +26,10 @@ export const BODY_R = 0.6
 export const BODY_Y = 0.65
 export const HEAD_R = 0.45
 export const HEAD_Y = 1.6
-export const MOVE_SPEED = 6.5
-export const MOVE_ACCEL = 45
-export const JUMP_SPEED = 9.5
+/** 이동은 누르는 순간 이 속도 (가속 없이 바로 방향 전환. 처음 6.5 + 가속은 느리고 굼떠서 바꿈) */
+export const MOVE_SPEED = 8.5
+/** 점프 높이 = JUMP_SPEED² / (2 × 중력) ≈ 3.3m (처음 9.5 ≈ 2.3m는 낮았음) */
+export const JUMP_SPEED = 11.5
 /** 몸에 맞고 튈 때 남는 속도 비율과 최소 튀는 속도 (받으면 늘 위로 떠오르게) */
 export const BODY_BOUNCE = 0.75
 export const MIN_BUMP_SPEED = 8

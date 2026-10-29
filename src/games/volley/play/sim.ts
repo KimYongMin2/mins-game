@@ -23,7 +23,6 @@ import {
   HEAD_Y,
   JUMP_SPEED,
   MIN_BUMP_SPEED,
-  MOVE_ACCEL,
   MOVE_SPEED,
   NET_BOUNCE,
   NET_H,
@@ -157,10 +156,8 @@ function movePlayer(p: Player, side: Side, input: Input, ball: Ball, canHit: boo
     recover--
     vx *= 0.8
   } else {
-    // 원하는 속도로 가속·감속
-    const target = dir * MOVE_SPEED
-    const dv = MOVE_ACCEL * DT
-    vx = Math.abs(target - vx) <= dv ? target : vx + Math.sign(target - vx) * dv
+    // 누르는 순간 바로 그 방향 최고 속도, 떼면 바로 멈춤
+    vx = dir * MOVE_SPEED
     if (onGround && input.jump) vy = JUMP_SPEED
     if (pressed && onGround) {
       dive = steps(DIVE_S)
