@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { ANY_BUMP_UP, BALL_R, COURT_W, JUMP_SPEED, GRAVITY, NET_H, NET_X, STEP_HZ, WIN_SCORE } from '../constants'
+import { ANY_BUMP_UP, BALL_R, BUMP_UP, COURT_W, JUMP_SPEED, GRAVITY, NET_H, NET_X, STEP_HZ, WIN_SCORE } from '../constants'
 import { type Input, NO_INPUT, type SimState, createSim, sideBounds, step, winnerOf } from './sim'
 
 const idle: [Input, Input] = [NO_INPUT, NO_INPUT]
@@ -96,6 +96,25 @@ describe('몸에 맞으면', () => {
     for (let i = 0; i < 10 && s.lastHit?.kind !== 'bump'; i++) s = step(s, idle)
     expect(s.lastHit?.kind).toBe('bump')
     expect(s.ball.vy).toBeGreaterThanOrEqual(ANY_BUMP_UP)
+  })
+
+  it('땅에 서 있으면 빠른 스파이크도 위로 높이 뜬다 (옆으로 가던 힘은 빠짐)', () => {
+    const base = createSim(0)
+    const me = { ...base.players[0], x: 5 }
+    let s = rally({ x: 7, y: 1, vx: -25, vy: -1 }, { players: [me, base.players[1]] })
+    for (let i = 0; i < 10 && s.lastHit?.kind !== 'bump'; i++) s = step(s, idle)
+    expect(s.ball.vy).toBeGreaterThanOrEqual(BUMP_UP)
+    expect(Math.abs(s.ball.vx)).toBeLessThan(8)
+  })
+
+  it('공중에선 빠른 공이 옆에 맞으면 조금만 뜬다', () => {
+    const base = createSim(0)
+    const me = { ...base.players[0], x: 5, y: 1.5, vy: 0 }
+    let s = rally({ x: 7, y: 2.5, vx: -25, vy: 0 }, { players: [me, base.players[1]] })
+    for (let i = 0; i < 10 && s.lastHit?.kind !== 'bump'; i++) s = step(s, idle)
+    expect(s.lastHit?.kind).toBe('bump')
+    expect(s.ball.vy).toBeGreaterThanOrEqual(ANY_BUMP_UP)
+    expect(s.ball.vy).toBeLessThan(BUMP_UP)
   })
 
   it('판정은 발끝~머리 위 일자: 목 높이에 맞아도 같은 막대', () => {

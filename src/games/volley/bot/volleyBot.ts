@@ -20,7 +20,7 @@ type Tuning = {
 }
 
 const TUNING: Record<BotLevel, Tuning> = {
-  normal: { thinkEvery: 9, aimError: 0.9, jumpChance: 0.35, spikeChance: 0.45, diveChance: 0.3 },
+  normal: { thinkEvery: 14, aimError: 1.4, jumpChance: 0.35, spikeChance: 0.45, diveChance: 0.12 },
   hard: { thinkEvery: 3, aimError: 0.2, jumpChance: 0.75, spikeChance: 0.9, diveChance: 0.8 },
 }
 

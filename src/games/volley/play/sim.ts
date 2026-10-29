@@ -307,7 +307,9 @@ function moveBall(b: Ball, players: [Player, Player]): BallStep {
       const incoming = Math.hypot(rvx, rvy)
       // 빠른 공(스파이크)은 받아 넘기기 도움 없이 물리대로. 옆·아래에 맞으면 힘없이 떨어진다
       const fast = incoming >= FAST_BALL_SPEED
-      const absorbed = fast && ny <= 0.3
+      // 땅에 서 있으면(몸 날리기 포함) 어디에 맞든 공을 위로 띄운다. 빠른 공은 옆으로 가던 힘은 빠지고 위로만
+      const grounded = p.y <= 0
+      const absorbed = fast && (ny <= 0.3 || grounded)
       const bounce = absorbed ? FAST_HIT_BOUNCE : BODY_BOUNCE
       const vn = rvx * nx + rvy * ny
       if (vn < 0) {
@@ -324,9 +326,11 @@ function moveBall(b: Ball, players: [Player, Player]): BallStep {
       }
       // 받아 넘기기: 느린 공이 위·옆에 맞으면 네트 쪽으로 밀고 높이 띄운다 (네트에서 멀수록 세게 밀어 넘어가게).
       // 빠른 스파이크까지 받아 넘겨 주면 스파이크가 점수가 안 나서 랠리가 안 끝났음. 그 밖엔 조금만 뜬다
-      if (!fast && ny > -0.3) {
+      if (!fast && (ny > -0.3 || grounded)) {
         const push = Math.min(BUMP_PUSH_MAX, Math.max(BUMP_PUSH_MIN, Math.abs(p.x - NET_X) * BUMP_AIM))
         vx += towardNet(side as Side) * push
+        vy = Math.max(vy, BUMP_UP)
+      } else if (grounded) {
         vy = Math.max(vy, BUMP_UP)
       } else {
         vy = Math.max(vy, ANY_BUMP_UP)
