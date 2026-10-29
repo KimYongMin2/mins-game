@@ -26,6 +26,16 @@ export const BODY_R = 0.6
 export const BODY_Y = 0.65
 export const HEAD_R = 0.45
 export const HEAD_Y = 1.6
+/**
+ * 피격 판정: 발끝~머리 위까지 일자 막대(캡슐) 하나. 아래·위 끝 원 중심 높이와 반지름 → 0~2.1m.
+ * 처음엔 몸통·머리 원 두 개였는데 목 부분이 잘록해서 어디에 맞는지 헷갈렸음. 위 BODY_·HEAD_는 그림용
+ */
+export const HIT_R = 0.55
+export const HIT_LOW = 0.55
+export const HIT_HIGH = 1.55
+/** 몸 날리는 중: 막대가 보는 쪽으로 눕는다 (머리 쪽 끝이 앞으로 이만큼, 높이는 이만큼) */
+export const DIVE_REACH = 0.9
+export const DIVE_HIGH = 0.6
 /** 이동은 누르는 순간 이 속도 (가속 없이 바로 방향 전환. 처음 6.5 + 가속은 느리고 굼떠서 바꿈) */
 export const MOVE_SPEED = 8.5
 /** 점프 높이 = JUMP_SPEED² / (2 × 중력) ≈ 3.3m (처음 9.5 ≈ 2.3m는 낮았음) */
@@ -42,10 +52,14 @@ export const CARRY = 0.35
  */
 export const BUMP_AIM = 1
 export const BUMP_PUSH_MIN = 2.5
-export const BUMP_PUSH_MAX = 6
+export const BUMP_PUSH_MAX = 5
 export const BUMP_UP = 9
-/** 몸 옆에 맞은 공도 이보다 느리면 받아 넘긴다 (빠른 스파이크는 물리대로 튕겨서 받기 어렵게) */
-export const SIDE_BUMP_MAX_SPEED = 13
+/** 몸(위·옆)에 맞은 공이 이보다 느리면 받아 넘기기 도움을 준다. 빠른 공(스파이크)은 물리대로 튕겨서 받기 어렵게 */
+export const FAST_BALL_SPEED = 13
+/** 그 밖에 몸 어디에 맞든 공이 적어도 이만큼은 위로 뜬다 (빠른 스파이크도 조금은) */
+export const ANY_BUMP_UP = 2
+/** 빠른 공(FAST_BALL_SPEED 이상)이 몸 옆에 맞으면 남는 속도 비율 — 힘없이 떨어진다 */
+export const FAST_HIT_BOUNCE = 0.25
 /** 네트 꼭대기에 얹힌 공을 옆으로 미는 속도 (안 그러면 위에서 멈출 수 있음) */
 export const NET_TOP_NUDGE = 1.5
 
@@ -71,8 +85,6 @@ export const DIVE_SPEED = 9
 export const DIVE_S = 0.22
 /** 날린 뒤 못 움직이는 시간 */
 export const DIVE_RECOVER_S = 0.3
-/** 날리는 동안 몸이 낮아지는 비율 (낮은 공 살리기) */
-export const DIVE_LOW = 0.45
 
 /** 경기 */
 export const WIN_SCORE = 15

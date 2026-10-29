@@ -1,8 +1,8 @@
 // 봇: 공이 떨어질 자리를 물리로 미리 굴려 보고(predictBall) 그 조금 뒤(네트 반대쪽)에 서서 받아 넘긴다.
 // 공이 머리 위 적당한 높이로 오면 점프, 공중에서 손 닿으면 스파이크. 멀리 떨어지면 몸 날리기.
 // 일반은 짐작에 오차가 있고 늦게 반응하며 스파이크를 덜 쓴다.
-import { BALL_R, GRAVITY, HEAD_Y, JUMP_SPEED, NET_X, SPIKE_REACH, STEP_HZ } from '../constants'
-import { type Input, NO_INPUT, type Side, type SimState, type SpikeKind, circlesOf, predictBall, spikeBall, towardNet } from '../play/sim'
+import { BALL_R, GRAVITY, HIT_HIGH, HIT_R, JUMP_SPEED, NET_X, SPIKE_REACH, STEP_HZ } from '../constants'
+import { type Input, NO_INPUT, type Side, type SimState, type SpikeKind, headOf, predictBall, spikeBall, towardNet } from '../play/sim'
 
 export type BotLevel = 'normal' | 'hard'
 
@@ -48,7 +48,7 @@ export function botInput(s: SimState, side: Side, level: BotLevel, mind: BotMind
   let next = mind
   // 정해진 간격으로만 다시 생각한다 (일반은 굼뜨게)
   if (s.tick >= mind.until || Number.isNaN(mind.target)) {
-    const reach = me.y + HEAD_Y + 0.3
+    const reach = me.y + HIT_HIGH + HIT_R
     const land = predictBall(s.ball, reach)
     const mySide = (x: number) => (side === 0 ? x < NET_X : x > NET_X)
     let target = home
@@ -63,12 +63,12 @@ export function botInput(s: SimState, side: Side, level: BotLevel, mind: BotMind
 
   const dx = next.target - me.x
   // 공이 머리 바로 위로 떨어지는 중이면 멈춰서 받는다 (달리면서 받으면 몸 속도가 더해져 낮게 꽂힘)
-  const bracing = me.y === 0 && s.ball.vy < 0 && Math.abs(s.ball.x - me.x) < 1 && s.ball.y - (me.y + HEAD_Y) < 1.6 && s.ball.y > me.y + HEAD_Y
+  const bracing = me.y === 0 && s.ball.vy < 0 && Math.abs(s.ball.x - me.x) < 1 && s.ball.y - (me.y + HIT_HIGH) < 1.6 && s.ball.y > me.y + HIT_HIGH
   const dir = bracing || Math.abs(dx) < 0.15 ? 0 : Math.sign(dx)
   const input: Input = { left: dir < 0, right: dir > 0, jump: false, down: false, hit: false }
   if (s.phase.kind !== 'rally') return { input, mind: next }
 
-  const head = circlesOf(me)[1]
+  const head = headOf(me)
   const bx = s.ball.x - head.x
   const by = s.ball.y - head.y
   const onMySide = side === 0 ? s.ball.x < NET_X : s.ball.x > NET_X

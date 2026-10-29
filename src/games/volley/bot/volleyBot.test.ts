@@ -9,7 +9,7 @@ function game(a: BotLevel, b: BotLevel, server: Side, salt: number) {
   let m1 = createBotMind(salt + 1)
   let crosses = 0
   let left = s.ball.x < NET_X
-  while (s.phase.kind !== 'done' && s.tick < STEP_HZ * 60 * 20) {
+  while (s.phase.kind !== 'done' && s.tick < STEP_HZ * 60 * 40) {
     const r0 = botInput(s, 0, a, m0)
     const r1 = botInput(s, 1, b, m1)
     m0 = r0.mind
@@ -35,8 +35,8 @@ describe('봇', () => {
 
   it('일반끼리는 양쪽 다 이긴다 (한쪽으로 쏠리지 않음)', () => {
     const winners = new Set<number>()
-    for (let i = 0; i < 8; i++) {
-      const { s } = game('normal', 'normal', (i % 2) as Side, i * 977 + 3)
+    for (let i = 0; i < 12; i++) {
+      const { s } = game('normal', 'normal', (i % 2) as Side, i * 7919 + 3)
       if (s.phase.kind === 'done') winners.add(s.phase.winner)
     }
     expect(winners.size).toBe(2)

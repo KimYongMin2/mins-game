@@ -6,25 +6,27 @@ import {
   BALL_MAX_SPEED,
   BALL_R,
   BODY_BOUNCE,
-  BODY_R,
-  BODY_Y,
+  FAST_HIT_BOUNCE,
   BUMP_AIM,
   BUMP_PUSH_MAX,
   BUMP_PUSH_MIN,
+  ANY_BUMP_UP,
   BUMP_UP,
-  SIDE_BUMP_MAX_SPEED,
+  FAST_BALL_SPEED,
   CARRY,
   CEILING,
   COURT_W,
-  DIVE_LOW,
+  DIVE_HIGH,
+  DIVE_REACH,
   DIVE_RECOVER_S,
   DIVE_S,
   DIVE_SPEED,
   DT,
   GRAVITY,
   HIT_BUFFER_S,
-  HEAD_R,
-  HEAD_Y,
+  HIT_HIGH,
+  HIT_LOW,
+  HIT_R,
   JUMP_SPEED,
   MIN_BUMP_SPEED,
   MOVE_SPEED,
@@ -101,7 +103,7 @@ const steps = (s: number) => Math.round(s * STEP_HZ)
 
 /** 사람이 서 있을 수 있는 범위 */
 export function sideBounds(side: Side): [number, number] {
-  return side === 0 ? [BODY_R, NET_X - NET_HALF - BODY_R] : [NET_X + NET_HALF + BODY_R, COURT_W - BODY_R]
+  return side === 0 ? [HIT_R, NET_X - NET_HALF - HIT_R] : [NET_X + NET_HALF + HIT_R, COURT_W - HIT_R]
 }
 
 /** 네트 쪽 방향 */
@@ -147,12 +149,27 @@ export function spikeKindOf(input: Input, side: Side): SpikeKind {
 }
 
 /** 선수의 몸통·머리 원 (몸 날리는 중이면 낮게) */
-export function circlesOf(p: Player): { x: number; y: number; r: number; head: boolean }[] {
-  const low = p.dive > 0 ? DIVE_LOW : 1
-  return [
-    { x: p.x, y: p.y + BODY_Y * low, r: BODY_R, head: false },
-    { x: p.x, y: p.y + HEAD_Y * low, r: HEAD_R, head: true },
-  ]
+export type Capsule = { ax: number; ay: number; bx: number; by: number; r: number }
+
+/** 선수 피격 판정: 발끝~머리 위 일자 막대. a = 아래 끝, b = 머리 쪽 끝. 몸 날리는 중엔 보는 쪽으로 눕는다 */
+export function capsuleOf(p: Player): Capsule {
+  if (p.dive > 0) return { ax: p.x, ay: p.y + HIT_R * 0.8, bx: p.x + p.facing * DIVE_REACH, by: p.y + DIVE_HIGH, r: HIT_R }
+  return { ax: p.x, ay: p.y + HIT_LOW, bx: p.x, by: p.y + HIT_HIGH, r: HIT_R }
+}
+
+/** 머리 쪽 끝 (스파이크 닿는 거리를 여기서 잰다) */
+export function headOf(p: Player): { x: number; y: number } {
+  const c = capsuleOf(p)
+  return { x: c.bx, y: c.by }
+}
+
+/** 막대에서 점까지 가장 가까운 점 */
+function closestOnCapsule(c: Capsule, x: number, y: number): { x: number; y: number } {
+  const dx = c.bx - c.ax
+  const dy = c.by - c.ay
+  const len2 = dx * dx + dy * dy
+  const t = len2 === 0 ? 0 : Math.min(1, Math.max(0, ((x - c.ax) * dx + (y - c.ay) * dy) / len2))
+  return { x: c.ax + dx * t, y: c.ay + dy * t }
 }
 
 function movePlayer(p: Player, side: Side, input: Input, ball: Ball, canHit: boolean): { p: Player; spike: Ball | null } {
@@ -185,7 +202,7 @@ function movePlayer(p: Player, side: Side, input: Input, ball: Ball, canHit: boo
     }
     // 공중에서 누른 치기: 기억하는 동안 공이 손에 닿으면 스파이크
     if (hitBuffer > 0 && !onGround && !spiked && canHit) {
-      const head = circlesOf(p)[1]
+      const head = headOf(p)
       if (Math.hypot(ball.x - head.x, ball.y - head.y) <= SPIKE_REACH) {
         spiked = true
         hitBuffer = 0
@@ -272,44 +289,50 @@ function moveBall(b: Ball, players: [Player, Player]): BallStep {
     hit = { kind: 'net', player: null }
   }
 
-  // 선수 몸: 원끼리 충돌. 부딪힌 방향으로 튀고, 선수 속도도 조금 더해 준다
+  // 선수 몸: 일자 막대(캡슐)와 충돌. 막대에서 가장 가까운 점 쪽으로 튀고, 선수 속도도 조금 더해 준다
   players.forEach((p, side) => {
     if (p.touchCool > 0) return
-    for (const c of circlesOf(p)) {
+    {
+      const cap = capsuleOf(p)
+      const c = closestOnCapsule(cap, x, y)
       const ex = x - c.x
       const ey = y - c.y
       const dist = Math.hypot(ex, ey)
-      if (dist >= BALL_R + c.r) continue
+      if (dist >= BALL_R + cap.r) return
       const [nx, ny] = dist > 1e-6 ? [ex / dist, ey / dist] : [0, 1]
-      x = c.x + nx * (BALL_R + c.r)
-      y = c.y + ny * (BALL_R + c.r)
+      x = c.x + nx * (BALL_R + cap.r)
+      y = c.y + ny * (BALL_R + cap.r)
       const rvx = vx - p.vx
       const rvy = vy - p.vy
       const incoming = Math.hypot(rvx, rvy)
+      // 빠른 공(스파이크)은 받아 넘기기 도움 없이 물리대로. 옆·아래에 맞으면 힘없이 떨어진다
+      const fast = incoming >= FAST_BALL_SPEED
+      const absorbed = fast && ny <= 0.3
+      const bounce = absorbed ? FAST_HIT_BOUNCE : BODY_BOUNCE
       const vn = rvx * nx + rvy * ny
       if (vn < 0) {
-        vx -= (1 + BODY_BOUNCE) * vn * nx
-        vy -= (1 + BODY_BOUNCE) * vn * ny
+        vx -= (1 + bounce) * vn * nx
+        vy -= (1 + bounce) * vn * ny
       }
       vx += p.vx * CARRY
       vy += Math.max(0, p.vy) * CARRY
-      // 받으면 늘 어느 정도는 튀어 나가게
+      // 받으면 늘 어느 정도는 튀어 나가게 (힘없이 떨어지는 공은 빼고)
       const out = vx * nx + vy * ny
-      if (out < MIN_BUMP_SPEED) {
+      if (!absorbed && out < MIN_BUMP_SPEED) {
         vx += (MIN_BUMP_SPEED - out) * nx
         vy += (MIN_BUMP_SPEED - out) * ny
       }
-      // 받아 넘기기: 네트 쪽으로 밀고 높이 띄운다 (네트에서 멀수록 세게 밀어 넘어가게).
-      // 위쪽에 맞으면 늘, 몸 옆에 맞으면 느린 공만 (처음엔 위쪽만이라 서브가 옆에 맞으면 내 코트에 꽂혔고,
-      // 옆도 다 띄우니 빠른 스파이크까지 다 받아져서 랠리가 안 끝났음)
-      if (ny > 0.3 || (ny > -0.3 && incoming < SIDE_BUMP_MAX_SPEED)) {
+      // 받아 넘기기: 느린 공이 위·옆에 맞으면 네트 쪽으로 밀고 높이 띄운다 (네트에서 멀수록 세게 밀어 넘어가게).
+      // 빠른 스파이크까지 받아 넘겨 주면 스파이크가 점수가 안 나서 랠리가 안 끝났음. 그 밖엔 조금만 뜬다
+      if (!fast && ny > -0.3) {
         const push = Math.min(BUMP_PUSH_MAX, Math.max(BUMP_PUSH_MIN, Math.abs(p.x - NET_X) * BUMP_AIM))
         vx += towardNet(side as Side) * push
         vy = Math.max(vy, BUMP_UP)
+      } else {
+        vy = Math.max(vy, ANY_BUMP_UP)
       }
       hit = { kind: 'bump', player: side as Side }
       touched.push(side as Side)
-      break
     }
   })
 
