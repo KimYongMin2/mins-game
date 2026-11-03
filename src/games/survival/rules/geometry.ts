@@ -3,7 +3,7 @@
 // 총알은 쏜 사람 자리에서 고른 방향으로 일자로 나가 처음 맞은 한 명에서 멈춘다. 엄폐물(벽)에 먼저 닿으면 거기서 멈추고,
 // 아무도 없으면 맵 끝까지.
 import type { Rng } from '../../../shared/random'
-import { ARENA_BY_PLAYERS, MAX_ARENA, PIECE_R, WALL_GAP, WALL_LEN, WALL_THICK } from '../constants'
+import { ARENA_BY_PLAYERS, MAX_ARENA, NO_WALL_HALF, PIECE_R, WALL_GAP, WALL_LEN, WALL_THICK } from '../constants'
 
 export type Vec = { x: number; y: number }
 
@@ -85,7 +85,7 @@ function rayWall(from: Vec, dx: number, dy: number, w: Wall): number | null {
 
 /** 라운드마다 엄폐물 짓기: 맵이 클수록 많이(7~8명 4개 · 5~6명 3개 · 3~4명 2개 · 2명 1개, 처음 5~3개는 너무 많아 줄임), 서로 떨어지게, 맵 안에 다 들어오게 */
 export function makeWalls(rng: Rng, half: number): Wall[] {
-  const count = Math.max(1, Math.min(4, Math.round((half - 20) / 10)))
+  const count = half < NO_WALL_HALF ? 0 : Math.max(1, Math.min(4, Math.round((half - 20) / 10)))
   const walls: Wall[] = []
   for (let tries = 0; walls.length < count && tries < 200; tries++) {
     const w = WALL_LEN[0] + rng.next() * (WALL_LEN[1] - WALL_LEN[0])

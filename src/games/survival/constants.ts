@@ -7,6 +7,11 @@ export const MAX_PLAYERS = 8
  *  처음엔 5라운드까지 라운드마다 줄였는데(50→20), 사람 수에 맞추고 둘이면 적당히 넓게 두기로 바꿈 */
 export const ARENA_BY_PLAYERS: Readonly<Record<number, number>> = { 2: 30, 3: 35, 4: 40, 5: 45, 6: 50, 7: 55, 8: 60 }
 export const MAX_ARENA = ARENA_BY_PLAYERS[8]
+/** 둘이 남았는데 아무도 안 죽은 라운드 뒤엔 맵을 이만큼씩 줄인다 (끝없이 버티지 못하게). 최소 SHRINK_MIN */
+export const SHRINK_STEP = 4
+export const SHRINK_MIN = 14
+/** 맵이 이보다 작으면 엄폐물 없음 (벽이 맵을 가로막아서) */
+export const NO_WALL_HALF = 24
 
 /** 엄폐물(벽): 길이·두께. 라운드마다 무작위로 새로 짓는다 */
 export const WALL_LEN: readonly [number, number] = [10, 18]

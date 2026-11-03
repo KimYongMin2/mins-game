@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { AFTER_SHOT_MS, COUNTDOWN_MS, LASER_SPEED, PIECE_R, PLAN_MS, SHOT_AT } from '../constants'
+import { AFTER_SHOT_MS, COUNTDOWN_MS, LASER_SPEED, PIECE_R, PLAN_MS, SHOT_AT, SHRINK_MIN } from '../constants'
 import { type EngineState, type Player, aliveIndexes, createEngine, engineReducer, hitAtOf, ranksOf } from './engine'
 
 const people = (n: number): Player[] => Array.from({ length: n }, (_, i) => ({ id: `p${i}`, name: `사람${i}`, kind: i === 0 ? 'user' : 'remote' }))
@@ -85,6 +85,24 @@ describe('라운드', () => {
     s = tick(s, COUNTDOWN_MS + 1 + s.lastReveal!.ms)
     expect(s.alive.filter(Boolean)).toHaveLength(3)
     expect(s.half).toBe(35)
+  })
+
+  it('둘이 남았는데 아무도 안 죽으면 라운드마다 맵이 줄어든다 (최소까지)', () => {
+    let s = createEngine({ now: 0, seed: 1, players: people(2) })
+    expect(s.half).toBe(30)
+    const halves: number[] = []
+    for (let round = 0; round < 6; round++) {
+      const t0 = s.phase.until
+      s = tick({ ...s, walls: [] }, t0)
+      // 둘 다 위로 쏴서 아무도 안 맞음
+      s = lockAt(s, 0, -8, 0, Math.PI / 2)
+      s = lockAt(s, 1, 8, 0, Math.PI / 2)
+      s = tick(s, t0 + 1)
+      s = tick(s, t0 + 1 + s.lastReveal!.ms)
+      halves.push(s.half)
+    }
+    expect(halves).toEqual([26, 22, 18, 14, 14, 14].map((h) => Math.max(SHRINK_MIN, h)))
+    expect(s.walls.length).toBe(0)
   })
 
   it('나가면 탈락, 한 명 남으면 끝', () => {

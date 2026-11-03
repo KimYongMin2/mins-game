@@ -3,7 +3,7 @@
 // 5라운드 뒤로는 가장 작은 맵 그대로 한 명 남을 때까지.
 import { type Rng, createRng } from '../../../shared/random'
 import { chooseBotPlan } from '../bot/survivalBot'
-import { AFTER_SHOT_MS, BOT_PLAN_MS, COUNTDOWN_MS, DONE_MS, LASER_SPEED, PLAN_MS, SHOT_AT } from '../constants'
+import { AFTER_SHOT_MS, BOT_PLAN_MS, COUNTDOWN_MS, DONE_MS, LASER_SPEED, PLAN_MS, SHOT_AT, SHRINK_MIN, SHRINK_STEP } from '../constants'
 import { type Vec, type Wall, halfFor, makeWalls, placeAt, randomSpot, shoot } from '../rules/geometry'
 
 /** user = 이 기기, bot = 봇, remote = 방에 들어온 친구 */
@@ -66,10 +66,9 @@ export type EngineAction =
 
 export const aliveIndexes = (s: { alive: boolean[] }) => s.alive.flatMap((a, i) => (a ? [i] : []))
 
-/** 라운드 준비: 남은 사람 수로 맵 크기를 정하고 엄폐물을 새로 짓는다 */
-function buildWalls(s: EngineState): EngineState {
+/** 라운드 준비: 남은 사람 수로 맵 크기를 정하고(줄이는 중이면 그 크기) 엄폐물을 새로 짓는다 */
+function buildWalls(s: EngineState, half = halfFor(aliveIndexes(s).length)): EngineState {
   const rng = createRng(s.seed)
-  const half = halfFor(aliveIndexes(s).length)
   const walls = makeWalls(rng, half)
   return { ...s, seed: rng.seed(), half, walls }
 }
@@ -162,7 +161,10 @@ function afterReveal(s: EngineState): EngineState {
     ? { ...s, kills, alive: s.alive.map((a, i) => a && !r.dead.includes(i)), out: [...s.out, r.dead] }
     : { ...s, kills }
   if (aliveIndexes(next).length <= 1) return { ...next, phase: { kind: 'done', until: s.now + DONE_MS } }
-  return buildWalls({ ...next, round: next.round + 1, plans: {}, phase: { kind: 'countdown', until: s.now + COUNTDOWN_MS } })
+  // 둘이 남았는데 아무도 안 죽었으면 맵을 줄인다
+  const alive = aliveIndexes(next).length
+  const half = alive === 2 && r.dead.length === 0 ? Math.max(SHRINK_MIN, Math.min(s.half, halfFor(2)) - SHRINK_STEP) : halfFor(alive)
+  return buildWalls({ ...next, round: next.round + 1, plans: {}, phase: { kind: 'countdown', until: s.now + COUNTDOWN_MS } }, half)
 }
 
 function drop(s: EngineState, player: number): EngineState {
