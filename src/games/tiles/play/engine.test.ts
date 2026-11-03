@@ -4,6 +4,7 @@ import { HAND_SIZE, TURN_MS } from '../constants'
 import { isValidSet } from '../rules/sets'
 import { TILE_COUNT, WILD_IDS, tileId } from '../rules/tiles'
 import { type EngineState, type Player, createEngine, engineReducer, rankingOf } from './engine'
+import { toView } from './view'
 
 const bots = (n: number): Player[] => Array.from({ length: n }, (_, i) => ({ id: `b${i}`, name: `봇${i}`, kind: 'bot' }))
 
@@ -147,5 +148,38 @@ describe('시간 초과', () => {
     const s = myTurn()
     expect(engineReducer(s, { type: 'draft', player: 0, turnSeq: 5, table: [hand.slice(0, 3)] }).draft).toBeNull()
     expect(engineReducer(s, { type: 'draft', player: 1, turnSeq: 0, table: [hand.slice(0, 3)] }).draft).toBeNull()
+  })
+})
+
+describe('따라보기', () => {
+  it('가져온 타일을 last.drawn에 남긴다', () => {
+    const players: Player[] = [
+      { id: 'me', name: '나', kind: 'user' },
+      { id: 'b', name: '봇', kind: 'bot' },
+    ]
+    let s = createEngine({ now: 0, seed: 7, players })
+    s = { ...s, turn: 0, phase: { kind: 'turn', until: 99_999 } }
+    const top = s.pool[0]
+    s = engineReducer(s, { type: 'draw', player: 0 })
+    expect(s.last).toMatchObject({ kind: 'draw', player: 0, drawn: top })
+    expect(s.hands[0]).toContain(top)
+  })
+
+  it('봇은 바뀐 줄을 하나씩 짜는 중인 바닥으로 보여 준 뒤 낸다', () => {
+    const tens = [0, 1, 2].map((c) => tileId(c, 10))
+    const elevens = [0, 1, 2].map((c) => tileId(c, 11))
+    let s = createEngine({ now: 0, seed: 7, players: bots(2) })
+    s = { ...s, hands: [[...tens, ...elevens, tileId(3, 1)], s.hands[1]], turn: 0, melded: [true, true], phase: { kind: 'turn', until: 99_999 } }
+    const seen: number[] = []
+    let now = 0
+    while (s.last === null && now < 20_000) {
+      now += 100
+      s = engineReducer(s, { type: 'tick', now })
+      const v = toView(s)
+      if (v.draft && seen.at(-1) !== v.draft.length) seen.push(v.draft.length)
+    }
+    expect(seen).toEqual([1, 2])
+    expect(s.last?.kind).toBe('play')
+    expect(s.table).toHaveLength(2)
   })
 })

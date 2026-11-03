@@ -205,6 +205,27 @@ button.nt-tile {
   gap: 4px;
 }
 
+.nt-drawn {
+  align-self: center;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 10px 2px 12px;
+  border: 2px solid #111;
+  border-radius: 999px;
+  background: #fff3bf;
+  font-size: 0.875rem;
+  font-weight: 800;
+  animation: nt-drawn-in 0.3s ease-out;
+}
+
+@keyframes nt-drawn-in {
+  from {
+    transform: scale(0.6);
+    opacity: 0;
+  }
+}
+
 .nt-status__tip {
   text-align: center;
   font-size: 0.875rem;

@@ -91,3 +91,39 @@ describe('가운데 끼우면 저절로 끊기', () => {
     expect(d.table).toEqual([[r(4), r(5), r(6)]])
   })
 })
+
+describe('가운데서 빼면 뒤쪽이 떨어져 나감', () => {
+  const run = [3, 4, 5, 6, 7].map((n) => r(n))
+
+  it('3~7에서 5를 새 줄로 → 3·4 / 6·7 / 5', () => {
+    let d = createDraft([run], [], true)
+    d = draftReducer(d, { type: 'place', set: -1, tiles: [r(5)] })
+    expect(d.table).toEqual([[r(3), r(4)], [r(6), r(7)], [r(5)]])
+  })
+
+  it('다른 줄로 옮겨도 끊긴다', () => {
+    let d = createDraft([run, [r(9, 1), r(10)]], [], true)
+    d = draftReducer(d, { type: 'place', set: 1, at: 0, tiles: [r(5)] })
+    expect(d.table).toEqual([[r(3), r(4)], [r(6), r(7)], [r(5), r(9, 1), r(10)]])
+  })
+
+  it('내 타일을 손으로 돌려도 끊긴다', () => {
+    let d = createDraft([[r(4), r(6)]], [r(5)], true)
+    d = draftReducer(d, { type: 'place', set: 0, at: 1, tiles: [r(5)] })
+    d = draftReducer(d, { type: 'unplace', tiles: [r(5)] })
+    expect(d.table).toEqual([[r(4)], [r(6)]])
+  })
+
+  it('같은 숫자 줄은 안 끊김', () => {
+    const group = [0, 1, 2, 3].map((c) => tileId(c, 7))
+    let d = createDraft([group], [], true)
+    d = draftReducer(d, { type: 'place', set: -1, tiles: [group[1]] })
+    expect(d.table).toEqual([[group[0], group[2], group[3]], [group[1]]])
+  })
+
+  it('같은 줄 안에서 자리만 바꾸면 안 끊김', () => {
+    let d = createDraft([run], [], true)
+    d = draftReducer(d, { type: 'place', set: 0, at: 5, tiles: [r(5)] })
+    expect(d.table).toEqual([[r(3), r(4), r(6), r(7), r(5)]])
+  })
+})

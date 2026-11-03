@@ -3,7 +3,7 @@
 // 고른 채로 줄을 누르면 맨 뒤, [새 줄]이면 새 줄로. 연속 줄은 순서가 맞아야 한다.
 import { isValidSet } from '../rules/sets'
 import { checkPlay, type PlayCheck, type Table } from '../rules/turn'
-import type { TileId } from '../rules/tiles'
+import { type TileId, isWild, numOf } from '../rules/tiles'
 
 export type Draft = {
   /** 차례가 시작될 때 바닥과 손패 */
@@ -47,7 +47,23 @@ export function checkDraft(d: Draft): PlayCheck {
   return checkPlay({ oldTable: d.base, hand: d.hand, newTable: d.table, melded: d.melded })
 }
 
-const without = (table: Table, ids: readonly TileId[]) => table.map((s) => s.filter((id) => !ids.includes(id)))
+/**
+ * 줄에서 타일을 빼면 뺀 자리에서 끊는다 (3·4·5·6·7에서 5를 빼면 3·4 / 6·7).
+ * 남은 걸 이어 붙여도 맞거나 같은 숫자 줄이면 그대로 (7·7·7·7에서 하나 빼도 7·7·7)
+ */
+function removeFrom(set: TileId[], ids: readonly TileId[]): Table {
+  const rest = set.filter((id) => !ids.includes(id))
+  const nums = new Set(rest.filter((id) => !isWild(id)).map(numOf))
+  if (rest.length === set.length || isValidSet(rest) || nums.size <= 1) return [rest]
+  const pieces: Table = [[]]
+  for (const id of set) {
+    if (!ids.includes(id)) pieces[pieces.length - 1].push(id)
+    else if (pieces[pieces.length - 1].length > 0) pieces.push([])
+  }
+  return pieces
+}
+
+const without = (table: Table, ids: readonly TileId[]) => table.flatMap((s) => removeFrom(s, ids))
 const clean = (table: Table) => table.filter((s) => s.length > 0)
 
 /**
@@ -76,14 +92,16 @@ export function draftReducer(d: Draft, a: DraftAction): Draft {
       const moving = a.tiles ?? d.selected
       if (moving.length === 0) return d
       // 줄 번호·자리는 옮길 타일을 빼기 전 기준
-      const stripped = without(d.table, moving)
+      // 옮겨 가는 줄 안에서 자리만 바꾸는 건 끊지 않는다
       const insert = (i: number): Table => {
+        const s = d.table[i].filter((id) => !moving.includes(id))
         const before = d.table[i].slice(0, a.at ?? d.table[i].length).filter((id) => !moving.includes(id)).length
-        const s = stripped[i]
         return splitIfNeeded(s.slice(0, before), moving, s.slice(before))
       }
       const table =
-        a.set >= 0 && a.set < stripped.length ? stripped.flatMap((s, i) => (i === a.set ? insert(i) : [s])) : [...stripped, [...moving]]
+        a.set >= 0 && a.set < d.table.length
+          ? d.table.flatMap((s, i) => (i === a.set ? insert(i) : removeFrom(s, moving)))
+          : [...without(d.table, moving), [...moving]]
       return { ...d, table: clean(table), selected: [] }
     }
     case 'unplace': {

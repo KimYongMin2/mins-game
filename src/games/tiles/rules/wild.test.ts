@@ -100,10 +100,10 @@ describe('작업판에서 와일드', () => {
     for (const id of [t(B, 9), t(K, 9), W1]) d = draftReducer(d, { type: 'toggle', tile: id })
     d = draftReducer(d, { type: 'place', set: -1 })
     expect(checkDraft(d)).toEqual({ ok: false, problem: 'bad-set' })
-    // 4·6 줄 맨 뒤에 5를 놓으면 4·6·5라 틀림, 가운데(1번 자리)에 끼워야 맞음
-    d = draftReducer(d, { type: 'toggle', tile: t(R, 5) })
-    expect(checkDraft(draftReducer(d, { type: 'place', set: 0 }))).toEqual({ ok: false, problem: 'bad-set' })
-    d = draftReducer(d, { type: 'place', set: 0, at: 1 })
+    // 가운데 와일드를 빼면 4 / 6으로 끊긴다. 4 뒤에 5, 그 뒤에 6을 붙여야 맞음
+    expect(d.table.slice(0, 2)).toEqual([[t(R, 4)], [t(R, 6)]])
+    d = draftReducer(d, { type: 'place', set: 0, tiles: [t(R, 5)] })
+    d = draftReducer(d, { type: 'place', set: 0, tiles: [t(R, 6)] })
     expect(d.table[0]).toEqual([t(R, 4), t(R, 5), t(R, 6)])
     expect(checkDraft(d).ok).toBe(true)
   })

@@ -21,5 +21,7 @@ export const INTRO_MS = 1800
 export const TURN_MS = 60_000
 /** 봇이 한 차례 생각하는 시간 */
 export const BOT_THINK_MS: readonly [number, number] = [1200, 2600]
+/** 봇이 바뀐 줄을 하나씩 보여 주는 간격 */
+export const BOT_STEP_MS = 700
 /** 경기가 끝난 뒤 결과 화면으로 넘어가기까지 */
 export const DONE_MS = 3000

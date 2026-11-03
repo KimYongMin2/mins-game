@@ -9,6 +9,8 @@ export type TilesView = {
   left: boolean[]
   hands: TileId[][]
   table: Table
+  /** 차례인 사람이 짜고 있는 바닥 (아직 안 냄). 바뀔 때마다 보내서 다른 사람이 따라본다 */
+  draft: Table | null
   melded: boolean[]
   poolCount: number
   turn: number
@@ -26,6 +28,7 @@ export function toView(s: EngineState): TilesView {
     left: s.left,
     hands: s.hands,
     table: s.table,
+    draft: s.phase.kind === 'turn' && s.draft?.player === s.turn ? s.draft.table : null,
     melded: s.melded,
     poolCount: s.pool.length,
     turn: s.turn,
@@ -39,7 +42,7 @@ export function toView(s: EngineState): TilesView {
 /** 친구에게 바로 알려야 할 만큼 바뀌었는지 (그 밖엔 1초마다 보냄) */
 export function viewChanged(a: TilesView | null, b: TilesView): boolean {
   if (!a) return true
-  return a.phase !== b.phase || a.turn !== b.turn || a.last?.seq !== b.last?.seq || a.left.some((x, i) => x !== b.left[i])
+  return a.phase !== b.phase || a.turn !== b.turn || a.last?.seq !== b.last?.seq || a.draft !== b.draft || a.left.some((x, i) => x !== b.left[i])
 }
 
 export type SoundName = 'turn' | 'play' | 'draw' | 'pick' | 'drop' | 'nope' | 'win' | 'lose'

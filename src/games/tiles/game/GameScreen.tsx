@@ -258,12 +258,27 @@ export function GameScreen(props: Props) {
   })
   const target: DropTarget = drag?.target ?? null
 
+  // 내가 가져온 타일을 기억해 둔다 (내가 내면 지움)
+  const [drawn, setDrawn] = useState<number | null>(null)
+  const lastSeq = v?.last?.seq
+  useEffect(() => {
+    const last = screenRef.current.view?.last
+    if (!last || last.player !== myIndex(screenRef.current)) return
+    setDrawn(last.kind === 'draw' ? (last.drawn ?? null) : null)
+  }, [lastSeq])
+
   if (!v) return <p className="nt-tip">시작하는 중…</p>
 
-  const table = mine ? draft.table : v.table
+  // 남의 차례엔 그 사람이 짜고 있는 바닥을 그대로 따라 그린다 (손에서 올린 타일은 표시)
+  const watching = !mine && v.phase === 'turn' && v.draft ? v.draft : null
+  const table = mine ? draft.table : (watching ?? v.table)
   const placed = mine ? placedOf(draft) : []
-  const justPlaced = !mine && v.last?.kind === 'play' ? v.last.placed : []
+  const onTable = new Set(v.table.flat())
+  const justPlaced = watching ? watching.flat().filter((id) => !onTable.has(id)) : !mine && v.last?.kind === 'play' ? v.last.placed : []
+  // 방금 내가 가져온 타일 (다음 차례에 내기 전까지 손패에 표시)
   const myHand = me >= 0 ? (mine ? rackOf(draft) : v.hands[me]) : []
+  const drawnTile = drawn !== null && myHand.includes(drawn) ? drawn : null
+  const justDrew = v.last?.kind === 'draw' && v.last.player === me && drawnTile !== null
   const rack = props.sortBy === 'color' ? sortByColor(myHand) : sortByNumber(myHand)
   const check = checkDraft(draft)
   const changed = mine && placed.length > 0
@@ -299,7 +314,7 @@ export function GameScreen(props: Props) {
             ? ` · ${v.players[v.last.player].name} 1장 가져감`
             : ''
         : ''
-    tip = `${v.players[v.turn].name} 차례…${lastText}`
+    tip = watching ? `${v.players[v.turn].name} 바닥을 짜는 중…` : `${v.players[v.turn].name} 차례…${lastText}`
   } else if (selected.length > 0) tip = '끌어서 원하는 자리에 놓거나, 줄을 누르면 맨 뒤 · [새 줄]'
   else if (!changed) tip = v.melded[me] ? '타일을 끌어 놓아요. 바닥 타일도 옮길 수 있어요' : '첫 등록: 내 타일로 합 30 이상 줄을 만들어요'
   else tip = check.ok ? '다 맞아요! [내려놓기]' : PROBLEM_TEXT[check.problem]
@@ -346,6 +361,11 @@ export function GameScreen(props: Props) {
       </div>
 
       <div className="nt-status">
+        {justDrew && drawnTile !== null && (
+          <span className="nt-drawn">
+            가져온 타일 <Tile id={drawnTile} small />
+          </span>
+        )}
         <span className={mine ? 'nt-status__tip nt-status__tip--mine' : 'nt-status__tip'}>{tip}</span>
         {v.phase === 'turn' && (
           <div className="nt-timer" aria-hidden>
@@ -387,7 +407,7 @@ export function GameScreen(props: Props) {
         </div>
         <div className="nt-rack__tiles">
           {rack.map((id) => (
-            <Tile key={id} id={id} selected={selected.includes(id)} dragging={dragging(id)} {...grab(id)} />
+            <Tile key={id} id={id} selected={selected.includes(id)} fresh={id === drawnTile} dragging={dragging(id)} {...grab(id)} />
           ))}
         </div>
       </div>
