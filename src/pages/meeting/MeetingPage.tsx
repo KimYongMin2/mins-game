@@ -2,24 +2,41 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router'
 import { levelContext, watchLevel } from '../../shared/call/level'
 import { type CallPeer, type CallSignal, VoiceMesh } from '../../shared/call/voiceMesh'
-import { CODE_LENGTH, type Member, type Room, RoomError, createRoom, joinRoom, normalizeCode } from '../../shared/online/room'
+import { type Member, type Room, RoomError, createRoom, joinRoom, makeRoomCode } from '../../shared/online/room'
+import { advertiseRoom, watchRooms } from '../../shared/online/roomList'
 import { loadNickname } from '../../shared/storage/nickname'
 import './meeting.css'
 
-// 회의방: 방 코드로 모여 음성 통화. 게임과 같은 방(Supabase Realtime)으로 연결 정보만 주고받고, 소리는 기기끼리 직접.
-// 처음 누를 때 마이크를 허락받는다. 거절하면 듣기만 (나중에 다시 허락할 수 있음).
+// 회의방: 열린 방 목록에서 골라 들어가 음성 통화. 방장이 방을 만들 때 이름과 전체 공개/비공개(코드)를 정한다.
+// 비공개 방도 목록에 🔒로 보이고, 누르면 코드를 물어본다. 코드는 방 채널 이름에 들어가 있어서 틀리면 '방 없음'이 된다.
+// 게임과 같은 방(Supabase Realtime)으로 연결 정보만 주고받고, 소리는 기기끼리 직접.
+// 들어갈 때 마이크를 허락받는다. 거절하면 듣기만 (나중에 다시 허락할 수 있음).
 
 /** 정원 (나 포함). 서로 다 잇는 방식이라 이보다 많으면 폰이 버겁다 */
 const CAPACITY = 8
 const ROOM_ID = 'meeting'
+/** 비공개 방 코드 자리 수 (숫자) */
+const PIN_LENGTH = 4
+const NAME_MAX = 20
 
-type View = { kind: 'menu' } | { kind: 'busy'; text: string } | { kind: 'error'; text: string } | { kind: 'room'; room: Room<CallSignal>; track: MediaStreamTrack | null }
+/** 목록에 올리는 방 정보 */
+type RoomInfo = { id: string; name: string; locked: boolean; count: number; at: number }
+
+/** 들어간 방: 이름과, 비공개면 코드 (화면에 보여 줌) */
+type Joined = { room: Room<CallSignal>; track: MediaStreamTrack | null; name: string; pin: string | null }
+
+type View = { kind: 'list'; error?: string } | { kind: 'create' } | { kind: 'busy'; text: string } | ({ kind: 'room' } & Joined)
 
 const ERROR_TEXT: Record<RoomError['reason'], string> = {
-  'not-found': '그 코드의 회의방이 없어요. 코드를 다시 확인해 주세요',
+  'not-found': '방이 없어졌어요',
   full: `회의방이 가득 찼어요 (${CAPACITY}명)`,
   offline: '서버에 연결하지 못했어요. 인터넷 연결을 확인해 주세요',
 }
+
+/** 방 채널 코드: 비공개면 코드를 붙여서, 코드가 틀리면 다른(빈) 채널이 된다 */
+const channelCode = (id: string, pin: string | null) => (pin ? `${id}-${pin}` : id)
+
+const randomPin = () => String(Math.floor(Math.random() * 10 ** PIN_LENGTH)).padStart(PIN_LENGTH, '0')
 
 /** 마이크 허락받기. 거절하거나 없으면 null (듣기만) */
 async function getMic(): Promise<MediaStreamTrack | null> {
@@ -82,17 +99,15 @@ const CONNECTION_TEXT: Record<CallPeer['connection'], string | null> = {
   failed: '연결 안 됨',
 }
 
-type RoomProps = {
-  room: Room<CallSignal>
+type RoomProps = Joined & {
   nickname: string
-  track: MediaStreamTrack | null
   /** 나중에 마이크를 허락받음 */
   onTrack: (track: MediaStreamTrack) => void
   onLeave: () => void
 }
 
 /** 방을 닫고 마이크를 끄는 건 부르는 쪽(MeetingPage)이 한다 */
-function MeetingRoom({ room, nickname, track, onTrack, onLeave }: RoomProps) {
+function MeetingRoom({ room, name, pin, nickname, track, onTrack, onLeave }: RoomProps) {
   const [members, setMembers] = useState<Member[]>([])
   const [blocked, setBlocked] = useState(false)
   const [asking, setAsking] = useState(false)
@@ -125,6 +140,25 @@ function MeetingRoom({ room, nickname, track, onTrack, onLeave }: RoomProps) {
     }
   }, [room])
 
+  // 방장: 목록에 방을 올려 두고 사람 수를 고친다 (방장이 나가면 목록에서 사라짐)
+  const count = members.length + 1
+  const advertRef = useRef<ReturnType<typeof advertiseRoom<RoomInfo>> | null>(null)
+  const [createdAt] = useState(() => Date.now())
+  const infoRef = useRef<RoomInfo>({ id: room.code.split('-')[0], name, locked: !!pin, count, at: createdAt })
+  useEffect(() => {
+    if (room.role !== 'host') return
+    const advert = advertiseRoom(ROOM_ID, infoRef.current)
+    advertRef.current = advert
+    return () => {
+      advert.stop()
+      advertRef.current = null
+    }
+  }, [room])
+  useEffect(() => {
+    infoRef.current = { ...infoRef.current, count }
+    advertRef.current?.update(infoRef.current)
+  }, [count])
+
   const micOn = !!track && call.mic
   const myStream = useMemo(() => (track ? new MediaStream([track]) : null), [track])
   const peers = new Map(call.peers.map((p) => [p.id, p]))
@@ -150,10 +184,16 @@ function MeetingRoom({ room, nickname, track, onTrack, onLeave }: RoomProps) {
   return (
     <section className="meet">
       <div className="meet__code">
-        <span>회의방 코드</span>
-        <strong>{room.code}</strong>
+        <strong className="meet__name">{name}</strong>
         <span>
-          {members.length + 1}/{CAPACITY}명
+          {pin ? (
+            <>
+              🔒 비공개 · 코드 <b className="meet__pin">{pin}</b>
+            </>
+          ) : (
+            '전체 공개'
+          )}{' '}
+          · {count}/{CAPACITY}명
         </span>
       </div>
 
@@ -172,7 +212,9 @@ function MeetingRoom({ room, nickname, track, onTrack, onLeave }: RoomProps) {
           )
         })}
       </ul>
-      {members.length === 0 && <p className="meet__tip">친구들에게 코드를 알려 주세요</p>}
+      {members.length === 0 && (
+        <p className="meet__tip">{pin ? '친구들에게 방 이름과 코드를 알려 주세요' : '목록에서 이 방을 누르면 들어올 수 있어요'}</p>
+      )}
       {[...peers.values()].some((p) => p.connection === 'failed') && (
         <p className="meet__tip">'연결 안 됨'은 인터넷이 막혀 있어서예요 (휴대폰 데이터·회사·학교 와이파이). 와이파이를 바꿔 보세요</p>
       )}
@@ -211,10 +253,152 @@ function MeetingRoom({ room, nickname, track, onTrack, onLeave }: RoomProps) {
   )
 }
 
+/** 열린 방 목록. 비공개 방은 누르면 코드를 묻는다 */
+function RoomList({ onJoin, onCreate, error }: { onJoin: (r: RoomInfo, pin: string | null) => void; onCreate: () => void; error?: string }) {
+  const [rooms, setRooms] = useState<RoomInfo[] | null>(null)
+  const [offline, setOffline] = useState(false)
+  const [asking, setAsking] = useState<string | null>(null)
+  const [pin, setPin] = useState('')
+  useEffect(() => watchRooms<RoomInfo>(ROOM_ID, setRooms, () => setOffline(true)), [])
+
+  const sorted = [...(rooms ?? [])].sort((a, b) => b.at - a.at)
+  return (
+    <section className="meet-list">
+      <button type="button" className="button button--primary pvp-lobby__big" onClick={onCreate}>
+        + 회의방 만들기
+      </button>
+      {error && (
+        <p className="error pvp-lobby__error" role="alert">
+          {error}
+        </p>
+      )}
+      <h2 className="meet-list__title">열린 회의방</h2>
+      {offline ? (
+        <p className="meet__tip">서버에 연결하지 못했어요. 인터넷 연결을 확인해 주세요</p>
+      ) : rooms === null ? (
+        <p className="meet__tip">불러오는 중…</p>
+      ) : sorted.length === 0 ? (
+        <p className="meet__tip">열린 회의방이 없어요. 새로 만들어 보세요</p>
+      ) : (
+        <ul className="meet-list__rooms">
+          {sorted.map((r) => {
+            const full = r.count >= CAPACITY
+            return (
+              <li key={r.id} className="meet-list__item">
+                <button
+                  type="button"
+                  className="meet-list__room"
+                  disabled={full}
+                  onClick={() => {
+                    if (!r.locked) onJoin(r, null)
+                    else {
+                      setAsking(asking === r.id ? null : r.id)
+                      setPin('')
+                    }
+                  }}
+                >
+                  <span className="meet-list__name">
+                    {r.locked && '🔒 '}
+                    {r.name}
+                  </span>
+                  <span className="meet-list__count">{full ? '가득' : `${r.count}/${CAPACITY}명`}</span>
+                </button>
+                {asking === r.id && (
+                  <form
+                    className="pvp-lobby__join meet-list__pin"
+                    onSubmit={(e) => {
+                      e.preventDefault()
+                      if (pin.length === PIN_LENGTH) onJoin(r, pin)
+                    }}
+                  >
+                    <input
+                      className="input pvp-lobby__input"
+                      value={pin}
+                      onChange={(e) => setPin(e.target.value.replace(/\D/g, '').slice(0, PIN_LENGTH))}
+                      placeholder={`코드 ${PIN_LENGTH}자리`}
+                      inputMode="numeric"
+                      autoComplete="off"
+                      autoFocus
+                      aria-label="비공개 방 코드"
+                    />
+                    <button type="submit" className="button" disabled={pin.length !== PIN_LENGTH}>
+                      들어가기
+                    </button>
+                  </form>
+                )}
+              </li>
+            )
+          })}
+        </ul>
+      )}
+      <ul className="meet__notes">
+        <li>들어갈 때 마이크 사용을 허락해 주세요 (거절하면 듣기만)</li>
+        <li>이어폰을 끼면 소리가 울리지 않아요</li>
+        <li>데이터는 한 사람과 1시간에 약 10MB</li>
+        <li>휴대폰 데이터·회사·학교 와이파이에선 연결이 안 될 수도 있어요</li>
+      </ul>
+    </section>
+  )
+}
+
+/** 방 만들기: 이름·공개 여부·코드. 비우면 이름은 'OO님의 방', 코드는 추천 숫자 */
+function CreateForm({ nickname, onCreate, onBack }: { nickname: string; onCreate: (name: string, pin: string | null) => void; onBack: () => void }) {
+  const [name, setName] = useState('')
+  const [locked, setLocked] = useState(false)
+  const [pin, setPin] = useState('')
+  const [suggested] = useState(randomPin)
+  const defaultName = `${nickname}님의 방`
+  const pinOk = pin.length === 0 || pin.length === PIN_LENGTH
+  return (
+    <form
+      className="meet-create"
+      onSubmit={(e) => {
+        e.preventDefault()
+        if (pinOk) onCreate(name.trim() || defaultName, locked ? pin || suggested : null)
+      }}
+    >
+      <label className="meet-create__field">
+        <span>방 이름</span>
+        <input className="input" value={name} onChange={(e) => setName(e.target.value.slice(0, NAME_MAX))} placeholder={defaultName} autoComplete="off" />
+      </label>
+      <div className="meet-create__field" role="radiogroup" aria-label="공개 여부">
+        <span>공개</span>
+        <div className="meet-create__toggle">
+          {[false, true].map((v) => (
+            <button key={String(v)} type="button" role="radio" aria-checked={locked === v} className={`button${locked === v ? ' button--primary' : ''}`} onClick={() => setLocked(v)}>
+              {v ? '🔒 비공개' : '전체 공개'}
+            </button>
+          ))}
+        </div>
+        <small>{locked ? '목록엔 보이지만 코드를 알아야 들어와요' : '목록에서 누구나 들어와요'}</small>
+      </div>
+      {locked && (
+        <label className="meet-create__field">
+          <span>코드 (숫자 {PIN_LENGTH}자리, 비우면 {suggested})</span>
+          <input
+            className="input pvp-lobby__input"
+            value={pin}
+            onChange={(e) => setPin(e.target.value.replace(/\D/g, '').slice(0, PIN_LENGTH))}
+            placeholder={suggested}
+            inputMode="numeric"
+            autoComplete="off"
+          />
+          {!pinOk && <small className="error">{PIN_LENGTH}자리로 입력하거나 비워 두세요</small>}
+        </label>
+      )}
+      <button type="submit" className="button button--primary pvp-lobby__big" disabled={!pinOk}>
+        만들기
+      </button>
+      <button type="button" className="button button--small pvp-lobby__back" onClick={onBack}>
+        취소
+      </button>
+    </form>
+  )
+}
+
 export function MeetingPage() {
   const nickname = loadNickname() ?? '나'
-  const [view, setView] = useState<View>({ kind: 'menu' })
-  const [input, setInput] = useState('')
+  const [view, setView] = useState<View>({ kind: 'list' })
   // 들어가는 도중에 화면을 떠나면 다 열린 방·마이크를 바로 닫는다
   const mountedRef = useRef(true)
   useEffect(() => {
@@ -237,7 +421,7 @@ export function MeetingPage() {
     v.room.leave()
   }
 
-  async function enter(open: () => Promise<Room<CallSignal>>) {
+  async function enter(name: string, pin: string | null, open: () => Promise<Room<CallSignal>>, wrongPin: string) {
     // 누르는 순간에 소리 장치를 깨워 둔다 (폰은 사용자 동작 안에서만 됨)
     levelContext()
     setView({ kind: 'busy', text: '마이크 확인 중…' })
@@ -250,21 +434,23 @@ export function MeetingPage() {
         track?.stop()
         return
       }
-      setView({ kind: 'room', room, track })
+      setView({ kind: 'room', room, track, name, pin })
     } catch (e) {
       track?.stop()
       if (!(e instanceof RoomError)) console.warn('[meeting] 접속 오류', e)
-      setView({ kind: 'error', text: e instanceof RoomError ? ERROR_TEXT[e.reason] : ERROR_TEXT.offline })
+      const text = e instanceof RoomError ? (e.reason === 'not-found' ? wrongPin : ERROR_TEXT[e.reason]) : ERROR_TEXT.offline
+      setView({ kind: 'list', error: text })
     }
   }
 
-  function join() {
-    const code = normalizeCode(input)
-    if (!code) {
-      setView({ kind: 'error', text: `코드 ${CODE_LENGTH}자리를 입력해 주세요` })
-      return
-    }
-    void enter(() => joinRoom<CallSignal>(ROOM_ID, code, nickname, { capacity: CAPACITY }))
+  function create(name: string, pin: string | null) {
+    const code = channelCode(makeRoomCode(), pin)
+    void enter(name, pin, () => createRoom<CallSignal>(ROOM_ID, nickname, { capacity: CAPACITY, code }), ERROR_TEXT['not-found'])
+  }
+
+  function join(r: RoomInfo, pin: string | null) {
+    const code = channelCode(r.id, pin)
+    void enter(r.name, pin, () => joinRoom<CallSignal>(ROOM_ID, code, nickname, { capacity: CAPACITY }), pin ? '코드가 틀렸어요 (방이 없어졌을 수도 있어요)' : ERROR_TEXT['not-found'])
   }
 
   return (
@@ -279,63 +465,22 @@ export function MeetingPage() {
       {view.kind === 'room' ? (
         <MeetingRoom
           room={view.room}
+          name={view.name}
+          pin={view.pin}
           nickname={nickname}
           track={view.track}
           onTrack={(track) => setView({ ...view, track })}
           onLeave={() => {
             close(view)
-            setView({ kind: 'menu' })
+            setView({ kind: 'list' })
           }}
         />
+      ) : view.kind === 'busy' ? (
+        <p className="pvp-lobby__status meet__busy">{view.text}</p>
+      ) : view.kind === 'create' ? (
+        <CreateForm nickname={nickname} onCreate={create} onBack={() => setView({ kind: 'list' })} />
       ) : (
-        <section className="pvp-lobby">
-          <p className="meet__intro">방 코드로 모여 음성으로 이야기해요 (최대 {CAPACITY}명)</p>
-          {view.kind === 'busy' ? (
-            <p className="pvp-lobby__status">{view.text}</p>
-          ) : (
-            <>
-              <button
-                type="button"
-                className="button button--primary pvp-lobby__big"
-                onClick={() => void enter(() => createRoom<CallSignal>(ROOM_ID, nickname, { capacity: CAPACITY }))}
-              >
-                회의방 만들기
-              </button>
-              <form
-                className="pvp-lobby__join"
-                onSubmit={(e) => {
-                  e.preventDefault()
-                  join()
-                }}
-              >
-                <input
-                  className="input pvp-lobby__input"
-                  value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                  placeholder="코드 입력"
-                  maxLength={CODE_LENGTH + 2}
-                  autoCapitalize="characters"
-                  autoComplete="off"
-                  aria-label="회의방 코드"
-                />
-                <button type="submit" className="button">
-                  들어가기
-                </button>
-              </form>
-              {view.kind === 'error' && (
-                <p className="error pvp-lobby__error" role="alert">
-                  {view.text}
-                </p>
-              )}
-            </>
-          )}
-          <ul className="meet__notes">
-            <li>처음에 마이크 사용을 허락해 주세요 (거절하면 듣기만)</li>
-            <li>이어폰을 끼면 소리가 울리지 않아요</li>
-            <li>데이터는 한 사람과 1시간에 약 10MB</li>
-            <li>휴대폰 데이터·회사·학교 와이파이에선 연결이 안 될 수도 있어요</li>
-          </ul>
-        </section>
+        <RoomList onJoin={join} onCreate={() => setView({ kind: 'create' })} error={view.error} />
       )}
     </main>
   )

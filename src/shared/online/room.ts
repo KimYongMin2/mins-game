@@ -104,6 +104,8 @@ function subscribe(channel: RealtimeChannel, meta: Meta): Promise<void> {
 export type RoomOptions = {
   /** 정원 (나 포함). 기본 2 */
   capacity?: number
+  /** 방장: 코드를 직접 정할 때 (없으면 무작위 4자리) */
+  code?: string
   /** 테스트에서 방장·친구를 서로 다른 연결로 만들 때만 넘긴다 */
   client?: SupabaseClient
 }
@@ -217,7 +219,7 @@ async function open<M>(gameId: string, code: string, meta: Meta, { capacity = 2,
 
 /** 새 방을 만든다 (방장) */
 export function createRoom<M>(gameId: string, nickname: string, opts: RoomOptions = {}): Promise<Room<M>> {
-  return open<M>(gameId, makeRoomCode(), { role: 'host', nickname, joinedAt: Date.now() }, opts)
+  return open<M>(gameId, opts.code ?? makeRoomCode(), { role: 'host', nickname, joinedAt: Date.now() }, opts)
 }
 
 /** 코드로 친구 방에 들어간다. 정원은 방장과 같게 넘긴다 */

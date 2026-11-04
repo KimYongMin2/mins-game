@@ -29,21 +29,15 @@
 
 .meet__code {
   display: flex;
-  align-items: baseline;
-  justify-content: center;
-  gap: 10px;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
   padding: 10px 14px;
   border: 2px solid var(--line);
   border-radius: 14px;
   font-size: 0.875rem;
   color: var(--ink-soft);
-}
-
-.meet__code strong {
-  font-size: 1.75rem;
-  font-weight: 900;
-  letter-spacing: 0.2em;
-  color: var(--ink);
+  text-align: center;
 }
 
 .meet__people {
@@ -141,4 +135,107 @@
   width: 100%;
   min-height: 60px;
   font-size: 1.125rem;
+}
+
+.meet__name {
+  font-size: 1.25rem;
+  font-weight: 900;
+  color: var(--ink);
+  word-break: keep-all;
+}
+
+.meet__pin {
+  letter-spacing: 0.15em;
+  color: var(--ink);
+}
+
+.meet__busy {
+  margin-top: 32px;
+  text-align: center;
+}
+
+/* 방 목록 */
+.meet-list,
+.meet-create {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-width: 420px;
+  margin: 16px auto 0;
+}
+
+.meet-list__title {
+  margin: 8px 0 0;
+  font-size: 1rem;
+  font-weight: 800;
+}
+
+.meet-list__rooms {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 8px;
+}
+
+.meet-list__item {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.meet-list__room {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  min-height: 52px;
+  padding: 10px 14px;
+  border: 2px solid var(--line);
+  border-radius: 12px;
+  background: var(--paper);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.meet-list__room:disabled {
+  border-color: var(--muted-line);
+  color: var(--ink-soft);
+  cursor: default;
+}
+
+.meet-list__name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 800;
+}
+
+.meet-list__count {
+  flex: none;
+  font-size: 0.875rem;
+  color: var(--ink-soft);
+}
+
+/* 방 만들기 */
+.meet-create__field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-weight: 700;
+}
+
+.meet-create__field small {
+  font-weight: 500;
+  color: var(--ink-soft);
+}
+
+.meet-create__toggle {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
 }
