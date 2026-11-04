@@ -65,6 +65,22 @@ export function MainPage({ nickname }: Props) {
           </ul>
         </section>
       ))}
+
+      <section className="game-section">
+        <h2 className="game-section__title">
+          같이 떠들기
+          <span className="game-section__note">음성 통화</span>
+        </h2>
+        <ul className="game-list">
+          <li>
+            <Link className="game-card" to="/meeting">
+              <span className="game-card__title">회의방</span>
+              <span className="game-card__desc">방 코드로 모여 음성 통화</span>
+              <span className="badge badge--count badge--group">2~8인</span>
+            </Link>
+          </li>
+        </ul>
+      </section>
     </main>
   )
 }

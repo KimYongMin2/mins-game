@@ -1,0 +1,144 @@
+/* 회의방 (pages/meeting) */
+.meet__header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.meet__intro {
+  color: var(--ink-soft);
+}
+
+.meet__notes {
+  margin: 8px 0 0;
+  padding: 12px 16px 12px 28px;
+  border: 1.5px solid var(--muted-line);
+  border-radius: 12px;
+  text-align: left;
+  font-size: 0.8125rem;
+  color: var(--ink-soft);
+}
+
+.meet {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-width: 480px;
+  margin: 16px auto 0;
+}
+
+.meet__code {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border: 2px solid var(--line);
+  border-radius: 14px;
+  font-size: 0.875rem;
+  color: var(--ink-soft);
+}
+
+.meet__code strong {
+  font-size: 1.75rem;
+  font-weight: 900;
+  letter-spacing: 0.2em;
+  color: var(--ink);
+}
+
+.meet__people {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  gap: 12px;
+}
+
+.meet-person {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  text-align: center;
+  min-width: 0;
+}
+
+.meet-person__face {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 64px;
+  height: 64px;
+  border: 3px solid var(--line);
+  border-radius: 50%;
+  background: #e7f0ff;
+  font-size: 1.625rem;
+  font-weight: 900;
+  transition: box-shadow 120ms ease;
+}
+
+/* 말하는 중: 초록 고리 */
+.meet-person--speaking .meet-person__face {
+  box-shadow: 0 0 0 4px #fff, 0 0 0 8px #2fb344;
+}
+
+.meet-person--waiting .meet-person__face {
+  opacity: 0.45;
+}
+
+.meet-person__muted {
+  position: absolute;
+  right: -6px;
+  bottom: -6px;
+  font-size: 1.125rem;
+  line-height: 1;
+  padding: 3px;
+  border: 2px solid var(--line);
+  border-radius: 50%;
+  background: #fff;
+}
+
+.meet-person__name {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 800;
+  font-size: 0.9375rem;
+}
+
+.meet-person__name span {
+  font-weight: 500;
+  color: var(--ink-soft);
+}
+
+.meet-person__status {
+  min-height: 1.3em;
+  font-size: 0.75rem;
+  color: var(--ink-soft);
+}
+
+.meet-person--speaking .meet-person__status {
+  color: #2b8a3e;
+  font-weight: 700;
+}
+
+.meet__tip {
+  text-align: center;
+  font-size: 0.875rem;
+  color: var(--ink-soft);
+}
+
+.meet__actions {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+.meet__big {
+  width: 100%;
+  min-height: 60px;
+  font-size: 1.125rem;
+}

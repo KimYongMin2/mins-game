@@ -16,6 +16,7 @@ import { VolleyPage } from './games/volley/VolleyPage'
 import { YutPage } from './games/yut/YutPage'
 import { ZolaballPage } from './games/zolaball/ZolaballPage'
 import { MainPage } from './pages/MainPage'
+import { MeetingPage } from './pages/meeting/MeetingPage'
 import { NicknamePage } from './pages/NicknamePage'
 import { loadNickname } from './shared/storage/nickname'
 
@@ -91,6 +92,10 @@ function App() {
         <Route
           path="/games/roulette"
           element={nickname ? <RoulettePage /> : <Navigate to="/nickname" replace />}
+        />
+        <Route
+          path="/meeting"
+          element={nickname ? <MeetingPage /> : <Navigate to="/nickname" replace />}
         />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
