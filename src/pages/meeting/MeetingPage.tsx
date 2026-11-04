@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router'
 import { levelContext, watchLevel } from '../../shared/call/level'
+import { VOICE_EFFECTS, type VoiceEffect, VoiceChanger } from '../../shared/call/voiceFx'
 import { type CallPeer, type CallSignal, VoiceMesh } from '../../shared/call/voiceMesh'
 import { type Member, type Room, RoomError, createRoom, joinRoom, makeRoomCode } from '../../shared/online/room'
 import { advertiseRoom, watchRooms } from '../../shared/online/roomList'
@@ -23,7 +24,7 @@ const NAME_MAX = 20
 type RoomInfo = { id: string; name: string; locked: boolean; count: number; at: number }
 
 /** 들어간 방: 이름과, 비공개면 코드 (화면에 보여 줌) */
-type Joined = { room: Room<CallSignal>; track: MediaStreamTrack | null; name: string; pin: string | null }
+type Joined = { room: Room<CallSignal>; voice: VoiceChanger | null; name: string; pin: string | null }
 
 type View = { kind: 'list'; error?: string } | { kind: 'create' } | { kind: 'busy'; text: string } | ({ kind: 'room' } & Joined)
 
@@ -38,11 +39,12 @@ const channelCode = (id: string, pin: string | null) => (pin ? `${id}-${pin}` : 
 
 const randomPin = () => String(Math.floor(Math.random() * 10 ** PIN_LENGTH)).padStart(PIN_LENGTH, '0')
 
-/** 마이크 허락받기. 거절하거나 없으면 null (듣기만) */
-async function getMic(): Promise<MediaStreamTrack | null> {
+/** 마이크 허락받기 (목소리 변조를 거쳐 보냄). 거절하거나 없으면 null (듣기만) */
+async function getMic(): Promise<VoiceChanger | null> {
   try {
     const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } })
-    return stream.getAudioTracks()[0] ?? null
+    const raw = stream.getAudioTracks()[0]
+    return raw ? new VoiceChanger(levelContext(), raw) : null
   } catch {
     return null
   }
@@ -102,21 +104,22 @@ const CONNECTION_TEXT: Record<CallPeer['connection'], string | null> = {
 type RoomProps = Joined & {
   nickname: string
   /** 나중에 마이크를 허락받음 */
-  onTrack: (track: MediaStreamTrack) => void
+  onVoice: (voice: VoiceChanger) => void
   onLeave: () => void
 }
 
 /** 방을 닫고 마이크를 끄는 건 부르는 쪽(MeetingPage)이 한다 */
-function MeetingRoom({ room, name, pin, nickname, track, onTrack, onLeave }: RoomProps) {
+function MeetingRoom({ room, name, pin, nickname, voice, onVoice, onLeave }: RoomProps) {
   const [members, setMembers] = useState<Member[]>([])
   const [blocked, setBlocked] = useState(false)
   const [asking, setAsking] = useState(false)
   /** 통화 상태 (바뀔 때마다 새로 받아 그린다) */
   const [call, setCall] = useState<{ peers: CallPeer[]; mic: boolean }>({ peers: [], mic: true })
   const meshRef = useRef<VoiceMesh | null>(null)
-  const trackRef = useRef(track)
+  const [effect, setEffect] = useState<VoiceEffect>(voice?.current ?? 'normal')
+  const voiceRef = useRef(voice)
   useEffect(() => {
-    trackRef.current = track
+    voiceRef.current = voice
   })
 
   useEffect(() => {
@@ -126,7 +129,7 @@ function MeetingRoom({ room, name, pin, nickname, track, onTrack, onLeave }: Roo
       onChange: () => setCall({ peers: mesh.peers(), mic: mesh.mic }),
     })
     meshRef.current = mesh
-    mesh.setTrack(trackRef.current)
+    mesh.setTrack(voiceRef.current?.track ?? null)
     const offMsg = room.onMessage((m) => mesh.receive(m))
     const offMembers = room.onMembers((ms) => {
       setMembers(ms)
@@ -159,8 +162,8 @@ function MeetingRoom({ room, name, pin, nickname, track, onTrack, onLeave }: Roo
     advertRef.current?.update(infoRef.current)
   }, [count])
 
-  const micOn = !!track && call.mic
-  const myStream = useMemo(() => (track ? new MediaStream([track]) : null), [track])
+  const micOn = !!voice && call.mic
+  const myStream = useMemo(() => (voice ? new MediaStream([voice.track]) : null), [voice])
   const peers = new Map(call.peers.map((p) => [p.id, p]))
   const onBlocked = useMemo(() => () => setBlocked(true), [])
   const hostGone = room.role === 'guest' && !members.some((m) => m.role === 'host')
@@ -168,11 +171,17 @@ function MeetingRoom({ room, name, pin, nickname, track, onTrack, onLeave }: Roo
   async function allowMic() {
     setAsking(true)
     levelContext()
-    const t = await getMic()
+    const v = await getMic()
     setAsking(false)
-    if (!t) return
-    onTrack(t)
-    meshRef.current?.setTrack(t)
+    if (!v) return
+    void v.setEffect(effect)
+    onVoice(v)
+    meshRef.current?.setTrack(v.track)
+  }
+
+  function changeVoice(next: VoiceEffect) {
+    setEffect(next)
+    void voice?.setEffect(next)
   }
 
   function unblock() {
@@ -228,15 +237,35 @@ function MeetingRoom({ room, name, pin, nickname, track, onTrack, onLeave }: Roo
             🔊 소리 켜기
           </button>
         )}
-        {track ? (
-          <button
-            type="button"
-            className={`button meet__big${micOn ? ' button--primary' : ''}`}
-            aria-pressed={micOn}
-            onClick={() => meshRef.current?.setMicOn(!micOn)}
-          >
-            {micOn ? '🎤 마이크 끄기' : '🔇 마이크 켜기'}
-          </button>
+        {voice ? (
+          <>
+            <button
+              type="button"
+              className={`button meet__big${micOn ? ' button--primary' : ''}`}
+              aria-pressed={micOn}
+              onClick={() => meshRef.current?.setMicOn(!micOn)}
+            >
+              {micOn ? '🎤 마이크 끄기' : '🔇 마이크 켜기'}
+            </button>
+            {/* 목소리 변조: 다른 사람에겐 표시 안 함 */}
+            <div className="meet-voice" role="radiogroup" aria-label="내 목소리">
+              <span className="meet-voice__label">내 목소리</span>
+              <div className="meet-voice__options">
+                {VOICE_EFFECTS.map((e) => (
+                  <button
+                    key={e.id}
+                    type="button"
+                    role="radio"
+                    aria-checked={effect === e.id}
+                    className={`button button--small${effect === e.id ? ' button--primary' : ''}`}
+                    onClick={() => changeVoice(e.id)}
+                  >
+                    {e.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </>
         ) : (
           <>
             <p className="meet__tip">마이크 없이 듣기만 하고 있어요</p>
@@ -417,7 +446,7 @@ export function MeetingPage() {
 
   function close(v: View) {
     if (v.kind !== 'room') return
-    v.track?.stop()
+    v.voice?.stop()
     v.room.leave()
   }
 
@@ -425,18 +454,18 @@ export function MeetingPage() {
     // 누르는 순간에 소리 장치를 깨워 둔다 (폰은 사용자 동작 안에서만 됨)
     levelContext()
     setView({ kind: 'busy', text: '마이크 확인 중…' })
-    const track = await getMic()
+    const voice = await getMic()
     setView({ kind: 'busy', text: '회의방에 들어가는 중…' })
     try {
       const room = await open()
       if (!mountedRef.current) {
         room.leave()
-        track?.stop()
+        voice?.stop()
         return
       }
-      setView({ kind: 'room', room, track, name, pin })
+      setView({ kind: 'room', room, voice, name, pin })
     } catch (e) {
-      track?.stop()
+      voice?.stop()
       if (!(e instanceof RoomError)) console.warn('[meeting] 접속 오류', e)
       const text = e instanceof RoomError ? (e.reason === 'not-found' ? wrongPin : ERROR_TEXT[e.reason]) : ERROR_TEXT.offline
       setView({ kind: 'list', error: text })
@@ -468,8 +497,8 @@ export function MeetingPage() {
           name={view.name}
           pin={view.pin}
           nickname={nickname}
-          track={view.track}
-          onTrack={(track) => setView({ ...view, track })}
+          voice={view.voice}
+          onVoice={(voice) => setView({ ...view, voice })}
           onLeave={() => {
             close(view)
             setView({ kind: 'list' })

@@ -239,3 +239,24 @@
   grid-template-columns: 1fr 1fr;
   gap: 8px;
 }
+
+/* 목소리 변조 고르기 */
+.meet-voice {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+}
+
+.meet-voice__label {
+  font-size: 0.8125rem;
+  color: var(--ink-soft);
+}
+
+.meet-voice__options {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+  width: 100%;
+}
