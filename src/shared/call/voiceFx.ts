@@ -12,6 +12,9 @@ export const VOICE_EFFECTS: { id: VoiceEffect; label: string }[] = [
   { id: 'echo', label: '메아리' },
 ]
 
+/** 메아리: 울리는 간격(초). 사용자가 이 안에서 고른다 */
+export const ECHO_DELAY = { min: 0.1, max: 0.8, default: 0.28 }
+
 /** 높게·낮게: 소리 높이 배율 */
 const PITCH = { high: 1.6, low: 0.65 }
 
@@ -97,6 +100,9 @@ export class VoiceChanger {
   private nodes: AudioNode[] = []
   private effect: VoiceEffect = 'normal'
   private seq = 0
+  private echoDelay = ECHO_DELAY.default
+  /** 메아리일 때 그 지연 노드 (간격을 바로 바꾸려고) */
+  private echoNode: DelayNode | null = null
 
   constructor(ctx: AudioContext, raw: MediaStreamTrack) {
     this.ctx = ctx
@@ -116,6 +122,16 @@ export class VoiceChanger {
 
   get current(): VoiceEffect {
     return this.effect
+  }
+
+  get echo(): number {
+    return this.echoDelay
+  }
+
+  /** 메아리 울리는 간격 (초). 메아리 중이면 바로 바뀐다 */
+  setEchoDelay(sec: number) {
+    this.echoDelay = Math.min(ECHO_DELAY.max, Math.max(ECHO_DELAY.min, sec))
+    this.echoNode?.delayTime.setTargetAtTime(this.echoDelay, this.ctx.currentTime, 0.05)
   }
 
   async setEffect(effect: VoiceEffect) {
@@ -175,7 +191,8 @@ export class VoiceChanger {
       noise.start()
     } else if (effect === 'echo') {
       const delay = keep(ctx.createDelay(1))
-      delay.delayTime.value = 0.28
+      delay.delayTime.value = this.echoDelay
+      this.echoNode = delay
       const fb = keep(ctx.createGain())
       fb.gain.value = 0.38
       const wet = keep(ctx.createGain())
@@ -204,5 +221,6 @@ export class VoiceChanger {
       n.disconnect()
     }
     this.nodes = []
+    this.echoNode = null
   }
 }

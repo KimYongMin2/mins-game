@@ -260,3 +260,18 @@
   gap: 6px;
   width: 100%;
 }
+
+.meet-voice__slider {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+  font-size: 0.8125rem;
+  color: var(--ink-soft);
+  text-align: center;
+}
+
+.meet-voice__slider input {
+  width: 100%;
+  accent-color: var(--ink);
+}

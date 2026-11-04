@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router'
 import { levelContext, watchLevel } from '../../shared/call/level'
-import { VOICE_EFFECTS, type VoiceEffect, VoiceChanger } from '../../shared/call/voiceFx'
+import { ECHO_DELAY, VOICE_EFFECTS, type VoiceEffect, VoiceChanger } from '../../shared/call/voiceFx'
 import { type CallPeer, type CallSignal, VoiceMesh } from '../../shared/call/voiceMesh'
 import { type Member, type Room, RoomError, createRoom, joinRoom, makeRoomCode } from '../../shared/online/room'
 import { advertiseRoom, watchRooms } from '../../shared/online/roomList'
@@ -117,6 +117,7 @@ function MeetingRoom({ room, name, pin, nickname, voice, onVoice, onLeave }: Roo
   const [call, setCall] = useState<{ peers: CallPeer[]; mic: boolean }>({ peers: [], mic: true })
   const meshRef = useRef<VoiceMesh | null>(null)
   const [effect, setEffect] = useState<VoiceEffect>(voice?.current ?? 'normal')
+  const [echo, setEcho] = useState(voice?.echo ?? ECHO_DELAY.default)
   const voiceRef = useRef(voice)
   useEffect(() => {
     voiceRef.current = voice
@@ -174,6 +175,7 @@ function MeetingRoom({ room, name, pin, nickname, voice, onVoice, onLeave }: Roo
     const v = await getMic()
     setAsking(false)
     if (!v) return
+    v.setEchoDelay(echo)
     void v.setEffect(effect)
     onVoice(v)
     meshRef.current?.setTrack(v.track)
@@ -264,6 +266,23 @@ function MeetingRoom({ room, name, pin, nickname, voice, onVoice, onLeave }: Roo
                   </button>
                 ))}
               </div>
+              {effect === 'echo' && (
+                <label className="meet-voice__slider">
+                  <span>울리는 간격 {echo.toFixed(2)}초</span>
+                  <input
+                    type="range"
+                    min={ECHO_DELAY.min}
+                    max={ECHO_DELAY.max}
+                    step={0.01}
+                    value={echo}
+                    onChange={(e) => {
+                      const sec = Number(e.target.value)
+                      setEcho(sec)
+                      voice.setEchoDelay(sec)
+                    }}
+                  />
+                </label>
+              )}
             </div>
           </>
         ) : (
