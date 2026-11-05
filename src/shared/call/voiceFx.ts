@@ -1,5 +1,6 @@
 // 목소리 변조: 마이크 소리를 보내기 전에 내 기기에서 Web Audio로 바꾼다. 상대는 바뀐 소리만 듣고, 바꿨다는 표시는 없다.
-// 마이크 → [효과] → 보낼 트랙(track). 효과를 바꿔도 보낼 트랙은 그대로라 통화를 다시 잇지 않는다.
+// 마이크 → [효과] → 마이크 크기 → 압축(작은 소리는 키우고 큰 소리는 눌러 전체를 크게) → 보낼 트랙(track).
+// 효과를 바꿔도 보낼 트랙은 그대로라 통화를 다시 잇지 않는다.
 
 export type VoiceEffect = 'normal' | 'high' | 'low' | 'robot' | 'radio' | 'echo'
 
@@ -12,8 +13,15 @@ export const VOICE_EFFECTS: { id: VoiceEffect; label: string }[] = [
   { id: 'echo', label: '메아리' },
 ]
 
-/** 메아리: 울리는 간격(초). 사용자가 이 안에서 고른다 */
-export const ECHO_DELAY = { min: 0.1, max: 0.8, default: 0.28 }
+/** 메아리: 울리는 간격(초). 노래방 마이크 에코 범위 안에서 고른다 (처음 0.1~0.8초는 너무 길게 울려 줄임) */
+export const ECHO_DELAY = { min: 0.08, max: 0.3, default: 0.15 }
+/** 메아리: 되울리는 비율·크기, 되울릴수록 먹먹해지는 정도 (노래방처럼 두세 번만 옅게. 처음 38%·55%는 너무 울림) */
+const ECHO = { feedback: 0.25, wet: 0.35, tone: 3200 }
+
+/** 내 마이크 크기 배율 (사용자가 고름) */
+export const MIC_VOLUME = { min: 0, max: 2, default: 1 }
+/** 보내기 전에 압축한 뒤 키우는 배율 (전체 소리를 크게) */
+const SEND_BOOST = 1.5
 
 /** 높게·낮게: 소리 높이 배율 */
 const PITCH = { high: 1.6, low: 0.65 }
@@ -95,12 +103,15 @@ export class VoiceChanger {
   private ctx: AudioContext
   private raw: MediaStreamTrack
   private input: MediaStreamAudioSourceNode
+  /** 효과가 끝나는 곳 = 마이크 크기 */
+  private bus: GainNode
   private output: MediaStreamAudioDestinationNode
   /** 지금 효과에 쓰는 노드들 (바꿀 때 끊고 멈춘다) */
   private nodes: AudioNode[] = []
   private effect: VoiceEffect = 'normal'
   private seq = 0
   private echoDelay = ECHO_DELAY.default
+  private micVolume = MIC_VOLUME.default
   /** 메아리일 때 그 지연 노드 (간격을 바로 바꾸려고) */
   private echoNode: DelayNode | null = null
 
@@ -110,7 +121,20 @@ export class VoiceChanger {
     this.input = ctx.createMediaStreamSource(new MediaStream([raw]))
     this.output = ctx.createMediaStreamDestination()
     this.track = this.output.stream.getAudioTracks()[0]
-    this.input.connect(this.output)
+    this.bus = ctx.createGain()
+    this.bus.gain.value = MIC_VOLUME.default
+    const comp = ctx.createDynamicsCompressor()
+    comp.threshold.value = -28
+    comp.knee.value = 12
+    comp.ratio.value = 4
+    comp.attack.value = 0.005
+    comp.release.value = 0.2
+    const boost = ctx.createGain()
+    boost.gain.value = SEND_BOOST
+    this.bus.connect(comp)
+    comp.connect(boost)
+    boost.connect(this.output)
+    this.input.connect(this.bus)
     void loadWorklet(ctx)
     document.addEventListener('visibilitychange', this.wake)
   }
@@ -128,6 +152,16 @@ export class VoiceChanger {
     return this.echoDelay
   }
 
+  get volume(): number {
+    return this.micVolume
+  }
+
+  /** 내 마이크 크기 (배율). 바로 바뀐다 */
+  setVolume(v: number) {
+    this.micVolume = Math.min(MIC_VOLUME.max, Math.max(MIC_VOLUME.min, v))
+    this.bus.gain.setTargetAtTime(this.micVolume, this.ctx.currentTime, 0.03)
+  }
+
   /** 메아리 울리는 간격 (초). 메아리 중이면 바로 바뀐다 */
   setEchoDelay(sec: number) {
     this.echoDelay = Math.min(ECHO_DELAY.max, Math.max(ECHO_DELAY.min, sec))
@@ -142,7 +176,7 @@ export class VoiceChanger {
     // 그사이 다른 효과로 또 바꿨으면 이번 건 버린다
     if (seq !== this.seq) return
     this.clear()
-    const { ctx, input, output } = this
+    const { ctx, input, bus: output } = this
     const chain = (...ns: AudioNode[]) => {
       for (let i = 0; i < ns.length - 1; i++) ns[i].connect(ns[i + 1])
     }
@@ -194,12 +228,15 @@ export class VoiceChanger {
       delay.delayTime.value = this.echoDelay
       this.echoNode = delay
       const fb = keep(ctx.createGain())
-      fb.gain.value = 0.38
+      fb.gain.value = ECHO.feedback
+      const tone = keep(ctx.createBiquadFilter())
+      tone.type = 'lowpass'
+      tone.frequency.value = ECHO.tone
       const wet = keep(ctx.createGain())
-      wet.gain.value = 0.55
+      wet.gain.value = ECHO.wet
       input.connect(output)
-      chain(input, delay, wet, output)
-      chain(delay, fb, delay)
+      chain(input, delay, tone, wet, output)
+      chain(tone, fb, delay)
     } else {
       input.connect(output)
     }

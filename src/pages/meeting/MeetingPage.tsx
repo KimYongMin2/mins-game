@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router'
 import { levelContext, watchLevel } from '../../shared/call/level'
-import { ECHO_DELAY, VOICE_EFFECTS, type VoiceEffect, VoiceChanger } from '../../shared/call/voiceFx'
+import { LISTEN_VOLUME, Speaker } from '../../shared/call/speaker'
+import { ECHO_DELAY, MIC_VOLUME, VOICE_EFFECTS, type VoiceEffect, VoiceChanger } from '../../shared/call/voiceFx'
 import { type CallPeer, type CallSignal, VoiceMesh } from '../../shared/call/voiceMesh'
 import { type Member, type Room, RoomError, createRoom, joinRoom, makeRoomCode } from '../../shared/online/room'
 import { advertiseRoom, watchRooms } from '../../shared/online/roomList'
+import { readLocal, writeLocal } from '../../shared/storage/local'
 import { loadNickname } from '../../shared/storage/nickname'
 import './meeting.css'
 
@@ -19,6 +21,15 @@ const ROOM_ID = 'meeting'
 /** 비공개 방 코드 자리 수 (숫자) */
 const PIN_LENGTH = 4
 const NAME_MAX = 20
+
+/** 소리 크기는 기기에 기억한다 */
+const MIC_VOLUME_KEY = 'meeting-mic-volume'
+const LISTEN_VOLUME_KEY = 'meeting-listen-volume'
+
+function loadVolume(key: string, range: { min: number; max: number; default: number }): number {
+  const v = Number(readLocal(key))
+  return readLocal(key) !== null && Number.isFinite(v) ? Math.min(range.max, Math.max(range.min, v)) : range.default
+}
 
 /** 목록에 올리는 방 정보 */
 type RoomInfo = { id: string; name: string; locked: boolean; count: number; at: number }
@@ -44,7 +55,10 @@ async function getMic(): Promise<VoiceChanger | null> {
   try {
     const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } })
     const raw = stream.getAudioTracks()[0]
-    return raw ? new VoiceChanger(levelContext(), raw) : null
+    if (!raw) return null
+    const voice = new VoiceChanger(levelContext(), raw)
+    voice.setVolume(loadVolume(MIC_VOLUME_KEY, MIC_VOLUME))
+    return voice
   } catch {
     return null
   }
@@ -66,16 +80,33 @@ function useSpeaking(stream: MediaStream | null): boolean {
 /** 브라우저가 소리를 막았을 때만 (다른 재생 요청에 끊긴 건 무시) */
 const isBlocked = (e: unknown) => e instanceof DOMException && e.name === 'NotAllowedError'
 
-/** 상대 소리 재생. 브라우저가 막으면 onBlocked ([소리 켜기]를 띄움) */
-function PeerAudio({ stream, onBlocked }: { stream: MediaStream; onBlocked: () => void }) {
+/** 소리를 audio 요소로 튼다. 브라우저가 막으면 onBlocked ([소리 켜기]를 띄움) */
+function Audio({ stream, muted, onBlocked }: { stream: MediaStream; muted?: boolean; onBlocked?: () => void }) {
   const ref = useRef<HTMLAudioElement>(null)
   useEffect(() => {
     const audio = ref.current
     if (!audio) return
     audio.srcObject = stream
-    audio.play().catch((e) => isBlocked(e) && onBlocked())
+    audio.play().catch((e) => isBlocked(e) && onBlocked?.())
   }, [stream, onBlocked])
-  return <audio ref={ref} autoPlay playsInline />
+  return <audio ref={ref} autoPlay playsInline muted={muted} />
+}
+
+/** 상대 한 사람 소리를 듣는 소리(Speaker)에 더한다. 크롬은 받은 소리를 audio에 걸어 둬야 Web Audio로 나와서 소리 끈 audio도 둔다 */
+function PeerAudio({ stream, speaker }: { stream: MediaStream; speaker: Speaker }) {
+  useEffect(() => speaker.add(stream), [stream, speaker])
+  return <Audio stream={stream} muted />
+}
+
+function VolumeSlider({ label, value, max, onChange }: { label: string; value: number; max: number; onChange: (v: number) => void }) {
+  return (
+    <label className="meet-voice__slider">
+      <span>
+        {label} {Math.round(value * 100)}%
+      </span>
+      <input type="range" min={0} max={max} step={0.05} value={value} onChange={(e) => onChange(Number(e.target.value))} />
+    </label>
+  )
 }
 
 function Person({ name, note, stream, micOn, status }: { name: string; note?: string; stream: MediaStream | null; micOn: boolean; status: string | null }) {
@@ -118,6 +149,13 @@ function MeetingRoom({ room, name, pin, nickname, voice, onVoice, onLeave }: Roo
   const meshRef = useRef<VoiceMesh | null>(null)
   const [effect, setEffect] = useState<VoiceEffect>(voice?.current ?? 'normal')
   const [echo, setEcho] = useState(voice?.echo ?? ECHO_DELAY.default)
+  const [micVolume, setMicVolume] = useState(() => voice?.volume ?? loadVolume(MIC_VOLUME_KEY, MIC_VOLUME))
+  const [speaker] = useState(() => {
+    const s = new Speaker(levelContext())
+    s.setVolume(loadVolume(LISTEN_VOLUME_KEY, LISTEN_VOLUME))
+    return s
+  })
+  const [listenVolume, setListenVolume] = useState(speaker.level)
   const voiceRef = useRef(voice)
   useEffect(() => {
     voiceRef.current = voice
@@ -176,6 +214,7 @@ function MeetingRoom({ room, name, pin, nickname, voice, onVoice, onLeave }: Roo
     setAsking(false)
     if (!v) return
     v.setEchoDelay(echo)
+    v.setVolume(micVolume)
     void v.setEffect(effect)
     onVoice(v)
     meshRef.current?.setTrack(v.track)
@@ -189,7 +228,7 @@ function MeetingRoom({ room, name, pin, nickname, voice, onVoice, onLeave }: Roo
   function unblock() {
     setBlocked(false)
     levelContext()
-    document.querySelectorAll<HTMLAudioElement>('.meet audio').forEach((a) => void a.play().catch((e) => isBlocked(e) && setBlocked(true)))
+    document.querySelectorAll<HTMLAudioElement>('.meet audio').forEach((a) => void a.play().catch((e) => isBlocked(e) && !a.muted && setBlocked(true)))
   }
 
   return (
@@ -231,7 +270,8 @@ function MeetingRoom({ room, name, pin, nickname, voice, onVoice, onLeave }: Roo
       )}
       {hostGone && <p className="meet__tip">방을 만든 사람이 나가서 새로 들어올 수는 없어요</p>}
 
-      {[...peers.values()].map((p) => p.stream && <PeerAudio key={p.id} stream={p.stream} onBlocked={onBlocked} />)}
+      <Audio stream={speaker.stream} onBlocked={onBlocked} />
+      {[...peers.values()].map((p) => p.stream && <PeerAudio key={p.id} stream={p.stream} speaker={speaker} />)}
 
       <div className="meet__actions">
         {blocked && (
@@ -293,6 +333,31 @@ function MeetingRoom({ room, name, pin, nickname, voice, onVoice, onLeave }: Roo
             </button>
           </>
         )}
+        <div className="meet-voice">
+          <span className="meet-voice__label">소리 크기</span>
+          <VolumeSlider
+            label="🔊 듣는 소리"
+            value={listenVolume}
+            max={LISTEN_VOLUME.max}
+            onChange={(v) => {
+              setListenVolume(v)
+              speaker.setVolume(v)
+              writeLocal(LISTEN_VOLUME_KEY, String(v))
+            }}
+          />
+          {voice && (
+            <VolumeSlider
+              label="🎤 내 마이크"
+              value={micVolume}
+              max={MIC_VOLUME.max}
+              onChange={(v) => {
+                setMicVolume(v)
+                voice.setVolume(v)
+                writeLocal(MIC_VOLUME_KEY, String(v))
+              }}
+            />
+          )}
+        </div>
         <button type="button" className="button button--small" onClick={onLeave}>
           나가기
         </button>
