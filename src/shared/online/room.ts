@@ -86,7 +86,12 @@ function subscribe(channel: RealtimeChannel, meta: Meta): Promise<void> {
       reject(new RoomError('offline'))
     }, SUBSCRIBE_TIMEOUT_MS)
     channel.subscribe(async (status, err) => {
-      if (settled) return
+      // 연결이 끊겼다가 다시 붙으면(폰을 잠깐 다른 앱으로 보냈다 오는 등) Realtime이 채널에 다시 들어가는데,
+      // '방에 있음'(presence)은 다시 안 보내 줘서 상대 화면엔 계속 나간 걸로 보인다. 그래서 다시 붙을 때마다 다시 보낸다
+      if (settled) {
+        if (status === 'SUBSCRIBED') void channel.track(meta)
+        return
+      }
       if (status === 'SUBSCRIBED') {
         // 상대에게 내가 들어온 걸 알린다. 한 번 실패하면 한 번 더
         if ((await channel.track(meta)) !== 'ok') await channel.track(meta)
@@ -161,6 +166,12 @@ async function open<M>(gameId: string, code: string, meta: Meta, { capacity = 2,
     throw e
   }
 
+  // 화면으로 돌아왔는데 서버 연결이 끊겨 있으면 기다리지 않고 바로 다시 잇는다 (원래는 점점 늘어나는 간격으로 다시 시도)
+  const wake = () => {
+    if (document.visibilityState === 'visible' && !supabase.realtime.isConnected()) supabase.realtime.connect()
+  }
+  if (typeof document !== 'undefined') document.addEventListener('visibilitychange', wake)
+
   const room: Room<M> = {
     code,
     role: meta.role,
@@ -188,6 +199,7 @@ async function open<M>(gameId: string, code: string, meta: Meta, { capacity = 2,
       return () => memberFns.delete(fn)
     },
     leave() {
+      if (typeof document !== 'undefined') document.removeEventListener('visibilitychange', wake)
       messageFns.clear()
       peerFns.clear()
       memberFns.clear()

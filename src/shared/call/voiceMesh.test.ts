@@ -112,6 +112,31 @@ describe('음성 통화 (메시)', () => {
     expect(meshes.get('a')!.peers().map((p) => p.id)).toEqual(['b'])
   })
 
+  it('끊긴 뒤(다른 앱에 갔다 옴) 다시 잇기: 청하는 쪽이 아니어도 상대에게 청해 달라고 해서 이어진다', async () => {
+    const { meshes, sent } = network(['a', 'b'])
+    meshes.get('a')!.setMembers(['b'])
+    meshes.get('b')!.setMembers(['a'])
+    await settle()
+    // 둘 다 끊김 (다시 시도도 다 써 버린 상태로 치려고 상태만 바꿈)
+    for (const m of meshes.values()) {
+      const pc = (m as unknown as { links: Map<string, { pc: FakePc }> }).links.values().next().value!.pc
+      pc.connectionState = 'failed'
+    }
+    const offers = sent.filter((m) => m.t === 'offer').length
+    // 청하는 쪽이 아닌 b가 돌아옴
+    meshes.get('b')!.refresh()
+    await settle()
+    expect(sent.some((m) => m.t === 'reconnect' && m.from === 'b' && m.to === 'a')).toBe(true)
+    expect(sent.filter((m) => m.t === 'offer').length).toBe(offers + 1)
+    for (const m of meshes.values()) expect(m.peers()[0].connection).toBe('connected')
+    // 이어져 있으면 아무것도 안 함
+    const before = sent.length
+    meshes.get('a')!.refresh()
+    meshes.get('b')!.refresh()
+    await settle()
+    expect(sent.length).toBe(before)
+  })
+
   it('마이크를 끄면 상대 화면에 꺼짐', async () => {
     const { meshes } = network(['a', 'b'])
     meshes.get('a')!.setMembers(['b'])

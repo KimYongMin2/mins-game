@@ -351,6 +351,15 @@ export class VoiceChanger {
     return this.raw
   }
 
+  /** 마이크가 끊겨(폰이 다른 앱에 갔다 오면 끝나 버리기도 함) 새로 받은 마이크로 바꾼다. 효과·보낼 트랙은 그대로 */
+  async replaceRaw(raw: MediaStreamTrack) {
+    this.raw?.stop()
+    this.raw = raw
+    this.input.disconnect()
+    this.input = this.ctx.createMediaStreamSource(new MediaStream([raw]))
+    await this.setEffect(this.effect)
+  }
+
   /** 다른 사람에게 보내기 켬/끔 (들어보는 동안 끔). 마이크 끄기와 따로 */
   setSending(on: boolean) {
     this.gate.gain.setTargetAtTime(on ? 1 : 0, this.ctx.currentTime, 0.01)

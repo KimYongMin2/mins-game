@@ -26,6 +26,8 @@ const NAME_MAX = 20
 /** 소리 크기는 기기에 기억한다 */
 const MIC_VOLUME_KEY = 'meeting-mic-volume'
 const LISTEN_VOLUME_KEY = 'meeting-listen-volume'
+/** 돌아온 뒤 끊긴 사람과 다시 잇기를 해 보는 때 (서버 연결이 다시 붙는 데 몇 초 걸릴 수 있어 두 번) */
+const REFRESH_AFTER_MS = [1500, 6000]
 
 function loadVolume(key: string, range: { min: number; max: number; default: number }): number {
   const v = Number(readLocal(key))
@@ -187,6 +189,34 @@ function MeetingRoom({ room, name, pin, nickname, voice, settings, onSettings, o
       meshRef.current = null
     }
   }, [room])
+
+  // 폰을 다른 앱으로 보냈다 돌아오면(또는 인터넷이 다시 붙으면) 끊긴 걸 다시 잇는다:
+  // 소리 처리 깨우기 → 끝나 버린 마이크 다시 받기 → 멈춘 소리 다시 틀기 → 조금 뒤(서버 연결이 다시 붙을 틈) 끊긴 사람과 다시 잇기
+  useEffect(() => {
+    const timers: ReturnType<typeof setTimeout>[] = []
+    const comeBack = async () => {
+      if (document.visibilityState !== 'visible') return
+      levelContext()
+      const v = voiceRef.current
+      if (v?.rawTrack && v.rawTrack.readyState === 'ended') {
+        const raw = await rawMic()
+        if (raw) await v.replaceRaw(raw)
+      }
+      document.querySelectorAll<HTMLAudioElement>('.meet audio').forEach((a) => {
+        if (a.paused) void a.play().catch((e) => isBlocked(e) && !a.muted && setBlocked(true))
+      })
+      timers.splice(0).forEach(clearTimeout)
+      for (const ms of REFRESH_AFTER_MS) timers.push(setTimeout(() => meshRef.current?.refresh(), ms))
+    }
+    const onVisible = () => void comeBack()
+    document.addEventListener('visibilitychange', onVisible)
+    window.addEventListener('online', onVisible)
+    return () => {
+      document.removeEventListener('visibilitychange', onVisible)
+      window.removeEventListener('online', onVisible)
+      timers.forEach(clearTimeout)
+    }
+  }, [])
 
   // 방장: 목록에 방을 올려 두고 사람 수를 고친다 (방장이 나가면 목록에서 사라짐)
   const count = members.length + 1

@@ -7,6 +7,8 @@ export type CallSignal =
   | { t: 'ice'; from: string; to: string; candidate: RTCIceCandidateInit }
   /** 내 마이크 켬/끔 (모두에게) */
   | { t: 'mic'; from: string; on: boolean }
+  /** 연결이 끊겼으니 다시 청해 달라 (청하는 쪽이 아닌 사람이 보냄) */
+  | { t: 'reconnect'; from: string; to: string }
 
 export type Connection = 'connecting' | 'connected' | 'failed'
 
@@ -19,11 +21,13 @@ export const VOICE_BITRATE = 24_000
 /** 연결이 끊기면 이만큼 뒤 한 번 더 청한다 */
 const RETRY_MS = 1500
 const MAX_RETRIES = 2
+/** 잇기 시작한 지 이만큼 지나도 안 이어졌으면 다시 잇기 대상 */
+const STALE_MS = 8000
 
 /** 둘 중 누가 연결을 청하나 (둘이 동시에 청해서 꼬이지 않게 한쪽만) */
 export const offersTo = (myId: string, otherId: string) => myId < otherId
 
-type Link = { pc: RTCPeerConnection; peer: CallPeer; pendingIce: RTCIceCandidateInit[]; remoteSet: boolean }
+type Link = { pc: RTCPeerConnection; peer: CallPeer; pendingIce: RTCIceCandidateInit[]; remoteSet: boolean; /** 만든 시각 */ at: number }
 
 type Options = {
   myId: string
@@ -90,9 +94,38 @@ export class VoiceMesh {
       return
     }
     if (msg.to !== this.opts.myId) return
+    if (msg.t === 'reconnect') {
+      if (offersTo(this.opts.myId, msg.from) && this.members.includes(msg.from) && !this.isUp(msg.from)) {
+        this.retries.delete(msg.from)
+        void this.offer(msg.from)
+      }
+      return
+    }
     if (msg.t === 'offer') void this.answer(msg.from, msg.sdp)
     else if (msg.t === 'answer') void this.accept(msg.from, msg.sdp)
     else if (msg.t === 'ice') void this.addIce(msg.from, msg.candidate)
+  }
+
+  /**
+   * 끊긴 연결을 다시 잇는다 (폰을 다른 앱으로 보냈다 돌아왔을 때 등). 이어져 있거나 잇는 중인 건 그대로.
+   * 내가 청하는 쪽이면 바로 청하고, 아니면 상대에게 청해 달라고 한다
+   */
+  refresh() {
+    if (this.closed) return
+    for (const id of this.members) {
+      if (this.isUp(id)) continue
+      this.retries.delete(id)
+      if (offersTo(this.opts.myId, id)) void this.offer(id)
+      else this.opts.send({ t: 'reconnect', from: this.opts.myId, to: id })
+    }
+  }
+
+  /** 이어져 있거나 막 잇는 중인지 (잇는 중이어도 오래됐으면 연결 정보가 빠진 걸로 보고 다시) */
+  private isUp(id: string): boolean {
+    const l = this.links.get(id)
+    if (!l) return false
+    const s = l.pc.connectionState
+    return s === 'connected' || ((s === 'connecting' || s === 'new') && Date.now() - l.at < STALE_MS)
   }
 
   close() {
@@ -111,7 +144,7 @@ export class VoiceMesh {
   private link(id: string): Link {
     this.drop(id)
     const pc = (this.opts.createPc ?? ((c) => new RTCPeerConnection(c)))({ iceServers: ICE_SERVERS })
-    const l: Link = { pc, peer: { id, connection: 'connecting', micOn: true, stream: null }, pendingIce: [], remoteSet: false }
+    const l: Link = { pc, peer: { id, connection: 'connecting', micOn: true, stream: null }, pendingIce: [], remoteSet: false, at: Date.now() }
     this.links.set(id, l)
     const update = (peer: Partial<CallPeer>) => {
       if (this.links.get(id) !== l) return
