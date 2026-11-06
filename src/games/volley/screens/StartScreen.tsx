@@ -20,7 +20,7 @@ const LEVELS: readonly BotLevel[] = ['normal', 'hard']
 export function StartScreen({ record, onLevel, onBot, onPvp }: Props) {
   return (
     <section className="vb-start">
-      <p className="subtitle">공을 상대 코트 바닥에 떨어뜨리면 1점! {WIN_SCORE}점 먼저 (14:14부터는 2점 차)</p>
+      <p className="subtitle">공을 상대 코트 바닥에 떨어뜨리면 1점! {WIN_SCORE}점 먼저</p>
 
       <ul className="vb-start__rules">
         <li>

@@ -72,18 +72,10 @@
   font-variant-numeric: tabular-nums;
 }
 
-.vb-deuce {
-  margin: -4px 0 0;
-  text-align: center;
-  font-size: 0.8125rem;
-  font-weight: 800;
-  color: #d97706;
-}
-
 .vb-view {
   position: relative;
-  /* 화면 높이가 모자라면 코트 비율(16:10)대로 폭을 줄여 양옆이 비지 않게 */
-  width: min(100%, calc((100dvh - 260px) * 1.6));
+  /* 화면 높이가 모자라면 코트 비율(16:12)대로 폭을 줄여 양옆이 비지 않게 */
+  width: min(100%, calc((100dvh - 260px) * 1.3333));
   margin: 0 auto;
   border: 3px solid #1f2937;
   border-radius: 14px;
@@ -403,14 +395,10 @@
     font-size: 1.25rem;
   }
 
-  .vb-deuce {
-    display: none;
-  }
-
   .vb-view {
     grid-area: view;
     justify-self: center;
-    width: min(100%, calc((100dvh - 100px) * 1.6));
+    width: min(100%, calc((100dvh - 100px) * 1.3333));
   }
 
   .vb-pads {

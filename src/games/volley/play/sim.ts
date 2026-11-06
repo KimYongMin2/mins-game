@@ -1,53 +1,45 @@
 // 점프 배구 물리 + 경기 규칙. 고정 스텝(1/60초) 순수 함수: step(상태, 두 사람 입력) → 다음 상태.
 // 같은 상태·같은 입력이면 어느 기기에서나 같은 결과라서, 친구 대전에서 친구 기기도 같이 돌려 지연을 숨긴다.
 // 왼쪽 = 0번(나/방장), 오른쪽 = 1번. '앞'은 네트 쪽.
+// 손맛은 고전 2D 네트 배구 게임처럼: 공은 몸 어디에 맞든 위로 튀고(옆으로는 몸 가운데에서 떨어진 만큼),
+// 공중에서 치기를 누르면 땅에 닿을 때까지 치는 자세라 그동안 닿는 공은 강타, 벽·네트는 속도를 잃지 않는다.
 import {
-  BALL_DRAG,
   BALL_MAX_SPEED,
   BALL_R,
-  BODY_BOUNCE,
-  FAST_HIT_BOUNCE,
-  BUMP_AIM,
-  BUMP_PUSH_MAX,
-  BUMP_PUSH_MIN,
-  ANY_BUMP_UP,
+  BUMP_SIDE_PER_PX,
   BUMP_UP,
-  FAST_BALL_SPEED,
-  CARRY,
   CEILING,
+  CEILING_DROP,
   COURT_W,
-  DIVE_HIGH,
-  DIVE_REACH,
+  DIVE_HOP,
   DIVE_RECOVER_S,
-  DIVE_S,
   DIVE_SPEED,
   DT,
   GRAVITY,
-  HIT_BUFFER_S,
-  HIT_HIGH,
-  HIT_LOW,
-  HIT_R,
   JUMP_SPEED,
-  MIN_BUMP_SPEED,
   MOVE_SPEED,
-  NET_BOUNCE,
-  NET_H,
-  NET_HALF,
-  NET_TOP_NUDGE,
+  NET_TOP_BAND,
+  NET_TOP_CY,
   NET_X,
+  NET_ZONE,
+  PLAYER_CY,
+  PLAYER_HALF,
   POINT_S,
-  SERVE_DROP_Y,
+  PX_LEN,
+  SERVE_BALL_X,
+  SERVE_PLAYER_X,
   SERVE_WAIT_S,
-  SPIKE,
-  SPIKE_REACH,
+  SPIKE_SIDE_FAST,
+  SPIKE_SIDE_SLOW,
+  SPIKE_UP_MUL,
   STEP_HZ,
-  WALL_BOUNCE,
+  V_UNIT,
   WIN_SCORE,
 } from '../constants'
 
 export type Side = 0 | 1
 
-/** jump = ↑(땅에서 점프, 공중에서 치면 위로 강타), down = ↓(공중에서 치면 내리찍기) */
+/** jump = ↑(땅에서 점프, 스파이크면 위로), down = ↓(스파이크면 아래로) */
 export type Input = { left: boolean; right: boolean; jump: boolean; down: boolean; hit: boolean }
 
 export const NO_INPUT: Input = { left: false, right: false, jump: false, down: false, hit: false }
@@ -58,19 +50,18 @@ export type Player = {
   y: number
   vx: number
   vy: number
-  /** 마지막으로 움직인 쪽 (몸 날리기 방향) */
+  /** 마지막으로 움직인 쪽 (몸 날리기 방향, 그림) */
   facing: 1 | -1
-  /** 몸 날리기 남은 스텝 / 날린 뒤 못 움직이는 남은 스텝 */
+  /** 몸 날리는 중이면 1 (땅에 닿으면 끝) */
   dive: number
+  /** 몸 날린 뒤 누워 있는 남은 스텝 */
   recover: number
-  /** 이번 점프에 스파이크를 썼는지 */
-  spiked: boolean
+  /** 공중에서 치기를 눌러 치는 자세 (땅에 닿을 때까지) */
+  power: boolean
   /** 지난 스텝에 치기를 누르고 있었는지 (누르는 순간만 친다) */
   prevHit: boolean
-  /** 공중에서 누른 치기를 기억하는 남은 스텝 (그 사이 공이 손에 닿으면 스파이크) */
-  hitBuffer: number
-  /** 같은 접촉에 여러 번 튀지 않게 (남은 스텝) */
-  touchCool: number
+  /** 지금 공과 겹쳐 있는지 (겹친 동안 한 번만 튄다) */
+  touching: boolean
 }
 
 export type Ball = { x: number; y: number; vx: number; vy: number }
@@ -78,7 +69,7 @@ export type Ball = { x: number; y: number; vx: number; vy: number }
 export type HitKind = 'bump' | 'spike' | 'net' | 'wall'
 
 export type Phase =
-  /** t = 남은 스텝. 공은 서브하는 사람 머리 위에 떠 있다 */
+  /** t = 남은 스텝. 공은 서브하는 사람 앞 하늘에 떠 있다 */
   | { kind: 'serve'; t: number }
   | { kind: 'rally' }
   /** 공이 바닥에 닿음. scorer가 1점 */
@@ -101,20 +92,31 @@ export type SimState = {
 
 const steps = (s: number) => Math.round(s * STEP_HZ)
 
-/** 사람이 서 있을 수 있는 범위 */
+/** 사람이 서 있을 수 있는 범위 (네트 앞 PLAYER_HALF 만큼은 못 들어감) */
 export function sideBounds(side: Side): [number, number] {
-  return side === 0 ? [HIT_R, NET_X - NET_HALF - HIT_R] : [NET_X + NET_HALF + HIT_R, COURT_W - HIT_R]
+  return side === 0 ? [PLAYER_HALF, NET_X - PLAYER_HALF] : [NET_X + PLAYER_HALF, COURT_W - PLAYER_HALF]
 }
 
 /** 네트 쪽 방향 */
 export const towardNet = (side: Side): 1 | -1 => (side === 0 ? 1 : -1)
 
 function freshPlayer(side: Side): Player {
-  return { x: side === 0 ? COURT_W * 0.2 : COURT_W * 0.8, y: 0, vx: 0, vy: 0, facing: towardNet(side), dive: 0, recover: 0, spiked: false, prevHit: false, hitBuffer: 0, touchCool: 0 }
+  return {
+    x: side === 0 ? SERVE_PLAYER_X : COURT_W - SERVE_PLAYER_X,
+    y: 0,
+    vx: 0,
+    vy: 0,
+    facing: towardNet(side),
+    dive: 0,
+    recover: 0,
+    power: false,
+    prevHit: false,
+    touching: false,
+  }
 }
 
 function serveBall(server: Side): Ball {
-  return { x: server === 0 ? COURT_W * 0.2 : COURT_W * 0.8, y: SERVE_DROP_Y, vx: 0, vy: 0 }
+  return { x: server === 0 ? SERVE_BALL_X : COURT_W - SERVE_BALL_X, y: CEILING - BALL_R, vx: 0, vy: 0 }
 }
 
 export function createSim(server: Side): SimState {
@@ -131,221 +133,126 @@ export function createSim(server: Side): SimState {
   }
 }
 
-export type SpikeKind = keyof typeof SPIKE
-
-/** 스파이크한 공 (방향은 누른 방향키) */
-export function spikeBall(ball: Ball, side: Side, kind: SpikeKind): Ball {
-  const net = towardNet(side)
-  return { x: ball.x, y: ball.y, vx: SPIKE[kind].vx * net, vy: SPIKE[kind].vy }
+/** 선수 판정 네모의 가운데 */
+export function centerOf(p: Player): { x: number; y: number } {
+  return { x: p.x, y: p.y + PLAYER_CY }
 }
 
-/** 누른 방향키 → 스파이크 종류. 아래 > 위 > 상대 쪽 > 반대쪽 > 없음 */
-export function spikeKindOf(input: Input, side: Side): SpikeKind {
-  if (input.down) return 'down'
-  if (input.jump) return 'up'
-  const dir = (input.right ? 1 : 0) - (input.left ? 1 : 0)
-  if (dir === 0) return 'none'
-  return dir === towardNet(side) ? 'forward' : 'back'
+/** 공 가운데가 선수 네모 안인지 */
+export function touchesBall(p: Player, b: Ball): boolean {
+  const c = centerOf(p)
+  return Math.abs(b.x - c.x) <= PLAYER_HALF && Math.abs(b.y - c.y) <= PLAYER_HALF
 }
 
-/** 선수의 몸통·머리 원 (몸 날리는 중이면 낮게) */
-export type Capsule = { ax: number; ay: number; bx: number; by: number; r: number }
-
-/** 선수 피격 판정: 발끝~머리 위 일자 막대. a = 아래 끝, b = 머리 쪽 끝. 몸 날리는 중엔 보는 쪽으로 눕는다 */
-export function capsuleOf(p: Player): Capsule {
-  if (p.dive > 0) return { ax: p.x, ay: p.y + HIT_R * 0.8, bx: p.x + p.facing * DIVE_REACH, by: p.y + DIVE_HIGH, r: HIT_R }
-  return { ax: p.x, ay: p.y + HIT_LOW, bx: p.x, by: p.y + HIT_HIGH, r: HIT_R }
+/** 틱마다 같은 값이 나오는 -1·0·1 (공이 몸 한가운데에 맞았을 때 옆으로 살짝) */
+function wobble(tick: number): number {
+  const h = Math.imul(tick ^ 0x5bd1e995, 0x27d4eb2d) >>> 0
+  return (h % 3) - 1
 }
 
-/** 머리 쪽 끝 (스파이크 닿는 거리를 여기서 잰다) */
-export function headOf(p: Player): { x: number; y: number } {
-  const c = capsuleOf(p)
-  return { x: c.bx, y: c.by }
+/**
+ * 공이 선수 몸에 맞은 뒤 속도. power(치는 자세)면 강타.
+ * 강타 방향: ←→ 아무거나 = 빠르게(늘 상대 쪽), ↑ 위로 · ↓ 아래로 · 없음 수평
+ */
+export function hitBall(b: Ball, p: Player, side: Side, input: Input, power: boolean, tick: number): Ball {
+  const dxPx = Math.abs(b.x - p.x) / PX_LEN
+  let vx = Math.floor(dxPx * BUMP_SIDE_PER_PX) * V_UNIT * (b.x < p.x ? -1 : 1)
+  if (vx === 0) vx = wobble(tick) * V_UNIT
+  let vy = Math.max(Math.abs(b.vy), BUMP_UP)
+  if (power) {
+    const sideways = input.left || input.right
+    vx = (sideways ? SPIKE_SIDE_FAST : SPIKE_SIDE_SLOW) * towardNet(side)
+    const ydir = input.down ? -1 : input.jump ? 1 : 0
+    vy = vy * ydir * SPIKE_UP_MUL
+  }
+  return { ...b, vx, vy }
 }
 
-/** 막대에서 점까지 가장 가까운 점 */
-function closestOnCapsule(c: Capsule, x: number, y: number): { x: number; y: number } {
-  const dx = c.bx - c.ax
-  const dy = c.by - c.ay
-  const len2 = dx * dx + dy * dy
-  const t = len2 === 0 ? 0 : Math.min(1, Math.max(0, ((x - c.ax) * dx + (y - c.ay) * dy) / len2))
-  return { x: c.ax + dx * t, y: c.ay + dy * t }
-}
-
-function movePlayer(p: Player, side: Side, input: Input, ball: Ball, canHit: boolean): { p: Player; spike: Ball | null } {
+function movePlayer(p: Player, side: Side, input: Input): Player {
   const dir = (input.right ? 1 : 0) - (input.left ? 1 : 0)
   const pressed = input.hit && !p.prevHit
-  let { x, y, vx, vy, facing, dive, recover, spiked, hitBuffer } = p
-  let spike: Ball | null = null
-  // 날리는 중·회복 중엔 방향이 안 바뀐다
-  if (dir !== 0 && dive === 0 && recover === 0) facing = dir as 1 | -1
+  let { x, y, vx, vy, facing, dive, recover, power } = p
   const onGround = y <= 0
 
   if (dive > 0) {
-    dive--
     vx = facing * DIVE_SPEED
-    if (dive === 0) recover = steps(DIVE_RECOVER_S)
   } else if (recover > 0) {
     recover--
-    // 날린 뒤엔 금방 멈춘다
-    vx *= 0.6
+    vx = 0
   } else {
-    // 누르는 순간 바로 그 방향 최고 속도, 떼면 바로 멈춤
+    if (dir !== 0) facing = dir as 1 | -1
+    // 누르는 순간 바로 그 방향 속도, 떼면 바로 멈춤 (공중에서도)
     vx = dir * MOVE_SPEED
-    if (onGround && input.jump) vy = JUMP_SPEED
-    if (pressed && onGround && !input.jump) {
-      // 땅에서 치기 = 몸 날리기 (점프와 같이 누르면 점프)
-      dive = steps(DIVE_S)
-      vx = facing * DIVE_SPEED
-    } else if (pressed && !onGround) {
-      hitBuffer = steps(HIT_BUFFER_S)
-    }
-    // 공중에서 누른 치기: 기억하는 동안 공이 손에 닿으면 스파이크
-    if (hitBuffer > 0 && !onGround && !spiked && canHit) {
-      const head = headOf(p)
-      if (Math.hypot(ball.x - head.x, ball.y - head.y) <= SPIKE_REACH) {
-        spiked = true
-        hitBuffer = 0
-        spike = spikeBall(ball, side, spikeKindOf(input, side))
+    if (onGround) {
+      if (input.jump) vy = JUMP_SPEED
+      else if (pressed && dir !== 0) {
+        // 땅에서 방향키 + 치기 = 몸 날리기
+        dive = 1
+        vx = dir * DIVE_SPEED
+        vy = DIVE_HOP
       }
+    } else if (pressed) {
+      // 공중에서 치기 = 땅에 닿을 때까지 치는 자세
+      power = true
     }
   }
 
-  if (hitBuffer > 0) hitBuffer--
   vy -= GRAVITY * DT
   y += vy * DT
   if (y <= 0) {
     y = 0
     vy = 0
-    spiked = false
-    hitBuffer = 0
+    power = false
+    if (dive > 0) {
+      dive = 0
+      recover = steps(DIVE_RECOVER_S)
+    }
   }
   x += vx * DT
   const [lo, hi] = sideBounds(side)
-  if (x < lo) {
-    x = lo
-    vx = 0
-  } else if (x > hi) {
-    x = hi
-    vx = 0
-  }
-  return {
-    p: { ...p, x, y, vx, vy, facing, dive, recover, spiked, prevHit: input.hit, hitBuffer, touchCool: Math.max(0, p.touchCool - 1) },
-    spike,
-  }
+  if (x < lo) x = lo
+  else if (x > hi) x = hi
+  return { ...p, x, y, vx, vy, facing, dive, recover, power, prevHit: input.hit }
 }
 
-/** 공만 굴려 볼 때 쓰는 빈 선수 (멀리 치워 둠) */
-const FAR: Player = { x: -100, y: -100, vx: 0, vy: 0, facing: 1, dive: 0, recover: 0, spiked: false, prevHit: false, hitBuffer: 0, touchCool: 0 }
-const NO_PLAYERS: [Player, Player] = [FAR, FAR]
+type WorldStep = { ball: Ball; hit: HitKind | null }
 
-type BallStep = { ball: Ball; hit: { kind: HitKind; player: Side | null } | null; touched: Side[] }
-
-/** 공 한 스텝: 중력·저항 → 벽·천장 → 네트 → 선수 몸 */
-function moveBall(b: Ball, players: [Player, Player]): BallStep {
+/** 공 한 스텝 (선수 빼고): 벽·천장·네트에 부딪히는지 보고 → 움직이고 → 중력 */
+function moveBall(b: Ball): WorldStep {
   let { x, y, vx, vy } = b
-  let hit: BallStep['hit'] = null
-  const touched: Side[] = []
+  let hit: HitKind | null = null
+
+  // 벽: 속도 그대로 되튄다
+  const fx = x + vx * DT
+  if ((fx < BALL_R && vx < 0) || (fx > COURT_W - BALL_R && vx > 0)) {
+    vx = -vx
+    hit = 'wall'
+  }
+  // 천장: 아래로 툭
+  if (y + vy * DT > CEILING - BALL_R && vy > 0) {
+    vy = -CEILING_DROP
+    hit = 'wall'
+  }
+  // 네트: 꼭대기 띠면 위로 튀고, 그 아래면 옆으로 되돌아온다
+  if (Math.abs(x - NET_X) < NET_ZONE && y < NET_TOP_CY) {
+    if (y >= NET_TOP_CY - NET_TOP_BAND) {
+      if (vy < 0) vy = -vy
+    } else {
+      vx = x < NET_X ? -Math.abs(vx) : Math.abs(vx)
+    }
+    hit = 'net'
+  }
+
+  x = Math.min(COURT_W - BALL_R, Math.max(BALL_R, x + vx * DT))
+  y = Math.min(CEILING - BALL_R, y + vy * DT)
   vy -= GRAVITY * DT
-  const drag = 1 - BALL_DRAG * DT
-  vx *= drag
-  vy *= drag
-  x += vx * DT
-  y += vy * DT
-
-  if (x - BALL_R < 0) {
-    x = BALL_R
-    vx = Math.abs(vx) * WALL_BOUNCE
-    hit = { kind: 'wall', player: null }
-  } else if (x + BALL_R > COURT_W) {
-    x = COURT_W - BALL_R
-    vx = -Math.abs(vx) * WALL_BOUNCE
-    hit = { kind: 'wall', player: null }
-  }
-  if (y + BALL_R > CEILING) {
-    y = CEILING - BALL_R
-    vy = -Math.abs(vy) * WALL_BOUNCE
-    hit = { kind: 'wall', player: null }
-  }
-
-  // 네트: 직사각형에서 가장 가까운 점과 비교 (기둥 끝에 맞으면 비스듬히 튄다)
-  const cx = Math.min(Math.max(x, NET_X - NET_HALF), NET_X + NET_HALF)
-  const cy = Math.min(Math.max(y, 0), NET_H)
-  const dx = x - cx
-  const dy = y - cy
-  const d = Math.hypot(dx, dy)
-  if (d < BALL_R) {
-    // 공 가운데가 네트 안이면 가까운 옆으로 밀어낸다
-    const [nx, ny] = d > 1e-6 ? [dx / d, dy / d] : [x < NET_X ? -1 : 1, 0]
-    x = cx + nx * BALL_R
-    y = cy + ny * BALL_R
-    const vn = vx * nx + vy * ny
-    if (vn < 0) {
-      vx -= (1 + NET_BOUNCE) * vn * nx
-      vy -= (1 + NET_BOUNCE) * vn * ny
-    }
-    // 꼭대기에 얹히면 가까운 쪽으로 굴러떨어지게
-    if (ny > 0.7) vx += (x >= NET_X ? 1 : -1) * NET_TOP_NUDGE
-    hit = { kind: 'net', player: null }
-  }
-
-  // 선수 몸: 일자 막대(캡슐)와 충돌. 막대에서 가장 가까운 점 쪽으로 튀고, 선수 속도도 조금 더해 준다
-  players.forEach((p, side) => {
-    if (p.touchCool > 0) return
-    {
-      const cap = capsuleOf(p)
-      const c = closestOnCapsule(cap, x, y)
-      const ex = x - c.x
-      const ey = y - c.y
-      const dist = Math.hypot(ex, ey)
-      if (dist >= BALL_R + cap.r) return
-      const [nx, ny] = dist > 1e-6 ? [ex / dist, ey / dist] : [0, 1]
-      x = c.x + nx * (BALL_R + cap.r)
-      y = c.y + ny * (BALL_R + cap.r)
-      const rvx = vx - p.vx
-      const rvy = vy - p.vy
-      const incoming = Math.hypot(rvx, rvy)
-      // 빠른 공(스파이크)은 받아 넘기기 도움 없이 물리대로. 옆·아래에 맞으면 힘없이 떨어진다
-      const fast = incoming >= FAST_BALL_SPEED
-      // 땅에 서 있으면(몸 날리기 포함) 어디에 맞든 공을 위로 띄운다. 빠른 공은 옆으로 가던 힘은 빠지고 위로만
-      const grounded = p.y <= 0
-      const absorbed = fast && (ny <= 0.3 || grounded)
-      const bounce = absorbed ? FAST_HIT_BOUNCE : BODY_BOUNCE
-      const vn = rvx * nx + rvy * ny
-      if (vn < 0) {
-        vx -= (1 + bounce) * vn * nx
-        vy -= (1 + bounce) * vn * ny
-      }
-      vx += p.vx * CARRY
-      vy += Math.max(0, p.vy) * CARRY
-      // 받으면 늘 어느 정도는 튀어 나가게 (힘없이 떨어지는 공은 빼고)
-      const out = vx * nx + vy * ny
-      if (!absorbed && out < MIN_BUMP_SPEED) {
-        vx += (MIN_BUMP_SPEED - out) * nx
-        vy += (MIN_BUMP_SPEED - out) * ny
-      }
-      // 받아 넘기기: 느린 공이 위·옆에 맞으면 네트 쪽으로 밀고 높이 띄운다 (네트에서 멀수록 세게 밀어 넘어가게).
-      // 빠른 스파이크까지 받아 넘겨 주면 스파이크가 점수가 안 나서 랠리가 안 끝났음. 그 밖엔 조금만 뜬다
-      if (!fast && (ny > -0.3 || grounded)) {
-        const push = Math.min(BUMP_PUSH_MAX, Math.max(BUMP_PUSH_MIN, Math.abs(p.x - NET_X) * BUMP_AIM))
-        vx += towardNet(side as Side) * push
-        vy = Math.max(vy, BUMP_UP)
-      } else if (grounded) {
-        vy = Math.max(vy, BUMP_UP)
-      } else {
-        vy = Math.max(vy, ANY_BUMP_UP)
-      }
-      hit = { kind: 'bump', player: side as Side }
-      touched.push(side as Side)
-    }
-  })
 
   const speed = Math.hypot(vx, vy)
   if (speed > BALL_MAX_SPEED) {
     vx *= BALL_MAX_SPEED / speed
     vy *= BALL_MAX_SPEED / speed
   }
-  return { ball: { x, y, vx, vy }, hit, touched }
+  return { ball: { x, y, vx, vy }, hit }
 }
 
 /**
@@ -355,7 +262,7 @@ function moveBall(b: Ball, players: [Player, Player]): BallStep {
 export function predictBall(b: Ball, y: number, maxSteps = STEP_HZ * 4): { x: number; steps: number } | null {
   let ball = b
   for (let i = 1; i <= maxSteps; i++) {
-    ball = moveBall(ball, NO_PLAYERS).ball
+    ball = moveBall(ball).ball
     if (ball.y <= y && ball.vy < 0) return { x: ball.x, steps: i }
   }
   return null
@@ -366,11 +273,12 @@ function withHit(s: SimState, kind: HitKind, player: Side | null): SimState {
   return { ...s, hitSeq: seq, lastHit: { kind, player, seq, tick: s.tick } }
 }
 
-/** 이겼는지: 15점 먼저, 14:14부터는 2점 차 */
+/** 이겼는지: 15점 먼저 (듀스 없음) */
 export function winnerOf(score: readonly [number, number]): Side | null {
   const [a, b] = score
-  if (Math.max(a, b) < WIN_SCORE || Math.abs(a - b) < 2) return null
-  return a > b ? 0 : 1
+  if (a >= WIN_SCORE) return 0
+  if (b >= WIN_SCORE) return 1
+  return null
 }
 
 function startServe(s: SimState, server: Side): SimState {
@@ -380,17 +288,12 @@ function startServe(s: SimState, server: Side): SimState {
 export function step(s: SimState, inputs: readonly [Input, Input]): SimState {
   if (s.phase.kind === 'done') return s
   const tick = s.tick + 1
-  const live = s.phase.kind === 'rally'
-  const moved = [0, 1].map((i) => movePlayer(s.players[i], i as Side, inputs[i], s.ball, live)) as [
-    ReturnType<typeof movePlayer>,
-    ReturnType<typeof movePlayer>,
-  ]
-  let players: [Player, Player] = [moved[0].p, moved[1].p]
+  let players: [Player, Player] = [movePlayer(s.players[0], 0, inputs[0]), movePlayer(s.players[1], 1, inputs[1])]
   let next: SimState = { ...s, tick, players }
 
   switch (s.phase.kind) {
     case 'serve': {
-      // 공은 머리 위에 떠 있다가 떨어진다
+      // 공은 하늘에 떠 있다가 떨어진다
       if (s.phase.t > 1) return { ...next, phase: { kind: 'serve', t: s.phase.t - 1 } }
       return { ...next, phase: { kind: 'rally' } }
     }
@@ -401,27 +304,27 @@ export function step(s: SimState, inputs: readonly [Input, Input]): SimState {
       return startServe(next, s.phase.scorer)
     }
     case 'rally': {
-      // 스파이크가 몸에 맞는 것보다 먼저
-      const spike = moved[0].spike ?? moved[1].spike
-      let ball = s.ball
-      if (spike) {
-        const who: Side = moved[0].spike ? 0 : 1
-        ball = spike
-        players = players.map((p, i) => (i === who ? { ...p, touchCool: 8 } : p)) as [Player, Player]
-        const spikes: [number, number] = who === 0 ? [s.spikes[0] + 1, s.spikes[1]] : [s.spikes[0], s.spikes[1] + 1]
-        next = withHit({ ...next, players, spikes }, 'spike', who)
-      }
-      const r = moveBall(ball, players)
-      if (r.touched.length > 0) {
-        players = players.map((p, i) => (r.touched.includes(i as Side) ? { ...p, touchCool: 6 } : p)) as [Player, Player]
-      }
-      next = { ...next, players, ball: r.ball }
-      if (r.hit) next = withHit(next, r.hit.kind, r.hit.player)
+      const w = moveBall(s.ball)
+      let ball = w.ball
+      if (w.hit) next = withHit(next, w.hit, null)
+      // 몸에 맞기: 겹치기 시작할 때 한 번만
+      let spikes = s.spikes
+      players = players.map((p, i) => {
+        const side = i as Side
+        const touching = touchesBall(p, ball)
+        if (touching && !p.touching) {
+          ball = hitBall(ball, p, side, inputs[side], p.power, tick)
+          if (p.power) spikes = side === 0 ? [spikes[0] + 1, spikes[1]] : [spikes[0], spikes[1] + 1]
+          next = withHit(next, p.power ? 'spike' : 'bump', side)
+        }
+        return touching === p.touching ? p : { ...p, touching }
+      }) as [Player, Player]
+      next = { ...next, players, ball, spikes }
       // 바닥에 닿으면 반대쪽 점수
-      if (r.ball.y - BALL_R <= 0) {
-        const scorer: Side = r.ball.x < NET_X ? 1 : 0
+      if (ball.y - BALL_R <= 0) {
+        const scorer: Side = ball.x < NET_X ? 1 : 0
         const score: [number, number] = scorer === 0 ? [s.score[0] + 1, s.score[1]] : [s.score[0], s.score[1] + 1]
-        return { ...next, ball: { ...r.ball, y: BALL_R, vx: 0, vy: 0 }, score, phase: { kind: 'point', scorer, t: steps(POINT_S) } }
+        return { ...next, ball: { ...ball, y: BALL_R, vx: 0, vy: 0 }, score, phase: { kind: 'point', scorer, t: steps(POINT_S) } }
       }
       return next
     }

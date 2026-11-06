@@ -7,8 +7,8 @@ import { type Ball, type Player, type Side, type SimState } from '../play/sim'
 // 만화풍 선수(굵은 외곽선, 머리띠, 나 파랑·상대 빨강), 흰·노랑 배구공에 빛 테두리·꼬리, 공 그림자(떨어질 자리 짐작용).
 // mirror면 좌우를 뒤집어 그린다 (친구 쪽 기기에서 자기가 왼쪽에 보이게).
 
-const VIEW_H = 10
-const GROUND = 9
+const VIEW_H = 12
+const GROUND = 11
 const OUT = 0.07
 const Y = (y: number) => GROUND - y
 
@@ -100,7 +100,7 @@ export function Court({ sim, me, mirror, trail, shake }: Props) {
   const { ball, players, lastHit } = sim
   const hitAge = (side: Side) => (lastHit && lastHit.kind === 'spike' && lastHit.player === side ? sim.tick - lastHit.tick : 99)
   const spikeAge = lastHit?.kind === 'spike' ? sim.tick - lastHit.tick : 99
-  const shadowScale = 1 - Math.min(ball.y / 10, 0.7)
+  const shadowScale = 1 - Math.min(ball.y / 11, 0.7)
   const above = ball.y - BALL_R > GROUND
   return (
     <svg className="vb-court" viewBox={`0 0 ${COURT_W} ${VIEW_H}`} role="img" aria-label="배구 코트">
@@ -126,8 +126,8 @@ export function Court({ sim, me, mirror, trail, shake }: Props) {
           <ellipse cx={x + 0.5} cy={y - 0.2} rx={0.6} ry={0.35} />
         </g>
       ))}
-      <rect x={0} y={7.4} width={COURT_W} height={GROUND - 7.4} fill="#38bdf8" />
-      <path d={Array.from({ length: 9 }, (_, i) => `M${i * 2 + 0.3} 7.9 q0.35 -0.15 0.7 0`).join(' ')} stroke="#e0f2fe" strokeWidth={0.05} fill="none" />
+      <rect x={0} y={GROUND - 1.6} width={COURT_W} height={1.6} fill="#38bdf8" />
+      <path d={Array.from({ length: 9 }, (_, i) => `M${i * 2 + 0.3} ${GROUND - 1.1} q0.35 -0.15 0.7 0`).join(' ')} stroke="#e0f2fe" strokeWidth={0.05} fill="none" />
       <g transform={`translate(${shake} 0)`}>
         <g transform={mirror ? `translate(${COURT_W} 0) scale(-1 1)` : undefined}>
           {/* 모래 */}

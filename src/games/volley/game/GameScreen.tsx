@@ -293,7 +293,6 @@ export function GameScreen(props: Props) {
   if (view.phase.kind === 'point') banner = view.phase.scorer === me ? { text: '득점!', cls: 'vb-banner--win' } : { text: '실점…' }
   else if (view.phase.kind === 'serve' && view.tick < 50 && view.score[0] + view.score[1] === 0) banner = { text: view.server === me ? '내 서브!' : '상대 서브' }
   else if (view.phase.kind === 'done') banner = view.phase.winner === me ? { text: '승리!', cls: 'vb-banner--win' } : { text: '패배' }
-  const deuce = view.score[0] >= 14 && view.score[1] >= 14
   // 스파이크하면 화면이 잠깐 좌우로 흔들린다
   const spikeAge = view.lastHit?.kind === 'spike' ? view.tick - view.lastHit.tick : 99
   const shake = spikeAge < 10 ? 0.14 * (1 - spikeAge / 10) * (spikeAge % 2 ? 1 : -1) : 0
@@ -313,7 +312,6 @@ export function GameScreen(props: Props) {
           {view.server === foe && <i aria-label="서브" />}
         </span>
       </div>
-      {deuce && <p className="vb-deuce">듀스! 2점 차가 나야 끝나요</p>}
 
       <div className="vb-view">
         <Court sim={view} me={me} mirror={mirror} trail={frame.trail} shake={shake} />
@@ -332,7 +330,7 @@ export function GameScreen(props: Props) {
         </div>
       </div>
       <p className="vb-rotate">폰을 가로로 돌리면 코트가 더 크게 보여요</p>
-      <p className="vb-hint">PC: ← → 이동 · ↑ 점프 · 스페이스 치기 · 스파이크 방향: ↑ 위로 강타 · 상대 쪽 빠르게 · 반대쪽 느리게 · ↓ 내리찍기</p>
+      <p className="vb-hint">PC: ← → 이동 · ↑ 점프 · 스페이스 치기(공중: 스파이크 · 땅에서 ←→와 같이: 몸 날리기) · 스파이크 방향: ←→ 빠르게 · ↑ 위로 · ↓ 아래로</p>
 
       {props.mode === 'pvp' && props.peerGone && (
         <div className="pvp-gone" role="alert">
