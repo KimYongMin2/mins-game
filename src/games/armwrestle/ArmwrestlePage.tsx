@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router'
 import { installAudioUnlock } from '../../shared/audio/synth'
+import { withDirectLink } from '../../shared/online/directLink'
 import type { Peer, Room } from '../../shared/online/room'
 import { loadNickname } from '../../shared/storage/nickname'
 import { PvpLobby } from '../../shared/ui/PvpLobby'
@@ -96,7 +97,8 @@ export function ArmwrestlePage() {
   useEffect(() => () => pvpRef.current?.room.leave(), [])
 
   function connected(room: Room<ArmMsg>, peer: Peer) {
-    setPvp({ room, peer })
+    // 되도록 기기끼리 직접 (WebRTC). 친구가 누른 게 방장에게 빨리 가야 공평해서
+    setPvp({ room: withDirectLink(room), peer })
     setPeerGone(false)
     setScreen({ kind: 'pvp-wait' })
   }

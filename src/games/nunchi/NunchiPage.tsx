@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router'
 import { installAudioUnlock } from '../../shared/audio/synth'
+import { withDirectLink } from '../../shared/online/directLink'
 import type { Member, Room } from '../../shared/online/room'
 import { loadNickname } from '../../shared/storage/nickname'
 import { GroupLobby } from '../../shared/ui/GroupLobby'
@@ -115,9 +116,11 @@ export function NunchiPage() {
           nickname={loadNickname() ?? '익명'}
           capacity={MAX_PLAYERS}
           minPlayers={MIN_PLAYERS}
-          onConnected={setRoom}
+          // 되도록 기기끼리 직접 (WebRTC, 방장 ↔ 친구 각자). 동시 판정이 방장 기기에 도착한 시각 기준이라, 늦게 가면 불공평해서
+          onConnected={(r) => setRoom(withDirectLink(r))}
           onStart={(with_, bots) => room && startPvp(room, with_, bots)}
           onBack={() => {
+            room?.leave()
             setRoom(null)
             toStart()
           }}

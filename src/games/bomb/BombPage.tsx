@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router'
 import { installAudioUnlock } from '../../shared/audio/synth'
+import { withDirectLink } from '../../shared/online/directLink'
 import type { Member, Room } from '../../shared/online/room'
 import { loadNickname } from '../../shared/storage/nickname'
 import { GroupLobby } from '../../shared/ui/GroupLobby'
@@ -115,9 +116,11 @@ export function BombPage() {
           nickname={loadNickname() ?? '익명'}
           capacity={MAX_PLAYERS}
           minPlayers={MIN_PLAYERS}
-          onConnected={setRoom}
+          // 되도록 기기끼리 직접 (WebRTC, 방장 ↔ 친구 각자). 던진 폭탄이 방장에게 늦게 가면 내 손에서 터질 수 있어서
+          onConnected={(r) => setRoom(withDirectLink(r))}
           onStart={(with_, bots) => room && startPvp(room, with_, bots)}
           onBack={() => {
+            room?.leave()
             setRoom(null)
             toStart()
           }}
