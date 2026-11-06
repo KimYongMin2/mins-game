@@ -89,9 +89,11 @@ type Props = {
   screen: ScreenState
   /** 누름·끌기·뗌 (맵 좌표, y는 위로 +) */
   onPointer: (kind: 'down' | 'move' | 'up', at: Vec) => void
+  /** 새총처럼 당기는 중: 처음 누른 곳 → 지금 손가락 */
+  pull?: { from: Vec; to: Vec } | null
 }
 
-export function Battlefield({ screen, onPointer }: Props) {
+export function Battlefield({ screen, onPointer, pull }: Props) {
   const v = screen.view
   const svgRef = useRef<SVGSVGElement>(null)
   const paths = useMemo(() => (v ? terrainPath(v.terrain) : null), [v?.terrain]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -205,6 +207,13 @@ export function Battlefield({ screen, onPointer }: Props) {
           <polyline points={guide.map((p) => `${p.x},${sy(p.y)}`).join(' ')} fill="none" stroke="#fff" strokeWidth={0.8} strokeDasharray="1.2 1.6" strokeLinecap="round" />
         )}
 
+        {pull && Math.hypot(pull.to.x - pull.from.x, pull.to.y - pull.from.y) > 1 && (
+          <g opacity={0.75} pointerEvents="none">
+            <line x1={pull.from.x} y1={sy(pull.from.y)} x2={pull.to.x} y2={sy(pull.to.y)} stroke="#fff" strokeWidth={0.9} strokeDasharray="1.5 1.5" />
+            <circle cx={pull.from.x} cy={sy(pull.from.y)} r={1.6} fill="none" stroke="#fff" strokeWidth={0.7} />
+            <circle cx={pull.to.x} cy={sy(pull.to.y)} r={2.4} fill="rgb(255 255 255 / 0.35)" stroke="#fff" strokeWidth={0.7} />
+          </g>
+        )}
         {trail.length > 1 && <polyline points={trail.map((p) => `${p.x},${sy(p.y)}`).join(' ')} fill="none" stroke="#f97316" strokeWidth={0.9} strokeLinecap="round" opacity={0.7} />}
         {ball &&
           (ball.y > WORLD_H ? (

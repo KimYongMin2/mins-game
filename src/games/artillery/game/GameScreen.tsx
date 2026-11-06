@@ -8,7 +8,7 @@ import { Battlefield } from '../field/Battlefield'
 import { type EngineAction, type EngineState, type Player, createEngine, engineReducer } from '../play/engine'
 import type { ArtilleryMsg } from '../play/pvp'
 import { type ArtilleryView, type ScreenAction, type ScreenState, canAim, createScreen, fuelLeft, myIndex, screenReducer, toView, viewChanged } from '../play/view'
-import { type Vec, tankCenter } from '../rules/physics'
+import type { Vec } from '../rules/physics'
 import type { GameSummary } from '../records'
 import { playSound } from '../sounds'
 
@@ -26,7 +26,7 @@ const SEND_MIN_MS = 100
 const HEARTBEAT_MS = 1000
 /** 친구가 겨누는 중인 걸 방장에게 보내는 간격 */
 const SEND_AIM_MS = 100
-/** 끌어서 겨눌 때: 대포에서 이만큼 끌면 힘 100 */
+/** 새총처럼 당길 때: 이만큼 당기면 힘 100 */
 const DRAG_FULL = 45
 
 const BOT_NAMES = ['봇 철수', '봇 영희', '봇 민수']
@@ -229,13 +229,22 @@ export function GameScreen(props: Props) {
     finishRef.current(props.mode === 'bot' ? { ...summary, level: props.level } : summary)
   }, [done, hostGone, props])
 
-  // 끌어서 겨누기: 대포에서 손가락 쪽이 방향, 거리가 힘 (떼도 안 쏨, [발사]를 눌러야)
+  // 새총처럼 겨누기: 처음 누른 곳에서 뒤로 당기면 그 반대쪽으로, 당긴 거리가 힘 (화면 어디서 당겨도 됨, 떼도 안 쏨 — [발사]를 눌러야)
+  const [pull, setPull] = useState<{ from: Vec; to: Vec } | null>(null)
   function onPointer(kind: 'down' | 'move' | 'up', at: Vec) {
     const s = screenRef.current
-    if (kind === 'up' || !canAim(s) || !s.draft || !s.view) return
-    const c = tankCenter(s.view.terrain, s.draft.x)
-    const dx = at.x - c.x
-    const dy = at.y - c.y
+    if (kind === 'up' || !canAim(s) || !s.draft) {
+      setPull(null)
+      return
+    }
+    if (kind === 'down') {
+      setPull({ from: at, to: at })
+      return
+    }
+    if (!pull) return
+    setPull({ from: pull.from, to: at })
+    const dx = pull.from.x - at.x
+    const dy = pull.from.y - at.y
     if (Math.hypot(dx, dy) < 2) return
     let angle = (Math.atan2(dy, dx) * 180) / Math.PI
     if (angle < 0) angle = dx >= 0 ? 0 : 180
@@ -321,7 +330,7 @@ export function GameScreen(props: Props) {
         {v && v.phase !== 'countdown' && v.phase !== 'done' && <Wind wind={v.wind} />}
       </div>
       <div className="at-view">
-        <Battlefield screen={screen} onPointer={onPointer} />
+        <Battlefield screen={screen} onPointer={onPointer} pull={aiming ? pull : null} />
       </div>
       <div className="at-timer" aria-hidden>
         <div className="at-timer__fill" style={{ transform: `scaleX(${v?.phase === 'aim' ? left / TURN_MS : 0})` }} />
@@ -371,7 +380,7 @@ export function GameScreen(props: Props) {
           {me >= 0 && v && !v.tanks[me].alive ? '탈락 · 구경 중' : v && me < 0 ? '이미 시작한 판이라 구경해요' : screen.fired ? '발사!' : '내 차례를 기다리는 중'}
         </p>
       )}
-      <p className="at-hint">전장을 끌어서 겨누기(방향·힘) · 떼도 안 쏴요, [발사!]를 눌러야 · PC: ←→ 각도 · ↑↓ 힘(Shift는 5씩) · A·D 이동 · 스페이스 발사</p>
+      <p className="at-hint">전장을 새총처럼 뒤로 당겨 겨누기(반대쪽으로 날아감, 당긴 만큼 힘) · 떼도 안 쏴요, [발사!]를 눌러야 · PC: ←→ 각도 · ↑↓ 힘(Shift는 5씩) · A·D 이동 · 스페이스 발사</p>
 
       {hostGone && props.mode === 'guest' && (
         <div className="pvp-gone" role="alert">
