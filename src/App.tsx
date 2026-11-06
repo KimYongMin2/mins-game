@@ -10,6 +10,7 @@ import { NumbaseballPage } from './games/numbaseball/NumbaseballPage'
 import { OmokPage } from './games/omok/OmokPage'
 import { RoulettePage } from './games/roulette/RoulettePage'
 import { SurvivalPage } from './games/survival/SurvivalPage'
+import { ArtilleryPage } from './games/artillery/ArtilleryPage'
 import { NunchiPage } from './games/nunchi/NunchiPage'
 import { TilesPage } from './games/tiles/TilesPage'
 import { VolleyPage } from './games/volley/VolleyPage'
@@ -92,6 +93,10 @@ function App() {
         <Route
           path="/games/roulette"
           element={nickname ? <RoulettePage /> : <Navigate to="/nickname" replace />}
+        />
+        <Route
+          path="/games/artillery"
+          element={nickname ? <ArtilleryPage /> : <Navigate to="/nickname" replace />}
         />
         <Route
           path="/meeting"

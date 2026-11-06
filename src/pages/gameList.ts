@@ -95,6 +95,15 @@ export const GAMES: GameEntry[] = [
     players: '2~8인',
   },
   {
+    id: 'artillery',
+    title: '포격전',
+    description: '각도·힘·바람 계산해 포탄 발사',
+    path: '/games/artillery',
+    ready: true,
+    play: 'pvp',
+    players: '2~4인',
+  },
+  {
     id: 'yut',
     title: '윷놀이',
     description: '윷·모면 한 번 더, 업고 잡기',

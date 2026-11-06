@@ -1,0 +1,404 @@
+/* 포격전(artillery) 전용 스타일. 모든 클래스는 at- 접두사를 쓴다. */
+.at-page {
+  max-width: 560px;
+}
+
+.at-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.at-header .title {
+  flex: 1;
+  min-width: 0;
+}
+
+.at-start__rules {
+  margin: 0;
+  padding: 12px 16px;
+  list-style: none;
+  text-align: left;
+  font-size: 0.875rem;
+  border: 1.5px solid var(--muted-line);
+  border-radius: 12px;
+  display: grid;
+  gap: 4px;
+}
+
+.at-start__button {
+  flex-direction: column;
+  min-height: 64px;
+  font-size: 1.25rem;
+}
+
+.at-start__button span {
+  font-size: 0.8125rem;
+  font-weight: 500;
+  opacity: 0.8;
+}
+
+.at-start__record {
+  font-size: 0.8125rem;
+  color: var(--ink-soft);
+}
+
+.at-start__bots {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border: 1.5px solid var(--muted-line);
+  border-radius: 12px;
+}
+
+.at-start__label {
+  font-weight: 800;
+}
+
+.at-start__counts {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 6px;
+}
+
+.at-start__counts .button {
+  padding-left: 0;
+  padding-right: 0;
+}
+
+.at-start__count--on {
+  color: var(--paper);
+  background: var(--ink);
+}
+
+.at-result__headline {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 20px 16px;
+  border: 2px solid var(--line);
+  border-radius: 14px;
+  text-align: center;
+}
+
+.at-result__headline strong {
+  font-size: 3rem;
+  font-weight: 900;
+  line-height: 1.1;
+}
+
+.at-result__headline span {
+  color: var(--ink-soft);
+  font-size: 0.875rem;
+}
+
+.at-result__headline--win {
+  border-color: #d97706;
+  background: #fffbeb;
+}
+
+.at-result__headline--win strong {
+  color: var(--accent);
+}
+
+.at-result__ranking {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 6px;
+}
+
+.at-result__ranking li {
+  padding: 8px 12px;
+  border: 1.5px solid var(--muted-line);
+  border-radius: 10px;
+  font-weight: 700;
+}
+
+.at-result__ranking li span {
+  display: inline-block;
+  width: 2.5em;
+  color: var(--ink-soft);
+}
+
+.at-result__ranking .at-result__me {
+  border-color: #2563eb;
+  color: #2563eb;
+}
+
+.at-result__career,
+.at-result__note {
+  text-align: center;
+  font-size: 0.875rem;
+  color: var(--ink-soft);
+}
+
+.at-result__buttons {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+}
+
+.at-timer {
+  height: 6px;
+  border: 2px solid var(--line);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.at-timer__fill {
+  height: 100%;
+  background: var(--ink);
+  transform-origin: left;
+}
+
+/* 경기 화면 */
+.at-game {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.at-players {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  justify-content: center;
+}
+
+.at-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border: 1.5px solid var(--muted-line);
+  border-radius: 999px;
+  font-size: 0.8125rem;
+  font-weight: 700;
+}
+
+.at-chip--me {
+  border-color: var(--ink);
+}
+
+.at-chip--out {
+  opacity: 0.4;
+  text-decoration: line-through;
+}
+
+.at-chip__dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+.at-chip__name {
+  max-width: 6em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.at-chip__kills {
+  color: var(--accent);
+}
+
+.at-chip__state {
+  color: var(--ink-soft);
+}
+
+.at-status {
+  min-height: 1.5em;
+  text-align: center;
+  font-weight: 900;
+  font-size: 1.0625rem;
+}
+
+.at-status--bad {
+  color: var(--accent);
+}
+
+.at-status--win {
+  color: #d97706;
+}
+
+/* 맵: 화면 높이에 맞춰 줄여 폰에서도 버튼까지 한 화면 */
+.at-tip {
+  min-height: 1.4em;
+  text-align: center;
+  font-weight: 800;
+  color: var(--ink-soft);
+}
+
+.at-buttons {
+  display: grid;
+  grid-template-columns: 1fr 2fr;
+  gap: 8px;
+}
+
+.at-buttons .button {
+  min-height: 52px;
+  white-space: nowrap;
+  font-size: 1.0625rem;
+}
+
+.at-hint {
+  text-align: center;
+  font-size: 0.75rem;
+  color: var(--ink-soft);
+}
+
+.at-result__ranking li em {
+  float: right;
+  font-style: normal;
+  color: var(--accent);
+}
+
+.at-start {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-width: 420px;
+  margin: 8px auto 0;
+  text-align: center;
+}
+
+.at-result {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-width: 420px;
+  margin: 8px auto 0;
+}
+
+/* ---- 포격전 경기 화면 ---- */
+.at-chip--turn {
+  border-color: var(--line);
+  box-shadow: 0 0 0 2px #facc15;
+}
+
+.at-chip__hp {
+  font-size: 0.75rem;
+  font-weight: 800;
+  color: var(--ink-soft);
+}
+
+.at-status--mine {
+  color: #1d4ed8;
+  font-weight: 900;
+}
+
+.at-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 1.6em;
+}
+
+.at-bar .at-status {
+  margin: 0;
+  text-align: left;
+}
+
+.at-wind {
+  flex: none;
+  padding: 2px 10px;
+  border: 1.5px solid var(--muted-line);
+  border-radius: 999px;
+  font-size: 0.8125rem;
+  white-space: nowrap;
+}
+
+.at-wind b {
+  color: #0369a1;
+  letter-spacing: -0.1em;
+}
+
+.at-view {
+  position: relative;
+  border: 3px solid #1f2937;
+  border-radius: 14px;
+  overflow: hidden;
+  background: #e0f2fe;
+}
+
+.at-field {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 200 / 130;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.at-field--empty {
+  aspect-ratio: 200 / 130;
+}
+
+.at-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+
+.at-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.at-move {
+  flex: none;
+  min-width: 84px;
+  touch-action: none;
+}
+
+.at-fuel {
+  position: relative;
+  flex: 1;
+  height: 10px;
+  border: 1.5px solid var(--line);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.at-fuel__fill {
+  position: absolute;
+  inset: 0;
+  background: #f59e0b;
+  transform-origin: left;
+}
+
+.at-tune {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.875rem;
+  color: var(--ink-soft);
+}
+
+.at-tune b {
+  min-width: 2.6em;
+  text-align: center;
+  font-size: 1.0625rem;
+  color: var(--ink);
+}
+
+.at-fire {
+  min-height: 56px;
+  font-size: 1.25rem;
+}
