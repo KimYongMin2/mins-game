@@ -289,3 +289,36 @@
   padding: 6px 10px;
   font-size: 0.875rem;
 }
+
+/* 내 목소리 들어보기 */
+.meet-test {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.meet-test audio {
+  display: none;
+}
+
+.meet-test__row {
+  display: flex;
+  gap: 8px;
+}
+
+.meet-test__status,
+.meet-test__hint {
+  margin: 0;
+  font-size: 0.8125rem;
+  text-align: center;
+}
+
+.meet-test__hint {
+  color: var(--ink-soft);
+}
+
+.meet-list__voice {
+  margin-top: 16px;
+}

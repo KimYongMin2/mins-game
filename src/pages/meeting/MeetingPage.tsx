@@ -2,12 +2,13 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router'
 import { levelContext, watchLevel } from '../../shared/call/level'
 import { LISTEN_VOLUME, Speaker } from '../../shared/call/speaker'
-import { ECHO_DELAY, MIC_VOLUME, VOICE_EFFECTS, TUNE_ROOTS, type TuneScale, VOICE_MIX_DEFAULT, type VoiceEffect, type VoiceMix, VoiceChanger } from '../../shared/call/voiceFx'
+import { DEFAULT_VOICE_SETTINGS, MIC_VOLUME, VoiceChanger, type VoiceSettings } from '../../shared/call/voiceFx'
 import { type CallPeer, type CallSignal, VoiceMesh } from '../../shared/call/voiceMesh'
 import { type Member, type Room, RoomError, createRoom, joinRoom, makeRoomCode } from '../../shared/online/room'
 import { advertiseRoom, watchRooms } from '../../shared/online/roomList'
 import { readLocal, writeLocal } from '../../shared/storage/local'
 import { loadNickname } from '../../shared/storage/nickname'
+import { VoicePicker, VoiceTest } from './VoicePanel'
 import './meeting.css'
 
 // 회의방: 열린 방 목록에서 골라 들어가 음성 통화. 방장이 방을 만들 때 이름과 전체 공개/비공개(코드)를 정한다.
@@ -134,23 +135,22 @@ const CONNECTION_TEXT: Record<CallPeer['connection'], string | null> = {
 
 type RoomProps = Joined & {
   nickname: string
+  /** 목소리 효과 (방 목록에서 고른 걸 이어서) */
+  settings: VoiceSettings
+  onSettings: (s: VoiceSettings) => void
   /** 나중에 마이크를 허락받음 */
   onVoice: (voice: VoiceChanger) => void
   onLeave: () => void
 }
 
 /** 방을 닫고 마이크를 끄는 건 부르는 쪽(MeetingPage)이 한다 */
-function MeetingRoom({ room, name, pin, nickname, voice, onVoice, onLeave }: RoomProps) {
+function MeetingRoom({ room, name, pin, nickname, voice, settings, onSettings, onVoice, onLeave }: RoomProps) {
   const [members, setMembers] = useState<Member[]>([])
   const [blocked, setBlocked] = useState(false)
   const [asking, setAsking] = useState(false)
   /** 통화 상태 (바뀔 때마다 새로 받아 그린다) */
   const [call, setCall] = useState<{ peers: CallPeer[]; mic: boolean }>({ peers: [], mic: true })
   const meshRef = useRef<VoiceMesh | null>(null)
-  const [effect, setEffect] = useState<VoiceEffect>(voice?.current ?? 'normal')
-  const [echo, setEcho] = useState(voice?.echo ?? ECHO_DELAY.default)
-  const [mix, setMix] = useState<Record<VoiceMix, number>>(() => ({ ...VOICE_MIX_DEFAULT }))
-  const [scale, setScale] = useState<TuneScale>(() => voice?.tuneScale ?? { kind: 'chromatic' })
   const [micVolume, setMicVolume] = useState(() => voice?.volume ?? loadVolume(MIC_VOLUME_KEY, MIC_VOLUME))
   const [speaker] = useState(() => {
     const s = new Speaker(levelContext())
@@ -162,6 +162,10 @@ function MeetingRoom({ room, name, pin, nickname, voice, onVoice, onLeave }: Roo
   useEffect(() => {
     voiceRef.current = voice
   })
+  // 효과를 바꾸면 보내는 내 목소리에 바로
+  useEffect(() => {
+    voice?.apply(settings)
+  }, [voice, settings])
 
   useEffect(() => {
     const mesh: VoiceMesh = new VoiceMesh({
@@ -215,37 +219,10 @@ function MeetingRoom({ room, name, pin, nickname, voice, onVoice, onLeave }: Roo
     const v = await getMic()
     setAsking(false)
     if (!v) return
-    v.setEchoDelay(echo)
-    for (const k of Object.keys(mix) as VoiceMix[]) v.setMix(k, mix[k])
-    v.setTuneScale(scale)
     v.setVolume(micVolume)
-    void v.setEffect(effect)
+    v.apply(settings)
     onVoice(v)
     meshRef.current?.setTrack(v.track)
-  }
-
-  function changeMix(key: VoiceMix, v: number) {
-    setMix((m) => ({ ...m, [key]: v }))
-    voice?.setMix(key, v)
-  }
-
-  const mixSlider = (key: VoiceMix, label: string) => (
-    <label className="meet-voice__slider" key={key}>
-      <span>
-        {label} {Math.round(mix[key] * 100)}%
-      </span>
-      <input type="range" min={0} max={1} step={0.05} value={mix[key]} onChange={(e) => changeMix(key, Number(e.target.value))} />
-    </label>
-  )
-
-  function changeScale(next: TuneScale) {
-    setScale(next)
-    voice?.setTuneScale(next)
-  }
-
-  function changeVoice(next: VoiceEffect) {
-    setEffect(next)
-    void voice?.setEffect(next)
   }
 
   function unblock() {
@@ -313,81 +290,11 @@ function MeetingRoom({ room, name, pin, nickname, voice, onVoice, onLeave }: Roo
               {micOn ? '🎤 마이크 끄기' : '🔇 마이크 켜기'}
             </button>
             {/* 목소리 변조: 다른 사람에겐 표시 안 함 */}
-            <div className="meet-voice" role="radiogroup" aria-label="내 목소리">
+            <div className="meet-voice" aria-label="내 목소리">
               <span className="meet-voice__label">내 목소리</span>
-              <div className="meet-voice__options">
-                {VOICE_EFFECTS.map((e) => (
-                  <button
-                    key={e.id}
-                    type="button"
-                    role="radio"
-                    aria-checked={effect === e.id}
-                    className={`button button--small${effect === e.id ? ' button--primary' : ''}`}
-                    onClick={() => changeVoice(e.id)}
-                  >
-                    {e.label}
-                  </button>
-                ))}
-              </div>
-              {effect === 'echo' && (
-                <label className="meet-voice__slider">
-                  <span>울리는 간격 {echo.toFixed(2)}초</span>
-                  <input
-                    type="range"
-                    min={ECHO_DELAY.min}
-                    max={ECHO_DELAY.max}
-                    step={0.01}
-                    value={echo}
-                    onChange={(e) => {
-                      const sec = Number(e.target.value)
-                      setEcho(sec)
-                      voice.setEchoDelay(sec)
-                    }}
-                  />
-                </label>
-              )}
-              {effect === 'cave' && mixSlider('caveReverb', '울림')}
-              {effect === 'autotune' && (
-                <>
-                  {mixSlider('autotune', '음 맞추기 세기')}
-                  {/* 음계: 반음 전부 또는 조(으뜸음 + 장조/단조) */}
-                  <div className="meet-voice__scale">
-                    <select
-                      className="input"
-                      aria-label="맞출 음"
-                      value={scale.kind}
-                      onChange={(e) => {
-                        const kind = e.target.value as TuneScale['kind']
-                        changeScale(kind === 'chromatic' ? { kind } : { kind, root: scale.kind === 'chromatic' ? 0 : scale.root })
-                      }}
-                    >
-                      <option value="chromatic">반음 전부 (12음)</option>
-                      <option value="major">장조 (7음)</option>
-                      <option value="minor">단조 (7음)</option>
-                    </select>
-                    {scale.kind !== 'chromatic' && (
-                      <select
-                        className="input"
-                        aria-label="조"
-                        value={scale.root}
-                        onChange={(e) => changeScale({ kind: scale.kind, root: Number(e.target.value) })}
-                      >
-                        {TUNE_ROOTS.map((name, i) => (
-                          <option key={name} value={i}>
-                            {name} {scale.kind === 'major' ? '장조' : '단조'}
-                          </option>
-                        ))}
-                      </select>
-                    )}
-                  </div>
-                </>
-              )}
-              {effect === 'karaoke' && (
-                <>
-                  {mixSlider('karaokeReverb', '울림 (리버브)')}
-                  {mixSlider('karaokeEcho', '에코')}
-                </>
-              )}
+              <VoicePicker settings={settings} onChange={onSettings} />
+              {/* 들어보는 동안엔 다른 사람에게 내 소리를 안 보낸다 */}
+              <VoiceTest settings={settings} getRaw={async () => voice.rawTrack} onBusy={(busy) => voice.setSending(!busy)} />
             </div>
           </>
         ) : (
@@ -432,7 +339,25 @@ function MeetingRoom({ room, name, pin, nickname, voice, onVoice, onLeave }: Roo
 }
 
 /** 열린 방 목록. 비공개 방은 누르면 코드를 묻는다 */
-function RoomList({ onJoin, onCreate, error }: { onJoin: (r: RoomInfo, pin: string | null) => void; onCreate: () => void; error?: string }) {
+/** 방 목록에서 쓰는 마이크 (효과 없는 그대로). 들어보기 녹음이 끝나면 놓는다 */
+async function rawMic(): Promise<MediaStreamTrack | null> {
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } })
+    return stream.getAudioTracks()[0] ?? null
+  } catch {
+    return null
+  }
+}
+
+type ListProps = {
+  onJoin: (r: RoomInfo, pin: string | null) => void
+  onCreate: () => void
+  error?: string
+  settings: VoiceSettings
+  onSettings: (s: VoiceSettings) => void
+}
+
+function RoomList({ onJoin, onCreate, error, settings, onSettings }: ListProps) {
   const [rooms, setRooms] = useState<RoomInfo[] | null>(null)
   const [offline, setOffline] = useState(false)
   const [asking, setAsking] = useState<string | null>(null)
@@ -509,6 +434,12 @@ function RoomList({ onJoin, onCreate, error }: { onJoin: (r: RoomInfo, pin: stri
           })}
         </ul>
       )}
+      {/* 들어가기 전에 목소리 효과를 골라 들어볼 수 있다. 고른 효과로 방에 들어간다 */}
+      <div className="meet-voice meet-list__voice" aria-label="내 목소리">
+        <span className="meet-voice__label">내 목소리 미리 골라 보기</span>
+        <VoicePicker settings={settings} onChange={onSettings} />
+        <VoiceTest settings={settings} getRaw={rawMic} release={(t) => t.stop()} />
+      </div>
       <ul className="meet__notes">
         <li>들어갈 때 마이크 사용을 허락해 주세요 (거절하면 듣기만)</li>
         <li>이어폰을 끼면 소리가 울리지 않아요</li>
@@ -577,6 +508,11 @@ function CreateForm({ nickname, onCreate, onBack }: { nickname: string; onCreate
 export function MeetingPage() {
   const nickname = loadNickname() ?? '나'
   const [view, setView] = useState<View>({ kind: 'list' })
+  const [settings, setSettings] = useState<VoiceSettings>(DEFAULT_VOICE_SETTINGS)
+  const settingsRef = useRef(settings)
+  useEffect(() => {
+    settingsRef.current = settings
+  })
   // 들어가는 도중에 화면을 떠나면 다 열린 방·마이크를 바로 닫는다
   const mountedRef = useRef(true)
   useEffect(() => {
@@ -604,6 +540,7 @@ export function MeetingPage() {
     levelContext()
     setView({ kind: 'busy', text: '마이크 확인 중…' })
     const voice = await getMic()
+    voice?.apply(settingsRef.current)
     setView({ kind: 'busy', text: '회의방에 들어가는 중…' })
     try {
       const room = await open()
@@ -647,6 +584,8 @@ export function MeetingPage() {
           pin={view.pin}
           nickname={nickname}
           voice={view.voice}
+          settings={settings}
+          onSettings={setSettings}
           onVoice={(voice) => setView({ ...view, voice })}
           onLeave={() => {
             close(view)
@@ -658,7 +597,7 @@ export function MeetingPage() {
       ) : view.kind === 'create' ? (
         <CreateForm nickname={nickname} onCreate={create} onBack={() => setView({ kind: 'list' })} />
       ) : (
-        <RoomList onJoin={join} onCreate={() => setView({ kind: 'create' })} error={view.error} />
+        <RoomList onJoin={join} onCreate={() => setView({ kind: 'create' })} error={view.error} settings={settings} onSettings={setSettings} />
       )}
     </main>
   )

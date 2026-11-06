@@ -51,12 +51,17 @@ export function nearestNote(midi: number, mask: boolean[]): number {
   return best
 }
 
+/** 목소리 효과 설정 한 묶음 (방 목록에서 고른 걸 방에 들고 들어간다) */
+export type VoiceSettings = { effect: VoiceEffect; echo: number; mix: Record<VoiceMix, number>; scale: TuneScale }
+
 /** 동굴: 길게 퍼지는 울림(초) · 노래방: 짧은 홀 울림 + 마이크 에코 */
 const CAVE = { seconds: 3.2, decay: 2.2, wet: 1.4 }
 const KARAOKE = { seconds: 1.6, decay: 3, wet: 1.1, echoDelay: 0.13, tone: 3500 }
 
 /** 메아리: 울리는 간격(초). 노래방 마이크 에코 범위 안에서 고른다 (처음 0.1~0.8초는 너무 길게 울려 줄임) */
 export const ECHO_DELAY = { min: 0.08, max: 0.3, default: 0.15 }
+
+export const DEFAULT_VOICE_SETTINGS: VoiceSettings = { effect: 'normal', echo: ECHO_DELAY.default, mix: { ...VOICE_MIX_DEFAULT }, scale: { kind: 'chromatic' } }
 /** 메아리: 되울리는 비율·크기, 되울릴수록 먹먹해지는 정도 (노래방처럼 두세 번만 옅게. 처음 38%·55%는 너무 울림) */
 const ECHO = { feedback: 0.25, wet: 0.35, tone: 3200 }
 
@@ -211,12 +216,22 @@ class AutoTune extends AudioWorkletProcessor {
   }
 }
 registerProcessor('autotune', AutoTune)
+
+// 녹음: 들어온 소리를 조각으로 그대로 보낸다 (내 목소리 들어보기)
+class Capture extends AudioWorkletProcessor {
+  process(inputs) {
+    const ch = inputs[0] && inputs[0][0]
+    if (ch) this.port.postMessage(ch.slice(0))
+    return true
+  }
+}
+registerProcessor('capture', Capture)
 `
 
 const workletReady = new WeakMap<AudioContext, Promise<boolean>>()
 
 /** 높이 바꾸기 모듈을 한 번만 올린다. 못 쓰는 브라우저면 false (높게·낮게가 보통으로) */
-function loadWorklet(ctx: AudioContext): Promise<boolean> {
+export function loadWorklet(ctx: AudioContext): Promise<boolean> {
   let ready = workletReady.get(ctx)
   if (!ready) {
     const url = URL.createObjectURL(new Blob([PITCH_WORKLET], { type: 'application/javascript' }))
@@ -271,8 +286,13 @@ export class VoiceChanger {
   /** 보낼 소리 (효과가 들어간 것). 마이크 끄기는 이 트랙의 enabled로 */
   readonly track: MediaStreamTrack
   private ctx: AudioContext
-  private raw: MediaStreamTrack
-  private input: MediaStreamAudioSourceNode
+  /** 마이크 (녹음한 소리를 넣으면 null) */
+  private raw: MediaStreamTrack | null
+  private input: AudioNode
+  /** 압축·키우기까지 지난 소리 (들어보기는 여기서 따로 뺀다) */
+  private final: GainNode
+  /** 보내는 길 문 (들어보는 동안 잠깐 닫아 다른 사람에게 안 가게) */
+  private gate: GainNode
   /** 효과가 끝나는 곳 = 마이크 크기 */
   private bus: GainNode
   private output: MediaStreamAudioDestinationNode
@@ -286,15 +306,18 @@ export class VoiceChanger {
   private echoNode: DelayNode | null = null
   private mix: Record<VoiceMix, number> = { ...VOICE_MIX_DEFAULT }
   private scale: TuneScale = { kind: 'chromatic' }
+  /** 효과를 한 번이라도 걸었는지 */
+  private applied = false
   /** 오토튠 중이면 그 노드 (음계를 바로 바꾸려고) */
   private tuner: AudioWorkletNode | null = null
   /** 슬라이더를 움직이면 바로 바꿀 노드들 */
   private mixNodes: Partial<Record<VoiceMix, (v: number) => void>> = {}
 
-  constructor(ctx: AudioContext, raw: MediaStreamTrack) {
+  /** source: 마이크 트랙, 또는 녹음한 소리를 트는 노드 (내 목소리 들어보기) */
+  constructor(ctx: AudioContext, source: MediaStreamTrack | AudioNode) {
     this.ctx = ctx
-    this.raw = raw
-    this.input = ctx.createMediaStreamSource(new MediaStream([raw]))
+    this.raw = source instanceof AudioNode ? null : source
+    this.input = source instanceof AudioNode ? source : ctx.createMediaStreamSource(new MediaStream([source]))
     this.output = ctx.createMediaStreamDestination()
     this.track = this.output.stream.getAudioTracks()[0]
     this.bus = ctx.createGain()
@@ -307,9 +330,12 @@ export class VoiceChanger {
     comp.release.value = 0.2
     const boost = ctx.createGain()
     boost.gain.value = SEND_BOOST
+    this.final = boost
+    this.gate = ctx.createGain()
     this.bus.connect(comp)
     comp.connect(boost)
-    boost.connect(this.output)
+    boost.connect(this.gate)
+    this.gate.connect(this.output)
     this.input.connect(this.bus)
     void loadWorklet(ctx)
     document.addEventListener('visibilitychange', this.wake)
@@ -318,6 +344,30 @@ export class VoiceChanger {
   /** 폰은 다른 앱에 갔다 오면 소리 처리가 멈춰 있을 수 있다. 멈추면 상대에게 소리가 안 가므로 다시 켠다 */
   private wake = () => {
     if (document.visibilityState === 'visible' && this.ctx.state !== 'running') void this.ctx.resume()
+  }
+
+  /** 마이크 그대로의 소리 (녹음용). 녹음한 소리로 만든 거면 null */
+  get rawTrack(): MediaStreamTrack | null {
+    return this.raw
+  }
+
+  /** 다른 사람에게 보내기 켬/끔 (들어보는 동안 끔). 마이크 끄기와 따로 */
+  setSending(on: boolean) {
+    this.gate.gain.setTargetAtTime(on ? 1 : 0, this.ctx.currentTime, 0.01)
+  }
+
+  /** 바뀐 소리를 다른 곳(들어보기 스피커)에도 보낸다. 끊는 함수를 돌려준다 */
+  connectOut(node: AudioNode): () => void {
+    this.final.connect(node)
+    return () => this.final.disconnect(node)
+  }
+
+  /** 설정 묶음을 한 번에 */
+  apply(s: VoiceSettings) {
+    this.setEchoDelay(s.echo)
+    for (const k of Object.keys(s.mix) as VoiceMix[]) this.setMix(k, s.mix[k])
+    this.setTuneScale(s.scale)
+    if (s.effect !== this.effect || !this.applied) void this.setEffect(s.effect)
   }
 
   get current(): VoiceEffect {
@@ -366,6 +416,7 @@ export class VoiceChanger {
 
   async setEffect(effect: VoiceEffect) {
     this.effect = effect
+    this.applied = true
     const seq = ++this.seq
     const pitch = effect === 'high' || effect === 'low' || effect === 'helium' || effect === 'monster' || effect === 'autotune'
     const canPitch = pitch && (await loadWorklet(this.ctx))
@@ -524,7 +575,7 @@ export class VoiceChanger {
     this.seq++
     this.clear()
     document.removeEventListener('visibilitychange', this.wake)
-    this.raw.stop()
+    this.raw?.stop()
     this.track.stop()
   }
 
