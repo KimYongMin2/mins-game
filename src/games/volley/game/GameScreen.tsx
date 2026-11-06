@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
-import type { DirectRoom, LinkStatus } from '../../../shared/online/directLink'
+import type { DirectRoom } from '../../../shared/online/directLink'
+import { LinkBadge } from '../../../shared/ui/LinkBadge'
 import { loadNickname } from '../../../shared/storage/nickname'
 import { type BotLevel, botInput, createBotMind } from '../bot/volleyBot'
 import { DONE_MS, STEP_HZ } from '../constants'
@@ -99,12 +100,6 @@ export function GameScreen(props: Props) {
 
   // 친구 대전 메시지
   const room = props.mode === 'pvp' ? props.room : null
-  // 메시지가 가는 길 (직접 연결 / 서버 경유) — 화면 위에 작게
-  const [link, setLink] = useState<LinkStatus | null>(() => room?.status() ?? null)
-  useEffect(() => {
-    if (!room) return
-    return room.onStatus(setLink)
-  }, [room])
   useEffect(() => {
     if (!room) return
     const pings = new Map<number, number>()
@@ -322,7 +317,7 @@ export function GameScreen(props: Props) {
       <div className="vb-view">
         <Court sim={view} me={me} mirror={mirror} trail={frame.trail} shake={shake} />
         {banner && <div className={`vb-banner ${banner.cls ?? ''}`}>{banner.text}</div>}
-        {link && <span className={`vb-link vb-link--${link}`}>{link === 'direct' ? '⚡ 직접 연결' : '서버 경유'}</span>}
+        {room && <LinkBadge room={room} />}
       </div>
 
       <div className="vb-pads" aria-label="조작">

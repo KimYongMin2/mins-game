@@ -21,8 +21,14 @@ export type LinkStatus = 'relay' | 'direct'
 export interface DirectRoom<M> extends Room<M> {
   /** 지금 메시지가 가는 길: 직접(direct) / 서버 경유(relay). 방장은 친구 모두와 직접 이어졌을 때만 direct */
   status(): LinkStatus
+  /** 직접 이어진 상대 수 / 이을 상대 수 (방장: 방에 있는 친구들, 친구: 방장 1) */
+  linkCount(): { direct: number; total: number }
+  /** 길이나 직접 이어진 수가 바뀌면 */
   onStatus(fn: (s: LinkStatus) => void): () => void
 }
+
+/** 직접 연결로 감싼 방인지 */
+export const isDirectRoom = <M>(room: Room<M>): room is DirectRoom<M> => typeof (room as Partial<DirectRoom<M>>).linkCount === 'function'
 
 type Options<M> = {
   /** 빠졌다 해도 괜찮은 메시지 (자주 보내는 상태 등). 직접 연결에선 다시 보내지 않고 순서도 안 지키는 채널로 → 늦은 패킷이 뒤를 막지 않음.
@@ -63,10 +69,13 @@ export function withDirectLink<M>(room: Room<M>, opts: Options<M> = {}): DirectR
   const deliver = (msg: M) => {
     for (const fn of messageFns) fn(msg)
   }
+  let count = { direct: 0, total: 0 }
   const refresh = () => {
-    const next: LinkStatus = peers.length > 0 && peers.every((p) => isUp(links.get(p))) ? 'direct' : 'relay'
-    if (next === status) return
+    const direct = peers.filter((p) => isUp(links.get(p))).length
+    const next: LinkStatus = peers.length > 0 && direct === peers.length ? 'direct' : 'relay'
+    if (next === status && direct === count.direct && peers.length === count.total) return
     status = next
+    count = { direct, total: peers.length }
     for (const fn of statusFns) fn(next)
   }
 
@@ -228,6 +237,7 @@ export function withDirectLink<M>(room: Room<M>, opts: Options<M> = {}): DirectR
     onMembers: (fn) => room.onMembers(fn),
     setPlaying: (p) => room.setPlaying(p),
     status: () => status,
+    linkCount: () => count,
     onStatus(fn) {
       statusFns.add(fn)
       return () => statusFns.delete(fn)

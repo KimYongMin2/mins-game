@@ -1,5 +1,6 @@
 import { useEffect, useReducer, useRef, useState } from 'react'
 import type { Member, Room } from '../../../shared/online/room'
+import { LinkBadge } from '../../../shared/ui/LinkBadge'
 import { randomSeed } from '../../../shared/random'
 import { loadNickname } from '../../../shared/storage/nickname'
 import { Table } from '../field/Table'
@@ -225,6 +226,7 @@ export function GameScreen(props: Props) {
       <div className="bm-view">
         <Table screen={screen} onPick={pick} />
         <Banner screen={screen} />
+        {'room' in props && <LinkBadge room={props.room} />}
       </div>
       {watching && <p className="bm-tip">이미 시작한 판이라 구경해요. 다음 판부터 같이 해요</p>}
       {/* 왼쪽·오른쪽 던지기 (옆 사람을 직접 눌러도 됨) */}

@@ -1,6 +1,7 @@
 import { useEffect, useReducer, useRef, useState } from 'react'
 import { eventTime } from '../../../shared/input/eventTime'
 import type { Room } from '../../../shared/online/room'
+import { LinkBadge } from '../../../shared/ui/LinkBadge'
 import { randomSeed } from '../../../shared/random'
 import { loadNickname } from '../../../shared/storage/nickname'
 import { DONE_MS, type Difficulty, type Event, ROUND_MS, WINS_NEEDED } from '../constants'
@@ -248,6 +249,7 @@ export function GameScreen({ event, difficulty, pvp, onFinish, onQuit }: Props) 
           <span className={`aw-clock${phaseLeft(state) <= 3000 ? ' aw-clock--low' : ''}`}>{Math.ceil(phaseLeft(state) / 1000)}</span>
         )}
         <Banner state={state} />
+        {pvp && <LinkBadge room={pvp.room} />}
         {event === 'timing' && foeGrade && state.now - foeGrade.at < GRADE_SHOW_MS && (
           <span className={`aw-foe-grade aw-gauge__grade--${foeGrade.grade}`}>{GRADE_LABEL[foeGrade.grade]}</span>
         )}

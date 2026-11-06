@@ -1,5 +1,6 @@
 import { useEffect, useReducer, useRef, useState } from 'react'
 import type { Member, Room } from '../../../shared/online/room'
+import { LinkBadge } from '../../../shared/ui/LinkBadge'
 import { randomSeed } from '../../../shared/random'
 import { loadNickname } from '../../../shared/storage/nickname'
 import { CALL_MS, RPS_PICK_MS } from '../constants'
@@ -262,6 +263,7 @@ export function GameScreen(props: Props) {
       <div className="nc-view">
         <Table screen={screen} />
         <Banner screen={screen} />
+        {'room' in props && <LinkBadge room={props.room} />}
       </div>
       <div className="nc-timer" aria-hidden>
         <div className="nc-timer__fill" style={{ transform: `scaleX(${timerScale})` }} />

@@ -569,6 +569,25 @@ a.game-card:hover {
   color: var(--ink);
 }
 
+/* 친구 대전 연결 상태 (shared/ui/LinkBadge): 게임 화면 왼쪽 위 구석 */
+.link-badge {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  z-index: 2;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  background: rgb(255 255 255 / 0.85);
+  color: #6b7280;
+  pointer-events: none;
+}
+
+.link-badge--direct {
+  color: #15803d;
+}
+
 /* 친구 대전 중 상대가 나갔을 때 */
 .pvp-gone {
   position: absolute;
