@@ -67,8 +67,9 @@
   try {
     tried = sessionStorage.getItem(KEY) === '1'
     sessionStorage.setItem(KEY, '1')
-  } catch (e) {
+  } catch {
     // 저장이 막혀 있으면 매번 시도
+    tried = false
   }
 
   function start() {

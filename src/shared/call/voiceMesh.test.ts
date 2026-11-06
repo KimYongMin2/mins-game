@@ -137,6 +137,33 @@ describe('음성 통화 (메시)', () => {
     expect(sent.length).toBe(before)
   })
 
+  it('보안: 방 목록에 없는 사람의 연결 요청엔 응답 안 함 (몰래 듣기 막기), 막 들어와 목록에 뜨면 그때 받음', async () => {
+    const { meshes, sent } = network(['b'])
+    const b = meshes.get('b')!
+    b.setMembers([])
+    // 목록에 없는 '몰래'가 연결 요청
+    b.receive({ t: 'offer', from: 'spy', to: 'b', sdp: 'offer' })
+    await settle()
+    expect(sent.filter((m) => m.t === 'answer')).toHaveLength(0)
+    expect(b.peers()).toHaveLength(0)
+    // 목록에 뜨면 (막 들어온 사람이었던 경우) 받는다
+    b.setMembers(['spy'])
+    await settle()
+    expect(sent.filter((m) => m.t === 'answer' && m.to === 'spy')).toHaveLength(1)
+  })
+
+  it('보안: 이미 잘 이어진 사람 이름으로 온 새 연결 요청은 무시 (사칭해 가로채기 막기)', async () => {
+    const { meshes, sent } = network(['a', 'b'])
+    meshes.get('a')!.setMembers(['b'])
+    meshes.get('b')!.setMembers(['a'])
+    await settle()
+    const answers = sent.filter((m) => m.t === 'answer').length
+    meshes.get('b')!.receive({ t: 'offer', from: 'a', to: 'b', sdp: 'offer' })
+    await settle()
+    expect(sent.filter((m) => m.t === 'answer').length).toBe(answers)
+    expect(meshes.get('b')!.peers()[0].connection).toBe('connected')
+  })
+
   it('마이크를 끄면 상대 화면에 꺼짐', async () => {
     const { meshes } = network(['a', 'b'])
     meshes.get('a')!.setMembers(['b'])

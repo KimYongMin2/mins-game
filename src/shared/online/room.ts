@@ -1,5 +1,5 @@
 import type { RealtimeChannel, SupabaseClient } from '@supabase/supabase-js'
-import { type Advert, advertiseRoom } from './roomList'
+import { type Advert, advertiseRoom, cleanId, cleanName, isInt } from './roomList'
 import { getRealtimeClient } from './supabase'
 
 // 친구 대전(PvP)용 방. Supabase Realtime 채널 하나 = 방 하나.
@@ -76,6 +76,15 @@ export type ListedRoom = {
   playing: boolean
   /** 만든 시각 (최근 것 먼저) */
   at: number
+}
+
+/** 목록에서 받은 방 정보 하나를 검사한다 (누구나 올릴 수 있어서). 이상하면 null */
+export function readListedRoom(x: Record<string, unknown>): ListedRoom | null {
+  const id = cleanId(x.id)
+  const name = cleanName(x.name)
+  if (!id || !name || typeof x.locked !== 'boolean' || typeof x.playing !== 'boolean') return null
+  if (!isInt(x.capacity, 2, 16) || !isInt(x.count, 0, 16) || typeof x.at !== 'number' || !Number.isFinite(x.at)) return null
+  return { id, name, locked: x.locked, playing: x.playing, capacity: x.capacity, count: Math.min(x.count, x.capacity), at: x.at }
 }
 
 /** 게임마다 따로 보이는 방 목록 이름 */

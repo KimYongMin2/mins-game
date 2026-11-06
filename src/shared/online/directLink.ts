@@ -127,15 +127,22 @@ export function withDirectLink<M>(room: Room<M>, opts: Options<M> = {}): DirectR
     for (const c of l.pendingIce.splice(0)) await l.pc.addIceCandidate(c).catch(() => {})
   }
 
+  // 보안: 방에 있는 상대하고만 잇는다 (친구는 방장, 방장은 방에 들어온 친구). 방 밖에서 보낸 연결 요청으로 가로채지 못하게
+  let peerId: string | null = null
+  const offMembers = room.onMembers((ms) => {
+    peerId = (room.role === 'guest' ? ms.find((m) => m.role === 'host') : ms.find((m) => m.role === 'guest'))?.id ?? null
+  })
+
   function onSignal(s: LinkSignal) {
-    if (s.from === me) return
+    if (s.from === me || s.from !== peerId) return
     if (s.rtc === 'hello') {
       if (room.role !== 'host') return
       // 이어져 있거나 막 청한 참이면 그대로
       if (link && (status === 'direct' || Date.now() - link.at < OFFER_TIMEOUT_MS)) return
       void offer()
     } else if (s.rtc === 'offer') {
-      if (room.role === 'guest') void answer(s.sdp, s.gen)
+      // 이미 직접 이어져 있으면 새 요청은 무시 (방장 이름을 사칭해 가로채는 것 막기). 끊기면 다시 받는다
+      if (room.role === 'guest' && status !== 'direct') void answer(s.sdp, s.gen)
     } else if (s.rtc === 'answer') {
       if (link && link.gen === s.gen && !link.remoteSet) {
         const l = link
@@ -206,6 +213,7 @@ export function withDirectLink<M>(room: Room<M>, opts: Options<M> = {}): DirectR
       closed = true
       clearInterval(helloTimer)
       offRaw()
+      offMembers()
       messageFns.clear()
       statusFns.clear()
       drop()

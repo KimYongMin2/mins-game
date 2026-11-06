@@ -105,11 +105,17 @@ function fakeRooms() {
       return () => fns[i].delete(fn as (m: unknown) => void)
     },
     onPeer: () => () => {},
-    onMembers: () => () => {},
+    // 상대 한 명이 방에 있다
+    onMembers: (fn) => {
+      queueMicrotask(() => fn([i === 0 ? { id: 'guest-1', nickname: '친구', role: 'guest' } : { id: 'host-1', nickname: '방장', role: 'host' }]))
+      return () => {}
+    },
     setPlaying() {},
     leave() {},
   })
-  return { host: make(0), guest: make(1), relayed }
+  /** i번 쪽에 방 메시지가 온 것처럼 */
+  const inject = (i: 0 | 1, msg: unknown) => fns[i].forEach((f) => f(msg))
+  return { host: make(0), guest: make(1), relayed, inject }
 }
 
 const settle = (ms = 40) => new Promise((r) => setTimeout(r, ms))
@@ -137,6 +143,24 @@ describe('직접 연결 (WebRTC)', () => {
     expect(relayed.length).toBe(before)
     const hostPc = pcs.find((p) => p.channels.some((c) => c.sent > 0 && c.label === 'fast'))
     expect(hostPc).toBeDefined()
+    h.leave()
+    g.leave()
+  })
+
+  it('보안: 방 밖 사람(spy)이 연결을 청하면 친구는 응하지 않고, 이어진 뒤 방장 이름으로 다시 청해도 무시', async () => {
+    FakePc.blocked = false
+    const { host, guest, relayed, inject } = fakeRooms()
+    const h = withDirectLink(host, opts)
+    const g = withDirectLink(guest, opts)
+    await settle()
+    expect(g.status()).toBe('direct')
+    const answers = () => relayed.filter((m) => (m as { rtc?: string }).rtc === 'answer').length
+    const before = answers()
+    inject(1, { rtc: 'offer', from: 'spy-1', sdp: 'offer-0', gen: 99 })
+    inject(1, { rtc: 'offer', from: 'host-1', sdp: 'offer-0', gen: 99 })
+    await settle()
+    expect(answers()).toBe(before)
+    expect(g.status()).toBe('direct')
     h.leave()
     g.leave()
   })

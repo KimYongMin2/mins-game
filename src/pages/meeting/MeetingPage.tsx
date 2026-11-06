@@ -5,7 +5,7 @@ import { LISTEN_VOLUME, Speaker } from '../../shared/call/speaker'
 import { DEFAULT_VOICE_SETTINGS, MIC_VOLUME, VoiceChanger, type VoiceSettings } from '../../shared/call/voiceFx'
 import { type CallPeer, type CallSignal, VoiceMesh } from '../../shared/call/voiceMesh'
 import { type Member, type Room, RoomError, createRoom, joinRoom, makeRoomCode } from '../../shared/online/room'
-import { advertiseRoom, watchRooms } from '../../shared/online/roomList'
+import { advertiseRoom, cleanId, cleanList, cleanName, isInt, watchRooms } from '../../shared/online/roomList'
 import { readLocal, writeLocal } from '../../shared/storage/local'
 import { loadNickname } from '../../shared/storage/nickname'
 import { VoicePicker, VoiceTest } from './VoicePanel'
@@ -36,6 +36,14 @@ function loadVolume(key: string, range: { min: number; max: number; default: num
 
 /** 목록에 올리는 방 정보 */
 type RoomInfo = { id: string; name: string; locked: boolean; count: number; at: number }
+
+/** 목록에서 받은 방 정보 검사 (누구나 올릴 수 있어서 믿지 않는다). 이상하면 null */
+function readRoomInfo(x: Record<string, unknown>): RoomInfo | null {
+  const id = cleanId(x.id)
+  const name = cleanName(x.name)
+  if (!id || !name || typeof x.locked !== 'boolean' || !isInt(x.count, 0, CAPACITY) || typeof x.at !== 'number' || !Number.isFinite(x.at)) return null
+  return { id, name, locked: x.locked, count: x.count, at: x.at }
+}
 
 /** 들어간 방: 이름과, 비공개면 코드 (화면에 보여 줌) */
 type Joined = { room: Room<CallSignal>; voice: VoiceChanger | null; name: string; pin: string | null }
@@ -392,7 +400,7 @@ function RoomList({ onJoin, onCreate, error, settings, onSettings }: ListProps) 
   const [offline, setOffline] = useState(false)
   const [asking, setAsking] = useState<string | null>(null)
   const [pin, setPin] = useState('')
-  useEffect(() => watchRooms<RoomInfo>(ROOM_ID, setRooms, () => setOffline(true)), [])
+  useEffect(() => watchRooms<object>(ROOM_ID, (raw) => setRooms(cleanList(raw, readRoomInfo)), () => setOffline(true)), [])
 
   const sorted = [...(rooms ?? [])].sort((a, b) => b.at - a.at)
   return (

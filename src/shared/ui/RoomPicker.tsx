@@ -1,12 +1,11 @@
 import { useEffect, useState } from 'react'
-import { type ListedRoom, PIN_LENGTH, gameListId } from '../online/room'
-import { watchRooms } from '../online/roomList'
+import { type ListedRoom, PIN_LENGTH, gameListId, readListedRoom } from '../online/room'
+import { ROOM_NAME_MAX, cleanList, watchRooms } from '../online/roomList'
 
 // 친구 대전 방 고르기: 그 게임의 열린 방 목록 + 방 만들기(이름 · 전체 공개 / 🔒 비공개 숫자 코드).
 // 비공개 방도 목록에 🔒로 보이고, 누르면 코드를 묻는다. 시작한 방('게임 중')·가득 찬 방은 못 누른다.
 // 방에 실제로 들어가는 건 부르는 쪽(대기실)이 한다. 게임 규칙은 모른다.
 
-const NAME_MAX = 20
 
 const randomPin = () => String(Math.floor(Math.random() * 10 ** PIN_LENGTH)).padStart(PIN_LENGTH, '0')
 
@@ -31,7 +30,7 @@ function RoomList({ gameId, onJoin, onCreate, error }: { gameId: string; onJoin:
   const [offline, setOffline] = useState(false)
   const [asking, setAsking] = useState<string | null>(null)
   const [pin, setPin] = useState('')
-  useEffect(() => watchRooms<ListedRoom>(gameListId(gameId), setRooms, () => setOffline(true)), [gameId])
+  useEffect(() => watchRooms<object>(gameListId(gameId), (raw) => setRooms(cleanList(raw, readListedRoom)), () => setOffline(true)), [gameId])
 
   // 들어갈 수 있는 방 먼저, 그다음 최근에 만든 순
   const open = (r: ListedRoom) => !r.playing && r.count < r.capacity
@@ -122,7 +121,7 @@ function CreateForm({ nickname, onCreate, onBack }: { nickname: string; onCreate
     >
       <label className="room-pick__field">
         <span>방 이름</span>
-        <input className="input" value={name} onChange={(e) => setName(e.target.value.slice(0, NAME_MAX))} placeholder={defaultName} autoComplete="off" />
+        <input className="input" value={name} onChange={(e) => setName(e.target.value.slice(0, ROOM_NAME_MAX))} placeholder={defaultName} autoComplete="off" />
       </label>
       <div className="room-pick__field" role="radiogroup" aria-label="공개 여부">
         <span>공개</span>

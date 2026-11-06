@@ -5,6 +5,43 @@ import { getRealtimeClient } from './supabase'
 // 목록 화면은 그 채널을 지켜본다(watch). 방장이 나가면(연결이 끊기면) 목록에서 저절로 사라진다 (1~3초).
 // 방 안 내용이나 게임은 모른다: 방 정보(T)는 쓰는 쪽이 정한다.
 
+/** 목록에 보여 줄 방 이름 최대 길이 */
+export const ROOM_NAME_MAX = 20
+/** 목록에 한 번에 보여 주는 방 수 (가짜 방을 잔뜩 올려도 화면이 넘치지 않게) */
+export const MAX_LISTED = 30
+
+/**
+ * 목록 정보 검사 (보안): 목록은 누구나 올릴 수 있어서 믿지 않는다. 모양이 이상한 건 버리고, 이름은 자르고,
+ * 같은 번호는 하나만, 최대 MAX_LISTED개. read는 한 개를 검사해 맞으면 고친 값, 아니면 null
+ */
+export function cleanList<T extends { id: string }>(raw: unknown[], read: (x: Record<string, unknown>) => T | null): T[] {
+  const seen = new Set<string>()
+  const out: T[] = []
+  for (const x of raw) {
+    if (typeof x !== 'object' || x === null) continue
+    const r = read(x as Record<string, unknown>)
+    if (!r || seen.has(r.id)) continue
+    seen.add(r.id)
+    out.push(r)
+    if (out.length >= MAX_LISTED) break
+  }
+  return out
+}
+
+/** 방 이름: 글자만, 앞뒤 공백 없이, ROOM_NAME_MAX자까지. 비면 null */
+export function cleanName(v: unknown): string | null {
+  if (typeof v !== 'string') return null
+  // eslint-disable-next-line no-control-regex -- 보이지 않는 제어 문자를 지우려는 것
+  const name = [...v.replace(/[\u0000-\u001f\u007f]/g, '').trim()].slice(0, ROOM_NAME_MAX).join('')
+  return name || null
+}
+
+export const isInt = (v: unknown, min: number, max: number): v is number => typeof v === 'number' && Number.isInteger(v) && v >= min && v <= max
+
+/** 방 번호: 영문 대문자·숫자 4~12자 */
+export const cleanId = (v: unknown): string | null => (typeof v === 'string' && /^[A-Z0-9]{4,12}$/.test(v) ? v : null)
+
+
 async function channelFor(listId: string): Promise<RealtimeChannel> {
   const supabase = await getRealtimeClient()
   const topic = `list:${listId}`

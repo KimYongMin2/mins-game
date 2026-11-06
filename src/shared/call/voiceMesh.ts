@@ -21,6 +21,8 @@ export const VOICE_BITRATE = 24_000
 /** 연결이 끊기면 이만큼 뒤 한 번 더 청한다 */
 const RETRY_MS = 1500
 const MAX_RETRIES = 2
+/** 목록에 없는 사람의 연결 요청을 이만큼 들고 있는다 (막 들어온 사람이 목록에 뜨는 데 걸리는 시간) */
+const PENDING_OFFER_MS = 10_000
 /** 잇기 시작한 지 이만큼 지나도 안 이어졌으면 다시 잇기 대상 */
 const STALE_MS = 8000
 
@@ -44,6 +46,8 @@ export class VoiceMesh {
   private micOn = true
   private members: string[] = []
   private retries = new Map<string, number>()
+  /** 방 목록에 뜨기 전에 온 연결 요청 */
+  private pendingOffers = new Map<string, { sdp: string; at: number }>()
   private closed = false
   private opts: Options
 
@@ -64,6 +68,14 @@ export class VoiceMesh {
     this.members = ids
     for (const id of [...this.links.keys()]) if (!ids.includes(id)) this.drop(id)
     for (const id of ids) if (!this.links.has(id) && offersTo(this.opts.myId, id)) void this.offer(id)
+    // 방 목록에 뜨기 전에 먼저 온 연결 요청 (막 들어온 사람): 이제 목록에 있으면 받는다
+    for (const [id, p] of [...this.pendingOffers]) {
+      if (Date.now() - p.at > PENDING_OFFER_MS) this.pendingOffers.delete(id)
+      else if (ids.includes(id)) {
+        this.pendingOffers.delete(id)
+        void this.answer(id, p.sdp)
+      }
+    }
     this.opts.onChange()
   }
 
@@ -101,7 +113,18 @@ export class VoiceMesh {
       }
       return
     }
-    if (msg.t === 'offer') void this.answer(msg.from, msg.sdp)
+    if (msg.t === 'offer') {
+      // 보안: 방 사람 목록(presence)에 없는 사람의 요청엔 응답하지 않는다 (목록에 안 보이게 붙어 몰래 듣는 것 막기).
+      // 막 들어와 아직 목록에 안 뜬 사람일 수 있어 잠깐 들고 있다가 목록에 뜨면 받는다
+      if (!this.members.includes(msg.from)) {
+        this.pendingOffers.set(msg.from, { sdp: msg.sdp, at: Date.now() })
+        return
+      }
+      // 이미 잘 이어진 사람 이름으로 온 새 요청은 무시한다 (남의 이름을 사칭해 통화를 가로채는 것 막기).
+      // 진짜로 끊겼으면 곧 '끊김'이 되고, 그때 다시 청하면 받는다
+      if (this.links.get(msg.from)?.pc.connectionState === 'connected') return
+      void this.answer(msg.from, msg.sdp)
+    }
     else if (msg.t === 'answer') void this.accept(msg.from, msg.sdp)
     else if (msg.t === 'ice') void this.addIce(msg.from, msg.candidate)
   }

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { CODE_LENGTH, aheadOf, makeRoomCode, normalizeCode, othersIn } from './room'
+import { CODE_LENGTH, aheadOf, makeRoomCode, normalizeCode, othersIn, readListedRoom } from './room'
+import { MAX_LISTED, cleanList } from './roomList'
 
 describe('방 코드', () => {
   it(`${CODE_LENGTH}자리, 헷갈리는 글자(0 O 1 I L) 없음`, () => {
@@ -40,5 +41,28 @@ describe('aheadOf (정원 확인)', () => {
     const me = guest('나', 200)
     const others = othersIn(state, 'guest-c')
     expect(aheadOf(others, me, 'guest-c').map((o) => o.nickname)).toEqual(['민', '철수'])
+  })
+})
+
+describe('방 목록 검사 (누구나 올릴 수 있어서)', () => {
+  const ok = { id: 'AB3K', name: '민님의 방', locked: false, count: 1, capacity: 2, playing: false, at: 1 }
+
+  it('맞는 방은 그대로', () => {
+    expect(cleanList([ok], readListedRoom)).toEqual([ok])
+  })
+
+  it('이상한 건 버리고, 이름은 20자로 자르고 제어 문자는 지운다', () => {
+    const list = cleanList(
+      [null, 'x', { ...ok, id: 'ab<script>' }, { ...ok, id: 'C1', name: 5 }, { ...ok, id: 'D2D2', capacity: 999 }, { ...ok, id: 'E5E5', name: '\u0007' + '가'.repeat(50) }],
+      readListedRoom,
+    )
+    expect(list.map((r) => r.id)).toEqual(['E5E5'])
+    expect(list[0].name).toBe('가'.repeat(20))
+  })
+
+  it('같은 번호는 하나만, 너무 많으면 앞에서부터 MAX_LISTED개', () => {
+    expect(cleanList([ok, { ...ok, name: '가짜' }], readListedRoom)).toHaveLength(1)
+    const many = Array.from({ length: 100 }, (_, i) => ({ ...ok, id: `R${String(i).padStart(3, '0')}` }))
+    expect(cleanList(many, readListedRoom)).toHaveLength(MAX_LISTED)
   })
 })
