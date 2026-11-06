@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router'
 import { levelContext, watchLevel } from '../../shared/call/level'
 import { LISTEN_VOLUME, Speaker } from '../../shared/call/speaker'
-import { ECHO_DELAY, MIC_VOLUME, VOICE_EFFECTS, type VoiceEffect, VoiceChanger } from '../../shared/call/voiceFx'
+import { ECHO_DELAY, MIC_VOLUME, VOICE_EFFECTS, VOICE_MIX_DEFAULT, type VoiceEffect, type VoiceMix, VoiceChanger } from '../../shared/call/voiceFx'
 import { type CallPeer, type CallSignal, VoiceMesh } from '../../shared/call/voiceMesh'
 import { type Member, type Room, RoomError, createRoom, joinRoom, makeRoomCode } from '../../shared/online/room'
 import { advertiseRoom, watchRooms } from '../../shared/online/roomList'
@@ -149,6 +149,7 @@ function MeetingRoom({ room, name, pin, nickname, voice, onVoice, onLeave }: Roo
   const meshRef = useRef<VoiceMesh | null>(null)
   const [effect, setEffect] = useState<VoiceEffect>(voice?.current ?? 'normal')
   const [echo, setEcho] = useState(voice?.echo ?? ECHO_DELAY.default)
+  const [mix, setMix] = useState<Record<VoiceMix, number>>(() => ({ ...VOICE_MIX_DEFAULT }))
   const [micVolume, setMicVolume] = useState(() => voice?.volume ?? loadVolume(MIC_VOLUME_KEY, MIC_VOLUME))
   const [speaker] = useState(() => {
     const s = new Speaker(levelContext())
@@ -214,11 +215,26 @@ function MeetingRoom({ room, name, pin, nickname, voice, onVoice, onLeave }: Roo
     setAsking(false)
     if (!v) return
     v.setEchoDelay(echo)
+    for (const k of Object.keys(mix) as VoiceMix[]) v.setMix(k, mix[k])
     v.setVolume(micVolume)
     void v.setEffect(effect)
     onVoice(v)
     meshRef.current?.setTrack(v.track)
   }
+
+  function changeMix(key: VoiceMix, v: number) {
+    setMix((m) => ({ ...m, [key]: v }))
+    voice?.setMix(key, v)
+  }
+
+  const mixSlider = (key: VoiceMix, label: string) => (
+    <label className="meet-voice__slider" key={key}>
+      <span>
+        {label} {Math.round(mix[key] * 100)}%
+      </span>
+      <input type="range" min={0} max={1} step={0.05} value={mix[key]} onChange={(e) => changeMix(key, Number(e.target.value))} />
+    </label>
+  )
 
   function changeVoice(next: VoiceEffect) {
     setEffect(next)
@@ -322,6 +338,13 @@ function MeetingRoom({ room, name, pin, nickname, voice, onVoice, onLeave }: Roo
                     }}
                   />
                 </label>
+              )}
+              {effect === 'cave' && mixSlider('caveReverb', '울림')}
+              {effect === 'karaoke' && (
+                <>
+                  {mixSlider('karaokeReverb', '울림 (리버브)')}
+                  {mixSlider('karaokeEcho', '에코')}
+                </>
               )}
             </div>
           </>

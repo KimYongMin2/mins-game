@@ -2,16 +2,29 @@
 // 마이크 → [효과] → 마이크 크기 → 압축(작은 소리는 키우고 큰 소리는 눌러 전체를 크게) → 보낼 트랙(track).
 // 효과를 바꿔도 보낼 트랙은 그대로라 통화를 다시 잇지 않는다.
 
-export type VoiceEffect = 'normal' | 'high' | 'low' | 'robot' | 'radio' | 'echo'
+export type VoiceEffect = 'normal' | 'high' | 'low' | 'helium' | 'monster' | 'robot' | 'radio' | 'phone' | 'echo' | 'cave' | 'karaoke'
 
 export const VOICE_EFFECTS: { id: VoiceEffect; label: string }[] = [
   { id: 'normal', label: '보통' },
   { id: 'high', label: '높게' },
   { id: 'low', label: '낮게' },
+  { id: 'helium', label: '헬륨' },
+  { id: 'monster', label: '괴물' },
   { id: 'robot', label: '로봇' },
   { id: 'radio', label: '무전기' },
+  { id: 'phone', label: '전화기' },
   { id: 'echo', label: '메아리' },
+  { id: 'cave', label: '동굴' },
+  { id: 'karaoke', label: '노래방' },
 ]
+
+/** 사용자가 슬라이더로 고르는 세기 (0~1): 동굴 울림, 노래방 울림·에코 */
+export type VoiceMix = 'caveReverb' | 'karaokeReverb' | 'karaokeEcho'
+export const VOICE_MIX_DEFAULT: Record<VoiceMix, number> = { caveReverb: 0.5, karaokeReverb: 0.35, karaokeEcho: 0.4 }
+
+/** 동굴: 길게 퍼지는 울림(초) · 노래방: 짧은 홀 울림 + 마이크 에코 */
+const CAVE = { seconds: 3.2, decay: 2.2, wet: 1.4 }
+const KARAOKE = { seconds: 1.6, decay: 3, wet: 1.1, echoDelay: 0.13, tone: 3500 }
 
 /** 메아리: 울리는 간격(초). 노래방 마이크 에코 범위 안에서 고른다 (처음 0.1~0.8초는 너무 길게 울려 줄임) */
 export const ECHO_DELAY = { min: 0.08, max: 0.3, default: 0.15 }
@@ -24,7 +37,7 @@ export const MIC_VOLUME = { min: 0, max: 2, default: 1 }
 const SEND_BOOST = 1.5
 
 /** 높게·낮게: 소리 높이 배율 */
-const PITCH = { high: 1.6, low: 0.65 }
+const PITCH = { high: 1.6, low: 0.65, helium: 2.1, monster: 0.55 }
 
 // 소리 높이 바꾸기 (실시간): 지난 소리를 담아 두고 두 읽기 위치를 다른 빠르기로 훑으며, 이음매는 서로 엇갈려 부드럽게 섞는다.
 // 지연은 GRAIN 정도(약 0.02~0.04초). 짧게 끊어 붙이는 방식이라 조금 지글거린다.
@@ -97,6 +110,20 @@ function noiseSource(ctx: AudioContext): AudioBufferSourceNode {
   return src
 }
 
+/** 울림(리버브)용 잔향: 점점 작아지는 잡음. 양쪽 귀가 조금 다르게 */
+function impulse(ctx: AudioContext, seconds: number, decay: number): AudioBuffer {
+  const len = Math.floor(ctx.sampleRate * seconds)
+  const buffer = ctx.createBuffer(2, len, ctx.sampleRate)
+  for (let c = 0; c < 2; c++) {
+    const data = buffer.getChannelData(c)
+    for (let i = 0; i < len; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / len) ** decay
+  }
+  return buffer
+}
+
+/** 노래방 에코 세기 → 되울림 비율·크기 */
+const karaokeEcho = (amt: number) => ({ feedback: 0.12 + 0.33 * amt, wet: 0.6 * amt })
+
 export class VoiceChanger {
   /** 보낼 소리 (효과가 들어간 것). 마이크 끄기는 이 트랙의 enabled로 */
   readonly track: MediaStreamTrack
@@ -114,6 +141,9 @@ export class VoiceChanger {
   private micVolume = MIC_VOLUME.default
   /** 메아리일 때 그 지연 노드 (간격을 바로 바꾸려고) */
   private echoNode: DelayNode | null = null
+  private mix: Record<VoiceMix, number> = { ...VOICE_MIX_DEFAULT }
+  /** 슬라이더를 움직이면 바로 바꿀 노드들 */
+  private mixNodes: Partial<Record<VoiceMix, (v: number) => void>> = {}
 
   constructor(ctx: AudioContext, raw: MediaStreamTrack) {
     this.ctx = ctx
@@ -168,10 +198,20 @@ export class VoiceChanger {
     this.echoNode?.delayTime.setTargetAtTime(this.echoDelay, this.ctx.currentTime, 0.05)
   }
 
+  getMix(key: VoiceMix): number {
+    return this.mix[key]
+  }
+
+  /** 동굴 울림·노래방 울림·에코 세기 (0~1). 그 효과 중이면 바로 바뀐다 */
+  setMix(key: VoiceMix, v: number) {
+    this.mix[key] = Math.min(1, Math.max(0, v))
+    this.mixNodes[key]?.(this.mix[key])
+  }
+
   async setEffect(effect: VoiceEffect) {
     this.effect = effect
     const seq = ++this.seq
-    const pitch = effect === 'high' || effect === 'low'
+    const pitch = effect === 'high' || effect === 'low' || effect === 'helium' || effect === 'monster'
     const canPitch = pitch && (await loadWorklet(this.ctx))
     // 그사이 다른 효과로 또 바꿨으면 이번 건 버린다
     if (seq !== this.seq) return
@@ -181,11 +221,84 @@ export class VoiceChanger {
       for (let i = 0; i < ns.length - 1; i++) ns[i].connect(ns[i + 1])
     }
     const keep = <T extends AudioNode>(n: T) => (this.nodes.push(n), n)
+    const smooth = (param: AudioParam, v: number) => param.setTargetAtTime(v, ctx.currentTime, 0.05)
+    /** 울림: 원래 소리는 그대로 두고 잔향을 더한다. 크기 노드를 돌려준다 */
+    const reverb = (from: AudioNode, seconds: number, decay: number) => {
+      const conv = keep(ctx.createConvolver())
+      conv.buffer = impulse(ctx, seconds, decay)
+      const wet = keep(ctx.createGain())
+      chain(from, conv, wet, output)
+      return wet
+    }
 
-    if (canPitch) {
+    if (canPitch && effect === 'monster') {
+      // 아주 낮게 + 낮은 소리 키우고 조금 거칠게 + 짧은 울림
       const shifter = keep(new AudioWorkletNode(ctx, 'pitch-shift'))
-      shifter.parameters.get('ratio')!.value = PITCH[effect as 'high' | 'low']
+      shifter.parameters.get('ratio')!.value = PITCH.monster
+      const low = keep(ctx.createBiquadFilter())
+      low.type = 'lowshelf'
+      low.frequency.value = 250
+      low.gain.value = 8
+      const grit = keep(ctx.createWaveShaper())
+      grit.curve = crunchCurve(3)
+      const level = keep(ctx.createGain())
+      level.gain.value = 0.8
+      chain(input, shifter, low, grit, level, output)
+      reverb(level, 0.6, 2).gain.value = 0.35
+    } else if (canPitch) {
+      const shifter = keep(new AudioWorkletNode(ctx, 'pitch-shift'))
+      shifter.parameters.get('ratio')!.value = PITCH[effect as 'high' | 'low' | 'helium']
       chain(input, shifter, output)
+    } else if (effect === 'phone') {
+      // 옛날 전화처럼 가늘고 좁게 (잡음·찌그러짐 없이)
+      const hp = keep(ctx.createBiquadFilter())
+      hp.type = 'highpass'
+      hp.frequency.value = 400
+      hp.Q.value = 0.9
+      const lp = keep(ctx.createBiquadFilter())
+      lp.type = 'lowpass'
+      lp.frequency.value = 3000
+      lp.Q.value = 0.9
+      const mid = keep(ctx.createBiquadFilter())
+      mid.type = 'peaking'
+      mid.frequency.value = 1500
+      mid.gain.value = 5
+      const level = keep(ctx.createGain())
+      level.gain.value = 1.3
+      chain(input, hp, lp, mid, level, output)
+    } else if (effect === 'cave') {
+      input.connect(output)
+      const wet = reverb(input, CAVE.seconds, CAVE.decay)
+      const apply = (v: number) => smooth(wet.gain, v * CAVE.wet)
+      wet.gain.value = this.mix.caveReverb * CAVE.wet
+      this.mixNodes.caveReverb = apply
+    } else if (effect === 'karaoke') {
+      // 노래방 마이크: 조금 밝게 + 에코(되울림) + 홀 울림. 둘 다 세기 조절
+      const bright = keep(ctx.createBiquadFilter())
+      bright.type = 'highshelf'
+      bright.frequency.value = 3000
+      bright.gain.value = 3
+      chain(input, bright, output)
+      const wetRev = reverb(bright, KARAOKE.seconds, KARAOKE.decay)
+      wetRev.gain.value = this.mix.karaokeReverb * KARAOKE.wet
+      this.mixNodes.karaokeReverb = (v) => smooth(wetRev.gain, v * KARAOKE.wet)
+      const delay = keep(ctx.createDelay(1))
+      delay.delayTime.value = KARAOKE.echoDelay
+      const fb = keep(ctx.createGain())
+      const tone = keep(ctx.createBiquadFilter())
+      tone.type = 'lowpass'
+      tone.frequency.value = KARAOKE.tone
+      const wetEcho = keep(ctx.createGain())
+      const e = karaokeEcho(this.mix.karaokeEcho)
+      fb.gain.value = e.feedback
+      wetEcho.gain.value = e.wet
+      chain(bright, delay, tone, wetEcho, output)
+      chain(tone, fb, delay)
+      this.mixNodes.karaokeEcho = (v) => {
+        const n = karaokeEcho(v)
+        smooth(fb.gain, n.feedback)
+        smooth(wetEcho.gain, n.wet)
+      }
     } else if (effect === 'robot') {
       // 낮은 떨림으로 곱하기(링 변조) + 짧은 울림
       const ring = keep(ctx.createGain())
@@ -259,5 +372,6 @@ export class VoiceChanger {
     }
     this.nodes = []
     this.echoNode = null
+    this.mixNodes = {}
   }
 }
