@@ -13,7 +13,10 @@ class FakeChannel {
   onmessage: ((e: { data: string }) => void) | null = null
   other: FakeChannel | null = null
   sent = 0
-  constructor(readonly label: string) {}
+  readonly label: string
+  constructor(label: string) {
+    this.label = label
+  }
   send(data: string) {
     if (this.readyState !== 'open') throw new Error('closed')
     this.sent++
