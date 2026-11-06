@@ -468,6 +468,107 @@ a.game-card:hover {
   align-self: center;
 }
 
+/* 친구 대전 방 고르기 (shared/ui/RoomPicker): 열린 방 목록 + 방 만들기 */
+.room-pick {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  text-align: left;
+}
+
+.room-pick__title {
+  margin: 8px 0 0;
+  font-size: 1rem;
+  font-weight: 800;
+}
+
+.room-pick__tip {
+  margin: 0;
+  text-align: center;
+  font-size: 0.875rem;
+  color: var(--ink-soft);
+}
+
+.room-pick__rooms {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 8px;
+}
+
+.room-pick__item {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.room-pick__room {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  min-height: 52px;
+  padding: 10px 14px;
+  border: 2px solid var(--line);
+  border-radius: 12px;
+  background: var(--paper);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.room-pick__room:disabled {
+  border-color: var(--muted-line);
+  color: var(--ink-soft);
+  cursor: default;
+}
+
+.room-pick__name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 800;
+}
+
+.room-pick__count {
+  flex: none;
+  font-size: 0.875rem;
+  color: var(--ink-soft);
+}
+
+.room-pick__field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-weight: 700;
+}
+
+.room-pick__field small {
+  font-weight: 500;
+  color: var(--ink-soft);
+}
+
+.room-pick__toggle {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.room-pick__room-name {
+  font-size: 1.25rem;
+  font-weight: 900;
+  word-break: keep-all;
+}
+
+.room-pick__pin {
+  letter-spacing: 0.15em;
+  color: var(--ink);
+}
+
 /* 친구 대전 중 상대가 나갔을 때 */
 .pvp-gone {
   position: absolute;

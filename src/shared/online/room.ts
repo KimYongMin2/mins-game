@@ -1,4 +1,5 @@
 import type { RealtimeChannel, SupabaseClient } from '@supabase/supabase-js'
+import { type Advert, advertiseRoom } from './roomList'
 import { getRealtimeClient } from './supabase'
 
 // 친구 대전(PvP)용 방. Supabase Realtime 채널 하나 = 방 하나.
@@ -62,6 +63,30 @@ export class RoomError extends Error {
   }
 }
 
+/** 게임 방 목록에 올라가는 방 정보 (방장이 올리고, 목록 화면이 본다) */
+export type ListedRoom = {
+  /** 방 번호 (비공개면 채널 이름엔 여기에 코드가 붙는다) */
+  id: string
+  name: string
+  locked: boolean
+  /** 지금 사람 수 (나 포함) · 정원 */
+  count: number
+  capacity: number
+  /** 시작했으면 true (목록에서 못 들어감) */
+  playing: boolean
+  /** 만든 시각 (최근 것 먼저) */
+  at: number
+}
+
+/** 게임마다 따로 보이는 방 목록 이름 */
+export const gameListId = (gameId: string) => `game-${gameId}`
+
+/** 비공개 방 코드 자리 수 (숫자) */
+export const PIN_LENGTH = 4
+
+/** 방 채널 코드: 비공개면 코드를 붙여서, 코드가 틀리면 다른(빈) 채널이 된다 (서버가 검사하는 건 아님) */
+export const channelCode = (id: string, pin: string | null) => (pin ? `${id}-${pin}` : id)
+
 export interface Room<M> {
   code: string
   role: RoomRole
@@ -74,6 +99,8 @@ export interface Room<M> {
   onPeer(fn: (peer: Peer | null) => void): () => void
   /** 여럿이 하는 게임용: 나 말고 방에 있는 사람들 (들어온 순서). 바뀔 때마다, 등록 직후에도 한 번 */
   onMembers(fn: (members: Member[]) => void): () => void
+  /** 방 목록에 '게임 중'으로 표시 (목록에 올린 방만, 방장만) */
+  setPlaying(playing: boolean): void
   leave(): void
 }
 
@@ -111,11 +138,13 @@ export type RoomOptions = {
   capacity?: number
   /** 방장: 코드를 직접 정할 때 (없으면 무작위 4자리) */
   code?: string
+  /** 방장: 그 게임 방 목록에 올린다 (이름·공개 여부). 방장이 나가면 목록에서 사라진다 */
+  listing?: { id: string; name: string; locked: boolean }
   /** 테스트에서 방장·친구를 서로 다른 연결로 만들 때만 넘긴다 */
   client?: SupabaseClient
 }
 
-async function open<M>(gameId: string, code: string, meta: Meta, { capacity = 2, client }: RoomOptions): Promise<Room<M>> {
+async function open<M>(gameId: string, code: string, meta: Meta, { capacity = 2, client, listing }: RoomOptions): Promise<Room<M>> {
   const supabase =
     client ??
     (await getRealtimeClient().catch(() => {
@@ -137,6 +166,16 @@ async function open<M>(gameId: string, code: string, meta: Meta, { capacity = 2,
   let peer: Peer | null = null
   let members: Member[] = []
   let synced = false
+  // 방 목록에 올린 방 정보 (방장만). 사람 수는 presence가 바뀔 때마다 고친다
+  let advert: Advert<ListedRoom> | null = null
+  let listed: ListedRoom | null = null
+  const updateListing = () => {
+    if (!advert || !listed) return
+    const count = Math.min(capacity, members.length + 1)
+    if (count === listed.count) return
+    listed = { ...listed, count }
+    advert.update(listed)
+  }
   const syncWaiters: (() => void)[] = []
 
   channel.on('broadcast', { event: 'msg' }, ({ payload }) => {
@@ -156,6 +195,7 @@ async function open<M>(gameId: string, code: string, meta: Meta, { capacity = 2,
       members = nextMembers
       for (const fn of memberFns) fn(members)
     }
+    updateListing()
   })
 
   try {
@@ -171,6 +211,11 @@ async function open<M>(gameId: string, code: string, meta: Meta, { capacity = 2,
     if (document.visibilityState === 'visible' && !supabase.realtime.isConnected()) supabase.realtime.connect()
   }
   if (typeof document !== 'undefined') document.addEventListener('visibilitychange', wake)
+
+  if (meta.role === 'host' && listing) {
+    listed = { ...listing, count: Math.min(capacity, members.length + 1), capacity, playing: false, at: meta.joinedAt }
+    advert = advertiseRoom(gameListId(gameId), listed)
+  }
 
   const room: Room<M> = {
     code,
@@ -198,7 +243,14 @@ async function open<M>(gameId: string, code: string, meta: Meta, { capacity = 2,
       })
       return () => memberFns.delete(fn)
     },
+    setPlaying(playing) {
+      if (!advert || !listed || listed.playing === playing) return
+      listed = { ...listed, playing }
+      advert.update(listed)
+    },
     leave() {
+      advert?.stop()
+      advert = null
       if (typeof document !== 'undefined') document.removeEventListener('visibilitychange', wake)
       messageFns.clear()
       peerFns.clear()

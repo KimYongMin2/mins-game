@@ -106,6 +106,7 @@ function fakeRooms() {
     },
     onPeer: () => () => {},
     onMembers: () => () => {},
+    setPlaying() {},
     leave() {},
   })
   return { host: make(0), guest: make(1), relayed }

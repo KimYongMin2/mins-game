@@ -196,6 +196,7 @@ export function withDirectLink<M>(room: Room<M>, opts: Options<M> = {}): DirectR
     },
     onPeer: (fn) => room.onPeer(fn),
     onMembers: (fn) => room.onMembers(fn),
+    setPlaying: (p) => room.setPlaying(p),
     status: () => status,
     onStatus(fn) {
       statusFns.add(fn)
