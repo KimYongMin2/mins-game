@@ -340,6 +340,7 @@ function MeetingRoom({ room, name, pin, nickname, voice, onVoice, onLeave }: Roo
                 </label>
               )}
               {effect === 'cave' && mixSlider('caveReverb', '울림')}
+              {effect === 'autotune' && mixSlider('autotune', '음 맞추기 세기')}
               {effect === 'karaoke' && (
                 <>
                   {mixSlider('karaokeReverb', '울림 (리버브)')}

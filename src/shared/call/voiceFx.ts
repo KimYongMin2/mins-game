@@ -2,7 +2,7 @@
 // 마이크 → [효과] → 마이크 크기 → 압축(작은 소리는 키우고 큰 소리는 눌러 전체를 크게) → 보낼 트랙(track).
 // 효과를 바꿔도 보낼 트랙은 그대로라 통화를 다시 잇지 않는다.
 
-export type VoiceEffect = 'normal' | 'high' | 'low' | 'helium' | 'monster' | 'robot' | 'radio' | 'phone' | 'echo' | 'cave' | 'karaoke'
+export type VoiceEffect = 'normal' | 'high' | 'low' | 'helium' | 'monster' | 'robot' | 'radio' | 'phone' | 'echo' | 'cave' | 'karaoke' | 'autotune'
 
 export const VOICE_EFFECTS: { id: VoiceEffect; label: string }[] = [
   { id: 'normal', label: '보통' },
@@ -16,11 +16,12 @@ export const VOICE_EFFECTS: { id: VoiceEffect; label: string }[] = [
   { id: 'echo', label: '메아리' },
   { id: 'cave', label: '동굴' },
   { id: 'karaoke', label: '노래방' },
+  { id: 'autotune', label: '오토튠' },
 ]
 
-/** 사용자가 슬라이더로 고르는 세기 (0~1): 동굴 울림, 노래방 울림·에코 */
-export type VoiceMix = 'caveReverb' | 'karaokeReverb' | 'karaokeEcho'
-export const VOICE_MIX_DEFAULT: Record<VoiceMix, number> = { caveReverb: 0.5, karaokeReverb: 0.35, karaokeEcho: 0.4 }
+/** 사용자가 슬라이더로 고르는 세기 (0~1): 동굴 울림, 노래방 울림·에코, 오토튠 음 맞추기 */
+export type VoiceMix = 'caveReverb' | 'karaokeReverb' | 'karaokeEcho' | 'autotune'
+export const VOICE_MIX_DEFAULT: Record<VoiceMix, number> = { caveReverb: 0.5, karaokeReverb: 0.35, karaokeEcho: 0.4, autotune: 0.8 }
 
 /** 동굴: 길게 퍼지는 울림(초) · 노래방: 짧은 홀 울림 + 마이크 에코 */
 const CAVE = { seconds: 3.2, decay: 2.2, wet: 1.4 }
@@ -68,6 +69,107 @@ class PitchShift extends AudioWorkletProcessor {
   }
 }
 registerProcessor('pitch-shift', PitchShift)
+
+// 오토튠: 목소리 높이를 재서(YIN, 4분의 1로 줄여 가볍게) 가장 가까운 반음으로 높이를 바꾼다.
+// strength: 0 = 그대로, 1 = 바로 딱 맞춤(기계음). 중간이면 덜 맞추고 천천히 따라간다.
+const DEC = 4, WIN = 384, MAXLAG = 192, HOP = 512
+class AutoTune extends AudioWorkletProcessor {
+  static get parameterDescriptors() { return [{ name: 'strength', defaultValue: 0.8, minValue: 0, maxValue: 1 }] }
+  constructor() {
+    super()
+    this.buf = new Float32Array(SIZE); this.w = 0; this.phase = 0
+    this.det = new Float32Array(WIN + MAXLAG); this.acc = 0; this.accN = 0
+    this.hop = 0; this.ratio = 1; this.target = 1
+    this.d = new Float32Array(MAXLAG + 1)
+  }
+  read(pos) {
+    const p = (pos + SIZE * 4) % SIZE, i = Math.floor(p), f = p - i
+    return this.buf[i] * (1 - f) + this.buf[(i + 1) % SIZE] * f
+  }
+  /** 줄인 소리에서 높이(Hz)를 찾는다. 소리가 작거나 높이가 없으면 0 */
+  detect() {
+    const x = this.det, n = WIN, d = this.d
+    let e = 0
+    for (let i = MAXLAG; i < x.length; i++) e += x[i] * x[i]
+    if (e / n < 1e-5) return 0
+    const minLag = Math.floor(sampleRate / DEC / 1000)
+    d[0] = 1
+    let run = 0
+    for (let t = 1; t <= MAXLAG; t++) {
+      let sum = 0
+      for (let i = 0; i < n; i++) { const v = x[MAXLAG + i] - x[MAXLAG + i - t]; sum += v * v }
+      run += sum
+      d[t] = run > 0 ? sum * t / run : 1
+    }
+    for (let t = Math.max(2, minLag); t < MAXLAG; t++) {
+      if (d[t] < 0.15) {
+        while (t + 1 < MAXLAG && d[t + 1] < d[t]) t++
+        const a = d[t - 1], b = d[t], c = d[t + 1], den = a - 2 * b + c
+        const lag = t + (den !== 0 ? (a - c) / (2 * den) : 0)
+        return sampleRate / this.refine(lag * DEC)
+      }
+    }
+    return 0
+  }
+  /** 줄인 소리로 찾은 주기(샘플)를 원래 소리로 다시 재서 정확하게 (높은 음일수록 줄인 소리로는 오차가 큼) */
+  refine(approx) {
+    const N = 1536, c = Math.round(approx), buf = this.buf, w = this.w
+    let bestL = c, best = Infinity
+    const at = (L) => {
+      let sum = 0
+      for (let i = 0; i < N; i++) {
+        const j = (w - 1 - i + SIZE * 2) % SIZE
+        const v = buf[j] - buf[(j - L + SIZE * 2) % SIZE]
+        sum += v * v
+      }
+      return sum
+    }
+    const vals = new Map()
+    for (let L = Math.max(2, c - DEC); L <= c + DEC; L++) {
+      const v = at(L)
+      vals.set(L, v)
+      if (v < best) { best = v; bestL = L }
+    }
+    const a = vals.get(bestL - 1) ?? at(bestL - 1), b = best, cc = vals.get(bestL + 1) ?? at(bestL + 1)
+    const den = a - 2 * b + cc
+    return bestL + (den > 0 ? (a - cc) / (2 * den) : 0)
+  }
+  process(inputs, outputs, params) {
+    const input = inputs[0] && inputs[0][0], out = outputs[0]
+    if (!out || !out[0]) return true
+    const strength = params.strength[0]
+    for (let i = 0; i < out[0].length; i++) {
+      const v = input ? input[i] : 0
+      this.buf[this.w] = v
+      // 높이 재기용으로 4개씩 평균 내어 줄인다
+      this.acc += v; this.accN++
+      if (this.accN === DEC) {
+        this.det.copyWithin(0, 1); this.det[this.det.length - 1] = this.acc / DEC
+        this.acc = 0; this.accN = 0
+      }
+      if (++this.hop >= HOP) {
+        this.hop = 0
+        const f = this.detect()
+        if (f >= 70 && f <= 1000) {
+          const midi = 69 + 12 * Math.log2(f / 440)
+          this.target = Math.pow(2, (strength * (Math.round(midi) - midi)) / 12)
+        } else this.target = 1
+        // 세게 = 빨리 따라감 (딱딱 끊기는 기계음), 약하게 = 천천히
+        const k = 0.08 + 0.92 * strength * strength
+        this.ratio += (this.target - this.ratio) * k
+      }
+      const ratio = this.ratio
+      this.phase = (this.phase + (1 - ratio) + GRAIN) % GRAIN
+      const d1 = this.phase, d2 = (this.phase + GRAIN / 2) % GRAIN
+      const g1 = Math.sin(Math.PI * d1 / GRAIN) ** 2, g2 = Math.sin(Math.PI * d2 / GRAIN) ** 2
+      const y = this.read(this.w - d1) * g1 + this.read(this.w - d2) * g2
+      for (const ch of out) ch[i] = y
+      this.w = (this.w + 1) % SIZE
+    }
+    return true
+  }
+}
+registerProcessor('autotune', AutoTune)
 `
 
 const workletReady = new WeakMap<AudioContext, Promise<boolean>>()
@@ -211,7 +313,7 @@ export class VoiceChanger {
   async setEffect(effect: VoiceEffect) {
     this.effect = effect
     const seq = ++this.seq
-    const pitch = effect === 'high' || effect === 'low' || effect === 'helium' || effect === 'monster'
+    const pitch = effect === 'high' || effect === 'low' || effect === 'helium' || effect === 'monster' || effect === 'autotune'
     const canPitch = pitch && (await loadWorklet(this.ctx))
     // 그사이 다른 효과로 또 바꿨으면 이번 건 버린다
     if (seq !== this.seq) return
@@ -231,7 +333,13 @@ export class VoiceChanger {
       return wet
     }
 
-    if (canPitch && effect === 'monster') {
+    if (canPitch && effect === 'autotune') {
+      const tuner = keep(new AudioWorkletNode(ctx, 'autotune'))
+      const strength = tuner.parameters.get('strength')!
+      strength.value = this.mix.autotune
+      this.mixNodes.autotune = (v) => smooth(strength, v)
+      chain(input, tuner, output)
+    } else if (canPitch && effect === 'monster') {
       // 아주 낮게 + 낮은 소리 키우고 조금 거칠게 + 짧은 울림
       const shifter = keep(new AudioWorkletNode(ctx, 'pitch-shift'))
       shifter.parameters.get('ratio')!.value = PITCH.monster
