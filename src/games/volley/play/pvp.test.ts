@@ -70,8 +70,9 @@ describe('친구 대전 (방장 심판 + 친구 예측)', () => {
     let host = s0
     for (let i = 0; i < 2; i++) host = step(host, [NO_INPUT, NO_INPUT])
     g = guestReceive(g, host, [NO_INPUT, NO_INPUT])
-    // 되감은 뒤에도 내가 누른 키가 다시 들어가 오른쪽으로 가 있다
-    expect(g.local.tick).toBe(2 + 6)
+    // 되감은 뒤에도 내가 누른 키가 다시 들어가 오른쪽으로 가 있다 (내 시계는 그대로, 목표 2+6보다 앞선 건 천천히 맞춤)
+    expect(g.local.tick).toBe(10)
+    expect(g.local.players[1].x).toBeCloseTo(before)
     expect(g.local.players[1].x).toBeGreaterThan(s0.players[1].x)
     // 옛 상태는 무시
     expect(guestReceive(g, s0, [NO_INPUT, NO_INPUT])).toBe(g)
