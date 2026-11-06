@@ -88,6 +88,24 @@
   height: auto;
 }
 
+/* 친구 대전: 메시지가 가는 길 (코트 왼쪽 위 구석에 작게) */
+.vb-link {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  background: rgb(255 255 255 / 0.8);
+  color: #6b7280;
+  pointer-events: none;
+}
+
+.vb-link--direct {
+  color: #15803d;
+}
+
 .vb-banner {
   position: absolute;
   inset: 0;

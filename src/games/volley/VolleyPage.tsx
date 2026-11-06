@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router'
 import { installAudioUnlock } from '../../shared/audio/synth'
+import { type DirectRoom, withDirectLink } from '../../shared/online/directLink'
 import type { Peer, Room } from '../../shared/online/room'
 import { loadNickname } from '../../shared/storage/nickname'
 import { PvpLobby } from '../../shared/ui/PvpLobby'
@@ -26,7 +27,7 @@ type Screen =
   | { kind: 'pvp-game'; key: number; server: Side }
   | { kind: 'pvp-result'; summary: GameSummary }
 
-type Pvp = { room: Room<VolleyMsg>; peer: Peer }
+type Pvp = { room: DirectRoom<VolleyMsg>; peer: Peer }
 
 export function VolleyPage() {
   const [screen, setScreen] = useState<Screen>({ kind: 'start' })
@@ -87,13 +88,14 @@ export function VolleyPage() {
   useEffect(() => () => pvpRef.current?.room.leave(), [])
 
   function connected(room: Room<VolleyMsg>, peer: Peer) {
-    setPvp({ room, peer })
+    // 경기 메시지는 되도록 기기끼리 직접 (WebRTC). 자주 오는 상태는 빠져도 다음 것이 오므로 다시 안 보내는 채널로 (끝난 상태는 꼭 가게)
+    setPvp({ room: withDirectLink(room, { lossy: (m) => m.t === 'state' && m.s.phase.kind !== 'done' }), peer })
     setPeerGone(false)
     setScreen({ kind: 'pvp-wait' })
   }
 
   /** 방장: 첫 서브를 무작위로 정해 친구에게 보내고 시작 */
-  function startPvp(room: Room<VolleyMsg>) {
+  function startPvp(room: DirectRoom<VolleyMsg>) {
     const server: Side = Math.random() < 0.5 ? 0 : 1
     room.send({ t: 'start', server })
     setScreen({ kind: 'pvp-game', key: Date.now(), server })
