@@ -23,6 +23,34 @@ export const VOICE_EFFECTS: { id: VoiceEffect; label: string }[] = [
 export type VoiceMix = 'caveReverb' | 'karaokeReverb' | 'karaokeEcho' | 'autotune'
 export const VOICE_MIX_DEFAULT: Record<VoiceMix, number> = { caveReverb: 0.5, karaokeReverb: 0.35, karaokeEcho: 0.4, autotune: 0.8 }
 
+/** 오토튠 음계: 반음 전부(12음) 또는 고른 조(장조·단조)의 7음 */
+export type TuneScale = { kind: 'chromatic' } | { kind: 'major' | 'minor'; root: number }
+export const TUNE_ROOTS = ['도', '도#', '레', '레#', '미', '파', '파#', '솔', '솔#', '라', '라#', '시']
+const SCALE_STEPS = { major: [0, 2, 4, 5, 7, 9, 11], minor: [0, 2, 3, 5, 7, 8, 10] }
+
+/** 맞출 수 있는 음 (도=0 … 시=11) 12칸 표시 */
+export function scaleMask(scale: TuneScale): boolean[] {
+  if (scale.kind === 'chromatic') return Array(12).fill(true)
+  const mask = Array(12).fill(false)
+  for (const step of SCALE_STEPS[scale.kind]) mask[(scale.root + step) % 12] = true
+  return mask
+}
+
+/** midi 음 높이(소수)를 맞출 수 있는 가장 가까운 음으로 */
+export function nearestNote(midi: number, mask: boolean[]): number {
+  let best = Math.round(midi)
+  let dist = Infinity
+  for (let n = Math.floor(midi) - 2; n <= Math.ceil(midi) + 2; n++) {
+    if (!mask[((n % 12) + 12) % 12]) continue
+    const d = Math.abs(n - midi)
+    if (d < dist) {
+      dist = d
+      best = n
+    }
+  }
+  return best
+}
+
 /** 동굴: 길게 퍼지는 울림(초) · 노래방: 짧은 홀 울림 + 마이크 에코 */
 const CAVE = { seconds: 3.2, decay: 2.2, wet: 1.4 }
 const KARAOKE = { seconds: 1.6, decay: 3, wet: 1.1, echoDelay: 0.13, tone: 3500 }
@@ -70,7 +98,8 @@ class PitchShift extends AudioWorkletProcessor {
 }
 registerProcessor('pitch-shift', PitchShift)
 
-// 오토튠: 목소리 높이를 재서(YIN, 4분의 1로 줄여 가볍게) 가장 가까운 반음으로 높이를 바꾼다.
+// 오토튠: 목소리 높이를 재서(YIN, 4분의 1로 줄여 가볍게) 가장 가까운 음(반음 전부 또는 고른 조의 음)으로 높이를 바꾼다.
+// (가장 가까운 음 찾기는 아래 nearestNote와 같은 계산)
 // strength: 0 = 그대로, 1 = 바로 딱 맞춤(기계음). 중간이면 덜 맞추고 천천히 따라간다.
 const DEC = 4, WIN = 384, MAXLAG = 192, HOP = 512
 class AutoTune extends AudioWorkletProcessor {
@@ -81,6 +110,18 @@ class AutoTune extends AudioWorkletProcessor {
     this.det = new Float32Array(WIN + MAXLAG); this.acc = 0; this.accN = 0
     this.hop = 0; this.ratio = 1; this.target = 1
     this.d = new Float32Array(MAXLAG + 1)
+    // 맞출 수 있는 음 (도=0 … 시=11). 바꾸면 메시지로 온다
+    this.mask = new Array(12).fill(true)
+    this.port.onmessage = (e) => { if (Array.isArray(e.data.mask)) this.mask = e.data.mask }
+  }
+  nearest(midi) {
+    let best = Math.round(midi), dist = Infinity
+    for (let n = Math.floor(midi) - 2; n <= Math.ceil(midi) + 2; n++) {
+      if (!this.mask[((n % 12) + 12) % 12]) continue
+      const d = Math.abs(n - midi)
+      if (d < dist) { dist = d; best = n }
+    }
+    return best
   }
   read(pos) {
     const p = (pos + SIZE * 4) % SIZE, i = Math.floor(p), f = p - i
@@ -152,7 +193,7 @@ class AutoTune extends AudioWorkletProcessor {
         const f = this.detect()
         if (f >= 70 && f <= 1000) {
           const midi = 69 + 12 * Math.log2(f / 440)
-          this.target = Math.pow(2, (strength * (Math.round(midi) - midi)) / 12)
+          this.target = Math.pow(2, (strength * (this.nearest(midi) - midi)) / 12)
         } else this.target = 1
         // 세게 = 빨리 따라감 (딱딱 끊기는 기계음), 약하게 = 천천히
         const k = 0.08 + 0.92 * strength * strength
@@ -244,6 +285,9 @@ export class VoiceChanger {
   /** 메아리일 때 그 지연 노드 (간격을 바로 바꾸려고) */
   private echoNode: DelayNode | null = null
   private mix: Record<VoiceMix, number> = { ...VOICE_MIX_DEFAULT }
+  private scale: TuneScale = { kind: 'chromatic' }
+  /** 오토튠 중이면 그 노드 (음계를 바로 바꾸려고) */
+  private tuner: AudioWorkletNode | null = null
   /** 슬라이더를 움직이면 바로 바꿀 노드들 */
   private mixNodes: Partial<Record<VoiceMix, (v: number) => void>> = {}
 
@@ -310,6 +354,16 @@ export class VoiceChanger {
     this.mixNodes[key]?.(this.mix[key])
   }
 
+  get tuneScale(): TuneScale {
+    return this.scale
+  }
+
+  /** 오토튠 음계. 오토튠 중이면 바로 바뀐다 */
+  setTuneScale(scale: TuneScale) {
+    this.scale = scale
+    this.tuner?.port.postMessage({ mask: scaleMask(scale) })
+  }
+
   async setEffect(effect: VoiceEffect) {
     this.effect = effect
     const seq = ++this.seq
@@ -338,6 +392,8 @@ export class VoiceChanger {
       const strength = tuner.parameters.get('strength')!
       strength.value = this.mix.autotune
       this.mixNodes.autotune = (v) => smooth(strength, v)
+      tuner.port.postMessage({ mask: scaleMask(this.scale) })
+      this.tuner = tuner
       chain(input, tuner, output)
     } else if (canPitch && effect === 'monster') {
       // 아주 낮게 + 낮은 소리 키우고 조금 거칠게 + 짧은 울림
@@ -481,5 +537,6 @@ export class VoiceChanger {
     this.nodes = []
     this.echoNode = null
     this.mixNodes = {}
+    this.tuner = null
   }
 }

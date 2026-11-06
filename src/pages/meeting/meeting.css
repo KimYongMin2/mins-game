@@ -275,3 +275,17 @@
   width: 100%;
   accent-color: var(--ink);
 }
+
+/* 오토튠 음계 고르기 */
+.meet-voice__scale {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.meet-voice__scale select {
+  width: auto;
+  padding: 6px 10px;
+  font-size: 0.875rem;
+}

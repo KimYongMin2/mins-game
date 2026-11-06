@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router'
 import { levelContext, watchLevel } from '../../shared/call/level'
 import { LISTEN_VOLUME, Speaker } from '../../shared/call/speaker'
-import { ECHO_DELAY, MIC_VOLUME, VOICE_EFFECTS, VOICE_MIX_DEFAULT, type VoiceEffect, type VoiceMix, VoiceChanger } from '../../shared/call/voiceFx'
+import { ECHO_DELAY, MIC_VOLUME, VOICE_EFFECTS, TUNE_ROOTS, type TuneScale, VOICE_MIX_DEFAULT, type VoiceEffect, type VoiceMix, VoiceChanger } from '../../shared/call/voiceFx'
 import { type CallPeer, type CallSignal, VoiceMesh } from '../../shared/call/voiceMesh'
 import { type Member, type Room, RoomError, createRoom, joinRoom, makeRoomCode } from '../../shared/online/room'
 import { advertiseRoom, watchRooms } from '../../shared/online/roomList'
@@ -150,6 +150,7 @@ function MeetingRoom({ room, name, pin, nickname, voice, onVoice, onLeave }: Roo
   const [effect, setEffect] = useState<VoiceEffect>(voice?.current ?? 'normal')
   const [echo, setEcho] = useState(voice?.echo ?? ECHO_DELAY.default)
   const [mix, setMix] = useState<Record<VoiceMix, number>>(() => ({ ...VOICE_MIX_DEFAULT }))
+  const [scale, setScale] = useState<TuneScale>(() => voice?.tuneScale ?? { kind: 'chromatic' })
   const [micVolume, setMicVolume] = useState(() => voice?.volume ?? loadVolume(MIC_VOLUME_KEY, MIC_VOLUME))
   const [speaker] = useState(() => {
     const s = new Speaker(levelContext())
@@ -216,6 +217,7 @@ function MeetingRoom({ room, name, pin, nickname, voice, onVoice, onLeave }: Roo
     if (!v) return
     v.setEchoDelay(echo)
     for (const k of Object.keys(mix) as VoiceMix[]) v.setMix(k, mix[k])
+    v.setTuneScale(scale)
     v.setVolume(micVolume)
     void v.setEffect(effect)
     onVoice(v)
@@ -235,6 +237,11 @@ function MeetingRoom({ room, name, pin, nickname, voice, onVoice, onLeave }: Roo
       <input type="range" min={0} max={1} step={0.05} value={mix[key]} onChange={(e) => changeMix(key, Number(e.target.value))} />
     </label>
   )
+
+  function changeScale(next: TuneScale) {
+    setScale(next)
+    voice?.setTuneScale(next)
+  }
 
   function changeVoice(next: VoiceEffect) {
     setEffect(next)
@@ -340,7 +347,41 @@ function MeetingRoom({ room, name, pin, nickname, voice, onVoice, onLeave }: Roo
                 </label>
               )}
               {effect === 'cave' && mixSlider('caveReverb', '울림')}
-              {effect === 'autotune' && mixSlider('autotune', '음 맞추기 세기')}
+              {effect === 'autotune' && (
+                <>
+                  {mixSlider('autotune', '음 맞추기 세기')}
+                  {/* 음계: 반음 전부 또는 조(으뜸음 + 장조/단조) */}
+                  <div className="meet-voice__scale">
+                    <select
+                      className="input"
+                      aria-label="맞출 음"
+                      value={scale.kind}
+                      onChange={(e) => {
+                        const kind = e.target.value as TuneScale['kind']
+                        changeScale(kind === 'chromatic' ? { kind } : { kind, root: scale.kind === 'chromatic' ? 0 : scale.root })
+                      }}
+                    >
+                      <option value="chromatic">반음 전부 (12음)</option>
+                      <option value="major">장조 (7음)</option>
+                      <option value="minor">단조 (7음)</option>
+                    </select>
+                    {scale.kind !== 'chromatic' && (
+                      <select
+                        className="input"
+                        aria-label="조"
+                        value={scale.root}
+                        onChange={(e) => changeScale({ kind: scale.kind, root: Number(e.target.value) })}
+                      >
+                        {TUNE_ROOTS.map((name, i) => (
+                          <option key={name} value={i}>
+                            {name} {scale.kind === 'major' ? '장조' : '단조'}
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                  </div>
+                </>
+              )}
               {effect === 'karaoke' && (
                 <>
                   {mixSlider('karaokeReverb', '울림 (리버브)')}
