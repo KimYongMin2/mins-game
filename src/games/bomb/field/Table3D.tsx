@@ -1,7 +1,8 @@
 import { useEffect, useRef } from 'react'
 import * as THREE from 'three'
 import { ANIMALS, type AnimalRig, type Mood, type Pose, makeAnimal } from '../../../shared/art3d/animals'
-import { createStage, woodTexture } from '../../../shared/art3d/stage'
+import { buildTableRoom, footRing, glowTexture } from '../../../shared/art3d/room'
+import { createStage, nearestOnScreen } from '../../../shared/art3d/stage'
 import { PERSON_SHIRTS } from '../../../shared/art/shapes'
 import { TEAM_COLORS } from '../../../shared/team/teams'
 import { TeamDot } from '../../../shared/ui/TeamResult'
@@ -18,26 +19,6 @@ type Props = {
 
 /** 터지는 연출 시간 (ms) */
 const BLAST_MS = 900
-
-/** 자리 각도: 나(자리 0)를 앞(+z)에 두고 시계 방향 */
-const seatAngle = (seat: number, count: number) => Math.PI / 2 + (seat / count) * Math.PI * 2
-
-/** 불꽃·폭발용 둥근 빛 텍스처 */
-function glowTexture(): THREE.CanvasTexture {
-  const c = document.createElement('canvas')
-  c.width = c.height = 128
-  const g = c.getContext('2d')!
-  const r = g.createRadialGradient(64, 64, 0, 64, 64, 64)
-  r.addColorStop(0, 'rgba(255,255,235,1)')
-  r.addColorStop(0.25, 'rgba(255,200,80,0.9)')
-  r.addColorStop(0.6, 'rgba(255,110,20,0.35)')
-  r.addColorStop(1, 'rgba(255,60,0,0)')
-  g.fillStyle = r
-  g.fillRect(0, 0, 128, 128)
-  const t = new THREE.CanvasTexture(c)
-  t.colorSpace = THREE.SRGBColorSpace
-  return t
-}
 
 function makeBomb() {
   const group = new THREE.Group()
@@ -98,44 +79,7 @@ export function Table3D({ screen, onPick }: Props) {
     const stage = createStage(host, { background: '#1f1914' })
     const { scene, camera } = stage
 
-    // 바닥: 나무 마루 + 둥근 깔개
-    const floorTex = woodTexture('#6b4a30', false)
-    floorTex.wrapS = floorTex.wrapT = THREE.RepeatWrapping
-    floorTex.repeat.set(4, 4)
-    const floor = new THREE.Mesh(new THREE.PlaneGeometry(40, 40), new THREE.MeshStandardMaterial({ map: floorTex, roughness: 0.8 }))
-    floor.rotation.x = -Math.PI / 2
-    floor.receiveShadow = true
-    scene.add(floor)
-
-    const R = 2.55 + Math.max(0, n - 4) * 0.2
-    const tableR = R - 0.95
-    const rug = new THREE.Mesh(new THREE.CircleGeometry(R + 1.1, 64), new THREE.MeshStandardMaterial({ color: '#7d2f2a', roughness: 1 }))
-    rug.rotation.x = -Math.PI / 2
-    rug.position.y = 0.01
-    rug.receiveShadow = true
-    scene.add(rug)
-    const rugEdge = new THREE.Mesh(new THREE.RingGeometry(R + 0.85, R + 0.98, 64), new THREE.MeshStandardMaterial({ color: '#e0b25a', roughness: 1 }))
-    rugEdge.rotation.x = -Math.PI / 2
-    rugEdge.position.y = 0.015
-    scene.add(rugEdge)
-
-    // 탁자
-    const top = new THREE.Mesh(new THREE.CylinderGeometry(tableR, tableR, 0.14, 72), [
-      new THREE.MeshStandardMaterial({ color: '#5b3216', roughness: 0.6 }),
-      new THREE.MeshStandardMaterial({ map: woodTexture('#a8642e'), roughness: 0.38 }),
-      new THREE.MeshStandardMaterial({ color: '#3d200c', roughness: 0.7 }),
-    ])
-    top.position.y = 1.0
-    top.castShadow = true
-    top.receiveShadow = true
-    scene.add(top)
-    const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.42, 0.95, 24), new THREE.MeshStandardMaterial({ color: '#4a2a12', roughness: 0.55 }))
-    leg.position.y = 0.48
-    leg.castShadow = true
-    scene.add(leg)
-    const foot = new THREE.Mesh(new THREE.CylinderGeometry(0.7, 0.8, 0.08, 32), new THREE.MeshStandardMaterial({ color: '#3d200c', roughness: 0.6 }))
-    foot.position.y = 0.05
-    scene.add(foot)
+    const room = buildTableRoom(scene, n)
 
     // 캐릭터
     const me = first.players.findIndex((p) => p.id === screenRef.current.myId)
@@ -143,8 +87,7 @@ export function Table3D({ screen, onPick }: Props) {
     const rigs: AnimalRig[] = first.players.map((_, i) => {
       const shirt = first.teams ? TEAM_COLORS[first.teams[i]] : PERSON_SHIRTS[i % PERSON_SHIRTS.length]
       const rig = makeAnimal(ANIMALS[i % ANIMALS.length], shirt)
-      const a = seatAngle(seatOf(i), n)
-      rig.root.position.set(Math.cos(a) * R, 0, Math.sin(a) * R)
+      rig.root.position.copy(room.seatPos(seatOf(i)))
       rig.root.lookAt(0, 0, 0)
       rig.root.userData.player = i
       rig.root.traverse((o) => (o.userData.player = i))
@@ -153,11 +96,9 @@ export function Table3D({ screen, onPick }: Props) {
     })
     // 던질 수 있는 사람 발밑 고리
     const rings = first.players.map((_, i) => {
-      const ring = new THREE.Mesh(new THREE.TorusGeometry(0.75, 0.05, 8, 40), new THREE.MeshBasicMaterial({ color: '#ffd43b', transparent: true, opacity: 0.9 }))
-      ring.rotation.x = Math.PI / 2
+      const ring = footRing('#ffd43b')
       ring.position.copy(rigs[i].root.position)
       ring.position.y = 0.06
-      ring.visible = false
       scene.add(ring)
       return ring
     })
@@ -168,8 +109,8 @@ export function Table3D({ screen, onPick }: Props) {
     scene.add(blast.group)
 
     // 카메라: 내 등 뒤 위에서
-    const camBase = new THREE.Vector3(0, 8.2 + n * 0.35, R + 4.6 + n * 0.3)
-    const look = new THREE.Vector3(0, 0.6, -0.5)
+    const camBase = room.camera.pos
+    const look = room.camera.look
     stage.lamp.target.position.set(0, 1, 0)
 
     const handsWorld = (i: number) => rigs[i].root.localToWorld(rigs[i].handsAt.clone())
@@ -279,30 +220,18 @@ export function Table3D({ screen, onPick }: Props) {
     }
     raf = requestAnimationFrame(frame)
 
-    // 누르기: 맞은 캐릭터가 던질 수 있는 옆 사람이면 던진다
-    const ray = new THREE.Raycaster()
-    const pointer = new THREE.Vector2()
+    // 누르기: 누른 곳에서 가장 가까운, 던질 수 있는 옆 사람
     function onDown(e: PointerEvent) {
       const s = screenRef.current
       if (!s.view || !canThrowNow(s)) return
       const side = neighborsOf(s.view.alive, myIndex(s))
       if (!side) return
-      const r = stage.renderer.domElement.getBoundingClientRect()
-      pointer.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1)
-      ray.setFromCamera(pointer, camera)
-      const hits = ray.intersectObjects([...rigs.map((x) => x.root), ...rings], true)
-      for (const h of hits) {
-        let o: THREE.Object3D | null = h.object
-        while (o && o.userData.player === undefined) o = o.parent
-        const i = o?.userData.player
-        if (typeof i === 'number' && i >= 0 && side.includes(i)) {
-          e.preventDefault()
-          pickRef.current(i)
-          return
-        }
-      }
+      const points = rigs.map((r, i) => (side.includes(i) ? r.root.localToWorld(new THREE.Vector3(0, 1.4, 0)) : null))
+      const i = nearestOnScreen(stage, e.clientX, e.clientY, points)
+      if (i === null) return
+      e.preventDefault()
+      pickRef.current(i)
     }
-    rings.forEach((ring, i) => (ring.userData.player = i))
     stage.renderer.domElement.addEventListener('pointerdown', onDown)
 
     return () => {

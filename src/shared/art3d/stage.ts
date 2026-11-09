@@ -115,3 +115,25 @@ export function woodTexture(base = '#9a5b2a', rings = true): THREE.CanvasTexture
   tex.anisotropy = 4
   return tex
 }
+
+/**
+ * 누른 곳(clientX·Y)에서 가장 가까운 대상 번호 (화면에서 몸 가운데까지 거리). 화면 폭의 15% 안에 없으면 null.
+ * 폰에서 작은 3D 캐릭터를 정확히 누르기 어려워서 광선 대신 이걸로 고른다
+ */
+export function nearestOnScreen(stage: Stage, clientX: number, clientY: number, points: (THREE.Vector3 | null)[]): number | null {
+  const r = stage.renderer.domElement.getBoundingClientRect()
+  const x = clientX - r.left
+  const y = clientY - r.top
+  let best: number | null = null
+  let bestD = Math.max(48, r.width * 0.15)
+  points.forEach((p, i) => {
+    if (!p) return
+    const s = stage.toScreen(p)
+    const d = Math.hypot(s.x - x, s.y - y)
+    if (d < bestD) {
+      bestD = d
+      best = i
+    }
+  })
+  return best
+}

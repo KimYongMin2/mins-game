@@ -1,15 +1,19 @@
-import { useEffect, useReducer, useRef, useState } from 'react'
+import { Suspense, lazy, useEffect, useReducer, useRef, useState } from 'react'
 import type { Member, Room } from '../../../shared/online/room'
 import { randomSeed } from '../../../shared/random'
 import { TEAM_NAMES, type Team, type TeamPick, planTeams, teamOutcome } from '../../../shared/team/teams'
 import { loadNickname } from '../../../shared/storage/nickname'
 import { CHAMBERS, TURN_MS } from '../constants'
+import { canWebGL } from '../../../shared/art3d/webgl'
 import { Table } from '../field/Table'
 import { type EngineAction, type EngineState, type Player, createEngine, engineReducer } from '../play/engine'
 import type { RouletteMsg } from '../play/pvp'
 import { type RouletteView, type ScreenState, createScreen, fired, isMyTurn, myIndex, screenReducer, toView, viewChanged } from '../play/view'
 import type { GameSummary } from '../records'
 import { playSound } from '../sounds'
+
+/** 3D 탁자는 three.js가 커서 경기 화면에서만 불러온다 (불러오는 동안은 2D 그림) */
+const Table3D = lazy(() => import('../field/Table3D').then((m) => ({ default: m.Table3D })))
 
 // 경기 화면. 방장(봇 연습 포함)은 심판을 돌리고 그 화면을 친구들에게 보낸다. 친구는 받은 화면만 그리고,
 // 자기 차례면 고른 사람·방아쇠를 방장에게 보낸다.
@@ -99,6 +103,8 @@ function statusOf(screen: ScreenState): { text: string; tone?: 'bad' | 'win' | '
 
 export function GameScreen(props: Props) {
   const isGuest = props.mode === 'guest'
+  // 3D 탁자 (WebGL이 안 되는 기기는 예전 2D 그림)
+  const [use3D] = useState(canWebGL)
   const [host, hostDispatch] = useReducer(hostReducer, props, initHost)
   const [guest, guestDispatch] = useReducer(screenReducer, undefined, () => createScreen(props.mode === 'guest' ? props.room.myId : '', performance.now()))
   const screen = isGuest ? guest : host.screen
@@ -227,7 +233,13 @@ export function GameScreen(props: Props) {
       <p className={`rl-status${status.tone ? ` rl-status--${status.tone}` : ''}`} aria-live="polite">
         {status.text}
       </p>
-      <Table screen={shownView} onPick={pick} />
+      {use3D ? (
+        <Suspense fallback={<Table screen={shownView} onPick={pick} />}>
+          <Table3D screen={shownView} onPick={pick} />
+        </Suspense>
+      ) : (
+        <Table screen={shownView} onPick={pick} />
+      )}
       <div className="rl-timer" aria-hidden>
         <div className="rl-timer__fill" style={{ transform: `scaleX(${v?.phase === 'aim' ? left / TURN_MS : 0})` }} />
       </div>
