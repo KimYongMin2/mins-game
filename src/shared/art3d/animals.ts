@@ -9,7 +9,7 @@ export { ANIMALS, ANIMAL_NAMES, type AnimalKind, type Look, plainLook } from './
 
 export type Mood = 'calm' | 'happy' | 'scared' | 'ko'
 /** idle 가만히 · hold 두 손으로 머리 위에 듦 · scared 덜덜 · ko 쓰러짐 · cheer 만세 · raise 한 손 번쩍(외치기) */
-export type Pose = 'idle' | 'hold' | 'scared' | 'ko' | 'cheer' | 'raise'
+export type Pose = 'idle' | 'hold' | 'scared' | 'ko' | 'cheer' | 'raise' | 'aim'
 
 type Palette = { fur: string; light: string; ear: string; nose: string }
 
@@ -766,6 +766,12 @@ export function makeAnimal(lookIn: Look, shirt: string, opts: { team?: boolean }
         sink = -0.55
         ax = -0.3
         az = 1.6
+        bob = 0
+        break
+      case 'aim':
+        // 두 손을 앞으로 뻗어 총을 겨눔
+        ax = -1.5
+        az = 0.28
         bob = 0
         break
       case 'cheer':

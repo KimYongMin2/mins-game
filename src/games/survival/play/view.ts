@@ -5,11 +5,12 @@ import { SHOT_AT } from '../constants'
 import { type Vec, type Wall, halfFor, placeAt } from '../rules/geometry'
 import type { Team } from '../../../shared/team/teams'
 import { type EngineState, type Plan, type Reveal, aliveIndexes, hitAtOf, ranksOf, winnerTeam } from './engine'
+import type { Look } from '../../../shared/art3d/animalKinds'
 
 export type PhaseKind = EngineState['phase']['kind']
 
 export type SurvivalView = {
-  players: { id: string; name: string }[]
+  players: { id: string; name: string; avatar?: Look }[]
   /** 팀전이면 사람마다 팀 */
   teams: Team[] | null
   /** 팀전에서 끝났으면 이긴 팀 */
@@ -38,7 +39,7 @@ export type SurvivalView = {
 export function toView(s: EngineState): SurvivalView {
   const { phase, now } = s
   return {
-    players: s.players.map(({ id, name }) => ({ id, name })),
+    players: s.players.map(({ id, name, avatar }) => ({ id, name, avatar })),
     teams: s.teams,
     winTeam: phase.kind === 'done' ? winnerTeam(s) : null,
     alive: s.alive,

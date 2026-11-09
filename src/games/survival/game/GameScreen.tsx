@@ -1,7 +1,10 @@
-import { useEffect, useReducer, useRef, useState } from 'react'
+import { Suspense, lazy, useEffect, useReducer, useRef, useState } from 'react'
 import type { Member, Room } from '../../../shared/online/room'
 import { randomSeed } from '../../../shared/random'
 import { TEAM_COLORS, TEAM_NAMES, type Team, type TeamPick, planTeams, teamOutcome } from '../../../shared/team/teams'
+import { assignLooks, decodeLook } from '../../../shared/art3d/animalKinds'
+import { canWebGL } from '../../../shared/art3d/webgl'
+import { loadLook } from '../../../shared/storage/avatar'
 import { loadNickname } from '../../../shared/storage/nickname'
 import { PIECE_R, PLAN_MS, PLAYER_COLORS } from '../constants'
 import { Arena } from '../field/Arena'
@@ -22,6 +25,9 @@ import {
 import type { Vec } from '../rules/geometry'
 import type { GameSummary } from '../records'
 import { playSound } from '../sounds'
+
+/** 3D 맵은 three.js가 커서 경기 화면에서만 불러온다 (불러오는 동안은 2D 그림) */
+const Arena3D = lazy(() => import('../field/Arena3D').then((m) => ({ default: m.Arena3D })))
 
 // 경기 화면. 방장(봇 연습 포함)은 심판을 돌리고 그 화면을 친구들에게 보낸다. 친구는 받은 화면만 그리고,
 // 자기가 고른 자리·방향은 방장에게 보낸다.
@@ -70,6 +76,12 @@ function initHost(props: Props): HostState {
       ...BOT_NAMES.slice(0, props.bots).map((name, i) => ({ id: `bot${i}`, name, kind: 'bot' as const })),
     ]
   }
+  // 3D 캐릭터: 나·친구는 고른 동물과 꾸미기(겹쳐도 됨), 안 고른 사람과 봇은 남은 동물
+  const chosen = players.map((p) =>
+    p.kind === 'user' ? (loadLook() ?? undefined) : p.kind === 'remote' && props.mode === 'host' ? decodeLook(props.members.find((m) => m.id === p.id)?.avatar) : undefined,
+  )
+  const looks = assignLooks(chosen)
+  players = players.map((p, i) => ({ ...p, avatar: looks[i] }))
   // 팀전: 두 팀이 번갈아 앉게(차례가 오게) 자리를 다시 늘어놓는다
   let teams: Team[] | null = null
   if (props.mode === 'host' && props.teams) {
@@ -131,6 +143,8 @@ function statusOf(screen: ScreenState): { text: string; tone?: 'bad' | 'win' } {
 
 export function GameScreen(props: Props) {
   const isGuest = props.mode === 'guest'
+  // 3D 맵 (WebGL이 안 되는 기기는 예전 2D 그림)
+  const [use3D] = useState(canWebGL)
   const [host, hostDispatch] = useReducer(hostReducer, props, initHost)
   const [guest, guestDispatch] = useReducer(screenReducer, undefined, () => createScreen(props.mode === 'guest' ? props.room.myId : '', performance.now()))
   const screen = isGuest ? guest : host.screen
@@ -286,7 +300,13 @@ export function GameScreen(props: Props) {
       <p className={`sv-status${status.tone ? ` sv-status--${status.tone}` : ''}`} aria-live="polite">
         {status.text}
       </p>
-      <Arena screen={screen} onPointer={onPointer} />
+      {use3D ? (
+        <Suspense fallback={<Arena screen={screen} onPointer={onPointer} />}>
+          <Arena3D screen={screen} onPointer={onPointer} />
+        </Suspense>
+      ) : (
+        <Arena screen={screen} onPointer={onPointer} />
+      )}
       <div className="sv-timer" aria-hidden>
         <div className="sv-timer__fill" style={{ transform: `scaleX(${v?.phase === 'plan' ? left / PLAN_MS : 0})` }} />
       </div>

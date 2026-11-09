@@ -6,11 +6,13 @@ import { type Team, lastTeam, sameTeam } from '../../../shared/team/teams'
 import { chooseBotPlan } from '../bot/survivalBot'
 import { AFTER_SHOT_MS, BOT_PLAN_MS, COUNTDOWN_MS, DONE_MS, LASER_SPEED, PLAN_MS, SHOT_AT, SHRINK_MIN, SHRINK_STEP } from '../constants'
 import { type Vec, type Wall, halfFor, makeWalls, placeAt, randomSpot, shoot } from '../rules/geometry'
+import type { Look } from '../../../shared/art3d/animalKinds'
 
 /** user = 이 기기, bot = 봇, remote = 방에 들어온 친구 */
 export type PlayerKind = 'user' | 'bot' | 'remote'
 
-export type Player = { id: string; name: string; kind: PlayerKind }
+/** avatar = 3D 캐릭터 (시작할 때 정해 둠) */
+export type Player = { id: string; name: string; kind: PlayerKind; avatar?: Look }
 
 /** 고르는 중인 것. locked = [확정] 누름 (그 뒤로는 못 바꿈) */
 export type Plan = { pos: Vec | null; angle: number | null; locked: boolean }
