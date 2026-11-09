@@ -1,6 +1,7 @@
 import { useEffect, useReducer, useRef, useState } from 'react'
 import type { Member, Room } from '../../../shared/online/room'
 import { randomSeed } from '../../../shared/random'
+import { TEAM_COLORS, TEAM_NAMES, type Team, type TeamPick, planTeams, teamOutcome } from '../../../shared/team/teams'
 import { loadNickname } from '../../../shared/storage/nickname'
 import { DECIDE_MS } from '../constants'
 import { Board, PLAYER_COLORS } from '../field/Board'
@@ -19,7 +20,7 @@ import { playSound } from '../sounds'
 type Props =
   | { mode: 'bot'; bots: number; pieceCount: number; onFinish: (s: GameSummary) => void }
   /** 방장: 시작할 때 방에 있던 사람들로 경기 */
-  | { mode: 'host'; room: Room<YutMsg>; members: Member[]; bots: number; pieceCount: number; onFinish: (s: GameSummary) => void; onQuit: () => void }
+  | { mode: 'host'; room: Room<YutMsg>; members: Member[]; bots: number; teams: TeamPick | null; pieceCount: number; onFinish: (s: GameSummary) => void; onQuit: () => void }
   | { mode: 'guest'; room: Room<YutMsg>; onFinish: (s: GameSummary) => void; onQuit: () => void }
 
 /** 방장이 친구들에게 화면을 보내는 최소 간격 (바뀌면 바로, 안 바뀌어도 이만큼마다) */
@@ -58,12 +59,31 @@ function initHost(props: Props): HostState {
     ]
     pieceCount = props.pieceCount
   }
-  const engine = createEngine({ now, seed: randomSeed(), players, pieceCount })
-  return { engine, screen: screenReducer(createScreen(players[0]?.id ?? '', now), { type: 'view', view: toView(engine) }) }
+  // 팀전: 두 팀이 번갈아 앉게(차례가 오게) 자리를 다시 늘어놓는다
+  let teams: Team[] | null = null
+  if (props.mode === 'host' && props.teams) {
+    const plan = planTeams(players.map((p) => p.id), props.teams)
+    players = plan.order.map((i) => players[i])
+    teams = plan.teams
+  }
+  const engine = createEngine({ now, seed: randomSeed(), players, teams, pieceCount })
+  return { engine, screen: screenReducer(createScreen(props.mode === 'bot' ? 'me' : props.mode === 'host' ? props.room.myId : '', now), { type: 'view', view: toView(engine) }) }
 }
 
+/** 팀전이면 팀 색, 아니면 자리 색 */
+const colorOf = (v: YutView, i: number) => (v.teams ? TEAM_COLORS[v.teams[i]] : PLAYER_COLORS[i])
+/** 이 사람이 움직이는 말 줄 */
+const rowOf = (v: YutView, i: number) => (v.teams ? v.teams[i] : i)
+
 function summaryOf(v: YutView, me: number, mode: GameSummary['mode']): GameSummary {
-  const outCount = (i: number) => v.pieces[i].filter((p) => p === 'out').length
+  const outCount = (i: number) => v.pieces[rowOf(v, i)].filter((p) => p === 'out').length
+  if (v.teams) {
+    const teams = v.teams
+    const winTeam = v.winner === null ? null : teams[v.winner]
+    const team = teamOutcome(v.players.map((p) => p.name), teams, me, winTeam)
+    const standings = v.players.map((p, i) => ({ name: p.name, out: outCount(i), total: v.pieces[rowOf(v, i)].length, winner: teams[i] === winTeam }))
+    return { mode, won: winTeam === teams[me], standings, team }
+  }
   // 우승 다음은 나간 말이 많은 순
   const order = v.players.map((_, i) => i).sort((a, b) => (a === v.winner ? -1 : b === v.winner ? 1 : outCount(b) - outCount(a)))
   return {
@@ -77,21 +97,22 @@ function PlayerBar({ v, me }: { v: YutView; me: number }) {
   return (
     <ul className="yt-players">
       {v.players.map((p, i) => {
-        const home = v.pieces[i].filter((x) => x === 'home').length
-        const out = v.pieces[i].filter((x) => x === 'out').length
+        const row = v.pieces[rowOf(v, i)]
+        const home = row.filter((x) => x === 'home').length
+        const out = row.filter((x) => x === 'out').length
         return (
           <li
             key={p.id}
             className={`yt-player${v.turn === i && v.phase === 'turn' ? ' yt-player--turn' : ''}${v.left[i] ? ' yt-player--left' : ''}`}
-            style={{ borderColor: v.turn === i && v.phase === 'turn' ? PLAYER_COLORS[i] : undefined }}
+            style={{ borderColor: v.turn === i && v.phase === 'turn' ? colorOf(v, i) : undefined }}
           >
-            <span className="yt-player__dot" style={{ background: PLAYER_COLORS[i] }} />
+            <span className="yt-player__dot" style={{ background: colorOf(v, i) }} />
             <span className="yt-player__name">
               {p.name}
               {i === me && ' (나)'}
             </span>
             <span className="yt-player__count" aria-label={`대기 ${home}, 나감 ${out}`}>
-              대기 {home} · 나감 {out}/{v.pieces[i].length}
+              {v.teams && `${TEAM_NAMES[v.teams[i]]} · `}대기 {home} · 나감 {out}/{row.length}
             </span>
           </li>
         )
@@ -190,7 +211,7 @@ export function GameScreen(props: Props) {
   const me = myIndex(screen)
   const canMoveNow = myMove(screen)
   const pick = v && chosen < v.pending.length ? chosen : 0
-  const moves = v && canMoveNow ? movesFor(v.pieces, me, v.pending).filter((m) => m.throwIdx === v.pending.indexOf(v.pending[pick])) : []
+  const moves = v && canMoveNow ? movesFor(v.pieces, rowOf(v, me), v.pending).filter((m) => m.throwIdx === v.pending.indexOf(v.pending[pick])) : []
   // 옮길 말은 두 번에: 말(또는 새 말)을 고르고 → 갈 칸을 눌러야 옮긴다. 고른 말이 이 결과로 못 가면 풀림
   // 판이 바뀌면(옮김·시간 초과·다음 사람) 고른 건 저절로 풀린다
   const boardKey = v ? `${v.turn}:${v.lastMove?.seq ?? 0}:${v.pending.length}` : ''
@@ -241,6 +262,7 @@ export function GameScreen(props: Props) {
 
   let tip: string
   if (v.phase === 'intro') tip = `${v.players[v.turn].name} 먼저 시작해요`
+  else if (v.phase === 'done' && v.teams && v.winner !== null) tip = v.teams[v.winner] === v.teams[me] ? '우리 팀 승리!' : `${TEAM_NAMES[v.teams[v.winner]]} 승리!`
   else if (v.phase === 'done') tip = v.winner === me ? '내가 우승!' : `${v.players[v.winner ?? 0].name} 우승!`
   else if (!myTurn) tip = `${turnName} 차례…`
   else if (v.throwsLeft > 0) tip = v.pending.length > 0 ? '한 번 더 던져요!' : '윷을 던져요!'
@@ -257,7 +279,8 @@ export function GameScreen(props: Props) {
           movable={moves.flatMap((m) => (m.from === 'home' ? [] : [m.from]))}
           selected={chosenMove ? selected : null}
           target={target}
-          me={me}
+          me={rowOf(v, me)}
+          colors={v.teams ? TEAM_COLORS : PLAYER_COLORS}
           lastTo={v.lastMove?.to ?? null}
           onSelect={setSelected}
           onConfirm={() => chosenMove && doMove(chosenMove.from)}
@@ -268,7 +291,7 @@ export function GameScreen(props: Props) {
         <Sticks result={last?.result ?? null} shaking={shaking} />
         <div className="yt-status__text">
           {last && (
-            <strong className="yt-status__result" style={{ color: PLAYER_COLORS[last.player] }}>
+            <strong className="yt-status__result" style={{ color: colorOf(v, last.player) }}>
               {THROW_LABEL[last.result]}!
             </strong>
           )}

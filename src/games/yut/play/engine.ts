@@ -1,6 +1,7 @@
 // 윷놀이 심판. 방장 기기(또는 봇 연습)에서만 돈다. 시간(now)과 시드 난수를 상태에 담은 순수 리듀서.
 // 차례: 던질 수 있는 만큼 던지고(윷·모·잡기면 한 번 더) → 쌓인 결과를 하나씩 골라 말을 옮긴다 → 다 쓰면 다음 사람.
 import { createRng } from '../../../shared/random'
+import { type Team, lastTeam } from '../../../shared/team/teams'
 import { chooseBotMove } from '../bot/yutBot'
 import { BOT_THINK_MS, DECIDE_MS, DONE_MS, INTRO_MS, THROW_SHOW_MS } from '../constants'
 import { nodeOf } from '../rules/board'
@@ -22,6 +23,8 @@ export type EngineState = {
   now: number
   seed: number
   players: Player[]
+  /** 팀전이면 사람마다 팀. 팀끼리 말을 같이 쓴다(pieces는 팀마다 한 줄). 개인전이면 null (pieces는 사람마다) */
+  teams: Team[] | null
   pieces: Piece[][]
   turn: number
   /** 쌓인 결과 (아직 안 쓴 것) */
@@ -47,14 +50,15 @@ export type EngineAction =
   /** 친구가 나감: 차례에서 빼고 말은 판에서 치운다 */
   | { type: 'drop'; player: number }
 
-export function createEngine(opts: { now: number; seed: number; players: Player[]; pieceCount: number }): EngineState {
+export function createEngine(opts: { now: number; seed: number; players: Player[]; teams?: Team[] | null; pieceCount: number }): EngineState {
   const rng = createRng(opts.seed)
   const first = Math.floor(rng.next() * opts.players.length)
   return {
     now: opts.now,
     seed: rng.seed(),
     players: opts.players,
-    pieces: opts.players.map(() => Array.from({ length: opts.pieceCount }, () => 'home' as const)),
+    teams: opts.teams ?? null,
+    pieces: (opts.teams ? [0, 1] : opts.players).map(() => Array.from({ length: opts.pieceCount }, () => 'home' as const)),
     turn: first,
     pending: [],
     throwsLeft: 1,
@@ -67,6 +71,9 @@ export function createEngine(opts: { now: number; seed: number; players: Player[
     phase: { kind: 'intro', until: opts.now + INTRO_MS },
   }
 }
+
+/** 이 사람이 움직이는 말 줄 (팀전이면 팀, 아니면 자기) */
+export const ownerOf = (teams: readonly Team[] | null, player: number): number => (teams ? teams[player] : player)
 
 /** 지금 이 사람이 던질 수 있는지 */
 export function canThrow(s: EngineState, player: number): boolean {
@@ -87,7 +94,7 @@ function tidy(s: EngineState): EngineState {
   if (s.phase.kind !== 'turn' || s.throwsLeft > 0) return s
   let pending = s.pending
   // 빽도는 판 위에 말이 없고, 다른 결과로 말을 올릴 수도 없을 때만 버린다
-  if (movesFor(s.pieces, s.turn, pending).length === 0) pending = []
+  if (movesFor(s.pieces, ownerOf(s.teams, s.turn), pending).length === 0) pending = []
   if (pending.length > 0) return { ...s, pending }
   return nextTurn({ ...s, pending })
 }
@@ -124,10 +131,11 @@ function doThrow(s: EngineState, player: number): EngineState {
 
 function doMove(s: EngineState, player: number, throwIdx: number, from: From): EngineState {
   if (!canMove(s, player)) return s
-  const move = movesFor(s.pieces, player, s.pending).find((m) => m.throwIdx === throwIdx && m.from === from)
+  const own = ownerOf(s.teams, player)
+  const move = movesFor(s.pieces, own, s.pending).find((m) => m.throwIdx === throwIdx && m.from === from)
   if (!move) return s
   const t = s.pending[throwIdx]
-  const { pieces, captured, bonus } = applyMove(s.pieces, player, t, from, move.to)
+  const { pieces, captured, bonus } = applyMove(s.pieces, own, t, from, move.to)
   const seq = s.seq + 1
   const next: EngineState = {
     ...s,
@@ -137,7 +145,7 @@ function doMove(s: EngineState, player: number, throwIdx: number, from: From): E
     throwsLeft: bonus ? 1 : 0,
     lastMove: { player, from, to: move.to === 'out' ? 'out' : nodeOf(move.to), captured, seq },
   }
-  if (allOut(pieces[player])) return { ...next, pending: [], phase: { kind: 'done', winner: player, until: s.now + DONE_MS } }
+  if (allOut(pieces[own])) return { ...next, pending: [], phase: { kind: 'done', winner: player, until: s.now + DONE_MS } }
   return tidy(decide(next))
 }
 
@@ -145,7 +153,7 @@ function doMove(s: EngineState, player: number, throwIdx: number, from: From): E
 function auto(s: EngineState): EngineState {
   if (s.throwsLeft > 0) return doThrow(s, s.turn)
   const rng = createRng(s.seed)
-  const m = chooseBotMove(rng, s.pieces as Pieces, s.turn, s.pending)
+  const m = chooseBotMove(rng, s.pieces as Pieces, ownerOf(s.teams, s.turn), s.pending)
   const next = { ...s, seed: rng.seed() }
   return m ? doMove(next, s.turn, m.throwIdx, m.from) : tidy(next)
 }
@@ -153,9 +161,10 @@ function auto(s: EngineState): EngineState {
 function drop(s: EngineState, player: number): EngineState {
   if (s.left[player] || s.phase.kind === 'done') return s
   const left = s.left.map((l, i) => l || i === player)
-  const pieces = s.pieces.map((row, i) => (i === player ? row.map(() => 'home' as const) : row))
+  // 팀전이면 말은 팀 것이라 그대로 둔다
+  const pieces = s.teams ? s.pieces : s.pieces.map((row, i) => (i === player ? row.map(() => 'home' as const) : row))
   const stay = left.flatMap((l, i) => (l ? [] : [i]))
-  if (stay.length === 1) return { ...s, left, pieces, phase: { kind: 'done', winner: stay[0], until: s.now + DONE_MS } }
+  if (stay.length === 1 || (s.teams && lastTeam(left.map((l) => !l), s.teams) !== null)) return { ...s, left, pieces, phase: { kind: 'done', winner: stay[0], until: s.now + DONE_MS } }
   const next = { ...s, left, pieces }
   return s.turn === player ? nextTurn(next) : next
 }

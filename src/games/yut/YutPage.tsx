@@ -3,6 +3,7 @@ import { Link } from 'react-router'
 import { installAudioUnlock } from '../../shared/audio/synth'
 import type { Member, Room } from '../../shared/online/room'
 import { loadNickname } from '../../shared/storage/nickname'
+import type { TeamPick } from '../../shared/team/teams'
 import { GroupLobby } from '../../shared/ui/GroupLobby'
 import { SoundToggle } from '../../shared/ui/SoundToggle'
 import { MAX_PLAYERS, MIN_PLAYERS } from './constants'
@@ -21,7 +22,7 @@ type Screen =
   | { kind: 'bot-game'; key: number }
   | { kind: 'lobby' }
   /** 방장은 시작할 때 방에 있던 사람들을 넘긴다 */
-  | { kind: 'pvp-game'; key: number; members: Member[]; bots: number }
+  | { kind: 'pvp-game'; key: number; members: Member[]; bots: number; teams: TeamPick | null }
   | { kind: 'result'; summary: GameSummary }
 
 export function YutPage() {
@@ -31,6 +32,8 @@ export function YutPage() {
   const [members, setMembers] = useState<Member[]>([])
   /** 방장이 대기실에서 채운 봇 수 (다시 하기 때 씀) */
   const [pvpBots, setPvpBots] = useState(0)
+  /** 방장이 대기실에서 고른 팀 (팀전, 다시 하기 때 씀) */
+  const [pvpTeams, setPvpTeams] = useState<TeamPick | null>(null)
   useEffect(installAudioUnlock, [])
 
   function update(next: YutRecord) {
@@ -50,7 +53,7 @@ export function YutPage() {
     if (!room) return
     const offMembers = room.onMembers(setMembers)
     const offMsg = room.onMessage((msg) => {
-      if (room.role === 'guest' && msg.t === 'start') setScreen({ kind: 'pvp-game', key: Date.now(), members: [], bots: 0 })
+      if (room.role === 'guest' && msg.t === 'start') setScreen({ kind: 'pvp-game', key: Date.now(), members: [], bots: 0, teams: null })
     })
     return () => {
       offMembers()
@@ -66,12 +69,13 @@ export function YutPage() {
   useEffect(() => () => roomRef.current?.leave(), [])
 
   /** 방장: 지금 방에 있는 사람들로 시작 */
-  function startPvp(r: Room<YutMsg>, with_: Member[], bots: number) {
+  function startPvp(r: Room<YutMsg>, with_: Member[], bots: number, teams: TeamPick | null) {
     // 그새 친구가 더 들어왔으면 봇을 그만큼 줄인다
     const n = Math.max(0, Math.min(bots, MAX_PLAYERS - with_.length - 1))
     setPvpBots(n)
+    setPvpTeams(teams)
     r.send({ t: 'start' })
-    setScreen({ kind: 'pvp-game', key: Date.now(), members: with_, bots: n })
+    setScreen({ kind: 'pvp-game', key: Date.now(), members: with_, bots: n, teams })
   }
 
   function leaveRoom() {
@@ -79,6 +83,7 @@ export function YutPage() {
     setRoom(null)
     setMembers([])
     setPvpBots(0)
+    setPvpTeams(null)
     toStart()
   }
 
@@ -116,8 +121,9 @@ export function YutPage() {
           nickname={loadNickname() ?? '익명'}
           capacity={MAX_PLAYERS}
           minPlayers={MIN_PLAYERS}
+          teams
           onConnected={setRoom}
-          onStart={(with_, bots) => room && startPvp(room, with_, bots)}
+          onStart={(with_, bots, teams) => room && startPvp(room, with_, bots, teams)}
           onBack={() => {
             setRoom(null)
             toStart()
@@ -134,6 +140,7 @@ export function YutPage() {
             room={room}
             members={screen.members}
             bots={screen.bots}
+            teams={screen.teams}
             pieceCount={record.pieceCount}
             onFinish={finish}
             onQuit={leaveRoom}
@@ -149,7 +156,7 @@ export function YutPage() {
           canRetry={screen.summary.mode === 'bot' || Math.min(MAX_PLAYERS, members.length + 1 + pvpBots) >= MIN_PLAYERS}
           onRetry={() => {
             if (screen.summary.mode === 'bot') setScreen({ kind: 'bot-game', key: Date.now() })
-            else if (room) startPvp(room, members, pvpBots)
+            else if (room) startPvp(room, members, pvpBots, pvpTeams)
           }}
           onMenu={screen.summary.mode === 'pvp' ? leaveRoom : toStart}
         />

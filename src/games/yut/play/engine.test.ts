@@ -92,3 +92,32 @@ describe('경기 전체', () => {
     expect(s.phase).toMatchObject({ kind: 'done', winner: 0 })
   })
 })
+
+describe('팀전', () => {
+  it('봇끼리 2:2: 팀이 말을 같이 써서 한 팀 말이 다 나가면 끝', () => {
+    for (let seed = 1; seed <= 10; seed++) {
+      const teams = [0, 1, 0, 1] as const
+      let s = createEngine({ now: 0, seed, players: players('bot', 'bot', 'bot', 'bot'), teams: [...teams], pieceCount: 3 })
+      expect(s.pieces).toHaveLength(2)
+      const turns = new Set<number>()
+      for (let now = 0; now < 3_000_000 && s.phase.kind !== 'done'; now += 50) {
+        s = at(s, now)
+        turns.add(s.turn)
+      }
+      expect(s.phase.kind).toBe('done')
+      if (s.phase.kind !== 'done') return
+      const w = teams[s.phase.winner]
+      expect(s.pieces[w].every((p) => p === 'out')).toBe(true)
+      expect(turns.size).toBe(4)
+    }
+  })
+
+  it('같은 팀 사람이 옮긴 말을 다음 같은 팀 사람이 이어서 쓴다 (말 줄은 팀 것)', () => {
+    let s = createEngine({ now: 0, seed: 2, players: players('user', 'remote', 'remote', 'remote'), teams: [0, 1, 0, 1], pieceCount: 2 })
+    s = at(s, INTRO_MS)
+    s = { ...s, turn: 2, pending: ['geol'], throwsLeft: 0, lockUntil: 0 }
+    s = engineReducer(s, { type: 'move', player: 2, throwIdx: 0, from: 'home' })
+    expect(s.pieces[0].filter((p) => p !== 'home')).toHaveLength(1)
+    expect(s.pieces[1].every((p) => p === 'home')).toBe(true)
+  })
+})

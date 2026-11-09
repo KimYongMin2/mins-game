@@ -19,6 +19,8 @@ type Props = {
   target: number | 'out' | null
   /** 이 플레이어 시점의 색을 진하게 */
   me: number
+  /** 말 줄마다 색 (팀전이면 팀 색) */
+  colors?: readonly string[]
   lastTo: number | 'out' | null
   onSelect: (from: From | null) => void
   onConfirm: () => void
@@ -34,7 +36,7 @@ const LINES = [
   'M270 30L30 270',
 ]
 
-export function Board({ pieces, movable, selected, target, me, lastTo, onSelect, onConfirm }: Props) {
+export function Board({ pieces, movable, selected, target, me, colors = PLAYER_COLORS, lastTo, onSelect, onConfirm }: Props) {
   const targetNode = target === 'out' ? 0 : target
   // 갈 칸을 누르면 옮기고, 움직일 수 있는 말을 누르면 그 말을 고르고(다시 누르면 풀기), 나머지는 풀기
   function tap(node: number | null) {
@@ -74,7 +76,7 @@ export function Board({ pieces, movable, selected, target, me, lastTo, onSelect,
       }}
     >
       <defs>
-        {PLAYER_COLORS.map((c, i) => (
+        {colors.map((c, i) => (
           <radialGradient key={c} id={`yt-piece-${i}`} cx="35%" cy="30%" r="75%">
             <stop offset="0%" stopColor="#fff" stopOpacity={0.75} />
             <stop offset="35%" stopColor={c} />

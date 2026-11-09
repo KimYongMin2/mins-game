@@ -103,8 +103,9 @@ describe('팀전', () => {
         const before = s.phase.kind
         const shooter = s.turn
         s = engineReducer(s, { type: 'tick', now })
-        if (before === 'flight' && s.phase.kind === 'boom') {
-          s.phase.boom.damage.forEach((d, i) => i !== shooter && teams[i] === teams[shooter] && expect(d).toBe(0))
+        const ph = s.phase as EngineState['phase']
+        if (before === 'flight' && ph.kind === 'boom') {
+          ph.boom.damage.forEach((d, i) => i !== shooter && teams[i] === teams[shooter] && expect(d).toBe(0))
         }
       }
       expect(s.phase.kind).toBe('done')

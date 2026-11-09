@@ -1,3 +1,4 @@
+import type { TeamOutcome } from '../../shared/team/teams'
 import { type RecordStore, localRecordStore } from '../../shared/storage/records'
 
 const GAME_ID = 'yut'
@@ -22,6 +23,8 @@ export type GameSummary = {
   won: boolean
   /** 우승 → 나간 말이 많은 순 */
   standings: { name: string; out: number; total: number; winner: boolean }[]
+  /** 팀전이면 팀 결과 */
+  team?: TeamOutcome
 }
 
 export function addGame(record: YutRecord, summary: GameSummary): YutRecord {

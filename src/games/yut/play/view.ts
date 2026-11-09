@@ -3,9 +3,12 @@
 import type { From, Piece } from '../rules/moves'
 import type { Throw } from '../rules/throw'
 import type { EngineState } from './engine'
+import type { Team } from '../../../shared/team/teams'
 
 export type YutView = {
   players: { id: string; name: string }[]
+  /** 팀전이면 사람마다 팀 (pieces는 팀마다 한 줄) */
+  teams: Team[] | null
   left: boolean[]
   pieces: Piece[][]
   turn: number
@@ -24,6 +27,7 @@ export type YutView = {
 export function toView(s: EngineState): YutView {
   return {
     players: s.players.map(({ id, name }) => ({ id, name })),
+    teams: s.teams,
     left: s.left,
     pieces: s.pieces,
     turn: s.turn,
@@ -108,7 +112,7 @@ function receive(s: ScreenState, v: YutView): ScreenState {
     sounds.push(v.lastMove.captured > 0 ? 'capture' : v.lastMove.to === 'out' ? 'out' : 'move')
   }
   if (prev && v.phase === 'turn' && v.turn === me && (prev.turn !== me || prev.phase !== 'turn')) sounds.push('turn')
-  if (prev && v.phase === 'done' && prev.phase !== 'done') sounds.push(v.winner === me ? 'win' : 'lose')
+  if (prev && v.phase === 'done' && prev.phase !== 'done') sounds.push((v.teams && v.winner !== null ? v.teams[v.winner] === v.teams[me] : v.winner === me) ? 'win' : 'lose')
   return withSounds({ ...s, view: v, phaseUntil: s.now + v.leftMs, lockUntil: s.now + v.lockMs, throwAt }, sounds)
 }
 
