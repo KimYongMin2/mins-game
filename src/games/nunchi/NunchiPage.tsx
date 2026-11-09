@@ -4,6 +4,7 @@ import { installAudioUnlock } from '../../shared/audio/synth'
 import { withDirectLink } from '../../shared/online/directLink'
 import type { Member, Room } from '../../shared/online/room'
 import { loadNickname } from '../../shared/storage/nickname'
+import type { TeamPick } from '../../shared/team/teams'
 import { GroupLobby } from '../../shared/ui/GroupLobby'
 import { SoundToggle } from '../../shared/ui/SoundToggle'
 import { MAX_PLAYERS, MIN_PLAYERS } from './constants'
@@ -22,7 +23,7 @@ type Screen =
   | { kind: 'bot-game'; key: number }
   | { kind: 'lobby' }
   /** 방장은 시작할 때 방에 있던 사람들을 넘긴다 */
-  | { kind: 'pvp-game'; key: number; members: Member[]; bots: number }
+  | { kind: 'pvp-game'; key: number; members: Member[]; bots: number; teams: TeamPick | null }
   | { kind: 'result'; summary: GameSummary }
 
 export function NunchiPage() {
@@ -32,6 +33,8 @@ export function NunchiPage() {
   const [members, setMembers] = useState<Member[]>([])
   /** 방장이 대기실에서 채운 봇 수 (다시 하기 때 씀) */
   const [pvpBots, setPvpBots] = useState(0)
+  /** 방장이 대기실에서 고른 팀 (팀전, 다시 하기 때 씀) */
+  const [pvpTeams, setPvpTeams] = useState<TeamPick | null>(null)
   useEffect(installAudioUnlock, [])
 
   function update(next: NunchiRecord) {
@@ -51,7 +54,7 @@ export function NunchiPage() {
     if (!room) return
     const offMembers = room.onMembers(setMembers)
     const offMsg = room.onMessage((msg) => {
-      if (room.role === 'guest' && msg.t === 'start') setScreen({ kind: 'pvp-game', key: Date.now(), members: [], bots: 0 })
+      if (room.role === 'guest' && msg.t === 'start') setScreen({ kind: 'pvp-game', key: Date.now(), members: [], bots: 0, teams: null })
     })
     return () => {
       offMembers()
@@ -67,12 +70,13 @@ export function NunchiPage() {
   useEffect(() => () => roomRef.current?.leave(), [])
 
   /** 방장: 지금 방에 있는 사람들로 시작 */
-  function startPvp(r: Room<NunchiMsg>, with_: Member[], bots: number) {
+  function startPvp(r: Room<NunchiMsg>, with_: Member[], bots: number, teams: TeamPick | null) {
     // 그새 친구가 더 들어왔으면 봇을 그만큼 줄인다
     const n = Math.max(0, Math.min(bots, MAX_PLAYERS - with_.length - 1))
     setPvpBots(n)
+    setPvpTeams(teams)
     r.send({ t: 'start' })
-    setScreen({ kind: 'pvp-game', key: Date.now(), members: with_, bots: n })
+    setScreen({ kind: 'pvp-game', key: Date.now(), members: with_, bots: n, teams })
   }
 
   function leaveRoom() {
@@ -80,6 +84,7 @@ export function NunchiPage() {
     setRoom(null)
     setMembers([])
     setPvpBots(0)
+    setPvpTeams(null)
     toStart()
   }
 
@@ -116,9 +121,10 @@ export function NunchiPage() {
           nickname={loadNickname() ?? '익명'}
           capacity={MAX_PLAYERS}
           minPlayers={MIN_PLAYERS}
+          teams
           // 되도록 기기끼리 직접 (WebRTC, 방장 ↔ 친구 각자). 동시 판정이 방장 기기에 도착한 시각 기준이라, 늦게 가면 불공평해서
           onConnected={(r) => setRoom(withDirectLink(r))}
-          onStart={(with_, bots) => room && startPvp(room, with_, bots)}
+          onStart={(with_, bots, teams) => room && startPvp(room, with_, bots, teams)}
           onBack={() => {
             room?.leave()
             setRoom(null)
@@ -130,7 +136,7 @@ export function NunchiPage() {
       {screen.kind === 'pvp-game' &&
         room &&
         (room.role === 'host' ? (
-          <GameScreen key={screen.key} mode="host" room={room} members={screen.members} bots={screen.bots} onFinish={finish} onQuit={leaveRoom} />
+          <GameScreen key={screen.key} mode="host" room={room} members={screen.members} bots={screen.bots} teams={screen.teams} onFinish={finish} onQuit={leaveRoom} />
         ) : (
           <GameScreen key={screen.key} mode="guest" room={room} onFinish={finish} onQuit={leaveRoom} />
         ))}
@@ -142,7 +148,7 @@ export function NunchiPage() {
           canRetry={screen.summary.mode === 'bot' || Math.min(MAX_PLAYERS, members.length + 1 + pvpBots) >= MIN_PLAYERS}
           onRetry={() => {
             if (screen.summary.mode === 'bot') setScreen({ kind: 'bot-game', key: Date.now() })
-            else if (room) startPvp(room, members, pvpBots)
+            else if (room) startPvp(room, members, pvpBots, pvpTeams)
           }}
           onMenu={screen.summary.mode === 'pvp' ? leaveRoom : toStart}
         />

@@ -1,4 +1,5 @@
 import type { GameSummary, NunchiRecord } from '../records'
+import { TeamResult } from '../../../shared/ui/TeamResult'
 
 type Props = {
   summary: GameSummary
@@ -18,18 +19,24 @@ export function ResultScreen({ summary, record, isHost, canRetry, onRetry, onMen
   const myName = summary.ranking.find((r) => r.rank === summary.rank)
   return (
     <section className="nc-result">
-      <div className={`nc-result__headline${summary.rank === 1 ? ' nc-result__headline--win' : ''}`}>
-        <strong>{summary.rank === 1 ? '우승!' : `${summary.rank}등`}</strong>
-        <span>{summary.ranking.length}명 중</span>
-      </div>
+      {summary.team ? (
+        <TeamResult outcome={summary.team} />
+      ) : (
+        <>
+          <div className={`nc-result__headline${summary.rank === 1 ? ' nc-result__headline--win' : ''}`}>
+            <strong>{summary.rank === 1 ? '우승!' : `${summary.rank}등`}</strong>
+            <span>{summary.ranking.length}명 중</span>
+          </div>
 
-      <ol className="nc-result__ranking">
-        {summary.ranking.map((r, i) => (
-          <li key={`${r.name}-${i}`} className={r === myName ? 'nc-result__me' : ''}>
-            <span>{r.rank}등</span> {r.name}
-          </li>
-        ))}
-      </ol>
+          <ol className="nc-result__ranking">
+            {summary.ranking.map((r, i) => (
+              <li key={`${r.name}-${i}`} className={r === myName ? 'nc-result__me' : ''}>
+                <span>{r.rank}등</span> {r.name}
+              </li>
+            ))}
+          </ol>
+        </>
+      )}
 
       <p className="nc-result__career">
         {pvp ? '친구 대전' : '봇 연습'} {t.games}판 · 우승 {t.wins}번

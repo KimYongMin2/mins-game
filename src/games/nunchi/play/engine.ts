@@ -2,6 +2,7 @@
 // 판: 3·2·1 → 외치기(누른 순서대로 1, 2, 3…) → 탈락자 보여주기 → 남은 사람끼리 다음 판.
 // 2명이 남으면 결승 가위바위보. 이기면 우승.
 import { type Rng, createRng, pickOne } from '../../../shared/random'
+import { type Team, lastTeam } from '../../../shared/team/teams'
 import { BOT_STYLES, CALL_MS, COLLIDE_MS, COUNTDOWN_MS, DONE_MS, RESULT_MS, RPS_PICK_MS, RPS_REVEAL_MS } from '../constants'
 
 /** user = 이 기기, bot = 봇, remote = 방에 들어온 친구 */
@@ -30,6 +31,8 @@ export type EngineState = {
   now: number
   seed: number
   players: Player[]
+  /** 팀전이면 사람마다 팀. 개인전이면 null */
+  teams: Team[] | null
   alive: boolean[]
   /** 판마다 탈락한 사람들 (같은 판이면 같은 등수) */
   out: number[][]
@@ -54,11 +57,12 @@ const within = (rng: Rng, [min, max]: readonly [number, number]) => min + rng.ne
 
 export const aliveIndexes = (s: { alive: boolean[] }) => s.alive.flatMap((a, i) => (a ? [i] : []))
 
-export function createEngine(opts: { now: number; seed: number; players: Player[] }): EngineState {
+export function createEngine(opts: { now: number; seed: number; players: Player[]; teams?: Team[] | null }): EngineState {
   return countdown({
     now: opts.now,
     seed: opts.seed,
     players: opts.players,
+    teams: opts.teams ?? null,
     alive: opts.players.map(() => true),
     out: [],
     round: 1,
@@ -69,6 +73,16 @@ export function createEngine(opts: { now: number; seed: number; players: Player[
   })
 }
 
+
+/** 끝났는지: 한 명 남음, 팀전이면 한 팀만 남음 (둘이 남았는데 다른 팀이면 결승 가위바위보) */
+function isOver(s: EngineState): boolean {
+  return aliveIndexes(s).length <= 1 || (!!s.teams && lastTeam(s.alive, s.teams) !== null)
+}
+
+/** 이긴 팀 (팀전이고 끝났을 때) */
+export function winnerTeam(s: EngineState): Team | null {
+  return s.teams ? lastTeam(s.alive, s.teams) : null
+}
 
 function countdown(s: EngineState): EngineState {
   return { ...s, presses: [], phase: { kind: 'countdown', until: s.now + COUNTDOWN_MS } }
@@ -131,7 +145,7 @@ function afterResult(s: EngineState): EngineState {
     ? { ...s, alive: s.alive.map((a, i) => a && !losers.includes(i)), out: [...s.out, losers] }
     : s
   const left = aliveIndexes(next).length
-  if (left <= 1) return { ...next, phase: { kind: 'done', until: s.now + DONE_MS } }
+  if (isOver(next)) return { ...next, phase: { kind: 'done', until: s.now + DONE_MS } }
   if (left === 2) return startRps({ ...next, round: next.round + 1 })
   return countdown({ ...next, round: next.round + 1 })
 }
@@ -196,7 +210,7 @@ function drop(s: EngineState, player: number): EngineState {
   if (!s.alive[player] || s.phase.kind === 'done') return s
   const next: EngineState = { ...s, alive: s.alive.map((a, i) => a && i !== player), out: [...s.out, [player]] }
   const left = aliveIndexes(next).length
-  if (left <= 1) return { ...next, phase: { kind: 'done', until: s.now + DONE_MS } }
+  if (isOver(next)) return { ...next, phase: { kind: 'done', until: s.now + DONE_MS } }
   // 결승이었거나 둘만 남았으면 남은 둘로 가위바위보, 아니면 이번 판 다시
   if (left === 2) return startRps(next)
   return s.phase.kind === 'call' ? countdown(next) : next

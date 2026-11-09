@@ -1,12 +1,17 @@
 // 화면에 그릴 것. 방장은 심판 상태에서 만들고, 친구는 방장이 보낸 것을 받는다 (시간은 '남은 ms'로 주고받음).
 // 그 위에서 각 기기가 효과음·남은 시간을 자기 시계로 계산한다 (screenReducer).
 import { COLLIDE_MS } from '../constants'
-import { type EngineState, type Hand, type OutReason, aliveIndexes, collidedOf, ranksOf } from './engine'
+import type { Team } from '../../../shared/team/teams'
+import { type EngineState, type Hand, type OutReason, aliveIndexes, collidedOf, ranksOf, winnerTeam } from './engine'
 
 export type PhaseKind = EngineState['phase']['kind']
 
 export type NunchiView = {
   players: { id: string; name: string }[]
+  /** 팀전이면 사람마다 팀 */
+  teams: Team[] | null
+  /** 팀전에서 끝났으면 이긴 팀 */
+  winTeam: Team | null
   alive: boolean[]
   round: number
   phase: PhaseKind
@@ -29,6 +34,8 @@ export function toView(s: EngineState): NunchiView {
   const collided = collidedOf(s.presses)
   return {
     players: s.players.map(({ id, name }) => ({ id, name })),
+    teams: s.teams,
+    winTeam: phase.kind === 'done' ? winnerTeam(s) : null,
     alive: s.alive,
     round: s.round,
     phase: phase.kind,

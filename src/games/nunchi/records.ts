@@ -1,3 +1,4 @@
+import type { TeamOutcome } from '../../shared/team/teams'
 import { type RecordStore, localRecordStore } from '../../shared/storage/records'
 
 const GAME_ID = 'nunchi'
@@ -22,6 +23,8 @@ export type GameSummary = {
   rank: number
   /** 등수 순으로 이름과 등수 (같은 판에 탈락하면 같은 등수) */
   ranking: { name: string; rank: number }[]
+  /** 팀전이면 팀 결과 (rank는 이기면 1, 지면 2) */
+  team?: TeamOutcome
 }
 
 export function addGame(record: NunchiRecord, summary: GameSummary): NunchiRecord {

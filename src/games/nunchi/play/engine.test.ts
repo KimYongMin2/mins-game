@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { CALL_MS, COLLIDE_MS, COUNTDOWN_MS, RESULT_MS, RPS_PICK_MS, RPS_REVEAL_MS } from '../constants'
-import { type EngineState, type Player, type PlayerKind, collidedOf, createEngine, engineReducer, ranksOf } from './engine'
+import { type EngineState, type Player, type PlayerKind, collidedOf, createEngine, engineReducer, ranksOf, winnerTeam } from './engine'
 
 const players = (...kinds: PlayerKind[]): Player[] => kinds.map((kind, i) => ({ id: `p${i}`, name: `사람${i}`, kind }))
 const at = (s: EngineState, now: number) => engineReducer(s, { type: 'tick', now })
@@ -143,5 +143,31 @@ describe('경기 전체', () => {
     s = engineReducer(s, { type: 'drop', player: 1 })
     expect(s.phase.kind).toBe('done')
     expect(ranksOf(s)[0]).toBe(1)
+  })
+})
+
+describe('팀전', () => {
+  it('봇끼리: 한 팀만 남으면 끝, 진 팀은 모두 탈락', () => {
+    for (let seed = 1; seed <= 20; seed++) {
+      const teams = [0, 1, 0, 1, 0, 1] as const
+      let s = createEngine({ now: 0, seed, players: players('bot', 'bot', 'bot', 'bot', 'bot', 'bot'), teams: [...teams] })
+      for (let now = 0; now < 600_000 && s.phase.kind !== 'done'; now += 16) s = at(s, now)
+      expect(s.phase.kind).toBe('done')
+      const w = winnerTeam(s)
+      expect(w).not.toBeNull()
+      teams.forEach((t, i) => expect(s.alive[i]).toBe(t === w ? s.alive[i] : false))
+      expect(s.alive.some(Boolean)).toBe(true)
+    }
+  })
+
+  it('같은 팀 둘만 남으면 결승 없이 끝', () => {
+    // 0·2(팀0), 1(팀1): 1이 시간 초과로 혼자 탈락
+    let s = at(createEngine({ now: 0, seed: 1, players: players('user', 'remote', 'remote'), teams: [0, 1, 0] }), T)
+    s = press(s, 0, T + 100)
+    s = press(s, 2, T + 1000)
+    s = at(s, T + CALL_MS + 10)
+    s = at(s, s.now + RESULT_MS)
+    expect(s.phase.kind).toBe('done')
+    expect(winnerTeam(s)).toBe(0)
   })
 })

@@ -1,4 +1,6 @@
 import { Person } from '../../../shared/art/Person'
+import { TEAM_COLORS } from '../../../shared/team/teams'
+import { TeamDot } from '../../../shared/ui/TeamResult'
 import type { Hand, OutReason } from '../play/engine'
 import { type ScreenState, myIndex } from '../play/view'
 
@@ -61,11 +63,13 @@ export function Table({ screen }: { screen: ScreenState }) {
             <Person
               className="nc-stick"
               shirt={i}
+              color={v.teams ? TEAM_COLORS[v.teams[i]] : undefined}
               out={out}
               pose={v.winner === i ? 'cheer' : press && !press.collided ? 'raise' : lost ? 'scared' : 'idle'}
               mood={out || lost ? 'ko' : v.winner === i || (press && !press.collided) ? 'happy' : 'calm'}
             />
             <span className="nc-seat__name">
+              {v.teams && <TeamDot team={v.teams[i]} />}
               {p.name}
               {i === me && ' (나)'}
             </span>
