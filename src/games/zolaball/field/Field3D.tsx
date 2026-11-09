@@ -447,13 +447,14 @@ export function Field3D(props: Props) {
         catcher.root.visible = false
       } else {
         fov = 44
-        camPos.set(22, 2.8, -9.2)
+        camPos.set(17, 2.6, -9.2)
         camLook.set(0, 1.5, -9.2)
       }
       lastView = view
       // 공 빛 테두리: 화면 크기 그대로라 망원(중계)에선 작게, 멀리 날아가는 타구는 크게
       const glow = view === 'broadcast' ? 0.03 : view === 'follow' ? 0.075 : 0.05
       halo.scale.setScalar(glow)
+      markSprite.scale.setScalar(view === 'broadcast' ? 0.022 : 0.04)
       trailSprites.forEach((sp, k) => sp.scale.setScalar(glow * (0.7 - k * 0.09)))
       if (camera.fov !== fov) {
         camera.fov = fov
