@@ -39,7 +39,7 @@ export const FALL_DAMAGE = 2
 
 /** 이동: 한 차례에 갈 수 있는 거리(연료), 빠르기(칸/초) */
 export const MOVE_MAX = 14
-export const MOVE_SPEED = 10
+export const MOVE_SPEED = 5
 
 /** 조준 범위 */
 export const ANGLE_MIN = 0
