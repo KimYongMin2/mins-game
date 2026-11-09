@@ -95,7 +95,7 @@ export function ArtilleryPage() {
   return (
     <main className="page sv-page">
       <header className="sv-header">
-        <h1 className="title">포격전</h1>
+        <h1 className="title">탱크 대전</h1>
         <SoundToggle />
         {inGame ? (
           <button

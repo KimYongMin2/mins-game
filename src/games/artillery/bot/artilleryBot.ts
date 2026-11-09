@@ -1,4 +1,4 @@
-// 포격전 봇: 바람·지형을 넣고 각도·힘을 여러 개 미리 쏴 보고(simulateShot) 가장 가까이 떨어지는 걸 고른 뒤,
+// 탱크 대전 봇: 바람·지형을 넣고 각도·힘을 여러 개 미리 쏴 보고(simulateShot) 가장 가까이 떨어지는 걸 고른 뒤,
 // 난이도만큼 손을 떨어 흔든다. 나한테 너무 가까이 떨어지는 건 피한다.
 import type { Rng } from "../../../shared/random";
 import { DAMAGE_R, POWER_MAX, POWER_MIN } from "../constants";

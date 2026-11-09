@@ -26,7 +26,7 @@ function playOut(s: EngineState, limitMs = 60 * 60_000): EngineState {
   return s;
 }
 
-describe("포격전 진행", () => {
+describe("탱크 대전 진행", () => {
   it("시작 안내 뒤 첫 차례, 사람마다 다른 자리, 체력 가득", () => {
     let s = createEngine({ now: 0, seed: 1, players: bots(3) });
     expect(s.phase.kind).toBe("countdown");

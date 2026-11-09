@@ -1,4 +1,4 @@
-// 포격전 심판. 방장 기기(또는 봇 연습)에서만 돈다. 시간(now)과 시드 난수를 상태에 담은 순수 리듀서.
+// 탱크 대전 심판. 방장 기기(또는 봇 연습)에서만 돈다. 시간(now)과 시드 난수를 상태에 담은 순수 리듀서.
 // 차례: 조준(움직이고 각도·힘 정하기, TURN_MS) → 발사(포탄이 날아감) → 터짐(땅 파임·피해) → 다음 사람. 한 명 남으면 끝.
 import { type Rng, createRng } from "../../../shared/random";
 import { type BotLevel, chooseBotAim } from "../bot/artilleryBot";

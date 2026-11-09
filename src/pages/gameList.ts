@@ -96,7 +96,7 @@ export const GAMES: GameEntry[] = [
   },
   {
     id: 'artillery',
-    title: '포격전',
+    title: '탱크 대전',
     description: '각도·힘·바람 계산해 포탄 발사',
     path: '/games/artillery',
     ready: true,

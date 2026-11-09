@@ -1,4 +1,4 @@
-// 포격전 수치. 길이는 화면 단위(가로 WORLD_W칸 = 맵 전체), 시간은 초(물리) / ms(화면).
+// 탱크 대전 수치. 길이는 화면 단위(가로 WORLD_W칸 = 맵 전체), 시간은 초(물리) / ms(화면).
 
 export const MIN_PLAYERS = 2;
 export const MAX_PLAYERS = 4;

@@ -1,4 +1,4 @@
-/* 포격전(artillery) 전용 스타일. 모든 클래스는 at- 접두사를 쓴다. */
+/* 탱크 대전(artillery) 전용 스타일. 모든 클래스는 at- 접두사를 쓴다. */
 .at-page {
   max-width: 560px;
 }
@@ -279,7 +279,7 @@
   margin: 8px auto 0;
 }
 
-/* ---- 포격전 경기 화면 ---- */
+/* ---- 탱크 대전 경기 화면 ---- */
 .at-chip--turn {
   border-color: var(--line);
   box-shadow: 0 0 0 2px #facc15;

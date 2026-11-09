@@ -1,7 +1,7 @@
 import { noise, tone } from "../../shared/audio/synth";
 import type { SoundName } from "./play/view";
 
-// 포격전 효과음 레시피. 모두 Web Audio로 합성한다.
+// 탱크 대전 효과음 레시피. 모두 Web Audio로 합성한다.
 
 const RECIPES: Record<SoundName, () => void> = {
   count: () => tone({ freq: 660, type: "square", duration: 0.1, gain: 0.06 }),

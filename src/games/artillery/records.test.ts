@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { EMPTY_RECORD, addGame } from "./records";
 
-describe("포격전 기록", () => {
+describe("탱크 대전 기록", () => {
   it("봇 연습은 난이도별, 친구 대전은 따로", () => {
     let r = addGame(EMPTY_RECORD, {
       mode: "bot",
