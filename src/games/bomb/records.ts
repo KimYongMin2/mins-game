@@ -1,3 +1,4 @@
+import type { TeamOutcome } from '../../shared/team/teams'
 import { type RecordStore, localRecordStore } from '../../shared/storage/records'
 
 const GAME_ID = 'bomb'
@@ -24,6 +25,8 @@ export type GameSummary = {
   names: string[]
   /** 내가 던진 횟수 */
   passes: number
+  /** 팀전이면 팀 결과 (rank는 이기면 1, 지면 2) */
+  team?: TeamOutcome
 }
 
 export function addGame(record: BombRecord, summary: GameSummary): BombRecord {

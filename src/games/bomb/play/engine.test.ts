@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { BOOM_MS, COUNTDOWN_MS, FLIGHT_MS, FUSE_MS, MIN_HOLD_MS } from '../constants'
-import { type EngineState, type Player, type PlayerKind, canPass, createEngine, engineReducer, neighborsOf, rankingOf } from './engine'
+import { type EngineState, type Player, type PlayerKind, canPass, createEngine, engineReducer, neighborsOf, rankingOf, winnerTeam } from './engine'
 
 const players = (...kinds: PlayerKind[]): Player[] => kinds.map((kind, i) => ({ id: `p${i}`, name: `사람${i}`, kind }))
 const at = (s: EngineState, now: number) => engineReducer(s, { type: 'tick', now })
@@ -116,5 +116,30 @@ describe('나감', () => {
     const s = engineReducer(playing(['user', 'remote']), { type: 'drop', player: 1 })
     expect(s.phase.kind).toBe('done')
     expect(rankingOf(s)[0]).toBe(0)
+  })
+})
+
+describe('팀전', () => {
+  it('한 팀만 남으면 끝나고 그 팀이 이긴다 (여러 명 남아도)', () => {
+    for (let seed = 1; seed <= 20; seed++) {
+      const teams = [0, 1, 0, 1, 0, 1] as const
+      let s = createEngine({ now: 0, seed, players: players('bot', 'bot', 'bot', 'bot', 'bot', 'bot'), teams: [...teams] })
+      for (let now = 0; now < 400_000 && s.phase.kind !== 'done'; now += 16) s = at(s, now)
+      expect(s.phase.kind).toBe('done')
+      const w = winnerTeam(s)
+      expect(w).not.toBeNull()
+      s.alive.forEach((a, i) => a && expect(teams[i]).toBe(w))
+      // 진 팀은 모두 탈락
+      teams.forEach((t, i) => t !== w && expect(s.alive[i]).toBe(false))
+    }
+  })
+
+  it('팀전 봇은 되도록 상대 팀에게 던진다', () => {
+    // 0(팀0) 양옆: 1(팀1), 3(팀0) → 늘 1에게
+    let s = createEngine({ now: 0, seed: 5, players: players('bot', 'bot', 'bot', 'bot'), teams: [0, 1, 1, 0] })
+    s = at(s, COUNTDOWN_MS)
+    s = { ...s, holder: 0, heldSince: s.now }
+    for (let now = s.now; now < s.now + 3000 && !s.flight; now += 16) s = at(s, now)
+    expect(s.flight?.to).toBe(1)
   })
 })

@@ -9,6 +9,8 @@ export type PersonMood = 'calm' | 'happy' | 'scared' | 'ko'
 type Props = {
   /** 셔츠 색 번호 (PERSON_SHIRTS) — 보통 자리 번호 */
   shirt: number
+  /** 셔츠 색을 직접 (팀전: 팀 색). 머리 모양은 그대로 shirt로 */
+  color?: string
   pose?: PersonPose
   mood?: PersonMood
   /** 탈락: 회색으로 */
@@ -94,8 +96,8 @@ function Face({ mood }: { mood: PersonMood }) {
   }
 }
 
-export function Person({ shirt, pose = 'idle', mood = 'calm', out = false, className }: Props) {
-  const color = out ? '#9ca3af' : PERSON_SHIRTS[shirt % PERSON_SHIRTS.length]
+export function Person({ shirt, color: teamColor, pose = 'idle', mood = 'calm', out = false, className }: Props) {
+  const color = out ? '#9ca3af' : (teamColor ?? PERSON_SHIRTS[shirt % PERSON_SHIRTS.length])
   const skin = out ? '#d1d5db' : TOON_SKIN
   const hair = out ? '#6b7280' : HAIR[shirt % HAIR.length]
   const [left, right] = ARMS[pose]

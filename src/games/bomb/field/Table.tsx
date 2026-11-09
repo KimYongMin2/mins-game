@@ -1,4 +1,6 @@
 import { Person } from '../../../shared/art/Person'
+import { TEAM_COLORS } from '../../../shared/team/teams'
+import { TeamDot } from '../../../shared/ui/TeamResult'
 import { neighborsOf } from '../play/engine'
 import { canThrowNow, myIndex, type ScreenState } from '../play/view'
 
@@ -96,11 +98,13 @@ export function Table({ screen, onPick }: Props) {
             <Person
               className="bm-stick"
               shirt={i}
+              color={v.teams ? TEAM_COLORS[v.teams[i]] : undefined}
               out={out}
               pose={holding ? 'hold' : v.victim === i ? 'scared' : 'idle'}
               mood={out || v.victim === i ? 'ko' : holding ? 'scared' : 'calm'}
             />
             <span className="bm-seat__name">
+              {v.teams && <TeamDot team={v.teams[i]} />}
               {p.name}
               {i === me && ' (나)'}
             </span>

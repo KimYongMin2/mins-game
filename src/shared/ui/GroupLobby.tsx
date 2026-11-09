@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { type ListedRoom, type Member, type Room, RoomError, channelCode, createRoom, joinRoom, makeRoomCode } from '../online/room'
+import { TEAM_COLORS, TEAM_NAMES, type Team, type TeamPick, assignTeams, teamsReady } from '../team/teams'
 import { RoomBadge, RoomPicker } from './RoomPicker'
 
 // 여럿이 하는 게임의 대기실: 열린 방 목록에서 고르거나 방 만들기(이름 · 전체 공개 / 비공개 코드) → 모인 사람 목록.
@@ -15,8 +16,10 @@ type Props<M> = {
   /** 이만큼 모여야 시작할 수 있다 (나 포함) */
   minPlayers: number
   onConnected: (room: Room<M>) => void
-  /** 방장이 시작함. 나 말고 방에 있는 사람들 (들어온 순서)과 채울 봇 수 */
-  onStart: (members: Member[], bots: number) => void
+  /** 팀전을 고를 수 있는 게임이면 true */
+  teams?: boolean
+  /** 방장이 시작함. 나 말고 방에 있는 사람들 (들어온 순서)과 채울 봇 수, 팀전이면 id(방장 id · 친구 id · 'bot0'…) → 팀 */
+  onStart: (members: Member[], bots: number, teams: TeamPick | null) => void
   /** 돌아가기 (연결된 방이 있으면 이미 닫은 뒤) */
   onBack: () => void
 }
@@ -33,11 +36,13 @@ const ERROR_TEXT: Record<RoomError['reason'], string> = {
   offline: '서버에 연결하지 못했어요. 인터넷 연결을 확인해 주세요',
 }
 
-export function GroupLobby<M>({ gameId, nickname, capacity, minPlayers, onConnected, onStart, onBack }: Props<M>) {
+export function GroupLobby<M>({ gameId, nickname, capacity, minPlayers, teams: canTeam = false, onConnected, onStart, onBack }: Props<M>) {
   const [view, setView] = useState<View>({ kind: 'menu' })
   const [room, setRoom] = useState<Room<M> | null>(null)
   const [members, setMembers] = useState<Member[]>([])
   const [botsWanted, setBotsWanted] = useState(0)
+  const [teamMode, setTeamMode] = useState(false)
+  const [pick, setPick] = useState<TeamPick>({})
   // 방에 들어가는 도중에 화면을 떠나면, 다 열린 방을 바로 닫는다
   const mountedRef = useRef(true)
   useEffect(() => {
@@ -98,6 +103,25 @@ export function GroupLobby<M>({ gameId, nickname, capacity, minPlayers, onConnec
     // 친구가 더 들어와 자리가 모자라면 봇을 그만큼 줄인다
     const bots = Math.min(botsWanted, capacity - members.length - 1)
     const count = members.length + 1 + bots
+    // 팀전: 자리 id 순서는 게임이 사람을 늘어놓는 순서와 같다 (방장 → 친구 → 봇)
+    const ids = [room.myId, ...members.map((m) => m.id), ...Array.from({ length: bots }, (_, i) => `bot${i}`)]
+    const teamOf = teamMode && isHost ? assignTeams(ids, pick) : null
+    const teamChip = (i: number) => {
+      if (!teamOf) return null
+      const t = teamOf[i]
+      return (
+        <button
+          type="button"
+          className="group-lobby__team"
+          style={{ background: TEAM_COLORS[t] }}
+          onClick={() => setPick({ ...Object.fromEntries(ids.map((id, k) => [id, teamOf[k]])), [ids[i]]: (1 - t) as Team })}
+          aria-label={`${TEAM_NAMES[t]} (눌러서 바꾸기)`}
+        >
+          {TEAM_NAMES[t]}
+        </button>
+      )
+    }
+    const ready = !teamOf || teamsReady(teamOf)
     return (
       <section className="pvp-lobby">
         <RoomBadge name={view.name} pin={view.pin} />
@@ -106,21 +130,39 @@ export function GroupLobby<M>({ gameId, nickname, capacity, minPlayers, onConnec
         </span>
         <ul className="group-lobby__members">
           <li className="group-lobby__member group-lobby__member--me">
-            {nickname} <span>(나{isHost ? ' · 방장' : ''})</span>
+            <span className="group-lobby__name">
+              {nickname} <span>(나{isHost ? ' · 방장' : ''})</span>
+            </span>
+            {teamChip(0)}
           </li>
-          {members.map((m) => (
+          {members.map((m, i) => (
             <li key={m.id} className="group-lobby__member">
-              {m.nickname} {m.role === 'host' && <span>(방장)</span>}
+              <span className="group-lobby__name">
+                {m.nickname} {m.role === 'host' && <span>(방장)</span>}
+              </span>
+              {teamChip(1 + i)}
             </li>
           ))}
           {Array.from({ length: bots }, (_, i) => (
             <li key={`bot${i}`} className="group-lobby__member group-lobby__member--bot">
-              봇 {i + 1}
+              <span className="group-lobby__name">봇 {i + 1}</span>
+              {teamChip(1 + members.length + i)}
             </li>
           ))}
         </ul>
         {isHost ? (
           <>
+            {canTeam && (
+              <div className="group-lobby__mode" role="group" aria-label="개인전 / 팀전">
+                <button type="button" className={`button button--small${teamMode ? '' : ' group-lobby__mode--on'}`} onClick={() => setTeamMode(false)}>
+                  개인전
+                </button>
+                <button type="button" className={`button button--small${teamMode ? ' group-lobby__mode--on' : ''}`} onClick={() => setTeamMode(true)}>
+                  팀전
+                </button>
+                {teamMode && <span className="group-lobby__mode-tip">팀 이름을 누르면 바뀌어요</span>}
+              </div>
+            )}
             <div className="group-lobby__bots" role="group" aria-label="봇 수">
               <span>빈자리에 봇</span>
               <button type="button" className="button button--small" disabled={bots <= 0} onClick={() => setBotsWanted(bots - 1)} aria-label="봇 빼기">
@@ -137,11 +179,15 @@ export function GroupLobby<M>({ gameId, nickname, capacity, minPlayers, onConnec
                 +
               </button>
             </div>
-            <button type="button" className="button button--primary pvp-lobby__big" disabled={count < minPlayers} onClick={() => {
+            <button type="button" className="button button--primary pvp-lobby__big" disabled={count < minPlayers || !ready} onClick={() => {
                 room.setPlaying(true)
-                onStart(members, bots)
+                onStart(members, bots, teamOf ? Object.fromEntries(ids.map((id, k) => [id, teamOf[k]])) : null)
               }}>
-              {count < minPlayers ? `${minPlayers}명부터 시작할 수 있어요` : `${count}명으로 시작${bots > 0 ? ` (봇 ${bots})` : ''}`}
+              {count < minPlayers
+                ? `${minPlayers}명부터 시작할 수 있어요`
+                : !ready
+                  ? '두 팀에 한 명 이상씩 있어야 해요'
+                  : `${count}명으로 ${teamOf ? '팀전 ' : ''}시작${bots > 0 ? ` (봇 ${bots})` : ''}`}
             </button>
           </>
         ) : (

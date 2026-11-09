@@ -2,6 +2,7 @@ import { useEffect, useReducer, useRef, useState } from 'react'
 import type { Member, Room } from '../../../shared/online/room'
 import { LinkBadge } from '../../../shared/ui/LinkBadge'
 import { randomSeed } from '../../../shared/random'
+import { TEAM_NAMES, type Team, type TeamPick, planTeams, teamOutcome } from '../../../shared/team/teams'
 import { loadNickname } from '../../../shared/storage/nickname'
 import { Table } from '../field/Table'
 import { type EngineAction, type EngineState, type Player, createEngine, engineReducer, neighborsOf } from '../play/engine'
@@ -15,7 +16,7 @@ import { playSound } from '../sounds'
 type Props =
   | { mode: 'bot'; bots: number; onFinish: (s: GameSummary) => void }
   /** 방장: 시작할 때 방에 있던 사람들로 경기 */
-  | { mode: 'host'; room: Room<BombMsg>; members: Member[]; bots: number; onFinish: (s: GameSummary) => void; onQuit: () => void }
+  | { mode: 'host'; room: Room<BombMsg>; members: Member[]; bots: number; teams: TeamPick | null; onFinish: (s: GameSummary) => void; onQuit: () => void }
   | { mode: 'guest'; room: Room<BombMsg>; onFinish: (s: GameSummary) => void; onQuit: () => void }
 
 /** 방장이 친구들에게 화면을 보내는 최소 간격 (바뀌면 바로, 안 바뀌어도 이만큼마다) */
@@ -51,15 +52,27 @@ function initHost(props: Props): HostState {
   } else {
     players = []
   }
-  const engine = createEngine({ now, seed: randomSeed(), players })
-  const myId = players[0]?.id ?? ''
+  // 팀전: 두 팀이 번갈아 앉게 자리를 다시 늘어놓는다
+  let teams: Team[] | null = null
+  if (props.mode === 'host' && props.teams) {
+    const plan = planTeams(players.map((p) => p.id), props.teams)
+    players = plan.order.map((i) => players[i])
+    teams = plan.teams
+  }
+  const engine = createEngine({ now, seed: randomSeed(), players, teams })
+  const myId = props.mode === 'bot' ? 'me' : props.mode === 'host' ? props.room.myId : ''
   return { engine, screen: screenReducer(createScreen(myId, now), { type: 'view', view: toView(engine) }) }
 }
 
 function summaryOf(screen: ScreenState, mode: GameSummary['mode'], passes: number): GameSummary {
   const v = screen.view!
   const me = myIndex(screen)
-  return { mode, rank: v.ranking.indexOf(me) + 1, names: v.ranking.map((i) => v.players[i].name), passes }
+  const names = v.ranking.map((i) => v.players[i].name)
+  if (v.teams) {
+    const team = teamOutcome(v.players.map((p) => p.name), v.teams, me, v.winner)
+    return { mode, rank: v.winner === v.teams[me] ? 1 : 2, names, passes, team }
+  }
+  return { mode, rank: v.ranking.indexOf(me) + 1, names, passes }
 }
 
 function Banner({ screen }: { screen: ScreenState }) {
@@ -79,6 +92,15 @@ function Banner({ screen }: { screen: ScreenState }) {
     return (
       <div className="bm-banner bm-banner--boom">
         <strong>{v.victim === me ? '내가 탈락!' : `${v.players[v.victim].name} 탈락!`}</strong>
+      </div>
+    )
+  }
+  if (v.phase === 'done' && v.teams && v.winner !== null) {
+    const won = v.winner === v.teams[me]
+    return (
+      <div className="bm-banner">
+        <strong className={won ? 'bm-banner__win' : ''}>{won ? '우리 팀 승리!' : `${TEAM_NAMES[v.winner]} 승리!`}</strong>
+        <span>결과 화면으로 넘어가요…</span>
       </div>
     )
   }

@@ -2,6 +2,7 @@
 // 판: 3·2·1 → 폭탄 돌리기(언제 터질지 모름) → 펑! 들고 있던 사람 탈락 → 남은 사람끼리 다음 판. 한 명 남으면 끝.
 // 폭탄은 바로 옆(왼쪽·오른쪽) 살아 있는 사람에게만 던질 수 있다 (처음엔 아무에게나였는데 바꿈).
 import { type Rng, createRng, pickOne } from '../../../shared/random'
+import { type Team, lastTeam, sameTeam } from '../../../shared/team/teams'
 import { BOOM_MS, BOT_HOLD_MS, COUNTDOWN_MS, DONE_MS, FLIGHT_MS, FUSE_MS, MIN_HOLD_MS } from '../constants'
 
 /** user = 이 기기, bot = 봇, remote = 방에 들어온 친구 */
@@ -21,6 +22,8 @@ export type EngineState = {
   now: number
   seed: number
   players: Player[]
+  /** 팀전이면 사람마다 팀 (자리는 두 팀이 번갈아 앉음). 개인전이면 null */
+  teams: Team[] | null
   alive: boolean[]
   /** 탈락한 순서 */
   out: number[]
@@ -46,11 +49,12 @@ export type EngineAction =
 
 const within = (rng: Rng, [min, max]: readonly [number, number]) => min + rng.next() * (max - min)
 
-export function createEngine(opts: { now: number; seed: number; players: Player[] }): EngineState {
+export function createEngine(opts: { now: number; seed: number; players: Player[]; teams?: Team[] | null }): EngineState {
   return countdown({
     now: opts.now,
     seed: opts.seed,
     players: opts.players,
+    teams: opts.teams ?? null,
     alive: opts.players.map(() => true),
     out: [],
     round: 1,
@@ -86,8 +90,19 @@ function explode(state: EngineState): EngineState {
   return { ...eliminate(state, victim), flight: null, botAt: null, phase: { kind: 'boom', victim, until: state.now + BOOM_MS } }
 }
 
+/** 끝났는지: 한 명 남음, 팀전이면 한 팀만 남음 */
+export function isOver(state: EngineState): boolean {
+  if (aliveIndexes(state).length <= 1) return true
+  return !!state.teams && lastTeam(state.alive, state.teams) !== null
+}
+
+/** 이긴 팀 (팀전이고 끝났을 때) */
+export function winnerTeam(state: EngineState): Team | null {
+  return state.teams ? lastTeam(state.alive, state.teams) : null
+}
+
 function afterBoom(state: EngineState): EngineState {
-  if (aliveIndexes(state).length <= 1) return { ...state, phase: { kind: 'done', until: state.now + DONE_MS } }
+  if (isOver(state)) return { ...state, phase: { kind: 'done', until: state.now + DONE_MS } }
   return countdown({ ...state, round: state.round + 1 })
 }
 
@@ -103,7 +118,10 @@ function botTurn(state: EngineState): EngineState {
   const rng = createRng(state.seed)
   if (state.botAt === null) return { ...state, seed: rng.seed(), botAt: state.now + within(rng, BOT_HOLD_MS) }
   if (state.now < state.botAt) return state
-  const to = pickOne(rng, neighborsOf(state.alive, holder) ?? [])
+  // 팀전이면 되도록 상대 팀 쪽으로
+  const side = neighborsOf(state.alive, holder) ?? []
+  const foes = side.filter((j) => !sameTeam(state.teams, holder, j))
+  const to = pickOne(rng, foes.length ? foes : side)
   return pass({ ...state, seed: rng.seed() }, holder, to)
 }
 
@@ -150,7 +168,7 @@ function drop(state: EngineState, player: number): EngineState {
   if (!state.alive[player] || state.phase.kind === 'done') return state
   let next = eliminate(state, player)
   const left = aliveIndexes(next)
-  if (left.length <= 1) return { ...next, flight: null, phase: { kind: 'done', until: state.now + DONE_MS } }
+  if (isOver(next)) return { ...next, flight: null, phase: { kind: 'done', until: state.now + DONE_MS } }
   // 나간 사람이 폭탄을 들고 있었거나 받는 중이었으면 남은 사람 중 아무에게나
   const involved = next.holder === player || next.flight?.to === player || next.flight?.from === player
   if (involved) {

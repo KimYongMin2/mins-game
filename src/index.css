@@ -418,6 +418,10 @@ a.game-card:hover {
 }
 
 .group-lobby__member {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
   padding: 8px 12px;
   border: 1.5px solid var(--muted-line);
   border-radius: 10px;
@@ -425,13 +429,42 @@ a.game-card:hover {
   text-align: left;
 }
 
-.group-lobby__member span {
+.group-lobby__name span {
   font-weight: 500;
   color: var(--ink-soft);
 }
 
 .group-lobby__member--me {
   border-color: var(--line);
+}
+
+.group-lobby__team {
+  flex: none;
+  padding: 4px 10px;
+  border: 2px solid var(--line);
+  border-radius: 999px;
+  font: inherit;
+  font-size: 0.8125rem;
+  font-weight: 800;
+  color: #fff;
+  cursor: pointer;
+}
+
+.group-lobby__mode {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.group-lobby__mode--on {
+  background: var(--line);
+  color: #fff;
+}
+
+.group-lobby__mode-tip {
+  font-size: 0.8125rem;
+  color: var(--ink-soft);
 }
 
 .group-lobby__member--bot {
@@ -611,4 +644,72 @@ a.game-card:hover {
   display: block;
   font-size: 0.75rem;
   word-break: break-all;
+}
+
+/* 팀전 결과 (shared/ui/TeamResult) */
+.team-result {
+  display: grid;
+  gap: 14px;
+  width: 100%;
+}
+
+.team-result__headline {
+  display: grid;
+  gap: 4px;
+  text-align: center;
+}
+
+.team-result__headline strong {
+  font-size: 2rem;
+  font-weight: 900;
+}
+
+.team-result__headline--win strong {
+  color: #16a34a;
+}
+
+.team-result__headline span {
+  color: var(--ink-soft);
+}
+
+.team-result__teams {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.team-result__team {
+  padding: 10px 12px;
+  border: 2.5px solid;
+  border-radius: 14px;
+  opacity: 0.75;
+}
+
+.team-result__team--win {
+  opacity: 1;
+  box-shadow: 0 3px 0 var(--line);
+}
+
+.team-result__team ul {
+  margin: 6px 0 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 4px;
+  font-weight: 700;
+}
+
+.team-result__me {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.team-dot {
+  display: inline-block;
+  width: 0.7em;
+  height: 0.7em;
+  margin-right: 0.25em;
+  border-radius: 50%;
+  border: 1.5px solid var(--line);
+  vertical-align: 0.05em;
 }

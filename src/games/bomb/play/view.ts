@@ -1,12 +1,17 @@
 // 화면에 그릴 것. 방장은 심판 상태에서 만들고, 친구는 방장이 보낸 것을 받는다 (시간은 '남은 ms'로 주고받음).
 // 그 위에서 각 기기가 날아가는 폭탄 위치·째깍 소리·효과음을 자기 시계로 계산한다 (screenReducer).
 import { FLIGHT_MS } from '../constants'
-import { type EngineState, holdLeft, rankingOf } from './engine'
+import type { Team } from '../../../shared/team/teams'
+import { type EngineState, holdLeft, rankingOf, winnerTeam } from './engine'
 
 export type PhaseKind = 'countdown' | 'play' | 'boom' | 'done'
 
 export type BombView = {
   players: { id: string; name: string }[]
+  /** 팀전이면 사람마다 팀 */
+  teams: Team[] | null
+  /** 팀전에서 끝났으면 이긴 팀 */
+  winner: Team | null
   alive: boolean[]
   holder: number
   /** 날아가는 중이면 던진 사람·받는 사람·도착까지 남은 시간 */
@@ -28,6 +33,8 @@ export function toView(s: EngineState): BombView {
   const { phase, now } = s
   return {
     players: s.players.map(({ id, name }) => ({ id, name })),
+    teams: s.teams,
+    winner: phase.kind === 'done' ? winnerTeam(s) : null,
     alive: s.alive,
     holder: s.holder,
     flight: s.flight ? { from: s.flight.from, to: s.flight.to, leftMs: Math.max(0, s.flight.landAt - now) } : null,

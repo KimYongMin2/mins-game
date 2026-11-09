@@ -1,3 +1,4 @@
+import { TeamResult } from '../../../shared/ui/TeamResult'
 import type { BombRecord, GameSummary } from '../records'
 
 type Props = {
@@ -17,20 +18,26 @@ export function ResultScreen({ summary, record, isHost, canRetry, onRetry, onMen
   const t = record[summary.mode]
   return (
     <section className="bm-result">
-      <div className={`bm-result__headline${summary.rank === 1 ? ' bm-result__headline--win' : ''}`}>
-        <strong>{summary.rank === 1 ? '우승!' : `${summary.rank}등`}</strong>
-        <span>
-          {summary.names.length}명 중 · {summary.passes}번 던짐
-        </span>
-      </div>
+      {summary.team ? (
+        <TeamResult outcome={summary.team} detail={`${summary.passes}번 던짐`} />
+      ) : (
+        <>
+          <div className={`bm-result__headline${summary.rank === 1 ? ' bm-result__headline--win' : ''}`}>
+            <strong>{summary.rank === 1 ? '우승!' : `${summary.rank}등`}</strong>
+            <span>
+              {summary.names.length}명 중 · {summary.passes}번 던짐
+            </span>
+          </div>
 
-      <ol className="bm-result__ranking">
-        {summary.names.map((name, i) => (
-          <li key={`${name}-${i}`} className={i + 1 === summary.rank ? 'bm-result__me' : ''}>
-            <span>{i + 1}등</span> {name}
-          </li>
-        ))}
-      </ol>
+          <ol className="bm-result__ranking">
+            {summary.names.map((name, i) => (
+              <li key={`${name}-${i}`} className={i + 1 === summary.rank ? 'bm-result__me' : ''}>
+                <span>{i + 1}등</span> {name}
+              </li>
+            ))}
+          </ol>
+        </>
+      )}
 
       <p className="bm-result__career">
         {pvp ? '친구 대전' : '봇 연습'} {t.games}판 · 우승 {t.wins}번
