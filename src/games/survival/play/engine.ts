@@ -174,7 +174,7 @@ function reveal(s: EngineState): EngineState {
 function afterReveal(s: EngineState): EngineState {
   const r = s.lastReveal
   if (!r) return s
-  const kills = r.voided ? s.kills : s.kills.map((k, i) => k + r.shots.filter((sh) => sh.from === i && sh.hit !== null && !sameTeam(s.teams, i, sh.hit)).length)
+  const kills = r.voided ? s.kills : s.kills.map((k, i) => k + r.shots.filter((sh) => sh.from === i && sh.hit !== null).length)
   const next: EngineState = r.dead.length
     ? { ...s, kills, alive: s.alive.map((a, i) => a && !r.dead.includes(i)), out: [...s.out, r.dead] }
     : { ...s, kills }

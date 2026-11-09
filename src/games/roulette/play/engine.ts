@@ -72,8 +72,8 @@ export function canTarget(s: Pick<EngineState, 'alive' | 'teams' | 'friendlyFire
   return !!s.alive[target] && (s.friendlyFire || !sameTeam(s.teams, player, target))
 }
 
-/** 봇·시간 초과가 고르는 사람들: 같은 팀 공격이 켜져 있어도 같은 팀은 빼고 (나는 됨) */
-const targetsOf = (s: EngineState, player: number) => aliveIndexes(s).filter((i) => s.alive[i] && !sameTeam(s.teams, player, i))
+/** 봇이 고르는 사람들: 같은 팀 공격이 켜져 있어도 같은 팀은 빼고 (나는 됨) */
+const botTargetsOf = (s: EngineState, player: number) => aliveIndexes(s).filter((i) => !sameTeam(s.teams, player, i))
 
 /** 끝났는지: 한 명 남음, 팀전이면 한 팀만 남음 */
 function isOver(s: EngineState): boolean {
@@ -117,7 +117,7 @@ function startTurn(s: EngineState, turn: number): EngineState {
   let next: EngineState = { ...s, turn, aimAt: null, bot: null, phase: { kind: 'aim', until: s.now + TURN_MS } }
   if (s.players[turn].kind === 'bot') {
     const rng = createRng(s.seed)
-    const target = chooseTarget(rng, turn, targetsOf(s, turn), s.pulls)
+    const target = chooseTarget(rng, turn, botTargetsOf(s, turn), s.pulls)
     const aimAt = s.now + within(rng, BOT_AIM_MS)
     next = { ...next, seed: rng.seed(), bot: { aimAt, pullAt: aimAt + within(rng, BOT_PULL_MS), target } }
   }
@@ -145,7 +145,7 @@ function afterFire(s: EngineState): EngineState {
     ...s,
     alive: s.alive.map((a, i) => a && i !== target),
     out: [...s.out, target],
-    kills: s.kills.map((k, i) => (i === shooter && shooter !== target && !sameTeam(s.teams, shooter, target) ? k + 1 : k)),
+    kills: s.kills.map((k, i) => (i === shooter && shooter !== target ? k + 1 : k)),
   }
   if (isOver(next)) return { ...next, aimAt: null, phase: { kind: 'done', until: s.now + DONE_MS } }
   // 남을 맞혔으면 쏜 사람이 계속, 자기를 쐈으면 다음 자리 (쏜 사람이 그새 나갔어도 다음 자리)
@@ -155,7 +155,8 @@ function afterFire(s: EngineState): EngineState {
 
 function timeout(s: EngineState): EngineState {
   const rng = createRng(s.seed)
-  const alive = targetsOf(s, s.turn)
+  // 시간 초과: 쏠 수 있는 사람 중 아무나 (같은 팀 공격이 켜져 있으면 같은 팀도)
+  const alive = aliveIndexes(s).filter((i) => canTarget(s, s.turn, i))
   const target = s.aimAt ?? alive[Math.floor(rng.next() * alive.length)]
   return pull({ ...s, seed: rng.seed() }, s.turn, target)
 }

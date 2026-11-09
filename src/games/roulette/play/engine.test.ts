@@ -134,3 +134,23 @@ describe('팀전 같은 팀 공격', () => {
     expect(engineReducer(s, { type: 'aim', player: t, target: mate }).aimAt).toBe(mate)
   })
 })
+
+describe('팀전 같은 팀 공격: 시간 초과', () => {
+  it('켜면 시간 초과 때 같은 팀도 걸릴 수 있고, 같은 팀을 죽여도 킬', () => {
+    const teams: (0 | 1)[] = [0, 1, 0, 1]
+    let mateShot = false
+    for (let seed = 1; seed <= 40 && !mateShot; seed++) {
+      let s = createEngine({ now: 0, seed, players: people(4), teams, friendlyFire: true })
+      s = engineReducer(s, { type: 'tick', now: INTRO_MS })
+      s = engineReducer(s, { type: 'tick', now: INTRO_MS + TURN_MS + 1 })
+      if (s.phase.kind === 'fire' && s.phase.fire.target !== s.phase.fire.shooter && teams[s.phase.fire.target] === teams[s.phase.fire.shooter]) {
+        mateShot = true
+        const shooter = s.phase.fire.shooter
+        s = { ...s, phase: { ...s.phase, fire: { ...s.phase.fire, bang: true } } }
+        s = engineReducer(s, { type: 'tick', now: s.phase.kind === 'fire' ? s.phase.until : 0 })
+        expect(s.kills[shooter]).toBe(1)
+      }
+    }
+    expect(mateShot).toBe(true)
+  })
+})

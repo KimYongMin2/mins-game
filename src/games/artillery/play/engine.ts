@@ -171,7 +171,7 @@ function land(s: EngineState, shot: Shot): EngineState {
     return { ...t, hp: blast.fell.includes(i) ? 0 : hp, alive: hp > 0 && !blast.fell.includes(i) }
   })
   const dead = tanks.flatMap((t, i) => (s.tanks[i].alive && !t.alive ? [i] : []))
-  const kills = s.kills.map((k, i) => (i === s.turn ? k + dead.filter((d) => d !== s.turn && !sameTeam(s.teams, s.turn, d)).length : k))
+  const kills = s.kills.map((k, i) => (i === s.turn ? k + dead.filter((d) => d !== s.turn).length : k))
   return {
     ...s,
     terrain: blast.terrain,
