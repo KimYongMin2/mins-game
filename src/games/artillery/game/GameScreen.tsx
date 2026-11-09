@@ -8,7 +8,7 @@ import { Battlefield } from '../field/Battlefield'
 import { type EngineAction, type EngineState, type Player, createEngine, engineReducer } from '../play/engine'
 import type { ArtilleryMsg } from '../play/pvp'
 import { type ArtilleryView, type ScreenAction, type ScreenState, canAim, chargePower, createScreen, fuelLeft, myIndex, screenReducer, toView, viewChanged } from '../play/view'
-import type { Vec } from '../rules/physics'
+import { type Vec, tankPose } from '../rules/physics'
 import type { GameSummary } from '../records'
 import { playSound } from '../sounds'
 
@@ -146,7 +146,11 @@ export function GameScreen(props: Props) {
       const dir = moveRef.current
       const s = screenRef.current
       if (chargeRef.current !== null && (!canAim(s) || s.phaseUntil - t < CHARGE_AUTO_FIRE_MS)) releaseRef.current()
-      if (dir !== 0 && s.draft) dispatchRef.current({ type: 'draft', x: s.draft.x + (dir * MOVE_SPEED * (t - last)) / 1000 })
+      if (dir !== 0 && s.draft && s.view) {
+        // 땅선을 따라 같은 빠르기로: 비탈이면 가로로는 덜 간다
+        const slope = Math.cos(tankPose(s.view.terrain, s.draft.x).tilt)
+        dispatchRef.current({ type: 'draft', x: s.draft.x + (dir * MOVE_SPEED * slope * (t - last)) / 1000 })
+      }
       last = t
       id = requestAnimationFrame(loop)
     })

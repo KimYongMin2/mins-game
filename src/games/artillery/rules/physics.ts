@@ -55,10 +55,21 @@ export function tankTilt(t: Terrain, x: number): number {
   return Math.max(-TILT_MAX, Math.min(TILT_MAX, a))
 }
 
-/** 대포 몸(포탑) 가운데: 땅에 닿은 곳에서 기운 방향으로 TANK_CY 위 */
-export const tankCenter = (t: Terrain, x: number): Vec => {
+/** 대포가 땅에 얹힌 모습: 기울기와, 바퀴 띠 밑면이 x 자리에서 있는 높이.
+ *  바퀴 띠(기운 직선)가 그 아래 땅 어디에도 파묻히지 않게 가장 높이 닿는 곳에 얹는다
+ *  (언덕 꼭대기에선 꼭대기에 올라타고, 골짜기에선 양쪽 가장자리에 걸침) */
+export function tankPose(t: Terrain, x: number): { y: number; tilt: number } {
   const tilt = tankTilt(t, x)
-  return { x: x - Math.sin(tilt) * TANK_CY, y: heightAt(t, x) + Math.cos(tilt) * TANK_CY }
+  const k = Math.tan(tilt)
+  let y = heightAt(t, x)
+  for (let dx = -TILT_SPAN; dx <= TILT_SPAN; dx += 0.5) y = Math.max(y, heightAt(t, x + dx) - dx * k)
+  return { y, tilt }
+}
+
+/** 대포 몸(포탑) 가운데: 땅에 얹힌 곳에서 기운 방향으로 TANK_CY 위 */
+export const tankCenter = (t: Terrain, x: number): Vec => {
+  const { y, tilt } = tankPose(t, x)
+  return { x: x - Math.sin(tilt) * TANK_CY, y: y + Math.cos(tilt) * TANK_CY }
 }
 
 /** 땅을 둥글게 판다 (원 아래쪽까지 깎임) */

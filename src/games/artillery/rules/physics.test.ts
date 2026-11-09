@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { createRng } from '../../../shared/random'
 import { COLS, CRATER_R, DAMAGE_R, MAX_DAMAGE, TANK_CY, TERRAIN_MAX, TERRAIN_MIN } from '../constants'
-import { blastDamage, carve, explode, heightAt, makeTerrain, simulateShot, tankCenter, tankTilt } from './physics'
+import { blastDamage, carve, explode, heightAt, makeTerrain, simulateShot, tankCenter, tankPose, tankTilt } from './physics'
 
 const flat = (h = 30) => Array.from({ length: COLS + 1 }, () => h)
 
@@ -97,5 +97,16 @@ describe('대포 기울기', () => {
     const tilt = tankTilt(up, 100)
     expect(tilt).toBeCloseTo(Math.atan(0.5), 5)
     expect(tankCenter(up, 100).x).toBeLessThan(100)
+  })
+})
+
+describe('대포가 땅에 얹힘', () => {
+  it('뾰족한 꼭대기에선 꼭대기에 올라타고, 파인 골짜기에선 가장자리에 걸쳐 파묻히지 않는다', () => {
+    const peak = Array.from({ length: COLS + 1 }, (_, i) => 60 - Math.abs(i - 100))
+    const p = tankPose(peak, 103)
+    // 바퀴 띠 밑면(기운 직선) 아래로 땅이 올라오지 않음
+    for (let dx = -5; dx <= 5; dx += 0.5) expect(heightAt(peak, 103 + dx)).toBeLessThanOrEqual(p.y + dx * Math.tan(p.tilt) + 1e-9)
+    const pit = Array.from({ length: COLS + 1 }, (_, i) => (Math.abs(i - 100) <= 2 ? 40 : 50))
+    expect(tankPose(pit, 100).y).toBe(50)
   })
 })

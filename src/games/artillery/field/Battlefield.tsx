@@ -1,7 +1,7 @@
 import { useMemo, useRef } from 'react'
 import { BARREL, CRATER_R, GRAVITY, MAX_SPEED, PLAYER_COLORS, STEP, TANK_CY, WORLD_H, WORLD_W } from '../constants'
 import { type ScreenState, canAim, myIndex } from '../play/view'
-import { type Terrain, type Vec, heightAt, muzzle, tankTilt } from '../rules/physics'
+import { type Terrain, type Vec, heightAt, muzzle, tankPose } from '../rules/physics'
 
 // 옆에서 본 전장 (SVG). 화면 좌표는 y가 아래로 커져서 WORLD_H - y로 뒤집어 그린다.
 // 만화풍: 굵은 외곽선, 색깔별 대포, 하늘·구름·풀 덮인 흙 언덕. 맞으면 폭발과 피해 숫자.
@@ -21,6 +21,8 @@ function terrainPath(t: Terrain): { fill: string; top: string } {
   const pts = t.map((h, x) => `${x},${sy(h).toFixed(1)}`)
   return { fill: `M0,${WORLD_H} L${pts.join(' L')} L${WORLD_W},${WORLD_H} Z`, top: `M${pts.join(' L')}` }
 }
+
+const poseOf = (p: { y: number; tilt: number }) => ({ ground: p.y, tilt: p.tilt })
 
 type TankDraw = { x: number; angle: number; hp: number; alive: boolean }
 
@@ -189,8 +191,7 @@ export function Battlefield({ screen, onPointer, pull }: Props) {
               key={v.players[i].id}
               t={t}
               color={PLAYER_COLORS[i % PLAYER_COLORS.length]}
-              ground={heightAt(v.terrain, t.x)}
-              tilt={tankTilt(v.terrain, t.x)}
+              {...poseOf(tankPose(v.terrain, t.x))}
               name={v.players[i].name}
               me={i === me}
               active={i === v.turn && (v.phase === 'aim' || v.phase === 'countdown')}
