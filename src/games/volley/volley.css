@@ -462,8 +462,8 @@
     display: grid;
     grid-template-columns: auto 1fr auto;
     grid-template-areas:
-      "hud hud hud"
-      "move view act";
+      'hud hud hud'
+      'move view act';
     align-items: center;
     gap: 6px 10px;
   }
