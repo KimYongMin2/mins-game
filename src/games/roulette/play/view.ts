@@ -3,11 +3,12 @@
 import { BANG_SHOW_MS, BLANK_SHOW_MS, SUSPENSE_MS } from '../constants'
 import type { Team } from '../../../shared/team/teams'
 import { type EngineState, type Fire, ranksOf, winnerTeam } from './engine'
+import type { AnimalKind } from '../../../shared/art3d/animalKinds'
 
 export type PhaseKind = EngineState['phase']['kind']
 
 export type RouletteView = {
-  players: { id: string; name: string }[]
+  players: { id: string; name: string; avatar?: AnimalKind }[]
   /** 팀전이면 사람마다 팀 */
   teams: Team[] | null
   /** 팀전에서 같은 팀도 쏠 수 있는지 */
@@ -30,7 +31,7 @@ export type RouletteView = {
 export function toView(s: EngineState): RouletteView {
   const { phase, now } = s
   return {
-    players: s.players.map(({ id, name }) => ({ id, name })),
+    players: s.players.map(({ id, name, avatar }) => ({ id, name, avatar })),
     teams: s.teams,
     friendlyFire: s.friendlyFire,
     winTeam: s.phase.kind === 'done' ? winnerTeam(s) : null,

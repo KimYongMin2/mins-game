@@ -718,3 +718,62 @@ a.game-card:hover {
   border: 1.5px solid var(--line);
   vertical-align: 0.05em;
 }
+
+/* 내 캐릭터 고르기 (shared/ui/AvatarPicker) */
+.avatar-pick {
+  display: grid;
+  gap: 10px;
+  margin: -12px 0 24px;
+}
+
+.avatar-pick__toggle {
+  justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.avatar-pick__emoji {
+  font-size: 1.25em;
+  line-height: 1;
+}
+
+.avatar-pick__panel {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  padding: 12px;
+  border: 1.5px solid var(--muted-line);
+  border-radius: 14px;
+}
+
+.avatar-pick__item {
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  padding: 8px 4px;
+  border: 2px solid var(--muted-line);
+  border-radius: 12px;
+  background: var(--paper);
+  color: var(--ink);
+  font: inherit;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.avatar-pick__item .avatar-pick__emoji {
+  font-size: 1.9rem;
+}
+
+.avatar-pick__item--on {
+  border-color: var(--line);
+  box-shadow: 0 3px 0 var(--line);
+}
+
+.avatar-pick__note {
+  grid-column: 1 / -1;
+  margin: 0;
+  font-size: 0.8125rem;
+  color: var(--ink-soft);
+}

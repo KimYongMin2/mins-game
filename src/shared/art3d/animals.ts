@@ -1,24 +1,11 @@
 import * as THREE from 'three'
+import type { AnimalKind } from './animalKinds'
 
 // 3D 동물 캐릭터 (three.js 기본 도형으로 만듦, 그림 파일 없음). 큰 머리 + 작은 몸의 귀여운 비율.
 // 몸통은 셔츠 색(팀전이면 팀 색), 얼굴은 동물마다 다르다. 표정(mood)과 자세(pose)를 바꿀 수 있다.
 // 단위: 키 약 2.6 (발 = y 0). 얼굴은 +z 쪽.
 
-export type AnimalKind = 'bear' | 'cat' | 'fox' | 'rabbit' | 'panda' | 'dog' | 'pig' | 'frog'
-
-/** 사람 번호마다 다른 동물이 되도록 이 순서로 나눠 준다 */
-export const ANIMALS: readonly AnimalKind[] = ['bear', 'cat', 'fox', 'rabbit', 'panda', 'dog', 'pig', 'frog']
-
-export const ANIMAL_NAMES: Record<AnimalKind, string> = {
-  bear: '곰',
-  cat: '고양이',
-  fox: '여우',
-  rabbit: '토끼',
-  panda: '판다',
-  dog: '강아지',
-  pig: '돼지',
-  frog: '개구리',
-}
+export { ANIMALS, ANIMAL_NAMES, type AnimalKind } from './animalKinds'
 
 export type Mood = 'calm' | 'happy' | 'scared' | 'ko'
 /** idle 가만히 · hold 두 손으로 앞에 듦 · scared 덜덜 · ko 뒤로 넘어감 · cheer 만세 */

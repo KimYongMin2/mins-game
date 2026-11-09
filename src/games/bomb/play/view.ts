@@ -3,11 +3,12 @@
 import { FLIGHT_MS } from '../constants'
 import type { Team } from '../../../shared/team/teams'
 import { type EngineState, holdLeft, rankingOf, winnerTeam } from './engine'
+import type { AnimalKind } from '../../../shared/art3d/animalKinds'
 
 export type PhaseKind = 'countdown' | 'play' | 'boom' | 'done'
 
 export type BombView = {
-  players: { id: string; name: string }[]
+  players: { id: string; name: string; avatar?: AnimalKind }[]
   /** 팀전이면 사람마다 팀 */
   teams: Team[] | null
   /** 팀전에서 끝났으면 이긴 팀 */
@@ -32,7 +33,7 @@ export type BombView = {
 export function toView(s: EngineState): BombView {
   const { phase, now } = s
   return {
-    players: s.players.map(({ id, name }) => ({ id, name })),
+    players: s.players.map(({ id, name, avatar }) => ({ id, name, avatar })),
     teams: s.teams,
     winner: phase.kind === 'done' ? winnerTeam(s) : null,
     alive: s.alive,

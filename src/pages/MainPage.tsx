@@ -1,5 +1,6 @@
 import { Link } from 'react-router'
 import { GAMES, type GameEntry } from './gameList'
+import { AvatarPicker } from '../shared/ui/AvatarPicker'
 
 /** 친구랑 할 수 있는 게임과 혼자 하는 게임을 나눠 보여준다 */
 const SECTIONS: { play: GameEntry['play']; title: string; note: string }[] = [
@@ -49,6 +50,7 @@ export function MainPage({ nickname }: Props) {
           닉네임 변경
         </Link>
       </header>
+      <AvatarPicker />
 
       {SECTIONS.map((section) => (
         <section key={section.play} className="game-section">

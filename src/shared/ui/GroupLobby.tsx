@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { type ListedRoom, type Member, type Room, RoomError, channelCode, createRoom, joinRoom, makeRoomCode } from '../online/room'
+import { loadAvatar } from '../storage/avatar'
 import { TEAM_COLORS, TEAM_NAMES, type Team, type TeamPick, assignTeams, teamsReady } from '../team/teams'
 import { RoomBadge, RoomPicker } from './RoomPicker'
 
@@ -80,7 +81,7 @@ export function GroupLobby<M>({ gameId, nickname, capacity, minPlayers, teams: c
     setView({ kind: 'busy', text: '방을 만드는 중…' })
     try {
       const id = makeRoomCode()
-      connected(await createRoom<M>(gameId, nickname, { capacity, code: channelCode(id, pin), listing: { id, name, locked: !!pin } }), name, pin)
+      connected(await createRoom<M>(gameId, nickname, { avatar: loadAvatar() ?? undefined, capacity, code: channelCode(id, pin), listing: { id, name, locked: !!pin } }), name, pin)
     } catch (e) {
       fail(e)
     }
@@ -89,7 +90,7 @@ export function GroupLobby<M>({ gameId, nickname, capacity, minPlayers, teams: c
   async function join(r: ListedRoom, pin: string | null) {
     setView({ kind: 'busy', text: '방에 들어가는 중…' })
     try {
-      connected(await joinRoom<M>(gameId, channelCode(r.id, pin), nickname, { capacity }), r.name, pin)
+      connected(await joinRoom<M>(gameId, channelCode(r.id, pin), nickname, { avatar: loadAvatar() ?? undefined, capacity }), r.name, pin)
     } catch (e) {
       fail(e, !!pin)
     }

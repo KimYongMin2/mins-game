@@ -12,7 +12,8 @@ export type RoomRole = 'host' | 'guest'
 export type Peer = { nickname: string }
 
 /** 방에 있는 사람 (나 빼고). id는 방 안에서만 쓰는 접속 번호 */
-export type Member = { id: string; nickname: string; role: RoomRole }
+/** avatar = 그 사람이 고른 캐릭터 (자기 신고라 쓰는 쪽에서 검사) */
+export type Member = { id: string; nickname: string; role: RoomRole; avatar?: string }
 
 /** 헷갈리는 글자(0·O·1·I·L)는 뺀다 */
 const CODE_CHARS = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'
@@ -34,7 +35,7 @@ export function normalizeCode(input: string): string | null {
   return [...code].every((c) => CODE_CHARS.includes(c)) ? code : null
 }
 
-type Meta = { role: RoomRole; nickname: string; /** 들어온 시각 (먼저 온 사람이 자리를 가진다) */ joinedAt: number }
+type Meta = { role: RoomRole; nickname: string; /** 들어온 시각 (먼저 온 사람이 자리를 가진다) */ joinedAt: number; avatar?: string }
 
 type Other = Meta & { key: string }
 
@@ -149,6 +150,8 @@ export type RoomOptions = {
   code?: string
   /** 방장: 그 게임 방 목록에 올린다 (이름·공개 여부). 방장이 나가면 목록에서 사라진다 */
   listing?: { id: string; name: string; locked: boolean }
+  /** 내가 고른 캐릭터 (친구들에게 사람 목록으로 알림) */
+  avatar?: string
   /** 테스트에서 방장·친구를 서로 다른 연결로 만들 때만 넘긴다 */
   client?: SupabaseClient
 }
@@ -199,7 +202,7 @@ async function open<M>(gameId: string, code: string, meta: Meta, { capacity = 2,
       peer = next
       for (const fn of peerFns) fn(peer)
     }
-    const nextMembers = others.map((o) => ({ id: o.key, nickname: o.nickname, role: o.role }))
+    const nextMembers = others.map((o) => ({ id: o.key, nickname: o.nickname, role: o.role, ...(typeof o.avatar === 'string' ? { avatar: o.avatar.slice(0, 16) } : {}) }))
     if (JSON.stringify(nextMembers) !== JSON.stringify(members)) {
       members = nextMembers
       for (const fn of memberFns) fn(members)
@@ -292,10 +295,10 @@ async function open<M>(gameId: string, code: string, meta: Meta, { capacity = 2,
 
 /** 새 방을 만든다 (방장) */
 export function createRoom<M>(gameId: string, nickname: string, opts: RoomOptions = {}): Promise<Room<M>> {
-  return open<M>(gameId, opts.code ?? makeRoomCode(), { role: 'host', nickname, joinedAt: Date.now() }, opts)
+  return open<M>(gameId, opts.code ?? makeRoomCode(), { role: 'host', nickname, joinedAt: Date.now(), ...(opts.avatar ? { avatar: opts.avatar } : {}) }, opts)
 }
 
 /** 코드로 친구 방에 들어간다. 정원은 방장과 같게 넘긴다 */
 export function joinRoom<M>(gameId: string, code: string, nickname: string, opts: RoomOptions = {}): Promise<Room<M>> {
-  return open<M>(gameId, code, { role: 'guest', nickname, joinedAt: Date.now() }, opts)
+  return open<M>(gameId, code, { role: 'guest', nickname, joinedAt: Date.now(), ...(opts.avatar ? { avatar: opts.avatar } : {}) }, opts)
 }
