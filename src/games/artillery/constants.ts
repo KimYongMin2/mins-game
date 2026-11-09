@@ -46,6 +46,8 @@ export const ANGLE_MIN = 0
 export const ANGLE_MAX = 180
 export const POWER_MIN = 5
 export const POWER_MAX = 100
+/** 힘 타이밍: [발사]를 누르고 있으면 힘이 0 → 100까지 이만큼 걸려 차오르고, 다시 내려갔다 올라간다. 떼는 순간의 힘으로 발사 */
+export const CHARGE_MS = 1400
 
 /** 시간 (ms): 시작 안내, 한 차례, 터진 뒤 보여주기, 끝 */
 export const COUNTDOWN_MS = 1500

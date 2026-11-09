@@ -7,7 +7,7 @@ import { MOVE_SPEED, PLAYER_COLORS, POWER_MAX, TURN_MS, WIND_MAX } from '../cons
 import { Battlefield } from '../field/Battlefield'
 import { type EngineAction, type EngineState, type Player, createEngine, engineReducer } from '../play/engine'
 import type { ArtilleryMsg } from '../play/pvp'
-import { type ArtilleryView, type ScreenAction, type ScreenState, canAim, createScreen, fuelLeft, myIndex, screenReducer, toView, viewChanged } from '../play/view'
+import { type ArtilleryView, type ScreenAction, type ScreenState, canAim, chargePower, createScreen, fuelLeft, myIndex, screenReducer, toView, viewChanged } from '../play/view'
 import type { Vec } from '../rules/physics'
 import type { GameSummary } from '../records'
 import { playSound } from '../sounds'
@@ -26,8 +26,8 @@ const SEND_MIN_MS = 100
 const HEARTBEAT_MS = 1000
 /** 친구가 겨누는 중인 걸 방장에게 보내는 간격 */
 const SEND_AIM_MS = 100
-/** 새총처럼 당길 때: 이만큼 당기면 힘 100 */
-const DRAG_FULL = 45
+/** 차례 시간이 이만큼 남았을 때 아직 힘을 모으는 중이면 그 힘으로 쏜다 */
+const CHARGE_AUTO_FIRE_MS = 60
 
 const BOT_NAMES = ['봇 철수', '봇 영희', '봇 민수']
 
@@ -134,6 +134,10 @@ export function GameScreen(props: Props) {
 
   // 움직이기: 누르고 있는 동안 (-1 왼쪽, 1 오른쪽)
   const moveRef = useRef(0)
+  // 힘 모으기: [발사]·스페이스를 누른 시각 (안 누르면 null). 떼면 그때 힘으로 발사
+  const chargeRef = useRef<number | null>(null)
+  const [chargeAt, setChargeAt] = useState<number | null>(null)
+  const releaseRef = useRef(() => {})
   useEffect(() => {
     let last = performance.now()
     let id = requestAnimationFrame(function loop(t) {
@@ -141,6 +145,7 @@ export function GameScreen(props: Props) {
       else hostDispatch({ type: 'tick', now: t })
       const dir = moveRef.current
       const s = screenRef.current
+      if (chargeRef.current !== null && (!canAim(s) || s.phaseUntil - t < CHARGE_AUTO_FIRE_MS)) releaseRef.current()
       if (dir !== 0 && s.draft) dispatchRef.current({ type: 'draft', x: s.draft.x + (dir * MOVE_SPEED * (t - last)) / 1000 })
       last = t
       id = requestAnimationFrame(loop)
@@ -229,7 +234,7 @@ export function GameScreen(props: Props) {
     finishRef.current(props.mode === 'bot' ? { ...summary, level: props.level } : summary)
   }, [done, hostGone, props])
 
-  // 새총처럼 겨누기: 처음 누른 곳에서 뒤로 당기면 그 반대쪽으로, 당긴 거리가 힘 (화면 어디서 당겨도 됨, 떼도 안 쏨 — [발사]를 눌러야)
+  // 새총처럼 겨누기: 처음 누른 곳에서 뒤로 당기면 그 반대쪽으로 (화면 어디서 당겨도 됨). 힘은 [발사]를 누르고 있다가 떼는 타이밍으로
   const [pull, setPull] = useState<{ from: Vec; to: Vec } | null>(null)
   function onPointer(kind: 'down' | 'move' | 'up', at: Vec) {
     const s = screenRef.current
@@ -248,11 +253,29 @@ export function GameScreen(props: Props) {
     if (Math.hypot(dx, dy) < 2) return
     let angle = (Math.atan2(dy, dx) * 180) / Math.PI
     if (angle < 0) angle = dx >= 0 ? 0 : 180
-    dispatch({ type: 'draft', angle, power: Math.min(POWER_MAX, (Math.hypot(dx, dy) / DRAG_FULL) * POWER_MAX) })
+    dispatch({ type: 'draft', angle })
   }
 
-  const fire = () => dispatch({ type: 'fire' })
-  // PC: ←→ 각도, ↑↓ 힘, A·D 이동(누르는 동안), 스페이스·Enter 발사
+  function startCharge() {
+    if (chargeRef.current !== null || !canAim(screenRef.current)) return
+    const t = performance.now()
+    chargeRef.current = t
+    setChargeAt(t)
+  }
+  function releaseCharge() {
+    const from = chargeRef.current
+    if (from === null) return
+    chargeRef.current = null
+    setChargeAt(null)
+    if (!canAim(screenRef.current)) return
+    dispatchRef.current({ type: 'draft', power: chargePower(performance.now() - from) })
+    dispatchRef.current({ type: 'fire' })
+  }
+  useEffect(() => {
+    releaseRef.current = releaseCharge
+  })
+
+  // PC: ←→ 각도(Shift는 5씩), A·D 이동(누르는 동안), 스페이스·Enter 누르고 있다가 떼면 발사
   useEffect(() => {
     function onKey(e: KeyboardEvent, down: boolean) {
       const s = screenRef.current
@@ -261,15 +284,17 @@ export function GameScreen(props: Props) {
         moveRef.current = down ? (e.code === 'KeyA' ? -1 : 1) : 0
         return
       }
+      if (e.code === 'Space' || e.code === 'Enter') {
+        e.preventDefault()
+        if (down && !e.repeat) startCharge()
+        if (!down) releaseRef.current()
+        return
+      }
       if (!down || !s.draft) return
       const step = e.shiftKey ? 5 : 1
       const keys: Record<string, () => void> = {
         ArrowLeft: () => dispatchRef.current({ type: 'draft', angle: s.draft!.angle + step }),
         ArrowRight: () => dispatchRef.current({ type: 'draft', angle: s.draft!.angle - step }),
-        ArrowUp: () => dispatchRef.current({ type: 'draft', power: s.draft!.power + step }),
-        ArrowDown: () => dispatchRef.current({ type: 'draft', power: s.draft!.power - step }),
-        Space: () => !e.repeat && dispatchRef.current({ type: 'fire' }),
-        Enter: () => !e.repeat && dispatchRef.current({ type: 'fire' }),
       }
       const fn = keys[e.code]
       if (!fn) return
@@ -278,7 +303,10 @@ export function GameScreen(props: Props) {
     }
     const down = (e: KeyboardEvent) => onKey(e, true)
     const up = (e: KeyboardEvent) => onKey(e, false)
-    const blur = () => (moveRef.current = 0)
+    const blur = () => {
+      moveRef.current = 0
+      releaseRef.current()
+    }
     window.addEventListener('keydown', down)
     window.addEventListener('keyup', up)
     window.addEventListener('blur', blur)
@@ -287,7 +315,7 @@ export function GameScreen(props: Props) {
       window.removeEventListener('keyup', up)
       window.removeEventListener('blur', blur)
     }
-  }, [])
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const v = screen.view
   const me = myIndex(screen)
@@ -295,6 +323,8 @@ export function GameScreen(props: Props) {
   const aiming = canAim(screen)
   const left = Math.max(0, screen.phaseUntil - screen.now)
   const d = screen.draft
+  const charging = chargeAt !== null
+  const power = charging ? chargePower(screen.now - chargeAt) : null
   const hold = (dir: number) => ({
     onPointerDown: (e: React.PointerEvent) => {
       e.preventDefault()
@@ -360,19 +390,33 @@ export function GameScreen(props: Props) {
                 ↻
               </button>
             </span>
-            <span className="at-tune">
-              힘
-              <button type="button" className="button button--small" onClick={() => dispatch({ type: 'draft', power: d.power - 1 })} aria-label="힘 빼기">
-                −
-              </button>
-              <b>{Math.round(d.power)}</b>
-              <button type="button" className="button button--small" onClick={() => dispatch({ type: 'draft', power: d.power + 1 })} aria-label="힘 더하기">
-                +
-              </button>
+            <span className="at-power" aria-label={`힘 ${power ?? Math.round(d.power)}`}>
+              <span className="at-power__label">힘</span>
+              <span className="at-power__bar">
+                <span className="at-power__fill" style={{ transform: `scaleX(${(power ?? 0) / POWER_MAX})` }} />
+                {/* 지난번에 쏜 힘 */}
+                <span className="at-power__last" style={{ left: `${(d.power / POWER_MAX) * 100}%` }} />
+              </span>
+              <b>{power ?? Math.round(d.power)}</b>
             </span>
           </div>
-          <button type="button" className="button button--primary at-fire" onClick={fire}>
-            발사!
+          <button
+            type="button"
+            className={`button button--primary at-fire${charging ? ' at-fire--charging' : ''}`}
+            onPointerDown={(e) => {
+              e.preventDefault()
+              try {
+                ;(e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId)
+              } catch {
+                // 이미 뗀 손가락이면 무시
+              }
+              startCharge()
+            }}
+            onPointerUp={releaseCharge}
+            onPointerCancel={releaseCharge}
+            onContextMenu={(e) => e.preventDefault()}
+          >
+            {charging ? '떼면 발사!' : '꾹 눌러 힘 모으기'}
           </button>
         </div>
       ) : (
@@ -380,7 +424,7 @@ export function GameScreen(props: Props) {
           {me >= 0 && v && !v.tanks[me].alive ? '탈락 · 구경 중' : v && me < 0 ? '이미 시작한 판이라 구경해요' : screen.fired ? '발사!' : '내 차례를 기다리는 중'}
         </p>
       )}
-      <p className="at-hint">전장을 새총처럼 뒤로 당겨 겨누기(반대쪽으로 날아감, 당긴 만큼 힘) · 떼도 안 쏴요, [발사!]를 눌러야 · PC: ←→ 각도 · ↑↓ 힘(Shift는 5씩) · A·D 이동 · 스페이스 발사</p>
+      <p className="at-hint">전장을 새총처럼 뒤로 당겨 각도 맞추기(반대쪽으로 날아감) · 아래 버튼을 꾹 누르면 힘이 오르내려요, 원하는 힘에서 떼면 발사 (노란 줄 = 지난번 힘) · PC: ←→ 각도(Shift는 5씩) · A·D 이동 · 스페이스 꾹 → 떼면 발사</p>
 
       {hostGone && props.mode === 'guest' && (
         <div className="pvp-gone" role="alert">

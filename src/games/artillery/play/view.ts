@@ -1,6 +1,6 @@
 // 화면에 그릴 것. 방장은 심판 상태에서 만들고, 친구는 방장이 보낸 것을 받는다 (시간은 '남은 ms'로 주고받음).
 // 내 차례에 겨누는 것(draft)은 각 기기가 들고 있다가 심판에게 보낸다 (내 화면엔 바로 보이게).
-import { ANGLE_MAX, ANGLE_MIN, MOVE_MAX, POWER_MAX, POWER_MIN, STEP, WORLD_W } from '../constants'
+import { ANGLE_MAX, ANGLE_MIN, CHARGE_MS, MOVE_MAX, POWER_MAX, POWER_MIN, STEP, WORLD_W } from '../constants'
 import type { Shot, Terrain } from '../rules/physics'
 import { type Boom, type EngineState, ranksOf } from './engine'
 
@@ -161,4 +161,10 @@ export function fuelLeft(s: ScreenState): number {
   const v = s.view
   if (!v || v.startX === null || !s.draft) return 0
   return Math.max(0, 1 - Math.abs(s.draft.x - v.startX) / MOVE_MAX)
+}
+
+/** 힘 타이밍: 누른 지 elapsed ms일 때 힘 (0 → 100 → 0 … 왔다 갔다) */
+export function chargePower(elapsed: number): number {
+  const p = (Math.max(0, elapsed) % (2 * CHARGE_MS)) / CHARGE_MS
+  return Math.max(POWER_MIN, Math.round((p <= 1 ? p : 2 - p) * POWER_MAX))
 }

@@ -401,4 +401,57 @@
 .at-fire {
   min-height: 56px;
   font-size: 1.25rem;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+
+.at-fire--charging {
+  filter: brightness(0.9);
+  transform: scale(0.98);
+}
+
+.at-power {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+  font-size: 0.875rem;
+  color: var(--ink-soft);
+}
+
+.at-power b {
+  min-width: 2em;
+  text-align: right;
+  font-size: 1.0625rem;
+  color: var(--ink);
+}
+
+.at-power__bar {
+  position: relative;
+  flex: 1;
+  height: 14px;
+  border: 1.5px solid var(--line);
+  border-radius: 999px;
+  overflow: hidden;
+  background: #fff;
+}
+
+.at-power__fill {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, #22c55e, #f59e0b 60%, #ef4444);
+  transform-origin: left;
+}
+
+.at-power__last {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  margin-left: -1.5px;
+  background: #facc15;
+  box-shadow: 0 0 0 1px var(--line);
 }
