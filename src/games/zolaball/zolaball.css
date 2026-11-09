@@ -836,3 +836,23 @@
   font-weight: 500;
   color: var(--ink-soft);
 }
+
+/* 3D 야구장 (field/Field3D) */
+.zb-field3d {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  background: #8fc3e8;
+}
+
+.zb-field3d canvas {
+  display: block;
+}
+
+.zb-view-toggle {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  z-index: 2;
+  background: rgb(255 255 255 / 0.9);
+}

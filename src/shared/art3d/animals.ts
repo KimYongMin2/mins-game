@@ -45,6 +45,10 @@ export type AnimalRig = {
   handsAt: THREE.Vector3
   /** 머리 (이름표를 붙일 곳) */
   head: THREE.Object3D
+  /** 몸 전체(다리 위)·팔 — 게임이 직접 움직일 때 (야구 스윙·투구). update 뒤에 바꾸면 그 프레임엔 그 값 */
+  body: THREE.Group
+  armL: THREE.Group
+  armR: THREE.Group
   dispose: () => void
 }
 
@@ -814,5 +818,5 @@ export function makeAnimal(lookIn: Look, shirt: string, opts: { team?: boolean }
     cheekM.dispose()
   }
 
-  return { root, kind, update, setOut, handsAt, head, dispose }
+  return { root, kind, update, setOut, handsAt, head, body: bodyG, armL, armR, dispose }
 }
