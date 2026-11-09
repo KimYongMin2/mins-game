@@ -16,10 +16,11 @@ describe('동물 정하기', () => {
 describe('꾸미기', () => {
   it('글자로 바꿨다가 되돌리면 같다, 이상한 값은 없음으로', async () => {
     const { decodeLook, encodeLook, assignLooks } = await import('./animalKinds')
-    const l = { animal: 'fox', hat: 'crown', glasses: 'sun', neck: 'bow', fur: 'dark' } as const
+    const l = { animal: 'tiger', hat: 'crown', glasses: 'sun', neck: 'bow', fur: 'dark', outfit: 'uniform', tint: 'navy', number: 27 } as const
     expect(decodeLook(encodeLook(l))).toEqual(l)
-    expect(decodeLook('cat.hacker.x.y.z')).toEqual({ animal: 'cat', hat: 'none', glasses: 'none', neck: 'none', fur: 'base' })
+    expect(decodeLook('cat.hacker.x.y.z')).toEqual({ animal: 'cat', hat: 'none', glasses: 'none', neck: 'none', fur: 'base', outfit: 'shirt', tint: 'red', number: 7 })
+    expect(decodeLook('cat.none.none.none.base.uniform.red.500')?.number).toBe(99)
     expect(decodeLook('dragon.cap')).toBeUndefined()
-    expect(assignLooks([l, undefined]).map((x) => x.animal)).toEqual(['fox', 'bear'])
+    expect(assignLooks([l, undefined]).map((x) => x.animal)).toEqual(['tiger', 'bear'])
   })
 })

@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
 import * as THREE from 'three'
+import { encodeLook } from '../art3d/animalKinds'
 import { type Look, makeAnimal } from '../art3d/animals'
 import { createStage } from '../art3d/stage'
 
@@ -7,7 +8,7 @@ import { createStage } from '../art3d/stage'
 
 export function AvatarPreview3D({ look, shirt = '#2563eb' }: { look: Look; shirt?: string }) {
   const hostRef = useRef<HTMLDivElement>(null)
-  const key = `${look.animal}.${look.hat}.${look.glasses}.${look.neck}.${look.fur}`
+  const key = encodeLook(look)
 
   useEffect(() => {
     const host = hostRef.current
@@ -31,7 +32,8 @@ export function AvatarPreview3D({ look, shirt = '#2563eb' }: { look: Look; shirt
     const t0 = performance.now()
     function frame(now: number) {
       const t = (now - t0) / 1000
-      rig.root.rotation.y = reduce ? 0.4 : Math.sin(t * 0.7) * 0.9
+      // 한 바퀴씩 돌아 등번호도 보이게
+      rig.root.rotation.y = reduce ? 0.4 : t * 0.6
       rig.update(t, 'idle', 'happy')
       stage.render()
       raf = requestAnimationFrame(frame)

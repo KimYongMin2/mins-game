@@ -88,7 +88,7 @@ export function Table3D({ screen, onPick }: Props) {
     const seatOf = (i: number) => (me < 0 ? i : (i - me + n) % n)
     const rigs: AnimalRig[] = first.players.map((_, i) => {
       const shirt = first.teams ? TEAM_COLORS[first.teams[i]] : PERSON_SHIRTS[i % PERSON_SHIRTS.length]
-      const rig = makeAnimal(first.players[i].avatar ?? plainLook(ANIMALS[i % ANIMALS.length]), shirt)
+      const rig = makeAnimal(first.players[i].avatar ?? plainLook(ANIMALS[i % ANIMALS.length]), shirt, { team: !!first.teams })
       rig.root.position.copy(room.seatPos(seatOf(i)))
       rig.root.lookAt(0, 0, 0)
       rig.root.traverse((o) => (o.userData.player = i))

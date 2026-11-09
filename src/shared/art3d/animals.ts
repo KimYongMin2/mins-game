@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import type { AnimalKind, Fur, Look } from './animalKinds'
+import { type AnimalKind, type Fur, type Look, TINT_HEX } from './animalKinds'
 
 // 3D 동물 캐릭터 (three.js 기본 도형으로 만듦, 그림 파일 없음). 큰 머리 + 작은 몸의 귀여운 비율.
 // 몸통은 셔츠 색(팀전이면 팀 색), 얼굴은 동물마다 다르다. 표정(mood)과 자세(pose)를 바꿀 수 있다.
@@ -22,6 +22,14 @@ const LOOKS: Record<AnimalKind, Palette> = {
   dog: { fur: '#e2b57a', light: '#fbecd6', ear: '#8a5a30', nose: '#2a1a12' },
   pig: { fur: '#f6b1b8', light: '#ffd3d8', ear: '#ee95a0', nose: '#d97683' },
   frog: { fur: '#6cc04a', light: '#d9f2b8', ear: '#6cc04a', nose: '#2d5e1e' },
+  tiger: { fur: '#f08c28', light: '#fff4e6', ear: '#2b2b2b', nose: '#2a1a12' },
+  lion: { fur: '#e8a33d', light: '#fbe3b4', ear: '#9c4f14', nose: '#4a2a1a' },
+  eagle: { fur: '#f8f9fa', light: '#ffffff', ear: '#6b3e1e', nose: '#f2b705' },
+  seagull: { fur: '#fbfbfb', light: '#ffffff', ear: '#adb5bd', nose: '#f59f00' },
+  penguin: { fur: '#23272d', light: '#ffffff', ear: '#23272d', nose: '#f59f00' },
+  dino: { fur: '#3fae8c', light: '#c3f0dc', ear: '#f08c00', nose: '#1d5c48' },
+  wolf: { fur: '#8d939b', light: '#eef0f2', ear: '#4b5058', nose: '#1f2226' },
+  elephant: { fur: '#9aa5b1', light: '#c5ccd4', ear: '#f3b6c2', nose: '#7d8894' },
 }
 
 const GREY = new THREE.Color('#9ca3af')
@@ -46,7 +54,26 @@ function shade(color: string, fur: Fur): string {
   return '#' + new THREE.Color(color).lerp(new THREE.Color(fur === 'light' ? '#ffffff' : '#000000'), fur === 'light' ? 0.4 : 0.35).getHexString()
 }
 
-export function makeAnimal(lookIn: Look, shirt: string): AnimalRig {
+/** 등번호 그림 (캔버스) */
+function numberTexture(n: number, color: string): THREE.CanvasTexture {
+  const c = document.createElement('canvas')
+  c.width = c.height = 128
+  const g = c.getContext('2d')!
+  g.font = '900 96px system-ui, sans-serif'
+  g.textAlign = 'center'
+  g.textBaseline = 'middle'
+  g.lineWidth = 8
+  g.strokeStyle = 'rgba(0,0,0,0.25)'
+  g.strokeText(String(n), 64, 70)
+  g.fillStyle = color
+  g.fillText(String(n), 64, 70)
+  const t = new THREE.CanvasTexture(c)
+  t.colorSpace = THREE.SRGBColorSpace
+  return t
+}
+
+/** shirt = 자리 색, opts.team = 팀전이라 shirt가 팀 색 (유니폼도 팀 색 바탕으로) */
+export function makeAnimal(lookIn: Look, shirt: string, opts: { team?: boolean } = {}): AnimalRig {
   const kind: AnimalKind = lookIn.animal
   const base = LOOKS[kind]
   const look = { ...base, fur: shade(base.fur, lookIn.fur), light: shade(base.light, lookIn.fur === 'dark' ? 'base' : lookIn.fur) }
@@ -60,11 +87,16 @@ export function makeAnimal(lookIn: Look, shirt: string): AnimalRig {
   const lightM = mat(look.light, 0.85)
   const earM = mat(look.ear, 0.8)
   const noseM = mat(look.nose, 0.35)
-  const shirtM = mat(shirt, 0.55)
+  // 야구 유니폼: 흰 바탕(팀전이면 팀 색) + 내 색 소매·깃·단추줄·등번호
+  const uniform = lookIn.outfit === 'uniform'
+  const tint = TINT_HEX[lookIn.tint]
+  const shirtM = mat(uniform ? (opts.team ? shirt : '#f4f4f1') : shirt, 0.55)
+  const sleeveM = uniform ? mat(tint, 0.5) : shirtM
   const eyeM = mat('#14161b', 0.15)
   const whiteM = mat('#ffffff', 0.3)
   const cheekM = new THREE.MeshStandardMaterial({ color: '#ff8f9a', roughness: 0.9, transparent: true, opacity: 0.55 })
 
+  const extraDispose: (() => void)[] = []
   const mesh = (g: THREE.BufferGeometry, m: THREE.Material, x = 0, y = 0, z = 0) => {
     const o = new THREE.Mesh(g, m)
     o.position.set(x, y, z)
@@ -87,7 +119,7 @@ export function makeAnimal(lookIn: Look, shirt: string): AnimalRig {
   const arm = (side: 1 | -1) => {
     const pivot = new THREE.Group()
     pivot.position.set(side * 0.46, 1.48, 0)
-    const sleeve = mesh(new THREE.CapsuleGeometry(0.12, 0.32, 6, 12), shirtM, 0, -0.24, 0)
+    const sleeve = mesh(new THREE.CapsuleGeometry(0.12, 0.32, 6, 12), sleeveM, 0, -0.24, 0)
     const hand = mesh(new THREE.SphereGeometry(0.13, 16, 12), furM, 0, -0.5, 0)
     pivot.add(sleeve, hand)
     bodyG.add(pivot)
@@ -261,6 +293,158 @@ export function makeAnimal(lookIn: Look, shirt: string): AnimalRig {
       smile.position.set(0, -0.12, 0.46)
       for (const s of [-1, 1]) head.add(mesh(new THREE.SphereGeometry(0.02, 6, 6), eyeM, s * 0.06, 0.02, 0.5))
       break
+    case 'tiger': {
+      const stripe = mat('#2b2b2b', 0.8)
+      for (const s of [-1, 1]) {
+        head.add(mesh(new THREE.SphereGeometry(0.16, 16, 12), furM, s * 0.34, 0.4, -0.02))
+        head.add(mesh(new THREE.SphereGeometry(0.08, 12, 10), stripe, s * 0.34, 0.41, 0.08))
+      }
+      // 이마·볼 줄무늬: 머리 겉면에 붙인 얇은 막대
+      for (const [x, y, len, rot] of [
+        [-0.12, 0.34, 0.16, 0],
+        [0, 0.38, 0.2, 0],
+        [0.12, 0.34, 0.16, 0],
+        [-0.42, 0.06, 0.18, 1.3],
+        [-0.44, -0.08, 0.16, 1.4],
+        [0.42, 0.06, 0.18, -1.3],
+        [0.44, -0.08, 0.16, -1.4],
+      ] as const) {
+        const z = Math.sqrt(Math.max(0, 0.52 * 0.52 - x * x - y * y)) * 0.95
+        const m = mesh(new THREE.BoxGeometry(0.045, len, 0.03), stripe, x, y, z)
+        m.lookAt(new THREE.Vector3(x, y, z).multiplyScalar(2))
+        m.rotateZ(rot)
+        head.add(m)
+      }
+      snout(lightM)
+      for (const s of [-1, 1]) {
+        const c = mesh(new THREE.SphereGeometry(0.16, 14, 10), lightM, s * 0.22, -0.16, 0.34)
+        c.scale.set(1, 0.7, 0.6)
+        head.add(c)
+      }
+      nose(-0.04, 0.55)
+      smile.position.set(0, -0.2, 0.5)
+      break
+    }
+    case 'lion': {
+      // 갈기: 머리 뒤로 둥글게 털뭉치
+      const mane = mat(look.ear, 0.95)
+      for (let k = 0; k < 14; k++) {
+        const a = (k / 14) * Math.PI * 2
+        head.add(mesh(new THREE.SphereGeometry(0.2, 12, 10), mane, Math.cos(a) * 0.5, Math.sin(a) * 0.48 + 0.02, -0.12))
+      }
+      for (const s of [-1, 1]) head.add(mesh(new THREE.SphereGeometry(0.12, 12, 10), furM, s * 0.32, 0.38, 0.05))
+      snout(lightM)
+      nose(-0.04, 0.55)
+      smile.position.set(0, -0.2, 0.5)
+      break
+    }
+    case 'eagle': {
+      const beak = mesh(new THREE.ConeGeometry(0.13, 0.34, 16), noseM, 0, -0.06, 0.6)
+      beak.rotation.x = Math.PI / 2 + 0.35
+      const tip = mesh(new THREE.SphereGeometry(0.05, 10, 8), noseM, 0, -0.17, 0.72)
+      head.add(beak, tip)
+      // 매서운 눈썹
+      for (const s of [-1, 1]) {
+        const brow = mesh(new THREE.BoxGeometry(0.17, 0.04, 0.04), earM, s * eyeX, eyeY + 0.12, eyeZ + 0.01)
+        brow.rotation.z = s * -0.35
+        head.add(brow)
+      }
+      smile.visible = false
+      break
+    }
+    case 'seagull': {
+      const beak = mesh(new THREE.ConeGeometry(0.08, 0.42, 14), noseM, 0, -0.08, 0.66)
+      beak.rotation.x = Math.PI / 2
+      beak.scale.set(1, 1, 0.6)
+      head.add(beak, mesh(new THREE.SphereGeometry(0.03, 8, 6), mat('#e03131', 0.4), 0, -0.12, 0.78))
+      // 머리 뒤 회색 깃
+      const back = mesh(new THREE.SphereGeometry(0.4, 20, 14), earM, 0, 0.08, -0.22)
+      back.scale.set(1.1, 0.9, 0.8)
+      head.add(back)
+      smile.visible = false
+      break
+    }
+    case 'penguin': {
+      const face = mesh(new THREE.SphereGeometry(0.42, 24, 18), lightM, 0, -0.05, 0.2)
+      face.scale.set(0.92, 0.85, 0.72)
+      head.add(face)
+      const beak = mesh(new THREE.ConeGeometry(0.08, 0.2, 12), noseM, 0, -0.08, 0.56)
+      beak.rotation.x = Math.PI / 2
+      head.add(beak)
+      smile.visible = false
+      break
+    }
+    case 'dino': {
+      // 길쭉한 주둥이 + 머리 뒤 등뼈
+      const muzzle = mesh(new THREE.SphereGeometry(0.3, 20, 14), furM, 0, -0.12, 0.34)
+      muzzle.scale.set(1.15, 0.75, 1)
+      head.add(muzzle)
+      for (const s of [-1, 1]) head.add(mesh(new THREE.SphereGeometry(0.025, 8, 6), noseM, s * 0.08, -0.06, 0.63))
+      for (let k = 0; k < 4; k++) {
+        const sp = mesh(new THREE.ConeGeometry(0.08 - k * 0.008, 0.2, 8), earM, 0, 0.46 - k * 0.12, -0.1 - k * 0.14)
+        sp.rotation.x = -0.5 - k * 0.3
+        head.add(sp)
+      }
+      smile.position.set(0, -0.22, 0.6)
+      smile.scale.set(1.6, 1, 1)
+      open.position.set(0, -0.24, 0.6)
+      break
+    }
+    case 'wolf':
+      for (const s of [-1, 1]) {
+        cone(furM, 0.15, 0.36, s * 0.28, 0.48, -0.02, -s * 0.2)
+        cone(earM, 0.07, 0.18, s * 0.28, 0.46, 0.05, -s * 0.2)
+      }
+      {
+        const m = mesh(new THREE.ConeGeometry(0.2, 0.36, 18), lightM, 0, -0.1, 0.48)
+        m.rotation.x = Math.PI / 2
+        head.add(m)
+      }
+      nose(-0.06, 0.67, 0.055)
+      smile.position.set(0, -0.24, 0.5)
+      open.position.set(0, -0.26, 0.5)
+      break
+    case 'elephant': {
+      for (const s of [-1, 1]) {
+        const ear = mesh(new THREE.SphereGeometry(0.34, 20, 14), furM, s * 0.52, 0.02, -0.08)
+        ear.scale.set(0.3, 1, 0.95)
+        const inner = mesh(new THREE.SphereGeometry(0.26, 16, 12), earM, s * 0.555, 0.02, -0.04)
+        inner.scale.set(0.2, 0.9, 0.85)
+        head.add(ear, inner)
+        const tusk = mesh(new THREE.ConeGeometry(0.04, 0.16, 8), whiteM, s * 0.14, -0.24, 0.42)
+        tusk.rotation.x = Math.PI * 0.85
+        head.add(tusk)
+      }
+      // 코: 아래로 휘어 내려가는 공 몇 개
+      for (let k = 0; k < 5; k++) {
+        const r = 0.12 - k * 0.012
+        head.add(mesh(new THREE.SphereGeometry(r, 14, 10), furM, 0, -0.08 - k * 0.1, 0.5 + Math.sin(k * 0.5) * 0.08))
+      }
+      smile.visible = false
+      break
+    }
+  }
+
+  // ---- 야구 유니폼: 깃·단추줄·앞 번호(작게)·등번호(크게) ----
+  if (uniform) {
+    collar.material = sleeveM
+    const placket = mesh(new THREE.BoxGeometry(0.06, 0.62, 0.02), sleeveM, 0, 1.16, 0.42)
+    bodyG.add(placket)
+    for (let k = 0; k < 3; k++) bodyG.add(mesh(new THREE.SphereGeometry(0.018, 8, 6), mat('#f8f9fa', 0.3), 0, 1.38 - k * 0.18, 0.435))
+    const numColor = opts.team ? '#ffffff' : tint
+    const numTex = numberTexture(lookIn.number, numColor)
+    const numMat = new THREE.MeshStandardMaterial({ map: numTex, transparent: true, roughness: 0.6 })
+    const back = new THREE.Mesh(new THREE.PlaneGeometry(0.5, 0.5), numMat)
+    back.position.set(0, 1.18, -0.44)
+    back.rotation.y = Math.PI
+    const front = new THREE.Mesh(new THREE.PlaneGeometry(0.2, 0.2), numMat)
+    front.position.set(-0.17, 1.3, 0.4)
+    front.rotation.y = -0.38
+    bodyG.add(back, front)
+    extraDispose.push(() => {
+      numTex.dispose()
+      numMat.dispose()
+    })
   }
 
   // ---- 꾸미기: 모자 · 안경 · 목 장식 ----
@@ -268,7 +452,7 @@ export function makeAnimal(lookIn: Look, shirt: string): AnimalRig {
   const headTop = kind === 'frog' ? 0.5 : 0.46
   switch (lookIn.hat) {
     case 'cap': {
-      const c = accM('#e03131', 0.6)
+      const c = accM(tint, 0.6)
       const dome = mesh(new THREE.SphereGeometry(0.55, 28, 14, 0, Math.PI * 2, 0, Math.PI / 2), c, 0, headTop - 0.28, 0)
       dome.scale.set(1, 0.72, 1)
       const brim = mesh(new THREE.CylinderGeometry(0.32, 0.32, 0.04, 24, 1, false, -Math.PI / 2, Math.PI), c, 0, headTop - 0.27, 0.42)
@@ -448,6 +632,7 @@ export function makeAnimal(lookIn: Look, shirt: string): AnimalRig {
       if (o instanceof THREE.Mesh) o.geometry.dispose()
     })
     for (const { m } of mats) m.dispose()
+    extraDispose.forEach((f) => f())
     cheekM.dispose()
   }
 

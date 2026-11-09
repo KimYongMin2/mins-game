@@ -826,3 +826,20 @@ a.game-card:hover {
   font-size: 0.8125rem;
   color: var(--ink-soft);
 }
+
+.avatar-pick__swatch {
+  width: 32px;
+  height: 32px;
+  border: 3px solid var(--paper);
+  border-radius: 50%;
+  box-shadow: 0 0 0 1.5px var(--muted-line);
+  cursor: pointer;
+}
+
+.avatar-pick__swatch--on {
+  box-shadow: 0 0 0 3px var(--line);
+}
+
+.avatar-pick__number {
+  width: 7em;
+}

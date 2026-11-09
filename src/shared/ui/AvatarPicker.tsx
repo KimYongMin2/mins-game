@@ -12,6 +12,12 @@ import {
   type Look,
   NECKS,
   NECK_NAMES,
+  OUTFITS,
+  OUTFIT_NAMES,
+  TINTS,
+  TINT_HEX,
+  TINT_NAMES,
+  clampNumber,
   plainLook,
 } from '../art3d/animalKinds'
 import { canWebGL } from '../art3d/webgl'
@@ -86,6 +92,40 @@ export function AvatarPicker() {
           <Row label="안경" value={look.glasses} opt={{ list: GLASSES, names: GLASSES_NAMES }} onPick={(glasses) => update({ ...look, glasses })} />
           <Row label="목" value={look.neck} opt={{ list: NECKS, names: NECK_NAMES }} onPick={(neck) => update({ ...look, neck })} />
           <Row label="털 색" value={look.fur} opt={{ list: FURS, names: FUR_NAMES }} onPick={(fur) => update({ ...look, fur })} />
+          <Row label="옷" value={look.outfit} opt={{ list: OUTFITS, names: OUTFIT_NAMES }} onPick={(outfit) => update({ ...look, outfit })} />
+          <div className="avatar-pick__row" role="radiogroup" aria-label="내 색 (야구모자·유니폼)">
+            <span className="avatar-pick__label">내 색 (야구모자·유니폼)</span>
+            <div className="avatar-pick__chips">
+              {TINTS.map((t) => (
+                <button
+                  key={t}
+                  type="button"
+                  role="radio"
+                  aria-checked={look.tint === t}
+                  aria-label={TINT_NAMES[t]}
+                  title={TINT_NAMES[t]}
+                  className={`avatar-pick__swatch${look.tint === t ? ' avatar-pick__swatch--on' : ''}`}
+                  style={{ background: TINT_HEX[t] }}
+                  onClick={() => update({ ...look, tint: t })}
+                />
+              ))}
+            </div>
+          </div>
+          {look.outfit === 'uniform' && (
+            <label className="avatar-pick__row">
+              <span className="avatar-pick__label">등번호 (0~99)</span>
+              <input
+                id="avatar-number"
+                className="input avatar-pick__number"
+                type="number"
+                inputMode="numeric"
+                min={0}
+                max={99}
+                value={look.number}
+                onChange={(e) => update({ ...look, number: clampNumber(e.target.value) })}
+              />
+            </label>
+          )}
           <p className="avatar-pick__note">폭탄 돌리기·러시안룰렛 3D 화면에서 내 캐릭터로 나와요. 친구와 같은 동물이어도 돼요.</p>
           <button type="button" className="button button--small" onClick={() => setOpen(false)}>
             다 했어요
