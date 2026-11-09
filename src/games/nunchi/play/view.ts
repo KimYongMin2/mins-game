@@ -3,11 +3,12 @@
 import { COLLIDE_MS } from '../constants'
 import type { Team } from '../../../shared/team/teams'
 import { type EngineState, type Hand, type OutReason, aliveIndexes, collidedOf, ranksOf, winnerTeam } from './engine'
+import type { Look } from '../../../shared/art3d/animalKinds'
 
 export type PhaseKind = EngineState['phase']['kind']
 
 export type NunchiView = {
-  players: { id: string; name: string }[]
+  players: { id: string; name: string; avatar?: Look }[]
   /** 팀전이면 사람마다 팀 */
   teams: Team[] | null
   /** 팀전에서 끝났으면 이긴 팀 */
@@ -33,7 +34,7 @@ export function toView(s: EngineState): NunchiView {
   const { phase, now } = s
   const collided = collidedOf(s.presses)
   return {
-    players: s.players.map(({ id, name }) => ({ id, name })),
+    players: s.players.map(({ id, name, avatar }) => ({ id, name, avatar })),
     teams: s.teams,
     winTeam: phase.kind === 'done' ? winnerTeam(s) : null,
     alive: s.alive,

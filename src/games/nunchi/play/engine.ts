@@ -4,11 +4,13 @@
 import { type Rng, createRng, pickOne } from '../../../shared/random'
 import { type Team, lastTeam } from '../../../shared/team/teams'
 import { BOT_STYLES, CALL_MS, COLLIDE_MS, COUNTDOWN_MS, DONE_MS, RESULT_MS, RPS_PICK_MS, RPS_REVEAL_MS } from '../constants'
+import type { Look } from '../../../shared/art3d/animalKinds'
 
 /** user = 이 기기, bot = 봇, remote = 방에 들어온 친구 */
 export type PlayerKind = 'user' | 'bot' | 'remote'
 
-export type Player = { id: string; name: string; kind: PlayerKind }
+/** avatar = 3D 캐릭터 (시작할 때 정해 둠) */
+export type Player = { id: string; name: string; kind: PlayerKind; avatar?: Look }
 
 export type Hand = 'rock' | 'paper' | 'scissors'
 export const HANDS: readonly Hand[] = ['rock', 'paper', 'scissors']

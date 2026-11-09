@@ -453,3 +453,108 @@
 .nc-view .nc-banner__win {
   color: #fde047;
 }
+
+/* 3D 탁자 (field/Table3D) */
+.nc3 {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  max-height: 70dvh;
+  margin: 0 auto;
+  overflow: hidden;
+  border-radius: 18px;
+  background: #1f1914;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.nc3 canvas {
+  position: absolute;
+  inset: 0;
+}
+
+.nc3-label {
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 1;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgb(20 16 12 / 0.62);
+  color: #fff;
+  font-size: 0.8125rem;
+  font-weight: 800;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.nc3-label--me {
+  background: rgb(37 99 235 / 0.85);
+}
+
+.nc3-label--out {
+  opacity: 0.55;
+  text-decoration: line-through;
+}
+
+.nc3-bubble {
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 2;
+  padding: 3px 12px;
+  border-radius: 999px;
+  background: #fff;
+  color: #1f2937;
+  font-size: 1.125rem;
+  font-weight: 900;
+  white-space: nowrap;
+  pointer-events: none;
+  box-shadow: 0 3px 10px rgb(0 0 0 / 0.35);
+}
+
+.nc3-bubble--num {
+  background: #2563eb;
+  color: #fff;
+  font-size: 1.5rem;
+  min-width: 2.2em;
+  text-align: center;
+}
+
+.nc3-bubble--clash {
+  background: #dc2626;
+  color: #fff;
+}
+
+.nc3-bubble--wait {
+  font-size: 0.875rem;
+  color: #6b7280;
+}
+
+/* 3D: 3·2·1 등 큰 글씨는 탁자 가운데, 안내는 아래 띠 */
+.nc-view--3d .nc-banner {
+  top: 47%;
+  z-index: 3;
+  padding: 6px 18px 8px;
+  border-radius: 16px;
+  background: rgb(20 16 12 / 0.55);
+}
+
+.nc-view--3d .nc-banner strong,
+.nc-view--3d .nc-banner span,
+.nc-view--3d .nc-tip {
+  text-shadow: 0 2px 10px rgb(0 0 0 / 0.75);
+}
+
+.nc-view--3d .nc-tip {
+  top: auto;
+  bottom: 12px;
+  left: 50%;
+  right: auto;
+  transform: translateX(-50%);
+  padding: 6px 14px;
+  border-radius: 999px;
+  background: rgb(20 16 12 / 0.7);
+  white-space: nowrap;
+  z-index: 3;
+}

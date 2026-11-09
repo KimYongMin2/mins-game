@@ -8,8 +8,8 @@ import { type AnimalKind, type Fur, type Look, TINT_HEX } from './animalKinds'
 export { ANIMALS, ANIMAL_NAMES, type AnimalKind, type Look, plainLook } from './animalKinds'
 
 export type Mood = 'calm' | 'happy' | 'scared' | 'ko'
-/** idle 가만히 · hold 두 손으로 앞에 듦 · scared 덜덜 · ko 뒤로 넘어감 · cheer 만세 */
-export type Pose = 'idle' | 'hold' | 'scared' | 'ko' | 'cheer'
+/** idle 가만히 · hold 두 손으로 머리 위에 듦 · scared 덜덜 · ko 쓰러짐 · cheer 만세 · raise 한 손 번쩍(외치기) */
+export type Pose = 'idle' | 'hold' | 'scared' | 'ko' | 'cheer' | 'raise'
 
 type Palette = { fur: string; light: string; ear: string; nose: string }
 
@@ -774,10 +774,13 @@ export function makeAnimal(lookIn: Look, shirt: string, opts: { team?: boolean }
         bob = Math.abs(Math.sin(t * 6)) * 0.18
         break
     }
+    // 한 손 번쩍: 오른손만 위로
+    const raise = pose === 'raise'
+    if (raise) bob = Math.abs(Math.sin(t * 5)) * 0.06
     armL.rotation.x = ease(armL.rotation.x, ax)
-    armR.rotation.x = ease(armR.rotation.x, ax)
+    armR.rotation.x = ease(armR.rotation.x, raise ? -0.2 : ax)
     armL.rotation.z = ease(armL.rotation.z, -az)
-    armR.rotation.z = ease(armR.rotation.z, az)
+    armR.rotation.z = ease(armR.rotation.z, raise ? 2.85 : az)
     bodyG.rotation.x = ease(bodyG.rotation.x, lean, 0.12)
     // 가라앉기·기울기는 따로 부드럽게 따라가고, 살랑임·떨림은 그 위에 더한다 (같이 섞으면 매 프레임 쌓여서 8배쯤 커졌음)
     sunk = ease(sunk, sink, 0.12)
