@@ -1,4 +1,5 @@
 import type { ArtilleryRecord, GameSummary } from '../records'
+import { TeamResult } from '../../../shared/ui/TeamResult'
 
 type Props = {
   summary: GameSummary
@@ -17,21 +18,27 @@ export function ResultScreen({ summary, record, isHost, canRetry, onRetry, onMen
   const t = pvp ? record.pvp : record.bot[summary.level ?? 'normal']
   return (
     <section className="at-result">
-      <div className={`at-result__headline${summary.rank === 1 ? ' at-result__headline--win' : ''}`}>
-        <strong>{summary.rank === 1 ? '승리!' : `${summary.rank}등`}</strong>
-        <span>
-          {summary.ranking.length}명 중 · {summary.kills}킬
-        </span>
-      </div>
+      {summary.team ? (
+        <TeamResult outcome={summary.team} detail={`${summary.kills}킬`} />
+      ) : (
+        <>
+          <div className={`at-result__headline${summary.rank === 1 ? ' at-result__headline--win' : ''}`}>
+            <strong>{summary.rank === 1 ? '승리!' : `${summary.rank}등`}</strong>
+            <span>
+              {summary.ranking.length}명 중 · {summary.kills}킬
+            </span>
+          </div>
 
-      <ol className="at-result__ranking">
-        {summary.ranking.map((r, i) => (
-          <li key={`${r.name}-${i}`} className={r.me ? 'at-result__me' : ''}>
-            <span>{r.rank}등</span> {r.name}
-            {r.kills > 0 && <em>{r.kills}킬</em>}
-          </li>
-        ))}
-      </ol>
+          <ol className="at-result__ranking">
+            {summary.ranking.map((r, i) => (
+              <li key={`${r.name}-${i}`} className={r.me ? 'at-result__me' : ''}>
+                <span>{r.rank}등</span> {r.name}
+                {r.kills > 0 && <em>{r.kills}킬</em>}
+              </li>
+            ))}
+          </ol>
+        </>
+      )}
 
       <p className="at-result__career">
         {pvp ? '친구 대전' : `봇 연습(${summary.level === 'hard' ? '어려움' : '일반'})`} {t.games}판 · 우승 {t.wins}번 · {t.kills}킬

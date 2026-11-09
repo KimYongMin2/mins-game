@@ -1,5 +1,6 @@
 import { useMemo } from 'react'
 import { BARREL, CRATER_R, GRAVITY, MAX_SPEED, PLAYER_COLORS, STEP, TANK_CY, WORLD_H, WORLD_W } from '../constants'
+import { TEAM_COLORS } from '../../../shared/team/teams'
 import { type ScreenState, canAim, myIndex } from '../play/view'
 import { type Terrain, type Vec, heightAt, muzzle, tankPose } from '../rules/physics'
 
@@ -158,7 +159,7 @@ export function Battlefield({ screen }: Props) {
             <Tank
               key={v.players[i].id}
               t={t}
-              color={PLAYER_COLORS[i % PLAYER_COLORS.length]}
+              color={v.teams ? TEAM_COLORS[v.teams[i]] : PLAYER_COLORS[i % PLAYER_COLORS.length]}
               {...poseOf(tankPose(v.terrain, t.x))}
               name={v.players[i].name}
               me={i === me}

@@ -1,6 +1,7 @@
 // 탱크 대전 봇: 바람·지형을 넣고 각도·힘을 여러 개 미리 쏴 보고(simulateShot) 가장 가까이 떨어지는 걸 고른 뒤,
 // 난이도만큼 손을 떨어 흔든다. 나한테 너무 가까이 떨어지는 건 피한다.
 import type { Rng } from '../../../shared/random'
+import { type Team, sameTeam } from '../../../shared/team/teams'
 import { DAMAGE_R, POWER_MAX, POWER_MIN } from '../constants'
 import { type ShotTank, type Terrain, simulateShot, tankCenter } from '../rules/physics'
 
@@ -14,9 +15,9 @@ const JITTER: Record<BotLevel, { angle: number; power: number }> = {
 
 export type BotAim = { angle: number; power: number }
 
-export function chooseBotAim(rng: Rng, terrain: Terrain, tanks: (ShotTank & { hp: number })[], me: number, wind: number, level: BotLevel): BotAim {
+export function chooseBotAim(rng: Rng, terrain: Terrain, tanks: (ShotTank & { hp: number })[], me: number, wind: number, level: BotLevel, teams: Team[] | null = null): BotAim {
   const myPos = tankCenter(terrain, tanks[me].x)
-  const enemies = tanks.map((t, i) => ({ t, i })).filter(({ t, i }) => t.alive && i !== me)
+  const enemies = tanks.map((t, i) => ({ t, i })).filter(({ t, i }) => t.alive && i !== me && !sameTeam(teams, me, i))
   if (enemies.length === 0) return { angle: 90, power: 30 }
   // 노릴 상대: 일반은 가장 가까운 사람, 어려움은 가까운 두 명 중 체력이 적은 사람
   enemies.sort((a, b) => Math.abs(a.t.x - tanks[me].x) - Math.abs(b.t.x - tanks[me].x))

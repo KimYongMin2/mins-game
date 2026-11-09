@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { COUNTDOWN_MS, HP, MOVE_MAX, TURN_MS } from '../constants'
-import { type EngineState, type Player, aliveIndexes, createEngine, engineReducer, ranksOf } from './engine'
+import { type EngineState, type Player, aliveIndexes, createEngine, engineReducer, ranksOf, winnerTeam } from './engine'
 
 const bots = (n: number): Player[] => Array.from({ length: n }, (_, i) => ({ id: `b${i}`, name: `봇${i}`, kind: 'bot' as const }))
 
@@ -91,5 +91,26 @@ describe('탱크 대전 진행', () => {
     s = engineReducer(s, { type: 'drop', player: s.turn })
     expect(s.phase.kind).toBe('done')
     expect(ranksOf(s)[aliveIndexes(s)[0]]).toBe(1)
+  })
+})
+
+describe('팀전', () => {
+  it('봇끼리 2:2: 한 팀만 남으면 끝, 같은 팀은 포탄에 안 다친다', () => {
+    for (let seed = 1; seed <= 6; seed++) {
+      const teams = [0, 1, 0, 1] as const
+      let s = createEngine({ now: 0, seed, players: bots(4), teams: [...teams] })
+      for (let now = 0; now < 60 * 60_000 && s.phase.kind !== 'done'; now += 50) {
+        const before = s.phase.kind
+        const shooter = s.turn
+        s = engineReducer(s, { type: 'tick', now })
+        if (before === 'flight' && s.phase.kind === 'boom') {
+          s.phase.boom.damage.forEach((d, i) => i !== shooter && teams[i] === teams[shooter] && expect(d).toBe(0))
+        }
+      }
+      expect(s.phase.kind).toBe('done')
+      const w = winnerTeam(s)
+      expect(w).not.toBeNull()
+      teams.forEach((t, i) => t !== w && expect(s.tanks[i].alive).toBe(false))
+    }
   })
 })

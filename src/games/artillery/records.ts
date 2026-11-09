@@ -1,3 +1,4 @@
+import type { TeamOutcome } from '../../shared/team/teams'
 import { type RecordStore, localRecordStore } from '../../shared/storage/records'
 import type { BotLevel } from './bot/artilleryBot'
 
@@ -27,6 +28,8 @@ export type GameSummary = {
   rank: number
   kills: number
   ranking: { name: string; rank: number; kills: number; me: boolean }[]
+  /** 팀전이면 팀 결과 (rank는 이기면 1, 지면 2) */
+  team?: TeamOutcome
 }
 
 const add = (t: Tally, s: GameSummary): Tally => ({ games: t.games + 1, wins: t.wins + (s.rank === 1 ? 1 : 0), kills: t.kills + s.kills })

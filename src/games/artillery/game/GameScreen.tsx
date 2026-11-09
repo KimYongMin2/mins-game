@@ -1,6 +1,7 @@
 import { useEffect, useReducer, useRef, useState } from 'react'
 import type { Member, Room } from '../../../shared/online/room'
 import { randomSeed } from '../../../shared/random'
+import { TEAM_COLORS, TEAM_NAMES, type Team, type TeamPick, planTeams, teamOutcome } from '../../../shared/team/teams'
 import { loadNickname } from '../../../shared/storage/nickname'
 import type { BotLevel } from '../bot/artilleryBot'
 import { MOVE_SPEED, PLAYER_COLORS, POWER_MAX, TURN_MS, WIND_MAX, WORLD_W } from '../constants'
@@ -19,7 +20,7 @@ import { playSound } from '../sounds'
 type Props =
   | { mode: 'bot'; bots: number; level: BotLevel; onFinish: (s: GameSummary) => void }
   /** 방장: 시작할 때 방에 있던 사람들로 경기 */
-  | { mode: 'host'; room: Room<ArtilleryMsg>; members: Member[]; bots: number; onFinish: (s: GameSummary) => void; onQuit: () => void }
+  | { mode: 'host'; room: Room<ArtilleryMsg>; members: Member[]; bots: number; teams: TeamPick | null; onFinish: (s: GameSummary) => void; onQuit: () => void }
   | { mode: 'guest'; room: Room<ArtilleryMsg>; onFinish: (s: GameSummary) => void; onQuit: () => void }
 
 /** 방장이 친구들에게 화면을 보내는 간격: 바뀌면 이만큼마다(움직이는 동안 너무 자주 안 보내게), 안 바뀌어도 HEARTBEAT_MS마다 */
@@ -65,8 +66,15 @@ function initHost(props: Props): HostState {
     ]
   }
   // 친구 대전 봇은 일반
-  const engine = createEngine({ now, seed: randomSeed(), players, level: props.mode === 'bot' ? props.level : 'normal' })
-  return { engine, screen: screenReducer(createScreen(players[0]?.id ?? '', now), { type: 'view', view: toView(engine) }) }
+  // 팀전: 두 팀이 번갈아 앉게(차례가 오게) 자리를 다시 늘어놓는다
+  let teams: Team[] | null = null
+  if (props.mode === 'host' && props.teams) {
+    const plan = planTeams(players.map((p) => p.id), props.teams)
+    players = plan.order.map((i) => players[i])
+    teams = plan.teams
+  }
+  const engine = createEngine({ now, seed: randomSeed(), players, teams, level: props.mode === 'bot' ? props.level : 'normal' })
+  return { engine, screen: screenReducer(createScreen(props.mode === 'bot' ? 'me' : props.mode === 'host' ? props.room.myId : '', now), { type: 'view', view: toView(engine) }) }
 }
 
 function summaryOf(screen: ScreenState, mode: GameSummary['mode']): GameSummary {
@@ -75,6 +83,10 @@ function summaryOf(screen: ScreenState, mode: GameSummary['mode']): GameSummary 
   const ranking = v.players
     .map((p, i) => ({ name: p.name, rank: v.ranks[i], kills: v.kills[i], me: i === me }))
     .sort((a, b) => a.rank - b.rank || b.kills - a.kills)
+  if (v.teams) {
+    const team = teamOutcome(v.players.map((p) => p.name), v.teams, me, v.winTeam)
+    return { mode, rank: v.winTeam === v.teams[me] ? 1 : 2, kills: v.kills[me], ranking, team }
+  }
   return { mode, rank: v.ranks[me], kills: v.kills[me], ranking }
 }
 
@@ -100,6 +112,7 @@ function statusOf(screen: ScreenState): { text: string; tone?: 'mine' | 'bad' | 
       return { text: hit.length ? hit.join(' · ') : '아무도 안 맞았어요' }
     }
     case 'done': {
+      if (v.teams && v.winTeam !== null) return v.winTeam === v.teams[me] ? { text: '우리 팀 승리!', tone: 'win' } : { text: `${TEAM_NAMES[v.winTeam]} 승리!` }
       const winner = v.ranks.indexOf(1)
       if (winner < 0) return { text: '모두 쓰러졌어요!' }
       return winner === me ? { text: '내가 이겼다!', tone: 'win' } : { text: `${v.players[winner].name} 승리!` }
@@ -331,7 +344,7 @@ export function GameScreen(props: Props) {
         <ul className="at-players" aria-label="참가자">
           {v.players.map((p, i) => (
             <li key={p.id} className={`at-chip${v.tanks[i].alive ? '' : ' at-chip--out'}${i === v.turn && v.phase !== 'done' ? ' at-chip--turn' : ''}`}>
-              <span className="at-chip__dot" style={{ background: PLAYER_COLORS[i % PLAYER_COLORS.length] }} />
+              <span className="at-chip__dot" style={{ background: v.teams ? TEAM_COLORS[v.teams[i]] : PLAYER_COLORS[i % PLAYER_COLORS.length] }} />
               <span className="at-chip__name">{i === me ? '나' : p.name}</span>
               <span className="at-chip__hp">{v.tanks[i].alive ? v.tanks[i].hp : '탈락'}</span>
             </li>
@@ -365,7 +378,7 @@ export function GameScreen(props: Props) {
             </button>
           </div>
           <div className="at-row at-row--aim">
-            <AngleDial angle={d.angle} color={PLAYER_COLORS[me % PLAYER_COLORS.length]} onChange={(angle) => dispatch({ type: 'draft', angle })} />
+            <AngleDial angle={d.angle} color={v?.teams ? TEAM_COLORS[v.teams[me]] : PLAYER_COLORS[me % PLAYER_COLORS.length]} onChange={(angle) => dispatch({ type: 'draft', angle })} />
             <div className="at-aim-side">
               <span className="at-tune">
                 <button type="button" className="button button--small" onClick={() => dispatch({ type: 'draft', angle: d.angle + 1 })} aria-label="각도 왼쪽으로 1도">

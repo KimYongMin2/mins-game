@@ -19,6 +19,7 @@ import {
   WORLD_W,
 } from '../constants'
 import { type Shot, type Terrain, type Vec, explode, makeTerrain, simulateShot } from '../rules/physics'
+import { type Team, lastTeam, sameTeam } from '../../../shared/team/teams'
 
 /** user = 이 기기, bot = 봇, remote = 방에 들어온 친구 */
 export type PlayerKind = 'user' | 'bot' | 'remote'
@@ -42,6 +43,8 @@ export type EngineState = {
   seed: number
   level: BotLevel
   players: Player[]
+  /** 팀전이면 사람마다 팀 (같은 팀은 포탄에 안 다침). 개인전이면 null */
+  teams: Team[] | null
   tanks: Tank[]
   terrain: Terrain
   /** 지금 차례인 사람 */
@@ -82,7 +85,7 @@ function startSpots(rng: Rng, n: number): number[] {
   return spots
 }
 
-export function createEngine(opts: { now: number; seed: number; players: Player[]; level?: BotLevel }): EngineState {
+export function createEngine(opts: { now: number; seed: number; players: Player[]; teams?: Team[] | null; level?: BotLevel }): EngineState {
   const rng = createRng(opts.seed)
   const terrain = makeTerrain(rng)
   const spots = startSpots(rng, opts.players.length)
@@ -93,6 +96,7 @@ export function createEngine(opts: { now: number; seed: number; players: Player[
     seed: rng.seed(),
     level: opts.level ?? 'normal',
     players: opts.players,
+    teams: opts.teams ?? null,
     tanks,
     terrain,
     turn,
@@ -103,6 +107,16 @@ export function createEngine(opts: { now: number; seed: number; players: Player[
     botAt: null,
     phase: { kind: 'countdown', until: opts.now + COUNTDOWN_MS },
   }
+}
+
+/** 끝났는지: 한 명 남음, 팀전이면 한 팀만 남음 */
+function isOver(s: EngineState): boolean {
+  return aliveIndexes(s).length <= 1 || (!!s.teams && lastTeam(s.tanks.map((t) => t.alive), s.teams) !== null)
+}
+
+/** 이긴 팀 (팀전이고 끝났을 때) */
+export function winnerTeam(s: EngineState): Team | null {
+  return s.teams ? lastTeam(s.tanks.map((t) => t.alive), s.teams) : null
 }
 
 /** 차례 시작: 바람을 새로 정하고, 봇이면 쏠 시각을 정한다 */
@@ -146,13 +160,15 @@ function launch(s: EngineState): EngineState {
 function land(s: EngineState, shot: Shot): EngineState {
   if (!shot.impact) return { ...s, phase: { kind: 'boom', until: s.now + BOOM_MS, boom: { at: null, damage: s.tanks.map(() => 0), dead: [], fell: [] } } }
   const blast = explode(s.terrain, s.tanks, shot.impact)
+  // 팀전: 쏜 사람과 같은 팀은 안 다친다 (나는 다침)
+  if (s.teams) blast.damage = blast.damage.map((d, i) => (sameTeam(s.teams, s.turn, i) ? 0 : d))
   const tanks = s.tanks.map((t, i) => {
     if (!t.alive) return t
     const hp = Math.max(0, t.hp - blast.damage[i])
     return { ...t, hp: blast.fell.includes(i) ? 0 : hp, alive: hp > 0 && !blast.fell.includes(i) }
   })
   const dead = tanks.flatMap((t, i) => (s.tanks[i].alive && !t.alive ? [i] : []))
-  const kills = s.kills.map((k, i) => (i === s.turn ? k + dead.filter((d) => d !== s.turn).length : k))
+  const kills = s.kills.map((k, i) => (i === s.turn ? k + dead.filter((d) => d !== s.turn && !sameTeam(s.teams, s.turn, d)).length : k))
   return {
     ...s,
     terrain: blast.terrain,
@@ -164,14 +180,14 @@ function land(s: EngineState, shot: Shot): EngineState {
 }
 
 function afterBoom(s: EngineState): EngineState {
-  if (aliveIndexes(s).length <= 1) return { ...s, phase: { kind: 'done', until: s.now + DONE_MS } }
+  if (isOver(s)) return { ...s, phase: { kind: 'done', until: s.now + DONE_MS } }
   return startTurn(s, nextAlive(s, s.turn))
 }
 
 function drop(s: EngineState, player: number): EngineState {
   if (!s.tanks[player].alive || s.phase.kind === 'done') return s
   const next: EngineState = { ...s, tanks: s.tanks.map((t, i) => (i === player ? { ...t, hp: 0, alive: false } : t)), out: [...s.out, [player]] }
-  if (aliveIndexes(next).length <= 1) return { ...next, phase: { kind: 'done', until: s.now + DONE_MS } }
+  if (isOver(next)) return { ...next, phase: { kind: 'done', until: s.now + DONE_MS } }
   // 그 사람 차례였으면 바로 다음 사람
   if (s.phase.kind === 'aim' && s.turn === player) return startTurn(next, nextAlive(next, player))
   return next
@@ -185,7 +201,7 @@ function tick(s: EngineState): EngineState {
     case 'aim': {
       if (s.botAt !== null && now >= s.botAt) {
         const rng = createRng(s.seed)
-        const aim = chooseBotAim(rng, s.terrain, s.tanks, s.turn, s.wind, s.level)
+        const aim = chooseBotAim(rng, s.terrain, s.tanks, s.turn, s.wind, s.level, s.teams)
         const t = s.tanks[s.turn]
         return launch(setAim({ ...s, seed: rng.seed() }, s.turn, t.x, aim.angle, aim.power))
       }

@@ -2,12 +2,17 @@
 // 내 차례에 겨누는 것(draft)은 각 기기가 들고 있다가 심판에게 보낸다 (내 화면엔 바로 보이게).
 import { ANGLE_MAX, ANGLE_MIN, CHARGE_MS, MOVE_MAX, POWER_MAX, POWER_MIN, STEP, WORLD_W } from '../constants'
 import type { Shot, Terrain } from '../rules/physics'
-import { type Boom, type EngineState, ranksOf } from './engine'
+import type { Team } from '../../../shared/team/teams'
+import { type Boom, type EngineState, ranksOf, winnerTeam } from './engine'
 
 export type PhaseKind = EngineState['phase']['kind']
 
 export type ArtilleryView = {
   players: { id: string; name: string }[]
+  /** 팀전이면 사람마다 팀 */
+  teams: Team[] | null
+  /** 팀전에서 끝났으면 이긴 팀 */
+  winTeam: Team | null
   tanks: { x: number; hp: number; alive: boolean; angle: number; power: number }[]
   terrain: Terrain
   turn: number
@@ -30,6 +35,8 @@ export function toView(s: EngineState): ArtilleryView {
   const { phase, now } = s
   return {
     players: s.players.map(({ id, name }) => ({ id, name })),
+    teams: s.teams,
+    winTeam: s.phase.kind === 'done' ? winnerTeam(s) : null,
     tanks: s.tanks.map(({ x, hp, alive, angle, power }) => ({ x, hp, alive, angle, power })),
     terrain: s.terrain,
     turn: s.turn,
@@ -129,7 +136,7 @@ function receive(s: ScreenState, v: ArtilleryView): ScreenState {
     if (b.damage.some((d, i) => d > 0 && prev?.tanks[i]?.alive)) sounds.push('hit')
     if (b.dead.length) sounds.push('out')
   }
-  if (v.phase === 'done') sounds.push(v.ranks[me] === 1 ? 'win' : 'lose')
+  if (v.phase === 'done') sounds.push((v.teams ? v.winTeam === v.teams[me] : v.ranks[me] === 1) ? 'win' : 'lose')
   return withSounds(next, sounds)
 }
 
