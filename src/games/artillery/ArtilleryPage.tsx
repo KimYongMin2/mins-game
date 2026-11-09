@@ -34,6 +34,8 @@ export function ArtilleryPage() {
   const [pvpBots, setPvpBots] = useState(0)
   /** 방장이 대기실에서 고른 팀 (팀전, 다시 하기 때 씀) */
   const [pvpTeams, setPvpTeams] = useState<TeamPick | null>(null)
+  /** 팀전에서 같은 팀도 공격할 수 있는지 (방장이 대기실에서 고름) */
+  const [pvpFriendlyFire, setPvpFriendlyFire] = useState(false)
   useEffect(installAudioUnlock, [])
 
   function update(next: ArtilleryRecord) {
@@ -122,8 +124,12 @@ export function ArtilleryPage() {
           capacity={MAX_PLAYERS}
           minPlayers={MIN_PLAYERS}
           teams
+          friendlyFire
           onConnected={setRoom}
-          onStart={(with_, bots, teams) => room && startPvp(room, with_, bots, teams)}
+          onStart={(with_, bots, teams, ff) => {
+            setPvpFriendlyFire(ff)
+            if (room) startPvp(room, with_, bots, teams)
+          }}
           onBack={() => {
             setRoom(null)
             toStart()
@@ -134,7 +140,7 @@ export function ArtilleryPage() {
       {screen.kind === 'pvp-game' &&
         room &&
         (room.role === 'host' ? (
-          <GameScreen key={screen.key} mode="host" room={room} members={screen.members} bots={screen.bots} teams={screen.teams} onFinish={finish} onQuit={leaveRoom} />
+          <GameScreen key={screen.key} mode="host" room={room} members={screen.members} bots={screen.bots} teams={screen.teams} friendlyFire={pvpFriendlyFire} onFinish={finish} onQuit={leaveRoom} />
         ) : (
           <GameScreen key={screen.key} mode="guest" room={room} onFinish={finish} onQuit={leaveRoom} />
         ))}

@@ -25,8 +25,10 @@ export type EngineState = {
   now: number
   seed: number
   players: Player[]
-  /** 팀전이면 사람마다 팀 (같은 팀은 못 쏨, 나는 쏠 수 있음). 개인전이면 null */
+  /** 팀전이면 사람마다 팀 (같은 팀 공격을 끄면 같은 팀은 못 쏨, 나는 늘 됨). 개인전이면 null */
   teams: Team[] | null
+  /** 팀전에서 같은 팀도 쏠 수 있는지 (방장이 대기실에서 고름) */
+  friendlyFire: boolean
   alive: boolean[]
   /** 탈락한 순서 */
   out: number[]
@@ -65,13 +67,13 @@ export function nextAlive(alive: readonly boolean[], from: number): number {
   return from
 }
 
-/** player가 target을 쏠 수 있는지 (살아 있고, 팀전이면 같은 팀이 아님 — 나는 됨) */
-export function canTarget(s: Pick<EngineState, 'alive' | 'teams'>, player: number, target: number): boolean {
-  return !!s.alive[target] && !sameTeam(s.teams, player, target)
+/** player가 target을 쏠 수 있는지 (살아 있고, 같은 팀 공격을 껐으면 같은 팀이 아님 — 나는 늘 됨) */
+export function canTarget(s: Pick<EngineState, 'alive' | 'teams' | 'friendlyFire'>, player: number, target: number): boolean {
+  return !!s.alive[target] && (s.friendlyFire || !sameTeam(s.teams, player, target))
 }
 
-/** player가 쏠 수 있는 사람들 */
-const targetsOf = (s: EngineState, player: number) => aliveIndexes(s).filter((i) => canTarget(s, player, i))
+/** 봇·시간 초과가 고르는 사람들: 같은 팀 공격이 켜져 있어도 같은 팀은 빼고 (나는 됨) */
+const targetsOf = (s: EngineState, player: number) => aliveIndexes(s).filter((i) => s.alive[i] && !sameTeam(s.teams, player, i))
 
 /** 끝났는지: 한 명 남음, 팀전이면 한 팀만 남음 */
 function isOver(s: EngineState): boolean {
@@ -89,7 +91,7 @@ function reload(s: EngineState): EngineState {
   return { ...s, seed: rng.seed(), chamber, pulls: 0 }
 }
 
-export function createEngine(opts: { now: number; seed: number; players: Player[]; teams?: Team[] | null }): EngineState {
+export function createEngine(opts: { now: number; seed: number; players: Player[]; teams?: Team[] | null; friendlyFire?: boolean }): EngineState {
   const rng = createRng(opts.seed)
   const turn = Math.floor(rng.next() * opts.players.length)
   return reload({
@@ -97,6 +99,7 @@ export function createEngine(opts: { now: number; seed: number; players: Player[
     seed: rng.seed(),
     players: opts.players,
     teams: opts.teams ?? null,
+    friendlyFire: !!opts.friendlyFire,
     alive: opts.players.map(() => true),
     out: [],
     kills: opts.players.map(() => 0),
@@ -142,7 +145,7 @@ function afterFire(s: EngineState): EngineState {
     ...s,
     alive: s.alive.map((a, i) => a && i !== target),
     out: [...s.out, target],
-    kills: s.kills.map((k, i) => (i === shooter && shooter !== target ? k + 1 : k)),
+    kills: s.kills.map((k, i) => (i === shooter && shooter !== target && !sameTeam(s.teams, shooter, target) ? k + 1 : k)),
   }
   if (isOver(next)) return { ...next, aimAt: null, phase: { kind: 'done', until: s.now + DONE_MS } }
   // 남을 맞혔으면 쏜 사람이 계속, 자기를 쐈으면 다음 자리 (쏜 사람이 그새 나갔어도 다음 자리)

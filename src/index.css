@@ -462,6 +462,11 @@ a.game-card:hover {
   color: #fff;
 }
 
+.group-lobby__mode-label {
+  font-size: 0.875rem;
+  font-weight: 700;
+}
+
 .group-lobby__mode-tip {
   font-size: 0.8125rem;
   color: var(--ink-soft);

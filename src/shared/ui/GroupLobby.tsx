@@ -18,8 +18,10 @@ type Props<M> = {
   onConnected: (room: Room<M>) => void
   /** 팀전을 고를 수 있는 게임이면 true */
   teams?: boolean
+  /** 팀전에서 '같은 팀 공격'을 켜고 끌 수 있는 게임이면 true (기본은 끔) */
+  friendlyFire?: boolean
   /** 방장이 시작함. 나 말고 방에 있는 사람들 (들어온 순서)과 채울 봇 수, 팀전이면 id(방장 id · 친구 id · 'bot0'…) → 팀 */
-  onStart: (members: Member[], bots: number, teams: TeamPick | null) => void
+  onStart: (members: Member[], bots: number, teams: TeamPick | null, friendlyFire: boolean) => void
   /** 돌아가기 (연결된 방이 있으면 이미 닫은 뒤) */
   onBack: () => void
 }
@@ -36,13 +38,14 @@ const ERROR_TEXT: Record<RoomError['reason'], string> = {
   offline: '서버에 연결하지 못했어요. 인터넷 연결을 확인해 주세요',
 }
 
-export function GroupLobby<M>({ gameId, nickname, capacity, minPlayers, teams: canTeam = false, onConnected, onStart, onBack }: Props<M>) {
+export function GroupLobby<M>({ gameId, nickname, capacity, minPlayers, teams: canTeam = false, friendlyFire: canFriendlyFire = false, onConnected, onStart, onBack }: Props<M>) {
   const [view, setView] = useState<View>({ kind: 'menu' })
   const [room, setRoom] = useState<Room<M> | null>(null)
   const [members, setMembers] = useState<Member[]>([])
   const [botsWanted, setBotsWanted] = useState(0)
   const [teamMode, setTeamMode] = useState(false)
   const [pick, setPick] = useState<TeamPick>({})
+  const [friendlyFire, setFriendlyFire] = useState(false)
   // 방에 들어가는 도중에 화면을 떠나면, 다 열린 방을 바로 닫는다
   const mountedRef = useRef(true)
   useEffect(() => {
@@ -163,6 +166,17 @@ export function GroupLobby<M>({ gameId, nickname, capacity, minPlayers, teams: c
                 {teamMode && <span className="group-lobby__mode-tip">팀 이름을 누르면 바뀌어요</span>}
               </div>
             )}
+            {canTeam && canFriendlyFire && teamMode && (
+              <div className="group-lobby__mode" role="group" aria-label="같은 팀 공격">
+                <span className="group-lobby__mode-label">같은 팀 공격</span>
+                <button type="button" className={`button button--small${friendlyFire ? '' : ' group-lobby__mode--on'}`} onClick={() => setFriendlyFire(false)}>
+                  안 됨
+                </button>
+                <button type="button" className={`button button--small${friendlyFire ? ' group-lobby__mode--on' : ''}`} onClick={() => setFriendlyFire(true)}>
+                  됨
+                </button>
+              </div>
+            )}
             <div className="group-lobby__bots" role="group" aria-label="봇 수">
               <span>빈자리에 봇</span>
               <button type="button" className="button button--small" disabled={bots <= 0} onClick={() => setBotsWanted(bots - 1)} aria-label="봇 빼기">
@@ -181,7 +195,7 @@ export function GroupLobby<M>({ gameId, nickname, capacity, minPlayers, teams: c
             </div>
             <button type="button" className="button button--primary pvp-lobby__big" disabled={count < minPlayers || !ready} onClick={() => {
                 room.setPlaying(true)
-                onStart(members, bots, teamOf ? Object.fromEntries(ids.map((id, k) => [id, teamOf[k]])) : null)
+                onStart(members, bots, teamOf ? Object.fromEntries(ids.map((id, k) => [id, teamOf[k]])) : null, !!teamOf && canFriendlyFire && friendlyFire)
               }}>
               {count < minPlayers
                 ? `${minPlayers}명부터 시작할 수 있어요`

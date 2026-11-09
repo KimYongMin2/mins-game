@@ -10,6 +10,8 @@ export type RouletteView = {
   players: { id: string; name: string }[]
   /** 팀전이면 사람마다 팀 */
   teams: Team[] | null
+  /** 팀전에서 같은 팀도 쏠 수 있는지 */
+  friendlyFire: boolean
   /** 팀전에서 끝났으면 이긴 팀 */
   winTeam: Team | null
   alive: boolean[]
@@ -30,6 +32,7 @@ export function toView(s: EngineState): RouletteView {
   return {
     players: s.players.map(({ id, name }) => ({ id, name })),
     teams: s.teams,
+    friendlyFire: s.friendlyFire,
     winTeam: s.phase.kind === 'done' ? winnerTeam(s) : null,
     alive: s.alive,
     kills: s.kills,

@@ -42,8 +42,10 @@ export type EngineState = {
   now: number
   seed: number
   players: Player[]
-  /** 팀전이면 사람마다 팀 (같은 팀은 레이저가 그냥 지나감). 개인전이면 null */
+  /** 팀전이면 사람마다 팀 (같은 팀 공격을 끄면 레이저가 같은 팀은 그냥 지나감). 개인전이면 null */
   teams: Team[] | null
+  /** 팀전에서 같은 팀도 레이저에 맞는지 (방장이 대기실에서 고름) */
+  friendlyFire: boolean
   alive: boolean[]
   /** 라운드마다 탈락한 사람들 (같은 라운드면 같은 등수) */
   out: number[][]
@@ -76,12 +78,13 @@ function buildWalls(s: EngineState, half = halfFor(aliveIndexes(s).length)): Eng
   return { ...s, seed: rng.seed(), half, walls }
 }
 
-export function createEngine(opts: { now: number; seed: number; players: Player[]; teams?: Team[] | null }): EngineState {
+export function createEngine(opts: { now: number; seed: number; players: Player[]; teams?: Team[] | null; friendlyFire?: boolean }): EngineState {
   return buildWalls({
     now: opts.now,
     seed: opts.seed,
     players: opts.players,
     teams: opts.teams ?? null,
+    friendlyFire: !!opts.friendlyFire,
     alive: opts.players.map(() => true),
     out: [],
     kills: opts.players.map(() => 0),
@@ -151,8 +154,8 @@ function reveal(s: EngineState): EngineState {
     angles[i] = p?.angle ?? rng.next() * Math.PI * 2
   }
   const shots: Shot[] = alive.map((i) => {
-    // 같은 팀은 과녁이 아님 (레이저가 그냥 지나감)
-    const targets = alive.filter((j) => j !== i && !sameTeam(s.teams, i, j)).map((j) => ({ player: j, pos: positions[j]! }))
+    // 같은 팀 공격을 껐으면 같은 팀은 과녁이 아님 (레이저가 그냥 지나감)
+    const targets = alive.filter((j) => j !== i && (s.friendlyFire || !sameTeam(s.teams, i, j))).map((j) => ({ player: j, pos: positions[j]! }))
     const { hit, end } = shoot(positions[i]!, angles[i], targets, half, s.walls)
     return { from: i, pos: positions[i]!, end, hit }
   })
@@ -171,7 +174,7 @@ function reveal(s: EngineState): EngineState {
 function afterReveal(s: EngineState): EngineState {
   const r = s.lastReveal
   if (!r) return s
-  const kills = r.voided ? s.kills : s.kills.map((k, i) => k + r.shots.filter((sh) => sh.from === i && sh.hit !== null).length)
+  const kills = r.voided ? s.kills : s.kills.map((k, i) => k + r.shots.filter((sh) => sh.from === i && sh.hit !== null && !sameTeam(s.teams, i, sh.hit)).length)
   const next: EngineState = r.dead.length
     ? { ...s, kills, alive: s.alive.map((a, i) => a && !r.dead.includes(i)), out: [...s.out, r.dead] }
     : { ...s, kills }

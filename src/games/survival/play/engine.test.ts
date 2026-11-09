@@ -183,3 +183,16 @@ describe('팀전', () => {
     }
   })
 })
+
+describe('팀전 같은 팀 공격', () => {
+  it('켜면 같은 팀도 레이저에 맞는다', () => {
+    let s = createEngine({ now: 0, seed: 1, players: people(3), teams: [0, 0, 1], friendlyFire: true })
+    s = engineReducer(s, { type: 'tick', now: COUNTDOWN_MS })
+    s = { ...s, walls: [] }
+    s = engineReducer(s, { type: 'plan', player: 0, plan: { pos: { x: -20, y: 0 }, angle: 0, locked: true } })
+    s = engineReducer(s, { type: 'plan', player: 1, plan: { pos: { x: 0, y: 0 }, angle: Math.PI / 2, locked: true } })
+    s = engineReducer(s, { type: 'plan', player: 2, plan: { pos: { x: 20, y: 0 }, angle: -Math.PI / 2, locked: true } })
+    s = engineReducer(s, { type: 'tick', now: COUNTDOWN_MS + 10 })
+    expect(s.lastReveal!.shots.find((sh) => sh.from === 0)!.hit).toBe(1)
+  })
+})

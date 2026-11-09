@@ -43,8 +43,10 @@ export type EngineState = {
   seed: number
   level: BotLevel
   players: Player[]
-  /** 팀전이면 사람마다 팀 (같은 팀은 포탄에 안 다침). 개인전이면 null */
+  /** 팀전이면 사람마다 팀 (같은 팀 공격을 끄면 같은 팀은 포탄에 안 다침). 개인전이면 null */
   teams: Team[] | null
+  /** 팀전에서 같은 팀도 포탄에 다치는지 (방장이 대기실에서 고름) */
+  friendlyFire: boolean
   tanks: Tank[]
   terrain: Terrain
   /** 지금 차례인 사람 */
@@ -85,7 +87,7 @@ function startSpots(rng: Rng, n: number): number[] {
   return spots
 }
 
-export function createEngine(opts: { now: number; seed: number; players: Player[]; teams?: Team[] | null; level?: BotLevel }): EngineState {
+export function createEngine(opts: { now: number; seed: number; players: Player[]; teams?: Team[] | null; friendlyFire?: boolean; level?: BotLevel }): EngineState {
   const rng = createRng(opts.seed)
   const terrain = makeTerrain(rng)
   const spots = startSpots(rng, opts.players.length)
@@ -97,6 +99,7 @@ export function createEngine(opts: { now: number; seed: number; players: Player[
     level: opts.level ?? 'normal',
     players: opts.players,
     teams: opts.teams ?? null,
+    friendlyFire: !!opts.friendlyFire,
     tanks,
     terrain,
     turn,
@@ -160,8 +163,8 @@ function launch(s: EngineState): EngineState {
 function land(s: EngineState, shot: Shot): EngineState {
   if (!shot.impact) return { ...s, phase: { kind: 'boom', until: s.now + BOOM_MS, boom: { at: null, damage: s.tanks.map(() => 0), dead: [], fell: [] } } }
   const blast = explode(s.terrain, s.tanks, shot.impact)
-  // 팀전: 쏜 사람과 같은 팀은 안 다친다 (나는 다침)
-  if (s.teams) blast.damage = blast.damage.map((d, i) => (sameTeam(s.teams, s.turn, i) ? 0 : d))
+  // 팀전에서 같은 팀 공격을 껐으면 쏜 사람과 같은 팀은 안 다친다 (나는 다침)
+  if (s.teams && !s.friendlyFire) blast.damage = blast.damage.map((d, i) => (sameTeam(s.teams, s.turn, i) ? 0 : d))
   const tanks = s.tanks.map((t, i) => {
     if (!t.alive) return t
     const hp = Math.max(0, t.hp - blast.damage[i])

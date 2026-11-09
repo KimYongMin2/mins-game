@@ -124,3 +124,13 @@ describe('팀전', () => {
     }
   })
 })
+
+describe('팀전 같은 팀 공격', () => {
+  it('켜면 같은 팀도 겨눌 수 있다', () => {
+    let s = createEngine({ now: 0, seed: 1, players: people(4), teams: [0, 1, 0, 1], friendlyFire: true })
+    s = engineReducer(s, { type: 'tick', now: INTRO_MS })
+    const t = s.turn
+    const mate = [0, 1, 2, 3].find((i) => i !== t && [0, 1, 0, 1][i] === [0, 1, 0, 1][t])!
+    expect(engineReducer(s, { type: 'aim', player: t, target: mate }).aimAt).toBe(mate)
+  })
+})

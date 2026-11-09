@@ -20,7 +20,7 @@ import { playSound } from '../sounds'
 type Props =
   | { mode: 'bot'; bots: number; level: BotLevel; onFinish: (s: GameSummary) => void }
   /** 방장: 시작할 때 방에 있던 사람들로 경기 */
-  | { mode: 'host'; room: Room<ArtilleryMsg>; members: Member[]; bots: number; teams: TeamPick | null; onFinish: (s: GameSummary) => void; onQuit: () => void }
+  | { mode: 'host'; room: Room<ArtilleryMsg>; members: Member[]; bots: number; teams: TeamPick | null; friendlyFire?: boolean; onFinish: (s: GameSummary) => void; onQuit: () => void }
   | { mode: 'guest'; room: Room<ArtilleryMsg>; onFinish: (s: GameSummary) => void; onQuit: () => void }
 
 /** 방장이 친구들에게 화면을 보내는 간격: 바뀌면 이만큼마다(움직이는 동안 너무 자주 안 보내게), 안 바뀌어도 HEARTBEAT_MS마다 */
@@ -73,7 +73,7 @@ function initHost(props: Props): HostState {
     players = plan.order.map((i) => players[i])
     teams = plan.teams
   }
-  const engine = createEngine({ now, seed: randomSeed(), players, teams, level: props.mode === 'bot' ? props.level : 'normal' })
+  const engine = createEngine({ now, seed: randomSeed(), players, teams, friendlyFire: props.mode === 'host' && !!props.friendlyFire, level: props.mode === 'bot' ? props.level : 'normal' })
   return { engine, screen: screenReducer(createScreen(props.mode === 'bot' ? 'me' : props.mode === 'host' ? props.room.myId : '', now), { type: 'view', view: toView(engine) }) }
 }
 

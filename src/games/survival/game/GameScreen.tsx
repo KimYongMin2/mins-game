@@ -29,7 +29,7 @@ import { playSound } from '../sounds'
 type Props =
   | { mode: 'bot'; bots: number; onFinish: (s: GameSummary) => void }
   /** 방장: 시작할 때 방에 있던 사람들로 경기 */
-  | { mode: 'host'; room: Room<SurvivalMsg>; members: Member[]; bots: number; teams: TeamPick | null; onFinish: (s: GameSummary) => void; onQuit: () => void }
+  | { mode: 'host'; room: Room<SurvivalMsg>; members: Member[]; bots: number; teams: TeamPick | null; friendlyFire?: boolean; onFinish: (s: GameSummary) => void; onQuit: () => void }
   | { mode: 'guest'; room: Room<SurvivalMsg>; onFinish: (s: GameSummary) => void; onQuit: () => void }
 
 /** 방장이 친구들에게 화면을 보내는 최소 간격 (바뀌면 바로, 안 바뀌어도 이만큼마다) */
@@ -77,7 +77,7 @@ function initHost(props: Props): HostState {
     players = plan.order.map((i) => players[i])
     teams = plan.teams
   }
-  const engine = createEngine({ now, seed: randomSeed(), players, teams })
+  const engine = createEngine({ now, seed: randomSeed(), players, teams, friendlyFire: props.mode === 'host' && !!props.friendlyFire })
   return { engine, screen: screenReducer(createScreen(props.mode === 'bot' ? 'me' : props.mode === 'host' ? props.room.myId : '', now), { type: 'view', view: toView(engine) }) }
 }
 

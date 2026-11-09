@@ -115,3 +115,26 @@ describe('팀전', () => {
     }
   })
 })
+
+describe('팀전 같은 팀 공격', () => {
+  // 0번 바로 옆에 같은 팀 2번을 두고, 거의 수직으로 약하게 쏴서 둘 다 폭발 안에 들게 한다
+  const shootNearMate = (friendlyFire: boolean) => {
+    let s = createEngine({ now: 0, seed: 3, players: bots(4), teams: [0, 1, 0, 1], friendlyFire })
+    s = engineReducer(s, { type: 'tick', now: COUNTDOWN_MS })
+    // 차례 시작 자리(이동 범위 기준)도 0번 자리로
+    s = { ...s, phase: { ...(s.phase as Extract<EngineState['phase'], { kind: 'aim' }>), startX: s.tanks[0].x }, turn: 0, wind: 0, terrain: s.terrain.map(() => 40), tanks: s.tanks.map((t, i) => (i === 2 ? { ...t, x: s.tanks[0].x + 4 } : t)) }
+    let t = engineReducer(s, { type: 'fire', player: 0, x: s.tanks[0].x, angle: 88, power: 20 })
+    for (let now = t.now; now < s.now + 10_000 && t.phase.kind !== 'boom'; now += 20) t = engineReducer(t, { type: 'tick', now })
+    const ph = t.phase as EngineState['phase']
+    return ph.kind === 'boom' ? ph.boom.damage : []
+  }
+
+  it('켜면 같은 팀도 포탄에 다치고, 끄면 안 다친다 (나는 늘 다침)', () => {
+    const on = shootNearMate(true)
+    const off = shootNearMate(false)
+    expect(on[0]).toBeGreaterThan(0)
+    expect(on[2]).toBeGreaterThan(0)
+    expect(off[0]).toBeGreaterThan(0)
+    expect(off[2]).toBe(0)
+  })
+})

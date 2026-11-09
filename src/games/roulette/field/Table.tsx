@@ -72,8 +72,8 @@ export function Table({ screen, onPick }: { screen: ScreenState; onPick: (i: num
         const dead = !v.alive[i]
         const hitNow = f?.bang && f.target === i && shown
         const isTarget = target === i
-        // 팀전: 같은 팀은 못 쏨
-        const pickable = mine && !dead && !sameTeam(v.teams, me, i)
+        // 팀전: 같은 팀 공격을 껐으면 같은 팀은 못 쏨
+        const pickable = mine && !dead && (v.friendlyFire || !sameTeam(v.teams, me, i))
         return (
           <button
             key={p.id}
