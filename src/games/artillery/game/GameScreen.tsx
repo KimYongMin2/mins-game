@@ -3,7 +3,7 @@ import type { Member, Room } from '../../../shared/online/room'
 import { randomSeed } from '../../../shared/random'
 import { loadNickname } from '../../../shared/storage/nickname'
 import type { BotLevel } from '../bot/artilleryBot'
-import { MOVE_SPEED, PLAYER_COLORS, POWER_MAX, TURN_MS, WIND_MAX } from '../constants'
+import { MOVE_SPEED, PLAYER_COLORS, POWER_MAX, TURN_MS, WIND_MAX, WORLD_W } from '../constants'
 import { Battlefield } from '../field/Battlefield'
 import { type EngineAction, type EngineState, type Player, createEngine, engineReducer } from '../play/engine'
 import type { ArtilleryMsg } from '../play/pvp'
@@ -279,13 +279,16 @@ export function GameScreen(props: Props) {
     releaseRef.current = releaseCharge
   })
 
-  // PC: ←→ 각도(Shift는 5씩), A·D 이동(누르는 동안), 스페이스·Enter 누르고 있다가 떼면 발사
+  // PC: ←→·A·D 이동(누르는 동안), ↑↓ 포신 올리기·내리기(Shift는 5씩), 스페이스·Enter 누르고 있다가 떼면 발사
   useEffect(() => {
     function onKey(e: KeyboardEvent, down: boolean) {
       const s = screenRef.current
-      if (e.code === 'KeyA' || e.code === 'KeyD') {
+      const moveKey: Record<string, number> = { KeyA: -1, ArrowLeft: -1, KeyD: 1, ArrowRight: 1 }
+      if (e.code in moveKey) {
         e.preventDefault()
-        moveRef.current = down ? (e.code === 'KeyA' ? -1 : 1) : 0
+        const dir = moveKey[e.code]
+        if (down) moveRef.current = dir
+        else if (moveRef.current === dir) moveRef.current = 0
         return
       }
       if (e.code === 'Space' || e.code === 'Enter') {
@@ -294,16 +297,14 @@ export function GameScreen(props: Props) {
         if (!down) releaseRef.current()
         return
       }
-      if (!down || !s.draft) return
-      const step = e.shiftKey ? 5 : 1
-      const keys: Record<string, () => void> = {
-        ArrowLeft: () => dispatchRef.current({ type: 'draft', angle: s.draft!.angle + step }),
-        ArrowRight: () => dispatchRef.current({ type: 'draft', angle: s.draft!.angle - step }),
-      }
-      const fn = keys[e.code]
-      if (!fn) return
+      // ↑ 포신 올리기 · ↓ 내리기 (지금 겨눈 쪽 기준, Shift는 5씩). 똑바로 위(90°)에서 ↓면 맵 가운데 쪽으로 내려감
+      if (e.code !== 'ArrowUp' && e.code !== 'ArrowDown') return
       e.preventDefault()
-      fn()
+      if (!down || !s.draft) return
+      const step = (e.shiftKey ? 5 : 1) * (e.code === 'ArrowUp' ? 1 : -1)
+      const a = s.draft.angle
+      const facingRight = a < 90 || (a === 90 && s.draft.x < WORLD_W / 2)
+      dispatchRef.current({ type: 'draft', angle: facingRight ? Math.min(90, a + step) : Math.max(90, a - step) })
     }
     const down = (e: KeyboardEvent) => onKey(e, true)
     const up = (e: KeyboardEvent) => onKey(e, false)
@@ -428,7 +429,7 @@ export function GameScreen(props: Props) {
           {me >= 0 && v && !v.tanks[me].alive ? '탈락 · 구경 중' : v && me < 0 ? '이미 시작한 판이라 구경해요' : screen.fired ? '발사!' : '내 차례를 기다리는 중'}
         </p>
       )}
-      <p className="at-hint">전장을 새총처럼 뒤로 당겨 각도 맞추기(반대쪽으로 날아감) · 아래 버튼을 꾹 누르면 힘이 오르내려요, 원하는 힘에서 떼면 발사 (노란 줄 = 지난번 힘) · PC: ←→ 각도(Shift는 5씩) · A·D 이동 · 스페이스 꾹 → 떼면 발사</p>
+      <p className="at-hint">전장을 새총처럼 뒤로 당겨 각도 맞추기(반대쪽으로 날아감) · 아래 버튼을 꾹 누르면 힘이 오르내려요, 원하는 힘에서 떼면 발사 (노란 줄 = 지난번 힘) · PC: ←→ 이동 · ↑↓ 포신 올리기·내리기(Shift는 5씩) · 스페이스 꾹 → 떼면 발사</p>
 
       {hostGone && props.mode === 'guest' && (
         <div className="pvp-gone" role="alert">
