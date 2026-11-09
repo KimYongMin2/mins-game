@@ -113,21 +113,106 @@
   touch-action: none;
 }
 
-.vb-pads__move,
 .vb-pads__act {
   display: flex;
   gap: 8px;
 }
 
-/* 폭이 모자라면 버튼이 같이 줄어든다 (왼쪽 3개 : 오른쪽 2개) */
-.vb-pads__move {
-  flex: 3;
-  max-width: 260px;
+.vb-pads {
+  align-items: center;
+}
+
+/* 방향패드: 한 손가락으로 8방향 */
+.vb-stick {
+  /* 화살표가 가운데에서 떨어진 거리 (대각선은 0.72배) */
+  --o: 50px;
+  --d: 36px;
+  position: relative;
+  flex: none;
+  width: 150px;
+  height: 150px;
+  border: 3px solid #1f2937;
+  border-radius: 50%;
+  background: radial-gradient(circle, #fff 0 30%, #f3f4f6 31%);
+  box-shadow: 0 4px 0 #1f2937;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+
+.vb-stick__arrow {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 40px;
+  height: 40px;
+  margin: -20px 0 0 -20px;
+  display: grid;
+  place-items: center;
+  border-radius: 12px;
+  font-size: 1.375rem;
+  font-weight: 900;
+  color: #1f2937;
+  pointer-events: none;
+}
+
+.vb-stick__arrow--diag {
+  font-size: 0.875rem;
+  color: #9ca3af;
+}
+
+.vb-stick__arrow--on {
+  background: #bfdbfe;
+  color: #1f2937;
+}
+
+.vb-stick__arrow--n {
+  transform: translate(0, calc(-1 * var(--o)));
+}
+.vb-stick__arrow--ne {
+  transform: translate(var(--d), calc(-1 * var(--d)));
+}
+.vb-stick__arrow--e {
+  transform: translate(var(--o), 0);
+}
+.vb-stick__arrow--se {
+  transform: translate(var(--d), var(--d));
+}
+.vb-stick__arrow--s {
+  transform: translate(0, var(--o));
+}
+.vb-stick__arrow--sw {
+  transform: translate(calc(-1 * var(--d)), var(--d));
+}
+.vb-stick__arrow--w {
+  transform: translate(calc(-1 * var(--o)), 0);
+}
+.vb-stick__arrow--nw {
+  transform: translate(calc(-1 * var(--d)), calc(-1 * var(--d)));
+}
+
+.vb-stick__dot {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 14px;
+  height: 14px;
+  margin: -7px 0 0 -7px;
+  border-radius: 50%;
+  background: #1f2937;
+  pointer-events: none;
 }
 
 .vb-pads__act {
-  flex: 2;
-  max-width: 176px;
+  flex: 1;
+  max-width: 180px;
+}
+
+.vb-pads__act .vb-pad {
+  height: 110px;
+  font-size: 1.5rem;
+  border-radius: 24px;
 }
 
 .vb-pad {
@@ -143,10 +228,6 @@
   border-radius: 16px;
   box-shadow: 0 4px 0 #1f2937;
   touch-action: none;
-}
-
-.vb-pad--jump {
-  background: #bfdbfe;
 }
 
 .vb-pad--hit {
@@ -381,8 +462,8 @@
     display: grid;
     grid-template-columns: auto 1fr auto;
     grid-template-areas:
-      'hud hud hud'
-      'move view act';
+      "hud hud hud"
+      "move view act";
     align-items: center;
     gap: 6px 10px;
   }
@@ -405,28 +486,30 @@
     display: contents;
   }
 
-  .vb-pads__move,
   .vb-pads__act {
     flex-direction: column;
   }
 
-  .vb-pads__move {
+  .vb-stick {
     grid-area: move;
+    width: 140px;
+    height: 140px;
+    --o: 44px;
+    --d: 32px;
   }
 
   .vb-pads__act {
     grid-area: act;
   }
 
-  .vb-pads__move,
   .vb-pads__act {
     max-width: none;
   }
 
-  .vb-pad {
+  .vb-pads__act .vb-pad {
     flex: none;
-    width: 76px;
-    height: 64px;
+    width: 110px;
+    height: 110px;
   }
 }
 
