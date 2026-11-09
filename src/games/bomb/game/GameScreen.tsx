@@ -1,9 +1,10 @@
-import { useEffect, useReducer, useRef, useState } from 'react'
+import { Suspense, lazy, useEffect, useReducer, useRef, useState } from 'react'
 import type { Member, Room } from '../../../shared/online/room'
 import { LinkBadge } from '../../../shared/ui/LinkBadge'
 import { randomSeed } from '../../../shared/random'
 import { TEAM_NAMES, type Team, type TeamPick, planTeams, teamOutcome } from '../../../shared/team/teams'
 import { loadNickname } from '../../../shared/storage/nickname'
+import { canWebGL } from '../../../shared/art3d/webgl'
 import { Table } from '../field/Table'
 import { type EngineAction, type EngineState, type Player, createEngine, engineReducer, neighborsOf } from '../play/engine'
 import type { BombMsg } from '../play/pvp'
@@ -21,6 +22,9 @@ type Props =
 
 /** 방장이 친구들에게 화면을 보내는 최소 간격 (바뀌면 바로, 안 바뀌어도 이만큼마다) */
 const HEARTBEAT_MS = 1000
+
+/** 3D 탁자는 three.js가 커서 경기 화면에서만 불러온다 (불러오는 동안은 2D 그림) */
+const Table3D = lazy(() => import('../field/Table3D').then((m) => ({ default: m.Table3D })))
 
 const BOT_NAMES = ['봇 철수', '봇 영희', '봇 민수', '봇 지수', '봇 현우', '봇 수진', '봇 동현']
 
@@ -125,6 +129,8 @@ export function GameScreen(props: Props) {
     createScreen(props.mode === 'guest' ? props.room.myId : '', performance.now()),
   )
   const screen = isGuest ? guest : host.screen
+  // 3D 탁자 (WebGL이 안 되는 기기는 예전 2D 그림)
+  const [use3D] = useState(canWebGL)
   const [hostGone, setHostGone] = useState(false)
   const room = props.mode === 'bot' ? null : props.room
 
@@ -245,8 +251,14 @@ export function GameScreen(props: Props) {
 
   return (
     <div className="bm-game">
-      <div className="bm-view">
-        <Table screen={screen} onPick={pick} />
+      <div className={`bm-view${use3D ? ' bm-view--3d' : ''}`}>
+        {use3D ? (
+          <Suspense fallback={<Table screen={screen} onPick={pick} />}>
+            <Table3D screen={screen} onPick={pick} />
+          </Suspense>
+        ) : (
+          <Table screen={screen} onPick={pick} />
+        )}
         <Banner screen={screen} />
         {'room' in props && <LinkBadge room={props.room} />}
       </div>

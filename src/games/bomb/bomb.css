@@ -470,3 +470,87 @@
 .bm-view .bm-banner__win {
   color: #fde047;
 }
+
+/* 3D 탁자 (field/Table3D) */
+.bm3 {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  max-height: 70dvh;
+  margin: 0 auto;
+  overflow: hidden;
+  border-radius: 18px;
+  background: #1f1914;
+  touch-action: manipulation;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.bm3 canvas {
+  position: absolute;
+  inset: 0;
+}
+
+.bm3--boom {
+  animation: bm-shake 0.4s linear;
+}
+
+.bm3-label {
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 1;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgb(20 16 12 / 0.62);
+  color: #fff;
+  font-size: 0.8125rem;
+  font-weight: 800;
+  white-space: nowrap;
+  pointer-events: none;
+  transition: background 0.15s;
+}
+
+.bm3-label--me {
+  background: rgb(37 99 235 / 0.85);
+}
+
+.bm3-label--target {
+  background: #facc15;
+  color: #1f2937;
+}
+
+.bm3-label--out {
+  opacity: 0.55;
+  text-decoration: line-through;
+}
+
+/* 3D: 안내 글씨는 탁자 아래쪽에 어두운 띠로, 3·2·1·펑은 위쪽에 */
+.bm-view--3d .bm-tip {
+  top: auto;
+  bottom: 12px;
+  left: 50%;
+  right: auto;
+  transform: translateX(-50%);
+  padding: 6px 14px;
+  border-radius: 999px;
+  background: rgb(20 16 12 / 0.7);
+  color: #fff;
+  white-space: nowrap;
+  z-index: 2;
+}
+
+.bm-view--3d .bm-tip--hot {
+  background: rgb(220 38 38 / 0.85);
+}
+
+.bm-view--3d .bm-banner {
+  top: 47%;
+  z-index: 2;
+  color: #fff;
+  text-shadow: 0 2px 10px rgb(0 0 0 / 0.7);
+}
+
+.bm-view--3d .bm-banner span {
+  color: #f5e6d3;
+}
