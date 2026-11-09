@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { AFTER_SHOT_MS, COUNTDOWN_MS, LASER_SPEED, PIECE_R, PLAN_MS, SHOT_AT, SHRINK_MIN } from '../constants'
-import { type EngineState, type Player, aliveIndexes, createEngine, engineReducer, hitAtOf, ranksOf } from './engine'
+import { type EngineState, type Player, aliveIndexes, createEngine, engineReducer, hitAtOf, ranksOf, winnerTeam } from './engine'
 
 const people = (n: number): Player[] => Array.from({ length: n }, (_, i) => ({ id: `p${i}`, name: `사람${i}`, kind: i === 0 ? 'user' : 'remote' }))
 const bots = (n: number): Player[] => [{ id: 'me', name: '나', kind: 'user' }, ...Array.from({ length: n }, (_, i) => ({ id: `b${i}`, name: `봇${i}`, kind: 'bot' as const }))]
@@ -152,6 +152,34 @@ describe('봇끼리 끝까지', () => {
         expect(aliveIndexes(s)).toHaveLength(1)
         expect(ranksOf(s).filter((r) => r === 1)).toHaveLength(1)
       }
+    }
+  })
+})
+
+describe('팀전', () => {
+  const allBots = (n: number): Player[] => Array.from({ length: n }, (_, i) => ({ id: `b${i}`, name: `봇${i}`, kind: 'bot' as const }))
+
+  it('같은 팀은 레이저에 안 맞는다', () => {
+    let s = createEngine({ now: 0, seed: 1, players: people(3), teams: [0, 0, 1] })
+    s = engineReducer(s, { type: 'tick', now: COUNTDOWN_MS })
+    // 0이 1(같은 팀)을 지나 2를 겨눔: 일자로 0 → 1 → 2
+    s = engineReducer(s, { type: 'plan', player: 0, plan: { pos: { x: -20, y: 0 }, angle: 0, locked: true } })
+    s = engineReducer(s, { type: 'plan', player: 1, plan: { pos: { x: 0, y: 0 }, angle: Math.PI / 2, locked: true } })
+    s = engineReducer(s, { type: 'plan', player: 2, plan: { pos: { x: 20, y: 0 }, angle: -Math.PI / 2, locked: true } })
+    s = { ...s, walls: [] }
+    s = engineReducer(s, { type: 'tick', now: COUNTDOWN_MS + 10 })
+    const shot = s.lastReveal!.shots.find((sh) => sh.from === 0)!
+    expect(shot.hit).toBe(2)
+  })
+
+  it('봇끼리: 한 팀만 남으면 끝', () => {
+    for (let seed = 1; seed <= 10; seed++) {
+      const teams = [0, 1, 0, 1, 0, 1] as const
+      let s = createEngine({ now: 0, seed, players: allBots(6), teams: [...teams] })
+      for (let now = 0; now < 2_000_000 && s.phase.kind !== 'done'; now += 50) s = engineReducer(s, { type: 'tick', now })
+      expect(s.phase.kind).toBe('done')
+      const w = winnerTeam(s)
+      teams.forEach((t, i) => t !== w && expect(s.alive[i]).toBe(false))
     }
   })
 })

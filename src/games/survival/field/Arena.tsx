@@ -3,6 +3,7 @@ import { COUNTDOWN_MS, PIECE_R, PLAYER_COLORS, SHOT_AT } from '../constants'
 import { type Vec, shoot } from '../rules/geometry'
 import { hitAtOf, laserMs } from '../play/engine'
 import { type ScreenState, myIndex } from '../play/view'
+import { TEAM_COLORS } from '../../../shared/team/teams'
 
 // 위에서 내려다본 둥근 맵. 가운데가 (0,0), 화면 틀은 이 경기 처음 맵 크기. 줄어든 바깥은 빗금(못 들어감).
 // 고르는 동안엔 내 말·내 조준선만, 공개 때 모두의 말과 총알 실선을 그린다.
@@ -60,6 +61,8 @@ export function Arena({ screen, onPointer }: Props) {
   // 라운드 안내 동안 맵이 줄어드는 모습
   const half = v.phase === 'countdown' ? lerp(v.prevHalf, v.half, t / (COUNTDOWN_MS * 0.6)) : v.half
   const nameOf = (i: number) => (i === me ? '나' : v.players[i].name)
+  // 팀전이면 팀 색
+  const colorOf = (i: number) => (v.teams ? TEAM_COLORS[v.teams[i]] : PLAYER_COLORS[i % PLAYER_COLORS.length])
   const r = v.reveal
   const draft = screen.draft
   const showDraft = v.phase === 'plan' && me >= 0 && v.alive[me]
@@ -130,11 +133,11 @@ export function Arena({ screen, onPointer }: Props) {
               y1={draft.pos.y}
               x2={shoot(draft.pos, draft.angle, [], half, v.walls).end.x}
               y2={shoot(draft.pos, draft.angle, [], half, v.walls).end.y}
-              stroke={PLAYER_COLORS[me % PLAYER_COLORS.length]}
+              stroke={colorOf(me)}
             />
           )}
           <g opacity={draft.locked ? 1 : 0.75}>
-            <Piece at={draft.pos} angle={draft.angle} color={PLAYER_COLORS[me % PLAYER_COLORS.length]} me label="나" />
+            <Piece at={draft.pos} angle={draft.angle} color={colorOf(me)} me label="나" />
           </g>
         </>
       )}
@@ -146,7 +149,7 @@ export function Arena({ screen, onPointer }: Props) {
             const p = shotT(laserMs(sh))
             if (p <= 0) return null
             const tip = { x: lerp(sh.pos.x, sh.end.x, p), y: lerp(sh.pos.y, sh.end.y, p) }
-            const color = PLAYER_COLORS[sh.from % PLAYER_COLORS.length]
+            const color = colorOf(sh.from)
             return (
               <g key={`s${sh.from}`}>
                 <line className="sv-shot__glow" x1={sh.pos.x} y1={sh.pos.y} x2={tip.x} y2={tip.y} stroke={color} />
@@ -165,7 +168,7 @@ export function Arena({ screen, onPointer }: Props) {
                 key={`p${i}`}
                 at={p}
                 angle={angle}
-                color={PLAYER_COLORS[i % PLAYER_COLORS.length]}
+                color={colorOf(i)}
                 me={i === me}
                 dead={isHit(i)}
                 label={nameOf(i)}

@@ -1,3 +1,4 @@
+import type { TeamOutcome } from '../../shared/team/teams'
 import { type RecordStore, localRecordStore } from '../../shared/storage/records'
 
 const GAME_ID = 'survival'
@@ -23,6 +24,8 @@ export type GameSummary = {
   kills: number
   /** 등수 순 (같은 라운드에 탈락하면 같은 등수) */
   ranking: { name: string; rank: number; kills: number; me: boolean }[]
+  /** 팀전이면 팀 결과 (rank는 이기면 1, 지면 2) */
+  team?: TeamOutcome
 }
 
 export function addGame(record: SurvivalRecord, summary: GameSummary): SurvivalRecord {

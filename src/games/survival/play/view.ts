@@ -3,12 +3,17 @@
 // 내가 고르는 것(draft)은 각 기기가 들고 있다가 심판에게 보낸다.
 import { SHOT_AT } from '../constants'
 import { type Vec, type Wall, halfFor, placeAt } from '../rules/geometry'
-import { type EngineState, type Plan, type Reveal, aliveIndexes, hitAtOf, ranksOf } from './engine'
+import type { Team } from '../../../shared/team/teams'
+import { type EngineState, type Plan, type Reveal, aliveIndexes, hitAtOf, ranksOf, winnerTeam } from './engine'
 
 export type PhaseKind = EngineState['phase']['kind']
 
 export type SurvivalView = {
   players: { id: string; name: string }[]
+  /** 팀전이면 사람마다 팀 */
+  teams: Team[] | null
+  /** 팀전에서 끝났으면 이긴 팀 */
+  winTeam: Team | null
   alive: boolean[]
   kills: number[]
   round: number
@@ -34,6 +39,8 @@ export function toView(s: EngineState): SurvivalView {
   const { phase, now } = s
   return {
     players: s.players.map(({ id, name }) => ({ id, name })),
+    teams: s.teams,
+    winTeam: phase.kind === 'done' ? winnerTeam(s) : null,
     alive: s.alive,
     kills: s.kills,
     round: s.round,

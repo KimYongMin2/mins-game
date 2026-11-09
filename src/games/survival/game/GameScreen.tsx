@@ -1,6 +1,7 @@
 import { useEffect, useReducer, useRef, useState } from 'react'
 import type { Member, Room } from '../../../shared/online/room'
 import { randomSeed } from '../../../shared/random'
+import { TEAM_COLORS, TEAM_NAMES, type Team, type TeamPick, planTeams, teamOutcome } from '../../../shared/team/teams'
 import { loadNickname } from '../../../shared/storage/nickname'
 import { PIECE_R, PLAN_MS, PLAYER_COLORS } from '../constants'
 import { Arena } from '../field/Arena'
@@ -28,7 +29,7 @@ import { playSound } from '../sounds'
 type Props =
   | { mode: 'bot'; bots: number; onFinish: (s: GameSummary) => void }
   /** 방장: 시작할 때 방에 있던 사람들로 경기 */
-  | { mode: 'host'; room: Room<SurvivalMsg>; members: Member[]; bots: number; onFinish: (s: GameSummary) => void; onQuit: () => void }
+  | { mode: 'host'; room: Room<SurvivalMsg>; members: Member[]; bots: number; teams: TeamPick | null; onFinish: (s: GameSummary) => void; onQuit: () => void }
   | { mode: 'guest'; room: Room<SurvivalMsg>; onFinish: (s: GameSummary) => void; onQuit: () => void }
 
 /** 방장이 친구들에게 화면을 보내는 최소 간격 (바뀌면 바로, 안 바뀌어도 이만큼마다) */
@@ -69,8 +70,15 @@ function initHost(props: Props): HostState {
       ...BOT_NAMES.slice(0, props.bots).map((name, i) => ({ id: `bot${i}`, name, kind: 'bot' as const })),
     ]
   }
-  const engine = createEngine({ now, seed: randomSeed(), players })
-  return { engine, screen: screenReducer(createScreen(players[0]?.id ?? '', now), { type: 'view', view: toView(engine) }) }
+  // 팀전: 두 팀이 번갈아 앉게(차례가 오게) 자리를 다시 늘어놓는다
+  let teams: Team[] | null = null
+  if (props.mode === 'host' && props.teams) {
+    const plan = planTeams(players.map((p) => p.id), props.teams)
+    players = plan.order.map((i) => players[i])
+    teams = plan.teams
+  }
+  const engine = createEngine({ now, seed: randomSeed(), players, teams })
+  return { engine, screen: screenReducer(createScreen(props.mode === 'bot' ? 'me' : props.mode === 'host' ? props.room.myId : '', now), { type: 'view', view: toView(engine) }) }
 }
 
 function summaryOf(screen: ScreenState, mode: GameSummary['mode']): GameSummary {
@@ -79,6 +87,10 @@ function summaryOf(screen: ScreenState, mode: GameSummary['mode']): GameSummary 
   const ranking = v.players
     .map((p, i) => ({ name: p.name, rank: v.ranks[i], kills: v.kills[i], me: i === me }))
     .sort((a, b) => a.rank - b.rank || b.kills - a.kills)
+  if (v.teams) {
+    const team = teamOutcome(v.players.map((p) => p.name), v.teams, me, v.winTeam)
+    return { mode, rank: v.winTeam === v.teams[me] ? 1 : 2, kills: v.kills[me], ranking, team }
+  }
   return { mode, rank: v.ranks[me], kills: v.kills[me], ranking }
 }
 
@@ -98,6 +110,9 @@ function statusOf(screen: ScreenState): { text: string; tone?: 'bad' | 'win' } {
     case 'reveal':
     case 'done': {
       const r = v.reveal
+      if (v.phase === 'done' && v.teams && v.winTeam !== null) {
+        return v.winTeam === v.teams[me] ? { text: '우리 팀 승리!', tone: 'win' } : { text: `${TEAM_NAMES[v.winTeam]} 승리!` }
+      }
       if (v.phase === 'done') {
         const winner = v.ranks.indexOf(1)
         return winner === me ? { text: '내가 최후의 1인!', tone: 'win' } : { text: `${v.players[winner].name} 우승!` }
@@ -260,7 +275,7 @@ export function GameScreen(props: Props) {
         <ul className="sv-players" aria-label="참가자">
           {v.players.map((p, i) => (
             <li key={p.id} className={`sv-chip${v.alive[i] ? '' : ' sv-chip--out'}${i === me ? ' sv-chip--me' : ''}`}>
-              <span className="sv-chip__dot" style={{ background: PLAYER_COLORS[i % PLAYER_COLORS.length] }} />
+              <span className="sv-chip__dot" style={{ background: v.teams ? TEAM_COLORS[v.teams[i]] : PLAYER_COLORS[i % PLAYER_COLORS.length] }} />
               <span className="sv-chip__name">{i === me ? '나' : p.name}</span>
               {v.kills[i] > 0 && <span className="sv-chip__kills">{v.kills[i]}킬</span>}
               {v.phase === 'plan' && v.alive[i] && <span className="sv-chip__state">{v.locked.includes(i) ? '✓' : '○'}</span>}

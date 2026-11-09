@@ -2,6 +2,7 @@
 // 라운드: 맵 줄어듦 안내 → 모두 몰래 위치·방향 고르기 → 공개(총알이 일자로, 처음 맞은 한 명 탈락) → 다음 라운드.
 // 5라운드 뒤로는 가장 작은 맵 그대로 한 명 남을 때까지.
 import { type Rng, createRng } from '../../../shared/random'
+import { type Team, lastTeam, sameTeam } from '../../../shared/team/teams'
 import { chooseBotPlan } from '../bot/survivalBot'
 import { AFTER_SHOT_MS, BOT_PLAN_MS, COUNTDOWN_MS, DONE_MS, LASER_SPEED, PLAN_MS, SHOT_AT, SHRINK_MIN, SHRINK_STEP } from '../constants'
 import { type Vec, type Wall, halfFor, makeWalls, placeAt, randomSpot, shoot } from '../rules/geometry'
@@ -41,6 +42,8 @@ export type EngineState = {
   now: number
   seed: number
   players: Player[]
+  /** 팀전이면 사람마다 팀 (같은 팀은 레이저가 그냥 지나감). 개인전이면 null */
+  teams: Team[] | null
   alive: boolean[]
   /** 라운드마다 탈락한 사람들 (같은 라운드면 같은 등수) */
   out: number[][]
@@ -73,11 +76,12 @@ function buildWalls(s: EngineState, half = halfFor(aliveIndexes(s).length)): Eng
   return { ...s, seed: rng.seed(), half, walls }
 }
 
-export function createEngine(opts: { now: number; seed: number; players: Player[] }): EngineState {
+export function createEngine(opts: { now: number; seed: number; players: Player[]; teams?: Team[] | null }): EngineState {
   return buildWalls({
     now: opts.now,
     seed: opts.seed,
     players: opts.players,
+    teams: opts.teams ?? null,
     alive: opts.players.map(() => true),
     out: [],
     kills: opts.players.map(() => 0),
@@ -89,6 +93,16 @@ export function createEngine(opts: { now: number; seed: number; players: Player[
     lastReveal: null,
     phase: { kind: 'countdown', until: opts.now + COUNTDOWN_MS },
   })
+}
+
+/** 끝났는지: 한 명 남음, 팀전이면 한 팀만 남음 */
+function isOver(s: EngineState): boolean {
+  return aliveIndexes(s).length <= 1 || (!!s.teams && lastTeam(s.alive, s.teams) !== null)
+}
+
+/** 이긴 팀 (팀전이고 끝났을 때) */
+export function winnerTeam(s: EngineState): Team | null {
+  return s.teams ? lastTeam(s.alive, s.teams) : null
 }
 
 const within = (rng: Rng, [min, max]: readonly [number, number]) => min + rng.next() * (max - min)
@@ -109,7 +123,7 @@ function bots(s: EngineState): EngineState {
     delete rest[i]
     const rng = createRng(next.seed)
     const lastSeen = aliveIndexes(next)
-      .filter((j) => j !== i)
+      .filter((j) => j !== i && !sameTeam(next.teams, i, j))
       .map((j) => next.lastReveal?.positions[j] ?? null)
     const { pos, angle } = chooseBotPlan(rng, next.half, next.walls, lastSeen)
     next = { ...next, seed: rng.seed(), botAt: rest, plans: { ...next.plans, [i]: { pos, angle, locked: true } } }
@@ -137,7 +151,8 @@ function reveal(s: EngineState): EngineState {
     angles[i] = p?.angle ?? rng.next() * Math.PI * 2
   }
   const shots: Shot[] = alive.map((i) => {
-    const targets = alive.filter((j) => j !== i).map((j) => ({ player: j, pos: positions[j]! }))
+    // 같은 팀은 과녁이 아님 (레이저가 그냥 지나감)
+    const targets = alive.filter((j) => j !== i && !sameTeam(s.teams, i, j)).map((j) => ({ player: j, pos: positions[j]! }))
     const { hit, end } = shoot(positions[i]!, angles[i], targets, half, s.walls)
     return { from: i, pos: positions[i]!, end, hit }
   })
@@ -160,17 +175,17 @@ function afterReveal(s: EngineState): EngineState {
   const next: EngineState = r.dead.length
     ? { ...s, kills, alive: s.alive.map((a, i) => a && !r.dead.includes(i)), out: [...s.out, r.dead] }
     : { ...s, kills }
-  if (aliveIndexes(next).length <= 1) return { ...next, phase: { kind: 'done', until: s.now + DONE_MS } }
-  // 둘이 남았는데 아무도 안 죽었으면 맵을 줄인다
+  if (isOver(next)) return { ...next, phase: { kind: 'done', until: s.now + DONE_MS } }
+  // 둘이 남았는데(팀전이면 몇 명이든) 아무도 안 죽었으면 맵을 줄인다
   const alive = aliveIndexes(next).length
-  const half = alive === 2 && r.dead.length === 0 ? Math.max(SHRINK_MIN, Math.min(s.half, halfFor(2)) - SHRINK_STEP) : halfFor(alive)
+  const half = (alive === 2 || s.teams) && r.dead.length === 0 ? Math.max(SHRINK_MIN, Math.min(s.half, halfFor(alive)) - SHRINK_STEP) : halfFor(alive)
   return buildWalls({ ...next, round: next.round + 1, plans: {}, phase: { kind: 'countdown', until: s.now + COUNTDOWN_MS } }, half)
 }
 
 function drop(s: EngineState, player: number): EngineState {
   if (!s.alive[player] || s.phase.kind === 'done') return s
   const next: EngineState = { ...s, alive: s.alive.map((a, i) => a && i !== player), out: [...s.out, [player]] }
-  if (aliveIndexes(next).length <= 1) return { ...next, phase: { kind: 'done', until: s.now + DONE_MS } }
+  if (isOver(next)) return { ...next, phase: { kind: 'done', until: s.now + DONE_MS } }
   return next
 }
 
