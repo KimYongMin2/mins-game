@@ -54,6 +54,31 @@ function shade(color: string, fur: Fur): string {
   return '#' + new THREE.Color(color).lerp(new THREE.Color(fur === 'light' ? '#ffffff' : '#000000'), fur === 'light' ? 0.4 : 0.35).getHexString()
 }
 
+/** 털·천 결 (작은 잡음 무늬를 bump로) — 모든 캐릭터가 같이 씀 */
+let grainTex: THREE.CanvasTexture | null = null
+function grain(): THREE.CanvasTexture {
+  if (grainTex) return grainTex
+  const c = document.createElement('canvas')
+  c.width = c.height = 128
+  const g = c.getContext('2d')!
+  const img = g.createImageData(128, 128)
+  let seed = 11
+  for (let i = 0; i < img.data.length; i += 4) {
+    seed = (seed * 16807) % 2147483647
+    const v = 110 + (seed % 90)
+    img.data[i] = img.data[i + 1] = img.data[i + 2] = v
+    img.data[i + 3] = 255
+  }
+  g.putImageData(img, 0, 0)
+  grainTex = new THREE.CanvasTexture(c)
+  grainTex.wrapS = grainTex.wrapT = THREE.RepeatWrapping
+  grainTex.repeat.set(3, 3)
+  return grainTex
+}
+
+/** 눈동자 색 */
+const IRIS: Partial<Record<AnimalKind, string>> = { cat: '#7cb342', fox: '#b8860b', wolf: '#4fa3d1', tiger: '#c98a1a', lion: '#a0661e', eagle: '#e0a419', frog: '#c9a227', dino: '#d08a1e' }
+
 /** 등번호 그림 (캔버스) */
 function numberTexture(n: number, color: string): THREE.CanvasTexture {
   const c = document.createElement('canvas')
@@ -78,20 +103,26 @@ export function makeAnimal(lookIn: Look, shirt: string, opts: { team?: boolean }
   const base = LOOKS[kind]
   const look = { ...base, fur: shade(base.fur, lookIn.fur), light: shade(base.light, lookIn.fur === 'dark' ? 'base' : lookIn.fur) }
   const mats: { m: THREE.MeshStandardMaterial; base: THREE.Color }[] = []
-  const mat = (color: string, rough = 0.75, metal = 0) => {
-    const m = new THREE.MeshStandardMaterial({ color, roughness: rough, metalness: metal })
+  const mat = (color: string, rough = 0.75, metal = 0, bump = 0) => {
+    const m = new THREE.MeshStandardMaterial({ color, roughness: rough, metalness: metal, ...(bump ? { bumpMap: grain(), bumpScale: bump } : {}) })
     mats.push({ m, base: m.color.clone() })
     return m
   }
-  const furM = mat(look.fur, 0.85)
-  const lightM = mat(look.light, 0.85)
+  // 털은 결이 보이게 (새·개구리·공룡은 매끈하게)
+  const furry = !['frog', 'dino', 'penguin'].includes(kind)
+  const furM = mat(look.fur, 0.85, 0, furry ? 0.035 : 0.008)
+  const lightM = mat(look.light, 0.85, 0, furry ? 0.03 : 0.006)
   const earM = mat(look.ear, 0.8)
   const noseM = mat(look.nose, 0.35)
   // 야구 유니폼: 흰 바탕(팀전이면 팀 색) + 내 색 소매·깃·단추줄·등번호
   const uniform = lookIn.outfit === 'uniform'
   const tint = TINT_HEX[lookIn.tint]
-  const shirtM = mat(uniform ? (opts.team ? shirt : '#f4f4f1') : shirt, 0.55)
-  const sleeveM = uniform ? mat(tint, 0.5) : shirtM
+  const shirtM = mat(uniform ? (opts.team ? shirt : '#f4f4f1') : shirt, 0.6, 0, 0.012)
+  const sleeveM = uniform ? mat(tint, 0.55, 0, 0.012) : shirtM
+  const pantsM = mat(uniform ? (opts.team ? '#f4f4f1' : '#e9e9e4') : '#34405a', 0.7, 0, 0.012)
+  const shoeM = mat('#f8f9fa', 0.45)
+  const soleM = mat(uniform ? tint : '#e8590c', 0.5)
+  const padM = mat(kind === 'panda' || kind === 'penguin' ? '#3a3f45' : '#f3a5b5', 0.6)
   const eyeM = mat('#14161b', 0.15)
   const whiteM = mat('#ffffff', 0.3)
   const cheekM = new THREE.MeshStandardMaterial({ color: '#ff8f9a', roughness: 0.9, transparent: true, opacity: 0.55 })
@@ -115,12 +146,114 @@ export function makeAnimal(lookIn: Look, shirt: string, opts: { team?: boolean }
   collar.rotation.x = Math.PI / 2
   bodyG.add(collar)
 
+  // 반바지 + 다리 + 운동화 (게임에선 탁자에 가려지지만 쓰러지거나 미리 보기에서 보임)
+  const shorts = mesh(new THREE.CylinderGeometry(0.43, 0.41, 0.26, 24), pantsM, 0, 0.66, 0)
+  bodyG.add(shorts)
+  for (const s of [-1, 1]) {
+    // 새는 부리 색 다리
+    const legM = kind === 'eagle' || kind === 'seagull' || kind === 'penguin' ? noseM : furM
+    bodyG.add(mesh(new THREE.CapsuleGeometry(0.13, 0.22, 6, 12), legM, s * 0.19, 0.34, 0))
+    const shoe = mesh(new THREE.SphereGeometry(0.17, 16, 12), shoeM, s * 0.19, 0.1, 0.06)
+    shoe.scale.set(0.95, 0.55, 1.35)
+    const sole = mesh(new THREE.CylinderGeometry(0.16, 0.16, 0.04, 16), soleM, s * 0.19, 0.03, 0.06)
+    sole.scale.set(1, 1, 1.35)
+    const lace = mesh(new THREE.BoxGeometry(0.12, 0.02, 0.06), soleM, s * 0.19, 0.17, 0.16)
+    bodyG.add(shoe, sole, lace)
+  }
+
+  // 꼬리 (동물마다)
+  const tail = new THREE.Group()
+  tail.position.set(0, 0.78, -0.4)
+  bodyG.add(tail)
+  const chain = (n: number, r: number, bend: number, m: (k: number) => THREE.Material) => {
+    let y = 0
+    let z = 0
+    for (let k = 0; k < n; k++) {
+      const a = (k / n) * bend
+      y += Math.sin(a) * r * 1.3
+      z -= Math.cos(a) * r * 1.1
+      tail.add(mesh(new THREE.SphereGeometry(r * (1 - k * 0.04), 12, 10), m(k), 0, y, z))
+    }
+  }
+  switch (kind) {
+    case 'bear':
+    case 'panda':
+      tail.add(mesh(new THREE.SphereGeometry(0.1, 12, 10), kind === 'panda' ? earM : furM))
+      break
+    case 'rabbit':
+      tail.add(mesh(new THREE.SphereGeometry(0.14, 14, 12), lightM))
+      break
+    case 'cat':
+      chain(8, 0.06, 2.2, () => furM)
+      break
+    case 'tiger':
+      chain(8, 0.065, 2.0, (k) => (k % 2 ? earM : furM))
+      break
+    case 'lion':
+      chain(7, 0.045, 1.6, () => furM)
+      tail.add(mesh(new THREE.SphereGeometry(0.09, 12, 10), earM, 0, 0.3, -0.4))
+      break
+    case 'elephant':
+      chain(5, 0.04, 0.4, () => furM)
+      break
+    case 'fox':
+    case 'wolf': {
+      const bush = mesh(new THREE.SphereGeometry(0.17, 16, 12), furM, 0, 0.16, -0.22)
+      bush.scale.set(0.85, 0.85, 1.9)
+      bush.rotation.x = -0.6
+      tail.add(bush)
+      const tip = mesh(new THREE.SphereGeometry(0.11, 12, 10), kind === 'fox' ? lightM : earM, 0, 0.36, -0.48)
+      tail.add(tip)
+      break
+    }
+    case 'dog': {
+      const t = mesh(new THREE.CapsuleGeometry(0.06, 0.26, 6, 10), furM, 0, 0.14, -0.08)
+      t.rotation.x = -0.7
+      tail.add(t)
+      break
+    }
+    case 'pig': {
+      const curl = mesh(new THREE.TorusGeometry(0.07, 0.025, 8, 16, Math.PI * 1.6), furM, 0, 0.04, -0.04)
+      curl.rotation.y = Math.PI / 2
+      tail.add(curl)
+      break
+    }
+    case 'dino': {
+      const t = mesh(new THREE.ConeGeometry(0.26, 0.9, 16), furM, 0, -0.32, -0.42)
+      t.rotation.x = -Math.PI / 2 - 0.45
+      tail.add(t)
+      for (let k = 0; k < 3; k++) {
+        const sp = mesh(new THREE.ConeGeometry(0.06, 0.14, 8), earM, 0, -0.08 - k * 0.12, -0.2 - k * 0.22)
+        sp.rotation.x = -0.6
+        tail.add(sp)
+      }
+      break
+    }
+    case 'eagle':
+    case 'seagull':
+    case 'penguin':
+      for (const a of [-0.45, 0, 0.45]) {
+        const f = mesh(new THREE.SphereGeometry(0.12, 12, 10), kind === 'eagle' ? earM : kind === 'seagull' ? lightM : furM, Math.sin(a) * 0.12, -0.05, -0.12)
+        f.scale.set(0.5, 0.25, 1.3)
+        f.rotation.y = a
+        tail.add(f)
+      }
+      break
+  }
+
   // 팔: 어깨에서 늘어진 팔 + 손 (손은 털 색)
   const arm = (side: 1 | -1) => {
     const pivot = new THREE.Group()
     pivot.position.set(side * 0.46, 1.48, 0)
     const sleeve = mesh(new THREE.CapsuleGeometry(0.12, 0.32, 6, 12), sleeveM, 0, -0.24, 0)
     const hand = mesh(new THREE.SphereGeometry(0.13, 16, 12), furM, 0, -0.5, 0)
+    // 손바닥 젤리 (새는 없음)
+    const birds = kind === 'eagle' || kind === 'seagull' || kind === 'penguin'
+    if (!birds && kind !== 'frog') {
+      const pad = mesh(new THREE.SphereGeometry(0.055, 10, 8), padM, 0, -0.56, 0.09)
+      pad.scale.set(1, 0.8, 0.5)
+      pivot.add(pad)
+    }
     pivot.add(sleeve, hand)
     bodyG.add(pivot)
     return pivot
@@ -150,9 +283,14 @@ export function makeAnimal(lookIn: Look, shirt: string, opts: { team?: boolean }
   const scaredEyes = new THREE.Group()
   const koEyes = new THREE.Group()
   for (const s of [-1, 1]) {
-    const e = mesh(new THREE.SphereGeometry(0.07, 14, 10), eyeM, s * eyeX, eyeY, eyeZ)
-    const shine = mesh(new THREE.SphereGeometry(0.024, 8, 6), whiteM, s * eyeX + 0.025, eyeY + 0.03, eyeZ + 0.055)
-    eyes.add(e, shine)
+    const iris = IRIS[kind]
+    const e = mesh(new THREE.SphereGeometry(0.075, 18, 14), iris ? mat(iris, 0.2) : eyeM, s * eyeX, eyeY, eyeZ)
+    const dot = mesh(new THREE.SphereGeometry(0.05, 14, 10), eyeM, s * eyeX, eyeY - 0.005, eyeZ + 0.032)
+    dot.scale.set(kind === 'cat' || kind === 'tiger' ? 0.55 : 1, 1, 0.6)
+    const shine = mesh(new THREE.SphereGeometry(0.024, 8, 6), whiteM, s * eyeX + 0.028, eyeY + 0.032, eyeZ + 0.06)
+    const shine2 = mesh(new THREE.SphereGeometry(0.011, 6, 4), whiteM, s * eyeX - 0.022, eyeY - 0.025, eyeZ + 0.062)
+    for (const o of [shine, shine2, dot]) o.castShadow = false
+    eyes.add(e, dot, shine, shine2)
     const white = mesh(new THREE.SphereGeometry(0.11, 14, 10), whiteM, s * eyeX, eyeY + 0.01, eyeZ - 0.02)
     white.scale.z = 0.6
     const pupil = mesh(new THREE.SphereGeometry(0.045, 10, 8), eyeM, s * eyeX, eyeY + 0.01, eyeZ + 0.05)
@@ -164,6 +302,21 @@ export function makeAnimal(lookIn: Look, shirt: string, opts: { team?: boolean }
     }
   }
   head.add(eyes, scaredEyes, koEyes)
+  // 눈썹 (새·개구리 빼고 — 독수리는 따로 매서운 눈썹). 겁먹으면 올라가고 가운데가 들림
+  const brows = new THREE.Group()
+  const browL: THREE.Mesh[] = []
+  if (!['eagle', 'seagull', 'penguin', 'frog'].includes(kind)) {
+    const browM = mat(new THREE.Color(look.fur).multiplyScalar(0.45).getStyle(), 0.8)
+    for (const s of [-1, 1]) {
+      const b = mesh(new THREE.CapsuleGeometry(0.018, 0.08, 4, 8), browM, s * eyeX, eyeY + 0.13, eyeZ - 0.01)
+      b.rotation.z = Math.PI / 2
+      b.userData.side = s
+      b.castShadow = false
+      brows.add(b)
+      browL.push(b)
+    }
+  }
+  head.add(brows)
 
   // 볼
   for (const s of [-1, 1]) {
@@ -568,13 +721,22 @@ export function makeAnimal(lookIn: Look, shirt: string, opts: { team?: boolean }
     eyes.visible = mood === 'calm' || mood === 'happy'
     scaredEyes.visible = mood === 'scared'
     koEyes.visible = mood === 'ko'
-    smile.visible = (mood === 'calm' || mood === 'happy') && kind !== 'rabbit'
+    // 토끼·새·코끼리는 웃는 입을 안 그림 (이·부리·코가 대신)
+    smile.visible = (mood === 'calm' || mood === 'happy') && !['rabbit', 'eagle', 'seagull', 'penguin', 'elephant'].includes(kind)
     open.visible = mood === 'scared' || mood === 'ko'
     eyes.scale.setScalar(mood === 'happy' ? 1.1 : 1)
+    brows.visible = mood !== 'ko'
+    for (const b of browL) {
+      const side = b.userData.side as number
+      b.position.y = eyeY + (mood === 'scared' ? 0.18 : 0.13)
+      b.rotation.z = Math.PI / 2 + (mood === 'scared' ? side * -0.4 : mood === 'happy' ? side * 0.15 : 0)
+    }
   }
   setMood('calm')
 
   const ease = (cur: number, to: number, k = 0.18) => cur + (to - cur) * k
+  let sunk = 0
+  let tilted = 0
 
   function update(t: number, pose: Pose, mood: Mood) {
     setMood(mood)
@@ -617,9 +779,16 @@ export function makeAnimal(lookIn: Look, shirt: string, opts: { team?: boolean }
     armL.rotation.z = ease(armL.rotation.z, -az)
     armR.rotation.z = ease(armR.rotation.z, az)
     bodyG.rotation.x = ease(bodyG.rotation.x, lean, 0.12)
-    bodyG.position.y = ease(bodyG.position.y, sink, 0.12) + bob
-    bodyG.rotation.z = ease(bodyG.rotation.z, tilt, 0.12) + shake
+    // 가라앉기·기울기는 따로 부드럽게 따라가고, 살랑임·떨림은 그 위에 더한다 (같이 섞으면 매 프레임 쌓여서 8배쯤 커졌음)
+    sunk = ease(sunk, sink, 0.12)
+    tilted = ease(tilted, tilt, 0.12)
+    bodyG.position.y = sunk + bob
+    bodyG.rotation.z = tilted + shake
     head.rotation.z = pose === 'idle' ? Math.sin(t * 1.3 + kind.length) * 0.06 : 0
+    // 꼬리: 신나면 빨리, 평소엔 천천히 흔들기, 쓰러지면 축
+    const wag = pose === 'ko' ? 0 : mood === 'happy' ? Math.sin(t * 12) * 0.5 : mood === 'scared' ? Math.sin(t * 30) * 0.12 : Math.sin(t * 2.4) * 0.18
+    tail.rotation.y = wag
+    tail.rotation.x = pose === 'ko' ? 0.5 : mood === 'scared' ? 0.35 : 0
   }
 
   function setOut(out: boolean) {

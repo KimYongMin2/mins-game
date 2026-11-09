@@ -20,11 +20,9 @@ export function AvatarPreview3D({ look, shirt = '#2563eb' }: { look: Look; shirt
     floor.receiveShadow = true
     stage.scene.add(floor)
     const rig = makeAnimal(look, shirt)
-    // 게임에선 탁자에 가려지는 아랫부분이 비어 있어서 바닥에 닿게 내린다
-    rig.root.position.y = -0.45
     stage.scene.add(rig.root)
-    stage.camera.position.set(0, 2.6, 6.4)
-    stage.camera.lookAt(0, 1.55, 0)
+    stage.camera.position.set(0, 2.4, 7.2)
+    stage.camera.lookAt(0, 1.35, 0)
     stage.lamp.position.set(1.5, 7, 4)
     stage.lamp.target.position.set(0, 1, 0)
     const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches
