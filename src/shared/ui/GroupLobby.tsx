@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { type ListedRoom, type Member, type Room, RoomError, channelCode, createRoom, joinRoom, makeRoomCode } from '../online/room'
-import { loadAvatar } from '../storage/avatar'
+import { encodeLook } from '../art3d/animalKinds'
+import { loadLook } from '../storage/avatar'
 import { TEAM_COLORS, TEAM_NAMES, type Team, type TeamPick, assignTeams, teamsReady } from '../team/teams'
 import { RoomBadge, RoomPicker } from './RoomPicker'
 
@@ -37,6 +38,12 @@ const ERROR_TEXT: Record<RoomError['reason'], string> = {
   'not-found': '방이 없어졌어요',
   full: '방이 가득 찼어요',
   offline: '서버에 연결하지 못했어요. 인터넷 연결을 확인해 주세요',
+}
+
+/** 방 사람 목록으로 알릴 내 캐릭터 */
+const myAvatar = () => {
+  const l = loadLook()
+  return l ? encodeLook(l) : undefined
 }
 
 export function GroupLobby<M>({ gameId, nickname, capacity, minPlayers, teams: canTeam = false, friendlyFire: canFriendlyFire = false, onConnected, onStart, onBack }: Props<M>) {
@@ -81,7 +88,7 @@ export function GroupLobby<M>({ gameId, nickname, capacity, minPlayers, teams: c
     setView({ kind: 'busy', text: '방을 만드는 중…' })
     try {
       const id = makeRoomCode()
-      connected(await createRoom<M>(gameId, nickname, { avatar: loadAvatar() ?? undefined, capacity, code: channelCode(id, pin), listing: { id, name, locked: !!pin } }), name, pin)
+      connected(await createRoom<M>(gameId, nickname, { avatar: myAvatar(), capacity, code: channelCode(id, pin), listing: { id, name, locked: !!pin } }), name, pin)
     } catch (e) {
       fail(e)
     }
@@ -90,7 +97,7 @@ export function GroupLobby<M>({ gameId, nickname, capacity, minPlayers, teams: c
   async function join(r: ListedRoom, pin: string | null) {
     setView({ kind: 'busy', text: '방에 들어가는 중…' })
     try {
-      connected(await joinRoom<M>(gameId, channelCode(r.id, pin), nickname, { avatar: loadAvatar() ?? undefined, capacity }), r.name, pin)
+      connected(await joinRoom<M>(gameId, channelCode(r.id, pin), nickname, { avatar: myAvatar(), capacity }), r.name, pin)
     } catch (e) {
       fail(e, !!pin)
     }

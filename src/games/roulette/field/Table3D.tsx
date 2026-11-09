@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react'
 import * as THREE from 'three'
-import { ANIMALS, type AnimalRig, type Mood, type Pose, makeAnimal } from '../../../shared/art3d/animals'
+import { ANIMALS, type AnimalRig, plainLook, type Mood, type Pose, makeAnimal } from '../../../shared/art3d/animals'
 import { buildTableRoom, footRing, glowTexture } from '../../../shared/art3d/room'
 import { createStage, nearestOnScreen } from '../../../shared/art3d/stage'
 import { PERSON_SHIRTS } from '../../../shared/art/shapes'
@@ -88,7 +88,7 @@ export function Table3D({ screen, onPick }: Props) {
     const seatOf = (i: number) => (me < 0 ? i : (i - me + n) % n)
     const rigs: AnimalRig[] = first.players.map((_, i) => {
       const shirt = first.teams ? TEAM_COLORS[first.teams[i]] : PERSON_SHIRTS[i % PERSON_SHIRTS.length]
-      const rig = makeAnimal(first.players[i].avatar ?? ANIMALS[i % ANIMALS.length], shirt)
+      const rig = makeAnimal(first.players[i].avatar ?? plainLook(ANIMALS[i % ANIMALS.length]), shirt)
       rig.root.position.copy(room.seatPos(seatOf(i)))
       rig.root.lookAt(0, 0, 0)
       rig.root.traverse((o) => (o.userData.player = i))

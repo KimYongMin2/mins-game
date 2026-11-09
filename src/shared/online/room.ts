@@ -202,7 +202,7 @@ async function open<M>(gameId: string, code: string, meta: Meta, { capacity = 2,
       peer = next
       for (const fn of peerFns) fn(peer)
     }
-    const nextMembers = others.map((o) => ({ id: o.key, nickname: o.nickname, role: o.role, ...(typeof o.avatar === 'string' ? { avatar: o.avatar.slice(0, 16) } : {}) }))
+    const nextMembers = others.map((o) => ({ id: o.key, nickname: o.nickname, role: o.role, ...(typeof o.avatar === 'string' ? { avatar: o.avatar.slice(0, 48) } : {}) }))
     if (JSON.stringify(nextMembers) !== JSON.stringify(members)) {
       members = nextMembers
       for (const fn of memberFns) fn(members)

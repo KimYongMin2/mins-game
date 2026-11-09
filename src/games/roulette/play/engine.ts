@@ -7,13 +7,13 @@ import { type Rng, createRng } from '../../../shared/random'
 import { type Team, lastTeam, sameTeam } from '../../../shared/team/teams'
 import { chooseTarget } from '../bot/rouletteBot'
 import { BANG_SHOW_MS, BLANK_SHOW_MS, BOT_AIM_MS, BOT_PULL_MS, CHAMBERS, DONE_MS, INTRO_MS, SUSPENSE_MS, TURN_MS } from '../constants'
-import type { AnimalKind } from '../../../shared/art3d/animalKinds'
+import type { Look } from '../../../shared/art3d/animalKinds'
 
 /** user = 이 기기, bot = 봇, remote = 방에 들어온 친구 */
 export type PlayerKind = 'user' | 'bot' | 'remote'
 
 /** avatar = 3D 캐릭터 (시작할 때 정해 둠) */
-export type Player = { id: string; name: string; kind: PlayerKind; avatar?: AnimalKind }
+export type Player = { id: string; name: string; kind: PlayerKind; avatar?: Look }
 
 export type Fire = { shooter: number; target: number; bang: boolean }
 

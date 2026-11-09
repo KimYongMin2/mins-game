@@ -1,19 +1,19 @@
 import * as THREE from 'three'
-import type { AnimalKind } from './animalKinds'
+import type { AnimalKind, Fur, Look } from './animalKinds'
 
 // 3D 동물 캐릭터 (three.js 기본 도형으로 만듦, 그림 파일 없음). 큰 머리 + 작은 몸의 귀여운 비율.
 // 몸통은 셔츠 색(팀전이면 팀 색), 얼굴은 동물마다 다르다. 표정(mood)과 자세(pose)를 바꿀 수 있다.
 // 단위: 키 약 2.6 (발 = y 0). 얼굴은 +z 쪽.
 
-export { ANIMALS, ANIMAL_NAMES, type AnimalKind } from './animalKinds'
+export { ANIMALS, ANIMAL_NAMES, type AnimalKind, type Look, plainLook } from './animalKinds'
 
 export type Mood = 'calm' | 'happy' | 'scared' | 'ko'
 /** idle 가만히 · hold 두 손으로 앞에 듦 · scared 덜덜 · ko 뒤로 넘어감 · cheer 만세 */
 export type Pose = 'idle' | 'hold' | 'scared' | 'ko' | 'cheer'
 
-type Look = { fur: string; light: string; ear: string; nose: string }
+type Palette = { fur: string; light: string; ear: string; nose: string }
 
-const LOOKS: Record<AnimalKind, Look> = {
+const LOOKS: Record<AnimalKind, Palette> = {
   bear: { fur: '#8a5a36', light: '#e1bf98', ear: '#c99a72', nose: '#2a1a12' },
   cat: { fur: '#f0a64b', light: '#fff1dc', ear: '#f7b3b3', nose: '#e57b8a' },
   fox: { fur: '#ee7a2c', light: '#fff4e6', ear: '#3a2418', nose: '#2a1a12' },
@@ -40,8 +40,16 @@ export type AnimalRig = {
   dispose: () => void
 }
 
-export function makeAnimal(kind: AnimalKind, shirt: string): AnimalRig {
-  const look = LOOKS[kind]
+/** 털 색 바꾸기: 연하게(흰색 쪽) · 진하게(검은색 쪽) */
+function shade(color: string, fur: Fur): string {
+  if (fur === 'base') return color
+  return '#' + new THREE.Color(color).lerp(new THREE.Color(fur === 'light' ? '#ffffff' : '#000000'), fur === 'light' ? 0.4 : 0.35).getHexString()
+}
+
+export function makeAnimal(lookIn: Look, shirt: string): AnimalRig {
+  const kind: AnimalKind = lookIn.animal
+  const base = LOOKS[kind]
+  const look = { ...base, fur: shade(base.fur, lookIn.fur), light: shade(base.light, lookIn.fur === 'dark' ? 'base' : lookIn.fur) }
   const mats: { m: THREE.MeshStandardMaterial; base: THREE.Color }[] = []
   const mat = (color: string, rough = 0.75, metal = 0) => {
     const m = new THREE.MeshStandardMaterial({ color, roughness: rough, metalness: metal })
@@ -253,6 +261,117 @@ export function makeAnimal(kind: AnimalKind, shirt: string): AnimalRig {
       smile.position.set(0, -0.12, 0.46)
       for (const s of [-1, 1]) head.add(mesh(new THREE.SphereGeometry(0.02, 6, 6), eyeM, s * 0.06, 0.02, 0.5))
       break
+  }
+
+  // ---- 꾸미기: 모자 · 안경 · 목 장식 ----
+  const accM = (color: string, rough = 0.5, metal = 0) => mat(color, rough, metal)
+  const headTop = kind === 'frog' ? 0.5 : 0.46
+  switch (lookIn.hat) {
+    case 'cap': {
+      const c = accM('#e03131', 0.6)
+      const dome = mesh(new THREE.SphereGeometry(0.55, 28, 14, 0, Math.PI * 2, 0, Math.PI / 2), c, 0, headTop - 0.28, 0)
+      dome.scale.set(1, 0.72, 1)
+      const brim = mesh(new THREE.CylinderGeometry(0.32, 0.32, 0.04, 24, 1, false, -Math.PI / 2, Math.PI), c, 0, headTop - 0.27, 0.42)
+      brim.scale.set(1, 1, 1.1)
+      const button = mesh(new THREE.SphereGeometry(0.06, 10, 8), accM('#ffffff'), 0, headTop + 0.1, 0)
+      head.add(dome, brim, button)
+      break
+    }
+    case 'crown': {
+      const gold = accM('#f5c518', 0.25, 0.9)
+      const band = mesh(new THREE.CylinderGeometry(0.3, 0.33, 0.2, 10, 1, true), gold, 0, headTop + 0.02, 0)
+      band.material.side = THREE.DoubleSide
+      head.add(band)
+      for (let k = 0; k < 5; k++) {
+        const a = (k / 5) * Math.PI * 2
+        head.add(mesh(new THREE.ConeGeometry(0.07, 0.18, 8), gold, Math.sin(a) * 0.3, headTop + 0.2, Math.cos(a) * 0.3))
+        head.add(mesh(new THREE.SphereGeometry(0.035, 8, 6), accM(['#e64980', '#4dabf7', '#51cf66'][k % 3], 0.2), Math.sin(a) * 0.32, headTop + 0.02, Math.cos(a) * 0.32))
+      }
+      break
+    }
+    case 'party': {
+      const cone = mesh(new THREE.ConeGeometry(0.22, 0.55, 20), accM('#7950f2', 0.55), 0.08, headTop + 0.24, 0)
+      cone.rotation.z = -0.2
+      const pom = mesh(new THREE.SphereGeometry(0.08, 12, 10), accM('#ffd43b'), 0.14, headTop + 0.52, 0)
+      for (let k = 0; k < 3; k++) {
+        const stripe = mesh(new THREE.TorusGeometry(0.17 - k * 0.05, 0.018, 6, 20), accM('#ffd43b'), 0.08 + k * 0.025, headTop + 0.08 + k * 0.13, 0)
+        stripe.rotation.x = Math.PI / 2
+        stripe.rotation.y = -0.2
+        head.add(stripe)
+      }
+      head.add(cone, pom)
+      break
+    }
+    case 'beanie': {
+      const knit = accM('#1c7ed6', 0.95)
+      const dome = mesh(new THREE.SphereGeometry(0.56, 28, 14, 0, Math.PI * 2, 0, Math.PI / 2), knit, 0, headTop - 0.3, 0)
+      dome.scale.set(1, 0.85, 1)
+      const band = mesh(new THREE.TorusGeometry(0.5, 0.07, 10, 32), accM('#f1f3f5', 0.95), 0, headTop - 0.28, 0)
+      band.rotation.x = Math.PI / 2
+      const pom = mesh(new THREE.SphereGeometry(0.12, 14, 10), accM('#f1f3f5', 0.95), 0, headTop + 0.22, 0)
+      head.add(dome, band, pom)
+      break
+    }
+    case 'tophat': {
+      const black = accM('#1a1b1e', 0.4)
+      head.add(mesh(new THREE.CylinderGeometry(0.42, 0.42, 0.04, 28), black, 0, headTop + 0.02, 0))
+      head.add(mesh(new THREE.CylinderGeometry(0.25, 0.27, 0.42, 24), black, 0, headTop + 0.24, 0))
+      head.add(mesh(new THREE.CylinderGeometry(0.272, 0.272, 0.08, 24), accM('#c92a2a', 0.5), 0, headTop + 0.08, 0))
+      break
+    }
+  }
+  if (lookIn.glasses !== 'none') {
+    const gz = eyeZ + 0.07
+    const frame = accM(lookIn.glasses === 'star' ? '#f06595' : '#212529', 0.3, 0.3)
+    for (const s of [-1, 1]) {
+      if (lookIn.glasses === 'round') {
+        head.add(mesh(new THREE.TorusGeometry(0.11, 0.016, 8, 24), frame, s * eyeX, eyeY, gz))
+      } else if (lookIn.glasses === 'sun') {
+        const lens = mesh(new THREE.CylinderGeometry(0.12, 0.12, 0.03, 24), accM('#101113', 0.08, 0.6), s * eyeX, eyeY - 0.01, gz)
+        lens.rotation.x = Math.PI / 2
+        lens.scale.set(1.15, 1, 0.85)
+        head.add(lens)
+      } else {
+        const star = new THREE.Shape()
+        for (let k = 0; k < 10; k++) {
+          const r = k % 2 ? 0.06 : 0.14
+          const a = (k / 10) * Math.PI * 2 + Math.PI / 2
+          if (k === 0) star.moveTo(Math.cos(a) * r, Math.sin(a) * r)
+          else star.lineTo(Math.cos(a) * r, Math.sin(a) * r)
+        }
+        const m = mesh(new THREE.ExtrudeGeometry(star, { depth: 0.025, bevelEnabled: false }), frame, s * eyeX, eyeY, gz - 0.01)
+        head.add(m)
+      }
+    }
+    const bridge = mesh(new THREE.CylinderGeometry(0.012, 0.012, eyeX * 2 - 0.2, 6), frame, 0, eyeY + 0.02, gz)
+    bridge.rotation.z = Math.PI / 2
+    head.add(bridge)
+  }
+  if (lookIn.neck !== 'none') {
+    collar.visible = false
+    if (lookIn.neck === 'bow') {
+      const red = accM('#e03131', 0.5)
+      for (const s of [-1, 1]) {
+        const wing = mesh(new THREE.ConeGeometry(0.1, 0.2, 12), red, s * 0.12, 1.6, 0.36)
+        wing.rotation.z = (s * Math.PI) / 2
+        bodyG.add(wing)
+      }
+      bodyG.add(mesh(new THREE.SphereGeometry(0.06, 10, 8), red, 0, 1.6, 0.38))
+    } else if (lookIn.neck === 'scarf') {
+      const wool = accM('#f08c00', 0.95)
+      const ring = mesh(new THREE.TorusGeometry(0.3, 0.1, 10, 28), wool, 0, 1.6, 0)
+      ring.rotation.x = Math.PI / 2
+      const tail = mesh(new THREE.BoxGeometry(0.16, 0.42, 0.08), wool, 0.18, 1.38, 0.36)
+      tail.rotation.z = 0.15
+      bodyG.add(ring, tail)
+    } else {
+      const navy = accM('#364fc7', 0.45)
+      bodyG.add(mesh(new THREE.BoxGeometry(0.1, 0.08, 0.06), navy, 0, 1.58, 0.4))
+      const blade = mesh(new THREE.BoxGeometry(0.12, 0.4, 0.04), navy, 0, 1.33, 0.43)
+      blade.rotation.x = -0.15
+      bodyG.add(blade)
+      bodyG.add(mesh(new THREE.TorusGeometry(0.22, 0.04, 8, 20), accM('#ffffff', 0.5), 0, 1.6, 0.05))
+    }
   }
 
   /** 손 사이 (머리 위로 번쩍 든 자세 기준 — 앞으로 들면 뒤에서 보는 내 캐릭터 머리에 가려서) */

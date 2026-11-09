@@ -3,8 +3,8 @@ import type { Member, Room } from '../../../shared/online/room'
 import { LinkBadge } from '../../../shared/ui/LinkBadge'
 import { randomSeed } from '../../../shared/random'
 import { TEAM_NAMES, type Team, type TeamPick, planTeams, teamOutcome } from '../../../shared/team/teams'
-import { asAnimal, assignAnimals } from '../../../shared/art3d/animalKinds'
-import { loadAvatar } from '../../../shared/storage/avatar'
+import { assignLooks, decodeLook } from '../../../shared/art3d/animalKinds'
+import { loadLook } from '../../../shared/storage/avatar'
 import { loadNickname } from '../../../shared/storage/nickname'
 import { canWebGL } from '../../../shared/art3d/webgl'
 import { Table } from '../field/Table'
@@ -58,12 +58,12 @@ function initHost(props: Props): HostState {
   } else {
     players = []
   }
-  // 3D 캐릭터: 나·친구는 고른 동물(겹쳐도 됨), 안 고른 사람과 봇은 남은 동물
+  // 3D 캐릭터: 나·친구는 고른 동물과 꾸미기(겹쳐도 됨), 안 고른 사람과 봇은 남은 동물
   const chosen = players.map((p) =>
-    p.kind === 'user' ? (loadAvatar() ?? undefined) : p.kind === 'remote' && props.mode === 'host' ? asAnimal(props.members.find((m) => m.id === p.id)?.avatar) : undefined,
+    p.kind === 'user' ? (loadLook() ?? undefined) : p.kind === 'remote' && props.mode === 'host' ? decodeLook(props.members.find((m) => m.id === p.id)?.avatar) : undefined,
   )
-  const animals = assignAnimals(chosen)
-  players = players.map((p, i) => ({ ...p, avatar: animals[i] }))
+  const looks = assignLooks(chosen)
+  players = players.map((p, i) => ({ ...p, avatar: looks[i] }))
   // 팀전: 두 팀이 번갈아 앉게 자리를 다시 늘어놓는다
   let teams: Team[] | null = null
   if (props.mode === 'host' && props.teams) {

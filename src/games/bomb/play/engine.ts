@@ -4,13 +4,13 @@
 import { type Rng, createRng, pickOne } from '../../../shared/random'
 import { type Team, lastTeam, sameTeam } from '../../../shared/team/teams'
 import { BOOM_MS, BOT_HOLD_MS, COUNTDOWN_MS, DONE_MS, FLIGHT_MS, FUSE_MS, MIN_HOLD_MS } from '../constants'
-import type { AnimalKind } from '../../../shared/art3d/animalKinds'
+import type { Look } from '../../../shared/art3d/animalKinds'
 
 /** user = 이 기기, bot = 봇, remote = 방에 들어온 친구 */
 export type PlayerKind = 'user' | 'bot' | 'remote'
 
 /** avatar = 3D 캐릭터 (시작할 때 정해 둠) */
-export type Player = { id: string; name: string; kind: PlayerKind; avatar?: AnimalKind }
+export type Player = { id: string; name: string; kind: PlayerKind; avatar?: Look }
 
 export type Phase =
   | { kind: 'countdown'; until: number }

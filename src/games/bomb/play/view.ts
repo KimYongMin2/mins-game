@@ -3,12 +3,12 @@
 import { FLIGHT_MS } from '../constants'
 import type { Team } from '../../../shared/team/teams'
 import { type EngineState, holdLeft, rankingOf, winnerTeam } from './engine'
-import type { AnimalKind } from '../../../shared/art3d/animalKinds'
+import type { Look } from '../../../shared/art3d/animalKinds'
 
 export type PhaseKind = 'countdown' | 'play' | 'boom' | 'done'
 
 export type BombView = {
-  players: { id: string; name: string; avatar?: AnimalKind }[]
+  players: { id: string; name: string; avatar?: Look }[]
   /** 팀전이면 사람마다 팀 */
   teams: Team[] | null
   /** 팀전에서 끝났으면 이긴 팀 */
