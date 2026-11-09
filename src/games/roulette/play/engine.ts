@@ -4,6 +4,7 @@
 // - 맞음: 그 사람 탈락, 총알을 다시 넣고 쏜 사람이 계속. 나를 쏴서 죽으면 다음 자리 사람 차례
 // 마지막 한 명이 우승.
 import { type Rng, createRng } from '../../../shared/random'
+import { type Team, lastTeam, sameTeam } from '../../../shared/team/teams'
 import { chooseTarget } from '../bot/rouletteBot'
 import { BANG_SHOW_MS, BLANK_SHOW_MS, BOT_AIM_MS, BOT_PULL_MS, CHAMBERS, DONE_MS, INTRO_MS, SUSPENSE_MS, TURN_MS } from '../constants'
 
@@ -24,6 +25,8 @@ export type EngineState = {
   now: number
   seed: number
   players: Player[]
+  /** 팀전이면 사람마다 팀 (같은 팀은 못 쏨, 나는 쏠 수 있음). 개인전이면 null */
+  teams: Team[] | null
   alive: boolean[]
   /** 탈락한 순서 */
   out: number[]
@@ -62,19 +65,38 @@ export function nextAlive(alive: readonly boolean[], from: number): number {
   return from
 }
 
+/** player가 target을 쏠 수 있는지 (살아 있고, 팀전이면 같은 팀이 아님 — 나는 됨) */
+export function canTarget(s: Pick<EngineState, 'alive' | 'teams'>, player: number, target: number): boolean {
+  return !!s.alive[target] && !sameTeam(s.teams, player, target)
+}
+
+/** player가 쏠 수 있는 사람들 */
+const targetsOf = (s: EngineState, player: number) => aliveIndexes(s).filter((i) => canTarget(s, player, i))
+
+/** 끝났는지: 한 명 남음, 팀전이면 한 팀만 남음 */
+function isOver(s: EngineState): boolean {
+  return aliveIndexes(s).length <= 1 || (!!s.teams && lastTeam(s.alive, s.teams) !== null)
+}
+
+/** 이긴 팀 (팀전이고 끝났을 때) */
+export function winnerTeam(s: EngineState): Team | null {
+  return s.teams ? lastTeam(s.alive, s.teams) : null
+}
+
 function reload(s: EngineState): EngineState {
   const rng = createRng(s.seed)
   const chamber = 1 + Math.floor(rng.next() * CHAMBERS)
   return { ...s, seed: rng.seed(), chamber, pulls: 0 }
 }
 
-export function createEngine(opts: { now: number; seed: number; players: Player[] }): EngineState {
+export function createEngine(opts: { now: number; seed: number; players: Player[]; teams?: Team[] | null }): EngineState {
   const rng = createRng(opts.seed)
   const turn = Math.floor(rng.next() * opts.players.length)
   return reload({
     now: opts.now,
     seed: rng.seed(),
     players: opts.players,
+    teams: opts.teams ?? null,
     alive: opts.players.map(() => true),
     out: [],
     kills: opts.players.map(() => 0),
@@ -92,7 +114,7 @@ function startTurn(s: EngineState, turn: number): EngineState {
   let next: EngineState = { ...s, turn, aimAt: null, bot: null, phase: { kind: 'aim', until: s.now + TURN_MS } }
   if (s.players[turn].kind === 'bot') {
     const rng = createRng(s.seed)
-    const target = chooseTarget(rng, turn, aliveIndexes(s), s.pulls)
+    const target = chooseTarget(rng, turn, targetsOf(s, turn), s.pulls)
     const aimAt = s.now + within(rng, BOT_AIM_MS)
     next = { ...next, seed: rng.seed(), bot: { aimAt, pullAt: aimAt + within(rng, BOT_PULL_MS), target } }
   }
@@ -100,12 +122,12 @@ function startTurn(s: EngineState, turn: number): EngineState {
 }
 
 function aim(s: EngineState, player: number, target: number): EngineState {
-  if (s.phase.kind !== 'aim' || player !== s.turn || !s.alive[target]) return s
+  if (s.phase.kind !== 'aim' || player !== s.turn || !canTarget(s, player, target)) return s
   return { ...s, aimAt: target }
 }
 
 function pull(s: EngineState, player: number, target: number | null = s.aimAt): EngineState {
-  if (s.phase.kind !== 'aim' || player !== s.turn || target === null || !s.alive[target]) return s
+  if (s.phase.kind !== 'aim' || player !== s.turn || target === null || !canTarget(s, player, target)) return s
   const pulls = s.pulls + 1
   const bang = pulls >= s.chamber
   const fire: Fire = { shooter: player, target, bang }
@@ -122,7 +144,7 @@ function afterFire(s: EngineState): EngineState {
     out: [...s.out, target],
     kills: s.kills.map((k, i) => (i === shooter && shooter !== target ? k + 1 : k)),
   }
-  if (aliveIndexes(next).length <= 1) return { ...next, aimAt: null, phase: { kind: 'done', until: s.now + DONE_MS } }
+  if (isOver(next)) return { ...next, aimAt: null, phase: { kind: 'done', until: s.now + DONE_MS } }
   // 남을 맞혔으면 쏜 사람이 계속, 자기를 쐈으면 다음 자리 (쏜 사람이 그새 나갔어도 다음 자리)
   const turn = next.alive[shooter] ? shooter : nextAlive(next.alive, shooter)
   return startTurn(reload(next), turn)
@@ -130,7 +152,7 @@ function afterFire(s: EngineState): EngineState {
 
 function timeout(s: EngineState): EngineState {
   const rng = createRng(s.seed)
-  const alive = aliveIndexes(s)
+  const alive = targetsOf(s, s.turn)
   const target = s.aimAt ?? alive[Math.floor(rng.next() * alive.length)]
   return pull({ ...s, seed: rng.seed() }, s.turn, target)
 }
@@ -147,7 +169,7 @@ function bots(s: EngineState): EngineState {
 function drop(s: EngineState, player: number): EngineState {
   if (!s.alive[player] || s.phase.kind === 'done') return s
   const next: EngineState = { ...s, alive: s.alive.map((a, i) => a && i !== player), out: [...s.out, player] }
-  if (aliveIndexes(next).length <= 1) return { ...next, aimAt: null, phase: { kind: 'done', until: s.now + DONE_MS } }
+  if (isOver(next)) return { ...next, aimAt: null, phase: { kind: 'done', until: s.now + DONE_MS } }
   if (s.phase.kind === 'aim') {
     if (s.turn === player) return startTurn(next, nextAlive(next.alive, player))
     if (s.aimAt === player) return { ...next, aimAt: null }

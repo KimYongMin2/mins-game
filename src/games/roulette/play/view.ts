@@ -1,12 +1,17 @@
 // 화면에 그릴 것. 방장은 심판 상태에서 만들고, 친구는 방장이 보낸 것을 받는다 (시간은 '남은 ms'로 주고받음).
 // 총알이 몇 번째 칸에 있는지는 절대 안 보낸다 (당긴 횟수만).
 import { BANG_SHOW_MS, BLANK_SHOW_MS, SUSPENSE_MS } from '../constants'
-import { type EngineState, type Fire, ranksOf } from './engine'
+import type { Team } from '../../../shared/team/teams'
+import { type EngineState, type Fire, ranksOf, winnerTeam } from './engine'
 
 export type PhaseKind = EngineState['phase']['kind']
 
 export type RouletteView = {
   players: { id: string; name: string }[]
+  /** 팀전이면 사람마다 팀 */
+  teams: Team[] | null
+  /** 팀전에서 끝났으면 이긴 팀 */
+  winTeam: Team | null
   alive: boolean[]
   kills: number[]
   turn: number
@@ -24,6 +29,8 @@ export function toView(s: EngineState): RouletteView {
   const { phase, now } = s
   return {
     players: s.players.map(({ id, name }) => ({ id, name })),
+    teams: s.teams,
+    winTeam: s.phase.kind === 'done' ? winnerTeam(s) : null,
     alive: s.alive,
     kills: s.kills,
     turn: s.turn,
@@ -98,7 +105,7 @@ function receive(s: ScreenState, v: RouletteView): ScreenState {
       const total = SUSPENSE_MS + (v.fire?.bang ? BANG_SHOW_MS : BLANK_SHOW_MS)
       next = { ...next, phaseStart: s.now - Math.max(0, total - v.leftMs) }
     }
-    if (v.phase === 'done') sounds.push(v.ranks[me] === 1 ? 'win' : 'lose')
+    if (v.phase === 'done') sounds.push((v.teams ? v.winTeam === v.teams[me] : v.ranks[me] === 1) ? 'win' : 'lose')
   } else if (prev && v.phase === 'aim' && v.aimAt !== null && prev.aimAt !== v.aimAt) sounds.push('aim')
   return withSounds(next, sounds)
 }

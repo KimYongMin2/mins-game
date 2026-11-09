@@ -113,7 +113,10 @@ function receive(s: ScreenState, v: BombView): ScreenState {
     if (v.phase === 'countdown') sounds.push('count')
     if (v.phase === 'play') sounds.push('go')
     if (v.phase === 'boom') sounds.push('boom')
-    if (v.phase === 'done') sounds.push(v.ranking[0] === v.players.findIndex((p) => p.id === s.myId) ? 'win' : 'lose')
+    if (v.phase === 'done') {
+      const me = v.players.findIndex((p) => p.id === s.myId)
+      sounds.push((v.teams ? v.winner === v.teams[me] : v.ranking[0] === me) ? 'win' : 'lose')
+    }
   }
   // 날아가는 폭탄: 새로 던졌으면 내 시계로 출발·도착을 정한다
   let flight = s.flight

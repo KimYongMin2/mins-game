@@ -133,7 +133,7 @@ function receive(s: ScreenState, v: SurvivalView): ScreenState {
     // 늦게 받았으면 그만큼 연출이 진행된 걸로
     next = { ...next, phaseStart: s.now - Math.max(0, (v.reveal?.ms ?? v.leftMs) - v.leftMs), revealStage: 0 }
   }
-  if (v.phase === 'done') sounds.push(v.ranks[me] === 1 ? 'win' : 'lose')
+  if (v.phase === 'done') sounds.push((v.teams ? v.winTeam === v.teams[me] : v.ranks[me] === 1) ? 'win' : 'lose')
   return withSounds(next, sounds)
 }
 

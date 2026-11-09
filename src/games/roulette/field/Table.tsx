@@ -1,4 +1,6 @@
 import { Person } from '../../../shared/art/Person'
+import { TEAM_COLORS, sameTeam } from '../../../shared/team/teams'
+import { TeamDot } from '../../../shared/ui/TeamResult'
 import { CHAMBERS, PLAYER_COLORS } from '../constants'
 import { type ScreenState, fired, isMyTurn, myIndex } from '../play/view'
 
@@ -70,13 +72,15 @@ export function Table({ screen, onPick }: { screen: ScreenState; onPick: (i: num
         const dead = !v.alive[i]
         const hitNow = f?.bang && f.target === i && shown
         const isTarget = target === i
+        // 팀전: 같은 팀은 못 쏨
+        const pickable = mine && !dead && !sameTeam(v.teams, me, i)
         return (
           <button
             key={p.id}
             type="button"
-            className={`rl-seat${i === me ? ' rl-seat--me' : ''}${dead || hitNow ? ' rl-seat--out' : ''}${v.turn === i && v.phase === 'aim' ? ' rl-seat--turn' : ''}${isTarget && !dead ? ' rl-seat--target' : ''}${mine && !dead ? ' rl-seat--pickable' : ''}`}
-            style={{ left: `${x}%`, top: `${y}%`, width: n > 6 ? '20%' : undefined, color: dead || hitNow ? undefined : PLAYER_COLORS[i % PLAYER_COLORS.length] }}
-            disabled={!mine || dead}
+            className={`rl-seat${i === me ? ' rl-seat--me' : ''}${dead || hitNow ? ' rl-seat--out' : ''}${v.turn === i && v.phase === 'aim' ? ' rl-seat--turn' : ''}${isTarget && !dead ? ' rl-seat--target' : ''}${pickable ? ' rl-seat--pickable' : ''}`}
+            style={{ left: `${x}%`, top: `${y}%`, width: n > 6 ? '20%' : undefined, color: dead || hitNow ? undefined : v.teams ? TEAM_COLORS[v.teams[i]] : PLAYER_COLORS[i % PLAYER_COLORS.length] }}
+            disabled={!pickable}
             onPointerDown={(e) => {
               e.preventDefault()
               onPick(i)
@@ -87,11 +91,13 @@ export function Table({ screen, onPick }: { screen: ScreenState; onPick: (i: num
             <Person
               className="rl-stick"
               shirt={i}
+              color={v.teams ? TEAM_COLORS[v.teams[i]] : undefined}
               out={dead || !!hitNow}
               pose={isTarget && !dead && !hitNow ? 'scared' : 'idle'}
               mood={dead || hitNow ? 'ko' : isTarget ? 'scared' : 'calm'}
             />
             <span className="rl-seat__name">
+              {v.teams && <TeamDot team={v.teams[i]} />}
               {i === me ? '나' : p.name}
               {v.kills[i] > 0 && <em> {v.kills[i]}킬</em>}
             </span>

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { BANG_SHOW_MS, BLANK_SHOW_MS, INTRO_MS, SUSPENSE_MS, TURN_MS } from '../constants'
-import { type EngineState, type Player, aliveIndexes, createEngine, engineReducer, nextAlive, ranksOf } from './engine'
+import { type EngineState, type Player, aliveIndexes, createEngine, engineReducer, nextAlive, ranksOf, winnerTeam } from './engine'
 
 const people = (n: number): Player[] => Array.from({ length: n }, (_, i) => ({ id: `p${i}`, name: `사람${i}`, kind: i === 0 ? 'user' : 'remote' }))
 
@@ -94,6 +94,33 @@ describe('봇끼리 끝까지', () => {
         expect(ranksOf(s).filter((r) => r === 1)).toHaveLength(1)
         expect(new Set(ranksOf(s)).size).toBe(n)
       }
+    }
+  })
+})
+
+describe('팀전', () => {
+  it('같은 팀은 못 겨누고 못 쏜다 (나는 됨)', () => {
+    let s = createEngine({ now: 0, seed: 1, players: people(4), teams: [0, 1, 0, 1] })
+    s = engineReducer(s, { type: 'tick', now: INTRO_MS })
+    const t = s.turn
+    const mate = [0, 1, 2, 3].find((i) => i !== t && [0, 1, 0, 1][i] === [0, 1, 0, 1][t])!
+    expect(engineReducer(s, { type: 'aim', player: t, target: mate }).aimAt).toBe(null)
+    expect(engineReducer(s, { type: 'pull', player: t, target: mate }).phase.kind).toBe('aim')
+    expect(engineReducer(s, { type: 'pull', player: t, target: t }).phase.kind).toBe('fire')
+  })
+
+  it('봇끼리: 한 팀만 남으면 끝, 봇은 같은 팀을 안 쏜다', () => {
+    for (let seed = 1; seed <= 20; seed++) {
+      const teams = [0, 1, 0, 1, 0, 1] as const
+      const players: Player[] = Array.from({ length: 6 }, (_, i) => ({ id: `b${i}`, name: `봇${i}`, kind: 'bot' as const }))
+      let s = createEngine({ now: 0, seed, players, teams: [...teams] })
+      for (let now = 0; now < 2_000_000 && s.phase.kind !== 'done'; now += 50) {
+        s = engineReducer(s, { type: 'tick', now })
+        if (s.phase.kind === 'fire') expect(s.phase.fire.target === s.phase.fire.shooter || teams[s.phase.fire.target] !== teams[s.phase.fire.shooter]).toBe(true)
+      }
+      expect(s.phase.kind).toBe('done')
+      const w = winnerTeam(s)
+      teams.forEach((tm, i) => tm !== w && expect(s.alive[i]).toBe(false))
     }
   })
 })

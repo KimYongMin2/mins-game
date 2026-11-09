@@ -118,7 +118,7 @@ function receive(s: ScreenState, v: NunchiView): ScreenState {
     if (v.phase === 'call' || v.phase === 'rps') sounds.push('go')
     if (v.phase === 'result') sounds.push('out')
     if (v.phase === 'reveal') sounds.push('reveal')
-    if (v.phase === 'done') sounds.push(v.ranks[me] === 1 ? 'win' : 'lose')
+    if (v.phase === 'done') sounds.push((v.teams ? v.winTeam === v.teams[me] : v.ranks[me] === 1) ? 'win' : 'lose')
   }
   if (prev && !phaseChanged) {
     if (v.presses.length > prev.presses.length) sounds.push('call')
