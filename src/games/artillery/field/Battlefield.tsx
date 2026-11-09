@@ -1,7 +1,7 @@
 import { useMemo, useRef } from 'react'
 import { BARREL, CRATER_R, GRAVITY, MAX_SPEED, PLAYER_COLORS, STEP, TANK_CY, WORLD_H, WORLD_W } from '../constants'
 import { type ScreenState, canAim, myIndex } from '../play/view'
-import { type Terrain, type Vec, heightAt, muzzle } from '../rules/physics'
+import { type Terrain, type Vec, heightAt, muzzle, tankTilt } from '../rules/physics'
 
 // 옆에서 본 전장 (SVG). 화면 좌표는 y가 아래로 커져서 WORLD_H - y로 뒤집어 그린다.
 // 만화풍: 굵은 외곽선, 색깔별 대포, 하늘·구름·풀 덮인 흙 언덕. 맞으면 폭발과 피해 숫자.
@@ -27,9 +27,10 @@ type TankDraw = { x: number; angle: number; hp: number; alive: boolean }
 /** 대포 그림 크기 (그림은 작은 단위로 그리고 키운다) */
 const S = 1.5
 
-function Tank({ t, color, ground, name, me, active, bob }: { t: TankDraw; color: string; ground: number; name: string; me: boolean; active: boolean; bob: number }) {
+function Tank({ t, color, ground, tilt, name, me, active, bob }: { t: TankDraw; color: string; ground: number; tilt: number; name: string; me: boolean; active: boolean; bob: number }) {
   const gy = sy(ground)
-  const a = (t.angle * Math.PI) / 180
+  // 몸은 땅 기울기만큼 기울이고, 포신은 겨눈 각도(화면 기준) 그대로 → 몸 안에선 기운 만큼 뺀다
+  const a = (t.angle * Math.PI) / 180 - tilt
   const body = t.alive ? color : '#9ca3af'
   // 몸 안쪽 단위: 땅 = 0, 위로 -. 포탑 가운데 = 대포 가운데(TANK_CY)
   const cy = -TANK_CY / S
@@ -38,7 +39,7 @@ function Tank({ t, color, ground, name, me, active, bob }: { t: TankDraw; color:
   const by = cy - Math.sin(a) * bl
   return (
     <g>
-      <g transform={`translate(${t.x},${gy}) scale(${S})`}>
+      <g transform={`translate(${t.x},${gy}) rotate(${((-tilt * 180) / Math.PI).toFixed(1)}) scale(${S})`}>
         {/* 포신 */}
         <line x1={0} y1={cy} x2={bx} y2={by} stroke={LINE} strokeWidth={1.5} strokeLinecap="round" />
         <line x1={0} y1={cy} x2={bx} y2={by} stroke={body} strokeWidth={0.75} strokeLinecap="round" />
@@ -189,6 +190,7 @@ export function Battlefield({ screen, onPointer, pull }: Props) {
               t={t}
               color={PLAYER_COLORS[i % PLAYER_COLORS.length]}
               ground={heightAt(v.terrain, t.x)}
+              tilt={tankTilt(v.terrain, t.x)}
               name={v.players[i].name}
               me={i === me}
               active={i === v.turn && (v.phase === 'aim' || v.phase === 'countdown')}

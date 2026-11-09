@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { createRng } from '../../../shared/random'
-import { COLS, CRATER_R, DAMAGE_R, MAX_DAMAGE, TERRAIN_MAX, TERRAIN_MIN } from '../constants'
-import { blastDamage, carve, explode, heightAt, makeTerrain, simulateShot, tankCenter } from './physics'
+import { COLS, CRATER_R, DAMAGE_R, MAX_DAMAGE, TANK_CY, TERRAIN_MAX, TERRAIN_MIN } from '../constants'
+import { blastDamage, carve, explode, heightAt, makeTerrain, simulateShot, tankCenter, tankTilt } from './physics'
 
 const flat = (h = 30) => Array.from({ length: COLS + 1 }, () => h)
 
@@ -85,5 +85,17 @@ describe('폭발', () => {
     expect(b.fell).toEqual([])
     const shallow = flat(5)
     expect(explode(shallow, tanks, { x: 100, y: 5 }).fell).toEqual([0])
+  })
+})
+
+describe('대포 기울기', () => {
+  it('평지면 0, 오르막이면 그쪽으로 기울고 포탑도 기운 쪽으로 옮겨진다', () => {
+    const flat50 = flat(50)
+    expect(tankTilt(flat50, 100)).toBe(0)
+    expect(tankCenter(flat50, 100)).toEqual({ x: 100, y: 50 + TANK_CY })
+    const up = Array.from({ length: COLS + 1 }, (_, i) => 20 + i * 0.5) // 오른쪽이 높음
+    const tilt = tankTilt(up, 100)
+    expect(tilt).toBeCloseTo(Math.atan(0.5), 5)
+    expect(tankCenter(up, 100).x).toBeLessThan(100)
   })
 })

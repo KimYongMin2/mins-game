@@ -47,8 +47,19 @@ export function heightAt(t: Terrain, x: number): number {
   return t[i] * (1 - f) + t[i + 1] * f
 }
 
-/** 대포 몸 가운데 */
-export const tankCenter = (t: Terrain, x: number): Vec => ({ x, y: heightAt(t, x) + TANK_CY })
+/** 대포가 땅 기울기를 따라 기운 각도 (라디안, + = 오른쪽이 높음). 바퀴 띠 양끝의 땅 높이로 잰다 */
+const TILT_SPAN = 5
+const TILT_MAX = (40 * Math.PI) / 180
+export function tankTilt(t: Terrain, x: number): number {
+  const a = Math.atan2(heightAt(t, x + TILT_SPAN) - heightAt(t, x - TILT_SPAN), TILT_SPAN * 2)
+  return Math.max(-TILT_MAX, Math.min(TILT_MAX, a))
+}
+
+/** 대포 몸(포탑) 가운데: 땅에 닿은 곳에서 기운 방향으로 TANK_CY 위 */
+export const tankCenter = (t: Terrain, x: number): Vec => {
+  const tilt = tankTilt(t, x)
+  return { x: x - Math.sin(tilt) * TANK_CY, y: heightAt(t, x) + Math.cos(tilt) * TANK_CY }
+}
 
 /** 땅을 둥글게 판다 (원 아래쪽까지 깎임) */
 export function carve(t: Terrain, c: Vec, r = CRATER_R): Terrain {
