@@ -8,6 +8,7 @@ import { chooseBotPlay } from '../bot/tilesBot'
 import { BOT_STEP_MS, BOT_THINK_MS, DONE_MS, HAND_SIZE, INTRO_MS, TURN_MS } from '../constants'
 import { type TileId, handValue, shuffledDeck } from '../rules/tiles'
 import { type Table, checkPlay } from '../rules/turn'
+import { type Team, lastTeam } from '../../../shared/team/teams'
 
 /** user = 이 기기, bot = 봇, remote = 방에 들어온 친구 */
 export type PlayerKind = 'user' | 'bot' | 'remote'
@@ -24,6 +25,8 @@ export type EngineState = {
   now: number
   seed: number
   players: Player[]
+  /** 팀전이면 사람마다 팀 (한 명이라도 손패를 다 털면 그 팀 승리). 개인전이면 null */
+  teams: Team[] | null
   hands: TileId[][]
   pool: TileId[]
   table: Table
@@ -55,7 +58,7 @@ export type EngineAction =
   /** 친구가 나감: 차례에서 뺀다 */
   | { type: 'drop'; player: number }
 
-export function createEngine(opts: { now: number; seed: number; players: Player[] }): EngineState {
+export function createEngine(opts: { now: number; seed: number; players: Player[]; teams?: Team[] | null }): EngineState {
   const rng = createRng(opts.seed)
   const deck = shuffledDeck(rng)
   const hands = opts.players.map((_, i) => deck.slice(i * HAND_SIZE, (i + 1) * HAND_SIZE))
@@ -63,6 +66,7 @@ export function createEngine(opts: { now: number; seed: number; players: Player[
     now: opts.now,
     seed: rng.seed(),
     players: opts.players,
+    teams: opts.teams ?? null,
     hands,
     pool: deck.slice(opts.players.length * HAND_SIZE),
     table: [],
@@ -198,7 +202,8 @@ function botTick(s: EngineState, p: number): EngineState {
 function drop(s: EngineState, player: number): EngineState {
   if (s.left[player] || s.phase.kind === 'done') return s
   const next = { ...s, left: s.left.map((l, i) => l || i === player) }
-  if (staying(next).length <= 1) return finish(next)
+  // 한 명만 남거나, 팀전이면 한 팀만 남으면 끝
+  if (staying(next).length <= 1 || (next.teams && lastTeam(next.left.map((l) => !l), next.teams) !== null)) return finish(next)
   return s.turn === player && s.phase.kind === 'turn' ? nextTurn(next) : next
 }
 
@@ -245,4 +250,9 @@ export function rankingOf(s: { hands: TileId[][]; left: boolean[] }): number[] {
       s.hands[a].length - s.hands[b].length ||
       a - b,
   )
+}
+
+/** 이긴 팀: 1등(손패를 다 턴 사람, 아니면 남은 점수가 가장 적은 사람)의 팀 */
+export function winnerTeam(s: { hands: TileId[][]; left: boolean[]; teams: Team[] | null }): Team | null {
+  return s.teams ? s.teams[rankingOf(s)[0]] : null
 }

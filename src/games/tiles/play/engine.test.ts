@@ -3,7 +3,7 @@ import { chooseBotPlay, setsFromHand } from '../bot/tilesBot'
 import { HAND_SIZE, TURN_MS } from '../constants'
 import { isValidSet } from '../rules/sets'
 import { TILE_COUNT, WILD_IDS, tileId } from '../rules/tiles'
-import { type EngineState, type Player, createEngine, engineReducer, rankingOf } from './engine'
+import { type EngineState, type Player, createEngine, engineReducer, rankingOf, winnerTeam } from './engine'
 import { toView } from './view'
 
 const bots = (n: number): Player[] => Array.from({ length: n }, (_, i) => ({ id: `b${i}`, name: `봇${i}`, kind: 'bot' }))
@@ -181,5 +181,25 @@ describe('따라보기', () => {
     expect(seen).toEqual([1, 2])
     expect(s.last?.kind).toBe('play')
     expect(s.table).toHaveLength(2)
+  })
+})
+
+describe('팀전', () => {
+  it('봇끼리 2:2: 끝나면 1등의 팀이 이긴다', () => {
+    for (let seed = 1; seed <= 4; seed++) {
+      let s = createEngine({ now: 0, seed, players: bots(4), teams: [0, 1, 0, 1] })
+      for (let now = 0; now < 20 * 60 * 60_000 && s.phase.kind !== 'done'; now += 200) s = engineReducer(s, { type: 'tick', now })
+      expect(s.phase.kind).toBe('done')
+      expect(winnerTeam(s)).toBe(s.teams![rankingOf(s)[0]])
+    }
+  })
+
+  it('한 팀이 모두 나가면 남은 팀 승리', () => {
+    let s = createEngine({ now: 0, seed: 1, players: [{ id: 'a', name: 'a', kind: 'user' }, ...bots(3)], teams: [0, 1, 0, 1] })
+    s = engineReducer(s, { type: 'drop', player: 1 })
+    expect(s.phase.kind).not.toBe('done')
+    s = engineReducer(s, { type: 'drop', player: 3 })
+    expect(s.phase.kind).toBe('done')
+    expect(winnerTeam(s)).toBe(0)
   })
 })

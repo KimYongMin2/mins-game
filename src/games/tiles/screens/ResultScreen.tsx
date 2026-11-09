@@ -1,4 +1,5 @@
 import type { GameSummary, TilesRecord } from '../records'
+import { TeamResult } from '../../../shared/ui/TeamResult'
 
 type Props = {
   summary: GameSummary
@@ -17,21 +18,27 @@ export function ResultScreen({ summary, record, isHost, canRetry, onRetry, onMen
   const winner = summary.standings[0]
   return (
     <section className="nt-result">
-      <div className={`nt-result__headline${summary.won ? ' nt-result__headline--win' : ''}`}>
-        <strong>{summary.won ? '우승!' : '아쉬워요'}</strong>
-        <span>
-          {winner && (winner.tiles === 0 ? `${winner.name} 님이 손패를 다 털었어요` : `더미가 떨어져 남은 점수가 가장 적은 ${winner.name} 님 우승`)}
-        </span>
-      </div>
+      {summary.team ? (
+        <TeamResult outcome={summary.team} />
+      ) : (
+        <>
+          <div className={`nt-result__headline${summary.won ? ' nt-result__headline--win' : ''}`}>
+            <strong>{summary.won ? '우승!' : '아쉬워요'}</strong>
+            <span>
+              {winner && (winner.tiles === 0 ? `${winner.name} 님이 손패를 다 털었어요` : `더미가 떨어져 남은 점수가 가장 적은 ${winner.name} 님 우승`)}
+            </span>
+          </div>
 
-      <ol className="nt-result__ranking">
-        {summary.standings.map((s, i) => (
-          <li key={`${s.name}-${i}`} className={s.me ? 'nt-result__me' : undefined}>
-            <span>{i === 0 ? '우승' : `${i + 1}등`}</span> {s.name}
-            <em>{s.tiles === 0 ? '다 털음' : `${s.tiles}장 · ${s.value}점 남음`}</em>
-          </li>
-        ))}
-      </ol>
+          <ol className="nt-result__ranking">
+            {summary.standings.map((s, i) => (
+              <li key={`${s.name}-${i}`} className={s.me ? 'nt-result__me' : undefined}>
+                <span>{i === 0 ? '우승' : `${i + 1}등`}</span> {s.name}
+                <em>{s.tiles === 0 ? '다 털음' : `${s.tiles}장 · ${s.value}점 남음`}</em>
+              </li>
+            ))}
+          </ol>
+        </>
+      )}
 
       <p className="nt-result__career">
         {pvp ? '친구 대전' : '봇 연습'} {t.games}판 · 우승 {t.wins}번

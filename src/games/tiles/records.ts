@@ -1,3 +1,4 @@
+import type { TeamOutcome } from '../../shared/team/teams'
 import { type RecordStore, localRecordStore } from '../../shared/storage/records'
 
 const GAME_ID = 'tiles'
@@ -25,6 +26,8 @@ export type GameSummary = {
   won: boolean
   /** 1등부터: 남은 타일 수와 점수 */
   standings: { name: string; tiles: number; value: number; me: boolean }[]
+  /** 팀전이면 팀 결과 */
+  team?: TeamOutcome
 }
 
 export function addGame(record: TilesRecord, summary: GameSummary): TilesRecord {

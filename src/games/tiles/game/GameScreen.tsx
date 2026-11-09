@@ -1,6 +1,8 @@
 import { useEffect, useReducer, useRef, useState } from 'react'
 import type { Member, Room } from '../../../shared/online/room'
 import { randomSeed } from '../../../shared/random'
+import { TEAM_NAMES, type Team, type TeamPick, planTeams, teamOutcome } from '../../../shared/team/teams'
+import { TeamDot } from '../../../shared/ui/TeamResult'
 import { loadNickname } from '../../../shared/storage/nickname'
 import { TURN_MS } from '../constants'
 import { Tile } from '../field/Tile'
@@ -26,6 +28,7 @@ type Props =
       room: Room<TilesMsg>
       members: Member[]
       bots: number
+      teams: TeamPick | null
       sortBy: SortBy
       onSort: (s: SortBy) => void
       onFinish: (s: GameSummary) => void
@@ -67,15 +70,24 @@ function initHost(props: Props): HostState {
       ...BOT_NAMES.slice(0, props.bots).map((name, i) => ({ id: `bot${i}`, name, kind: 'bot' as const })),
     ]
   }
-  const engine = createEngine({ now, seed: randomSeed(), players })
-  return { engine, screen: screenReducer(createScreen(players[0]?.id ?? '', now), { type: 'view', view: toView(engine) }) }
+  // 팀전: 두 팀이 번갈아 차례가 오게 자리를 다시 늘어놓는다
+  let teams: Team[] | null = null
+  if (props.mode === 'host' && props.teams) {
+    const plan = planTeams(players.map((p) => p.id), props.teams)
+    players = plan.order.map((i) => players[i])
+    teams = plan.teams
+  }
+  const engine = createEngine({ now, seed: randomSeed(), players, teams })
+  return { engine, screen: screenReducer(createScreen(props.mode === 'bot' ? 'me' : props.mode === 'host' ? props.room.myId : '', now), { type: 'view', view: toView(engine) }) }
 }
 
 function summaryOf(v: TilesView, me: number, mode: GameSummary['mode']): GameSummary {
   const order = v.ranking ?? v.players.map((_, i) => i)
+  const team = v.teams ? teamOutcome(v.players.map((p) => p.name), v.teams, me, v.winTeam) : undefined
   return {
     mode,
-    won: order[0] === me,
+    won: v.teams ? v.winTeam === v.teams[me] : order[0] === me,
+    team,
     standings: order.map((i) => ({ name: v.players[i].name, tiles: v.hands[i].length, value: handValue(v.hands[i]), me: i === me })),
   }
 }
@@ -86,6 +98,7 @@ function PlayerBar({ v, me }: { v: TilesView; me: number }) {
       {v.players.map((p, i) => (
         <li key={p.id} className={`nt-player${v.turn === i && v.phase === 'turn' ? ' nt-player--turn' : ''}${v.left[i] ? ' nt-player--left' : ''}`}>
           <span className="nt-player__name">
+            {v.teams && <TeamDot team={v.teams[i]} />}
             {p.name}
             {i === me && ' (나)'}
           </span>
@@ -304,6 +317,7 @@ export function GameScreen(props: Props) {
 
   let tip: string
   if (v.phase === 'intro') tip = `${v.players[v.turn].name} 먼저 시작해요`
+  else if (v.phase === 'done' && v.teams && v.winTeam !== null) tip = v.winTeam === v.teams[me] ? '우리 팀 승리!' : `${TEAM_NAMES[v.winTeam]} 승리!`
   else if (v.phase === 'done') tip = v.ranking?.[0] === me ? '내가 우승!' : `${v.players[v.ranking?.[0] ?? 0].name} 우승!`
   else if (!mine) {
     const lastText =

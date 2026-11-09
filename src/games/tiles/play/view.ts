@@ -2,10 +2,15 @@
 // 각 기기가 자기 손패를 알아야 해서 모든 손패를 같이 보낸다. 화면엔 내 손패만 그린다 (치팅 방지 없음, 친구끼리라).
 import type { TileId } from '../rules/tiles'
 import type { Table } from '../rules/turn'
-import { type EngineState, rankingOf } from './engine'
+import type { Team } from '../../../shared/team/teams'
+import { type EngineState, rankingOf, winnerTeam } from './engine'
 
 export type TilesView = {
   players: { id: string; name: string }[]
+  /** 팀전이면 사람마다 팀 */
+  teams: Team[] | null
+  /** 팀전에서 끝났으면 이긴 팀 */
+  winTeam: Team | null
   left: boolean[]
   hands: TileId[][]
   table: Table
@@ -25,6 +30,8 @@ export type TilesView = {
 export function toView(s: EngineState): TilesView {
   return {
     players: s.players.map(({ id, name }) => ({ id, name })),
+    teams: s.teams,
+    winTeam: s.phase.kind === 'done' ? winnerTeam(s) : null,
     left: s.left,
     hands: s.hands,
     table: s.table,
@@ -85,7 +92,7 @@ function receive(s: ScreenState, v: TilesView): ScreenState {
   const sounds: SoundName[] = []
   if (prev && v.last && v.last.seq !== prev.last?.seq) sounds.push(v.last.kind === 'play' ? 'play' : 'draw')
   if (prev && v.phase === 'turn' && v.turn === me && (prev.turn !== me || prev.phase !== 'turn')) sounds.push('turn')
-  if (prev && v.phase === 'done' && prev.phase !== 'done') sounds.push(v.ranking?.[0] === me ? 'win' : 'lose')
+  if (prev && v.phase === 'done' && prev.phase !== 'done') sounds.push((v.teams ? v.winTeam === v.teams[me] : v.ranking?.[0] === me) ? 'win' : 'lose')
   return withSounds({ ...s, view: v, phaseUntil: s.now + v.leftMs }, sounds)
 }
 
