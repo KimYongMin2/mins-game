@@ -38,6 +38,8 @@ type Props = {
   colors?: { batter: string; pitcher: string }
   /** 숨쉬기·관중 들썩임 같은 잔동작용 시각 */
   now?: number
+  /** false면 투수·타자를 안 그림 (위에 3D 동물 선수 층을 겹칠 때) */
+  players?: boolean
 }
 
 const BALL_RADIUS = 0.15 // 잘 보이도록 실제(약 0.037m)보다 크게, 존 근처 볼이 존에 걸쳐 보이지 않을 만큼만
@@ -56,6 +58,7 @@ export function Field({
   celebrate = false,
   colors = { batter: TEAM_COLORS.me, pitcher: TEAM_COLORS.opponent },
   now = 0,
+  players = true,
 }: Props) {
   const u = screenUnit(camera)
   const shake = shakeOf(impact, u)
@@ -97,14 +100,14 @@ export function Field({
           d={`M${PITCHER_DISTANCE - 2.8} 0 Q${PITCHER_DISTANCE} ${-MOUND_HEIGHT * 2} ${PITCHER_DISTANCE + 2.8} 0 Z`}
           className="zb-mound"
         />
-        <Pitcher x={PITCHER_DISTANCE} ground={MOUND_HEIGHT} height={PLAYER_HEIGHT} color={colors.pitcher} throwT={throwT} now={now} />
+        {players && <Pitcher x={PITCHER_DISTANCE} ground={MOUND_HEIGHT} height={PLAYER_HEIGHT} color={colors.pitcher} throwT={throwT} now={now} />}
 
         {/* 홈플레이트, 타석 선, 타자 */}
         <path d="M-0.3 0 L0.3 0" className="zb-plate" />
         <path d={`M${BATTER_X - 0.9} 0.02 L${BATTER_X + 0.5} 0.02`} className="zb-chalk" />
         {/* 스트라이크 존: 홈플레이트 위 상자 (옆에서 본 높이 범위) */}
         <rect x={-0.3} y={-STRIKE_ZONE.top} width={0.6} height={STRIKE_ZONE.top - STRIKE_ZONE.bottom} className="zb-zone" />
-        <Batter x={BATTER_X} height={PLAYER_HEIGHT} color={colors.batter} swing={swing} now={now} />
+        {players && <Batter x={BATTER_X} height={PLAYER_HEIGHT} color={colors.batter} swing={swing} now={now} />}
 
         {mark && (
           <path

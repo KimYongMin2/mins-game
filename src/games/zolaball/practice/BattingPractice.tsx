@@ -1,6 +1,8 @@
-import { useEffect, useReducer, useState } from 'react'
+import { Suspense, lazy, useEffect, useReducer, useState } from 'react'
 import { SWING_DURATION_MS } from '../constants'
+import { canWebGL } from '../../../shared/art3d/webgl'
 import { Field } from '../field/Field'
+import { teamLooks } from '../field/teamLooks'
 import type { Impact } from '../field/impact'
 import { trailOf } from '../field/trail'
 import { CAMERA_PITCH } from '../field/camera'
@@ -14,6 +16,9 @@ import {
   isSwinging,
   practiceReducer,
 } from './practiceState'
+
+/** 3D 동물 선수 층은 three.js가 커서 이 화면에서만 불러온다 (불러오는 동안은 2D 선수) */
+const Players3D = lazy(() => import('../field/Players3D').then((m) => ({ default: m.Players3D })))
 
 const RESULT_LABEL: Record<SwingResult, string> = {
   homerun: '홈런!',
@@ -91,6 +96,10 @@ export function BattingPractice() {
     initialPracticeState(performance.now()),
   )
   const [difficulty, setDifficulty] = useState<Difficulty>('normal')
+  const [use3D] = useState(canWebGL)
+  const [players3D, setPlayers3D] = useState(false)
+  const [team] = useState(teamLooks)
+  const looks = { batter: team.me, pitcher: team.opp }
   const [pitchType, setPitchType] = useState<Choice<PitchType>>('random')
   const [course, setCourse] = useState<Choice<'strike' | 'ball'>>('random')
   const [height, setHeight] = useState<Choice<PitchHeight>>('random')
@@ -147,7 +156,12 @@ export function BattingPractice() {
   return (
     <>
       <div className="zb-field-wrap">
-        <Field camera={CAMERA_PITCH} ball={ball} trail={trail} swing={swingProgress} throwT={throwT} mark={mark} impact={impact} now={now} />
+        <Field camera={CAMERA_PITCH} ball={ball} trail={trail} swing={swingProgress} throwT={throwT} mark={mark} impact={impact} now={now} players={!players3D} />
+        {use3D && (
+          <Suspense fallback={null}>
+            <Players3D camera={CAMERA_PITCH} swing={swingProgress} throwT={throwT} impact={impact} looks={looks} now={now} onReady={() => setPlayers3D(true)} />
+          </Suspense>
+        )}
       </div>
 
       <div className="zb-practice-result" aria-live="polite">

@@ -837,22 +837,13 @@
   color: var(--ink-soft);
 }
 
-/* 3D 야구장 (field/Field3D) */
-.zb-field3d {
-  display: block;
-  width: 100%;
-  aspect-ratio: 16 / 10;
-  background: #8fc3e8;
+/* 3D 동물 선수 층 (field/Players3D): 2D 경기장 위에 겹침 */
+.zb-field-wrap {
+  position: relative;
 }
 
-.zb-field3d canvas {
-  display: block;
-}
-
-.zb-view-toggle {
+.zb-players3d {
   position: absolute;
-  right: 8px;
-  bottom: 8px;
-  z-index: 2;
-  background: rgb(255 255 255 / 0.9);
+  inset: 0;
+  pointer-events: none;
 }

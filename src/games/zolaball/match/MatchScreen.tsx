@@ -1,12 +1,9 @@
 import { Suspense, lazy, useEffect, useReducer, useRef, useState } from 'react'
 import type { Room } from '../../../shared/online/room'
 import { SWING_DURATION_MS, TEAM_COLORS } from '../constants'
-import { ANIMALS, type Look, plainLook } from '../../../shared/art3d/animalKinds'
 import { canWebGL } from '../../../shared/art3d/webgl'
-import { loadLook } from '../../../shared/storage/avatar'
-import { readLocal, writeLocal } from '../../../shared/storage/local'
 import { Field } from '../field/Field'
-import type { FieldView } from '../field/Field3D'
+import { teamLooks } from '../field/teamLooks'
 import type { Impact } from '../field/impact'
 import { CAMERA_PITCH, type Camera } from '../field/camera'
 import { followCamera } from '../field/followCamera'
@@ -14,7 +11,7 @@ import { trailOf } from '../field/trail'
 import { usePitchKeys } from '../input/pitchKeys'
 import { eventTime } from '../../../shared/input/eventTime'
 import { useSpaceSwing } from '../input/swingInput'
-import { type BattedBall, battedBallPosition } from '../play/battedBall'
+import { battedBallPosition } from '../play/battedBall'
 import { type Point, ballPosition } from '../play/pitch'
 import { PITCH_CHOICE_MS } from '../play/pitchSelection'
 import { randomSeed } from '../../../shared/random'
@@ -45,38 +42,8 @@ type Props = {
   onQuit?: () => void
 }
 
-/** 3D 야구장은 three.js가 커서 경기 화면에서만 불러온다 (불러오는 동안은 2D 그림) */
-const Field3D = lazy(() => import('../field/Field3D').then((m) => ({ default: m.Field3D })))
-
-/** 내가 칠 때 고른 시점 (타자 뒤 / 옆) — 기기에 기억 */
-const VIEW_KEY = 'zolaball-bat-view'
-type BatView = Extract<FieldView, 'catcher' | 'side'>
-const loadBatView = (): BatView => (readLocal(VIEW_KEY) === 'side' ? 'side' : 'catcher')
-
-/** 야구 선수 모습: 고른 동물에 팀 색 유니폼·야구모자(다른 모자를 골랐으면 그대로) */
-function playerLook(base: Look, tint: Look['tint'], number: number): Look {
-  return { ...base, outfit: 'uniform', tint, hat: base.hat === 'none' ? 'cap' : base.hat, number }
-}
-
-/** 두 팀 선수 모습: 나(타자·투수 겸)·우리 포수 / 상대 선수·상대 포수 — 동물이 겹치지 않게 */
-function teamLooks(): { me: Look; myCatcher: Look; opp: Look; oppCatcher: Look } {
-  const mine = loadLook() ?? plainLook('bear')
-  const others = ANIMALS.filter((a) => a !== mine.animal)
-  return {
-    me: playerLook(mine, 'blue', mine.outfit === 'uniform' ? mine.number : 7),
-    myCatcher: playerLook(plainLook(others[3]), 'blue', 2),
-    opp: playerLook(plainLook(others[0]), 'red', 11),
-    oppCatcher: playerLook(plainLook(others[1]), 'red', 22),
-  }
-}
-
-/** 타구 방향: 내가 쳤으면 빠르면 당겨(3루 쪽)·늦으면 밀어(1루 쪽), 아니면 시각으로 섞음. 파울은 선 밖으로 */
-function sprayOf(batted: BattedBall, diffMs: number | null): number {
-  const h = ((Math.floor(batted.startAt) * 9301 + 49297) % 233280) / 233280
-  if (batted.kind === 'foul') return (h < 0.5 ? -1 : 1) * (0.9 + h * 0.4)
-  const base = diffMs !== null ? Math.max(-0.6, Math.min(0.6, diffMs / 70)) : (h - 0.5) * 1.0
-  return base + (h - 0.5) * 0.15
-}
+/** 3D 동물 선수 층은 three.js가 커서 경기 화면에서만 불러온다 (불러오는 동안은 2D 선수) */
+const Players3D = lazy(() => import('../field/Players3D').then((m) => ({ default: m.Players3D })))
 
 function Banner({ state }: { state: MatchState }) {
   const { phase, game } = state
@@ -141,13 +108,9 @@ export function MatchScreen({ config, pvp, onFinish, onQuit }: Props) {
   const [peerGone, setPeerGone] = useState(false)
   // 3D 야구장 (WebGL이 안 되는 기기는 예전 2D 그림)
   const [use3D] = useState(canWebGL)
-  const [batView, setBatView] = useState<BatView>(loadBatView)
   const [team] = useState(teamLooks)
-  function toggleView() {
-    const next: BatView = batView === 'catcher' ? 'side' : 'catcher'
-    writeLocal(VIEW_KEY, next)
-    setBatView(next)
-  }
+  // 3D 층이 다 불러와지면 2D 선수를 끈다
+  const [players3D, setPlayers3D] = useState(false)
 
   // 친구 대전: 받은 투구·판정을 경기에 넣고, 상대가 나가면 알린다
   useEffect(() => {
@@ -250,13 +213,8 @@ export function MatchScreen({ config, pvp, onFinish, onQuit }: Props) {
       ? Math.max(0, now - state.swingAt) / SWING_DURATION_MS
       : null
 
-  // 3D: 내가 던지면 중계 화면, 칠 땐 고른 시점, 맞으면 타구를 따라감
-  const following = phase.kind === 'result' && !!phase.batted
-  const spray = phase.kind === 'result' && phase.batted ? sprayOf(phase.batted, phase.userDiffMs) : 0
-  const view: FieldView = userPitching ? 'broadcast' : batView
-  const looks = userPitching
-    ? { batter: team.opp, pitcher: team.me, catcher: team.myCatcher }
-    : { batter: team.me, pitcher: team.opp, catcher: team.oppCatcher }
+  // 동물 선수: 내가 던지면 투수가 나, 치면 타자가 나
+  const looks = userPitching ? { batter: team.opp, pitcher: team.me } : { batter: team.me, pitcher: team.opp }
 
   // 타이머
   let timerRemaining: number | null = null
@@ -276,36 +234,25 @@ export function MatchScreen({ config, pvp, onFinish, onQuit }: Props) {
       <Scoreboard game={state.game} userSide={config.userSide} opponentName={pvp?.peerName} />
 
       <div className="zb-field-wrap zb-field-wrap--match">
-        {(() => {
-          const flat = (
-            <Field camera={camera} ball={ball} trail={trail} swing={swingProgress} throwT={throwT} mark={mark} impact={impact} celebrate={celebrate} colors={colors} now={now} />
-          )
-          if (!use3D) return flat
-          return (
-            <Suspense fallback={flat}>
-              <Field3D
-                view={view}
-                ball={ball}
-                trail={trail}
-                following={following}
-                spray={spray}
-                swing={swingProgress}
-                throwT={throwT}
-                mark={mark}
-                impact={impact}
-                celebrate={celebrate}
-                looks={looks}
-                now={now}
-              />
-            </Suspense>
-          )
-        })()}
-        <Banner state={state} />
-        {use3D && userBatting && (
-          <button type="button" className="button button--small zb-view-toggle" onClick={toggleView}>
-            시점: {batView === 'catcher' ? '타자 뒤' : '옆에서'} ⇄
-          </button>
+        <Field
+          camera={camera}
+          ball={ball}
+          trail={trail}
+          swing={swingProgress}
+          throwT={throwT}
+          mark={mark}
+          impact={impact}
+          celebrate={celebrate}
+          colors={colors}
+          now={now}
+          players={!players3D}
+        />
+        {use3D && (
+          <Suspense fallback={null}>
+            <Players3D camera={camera} swing={swingProgress} throwT={throwT} impact={impact} looks={looks} now={now} onReady={() => setPlayers3D(true)} />
+          </Suspense>
         )}
+        <Banner state={state} />
       </div>
 
       <div className="zb-match__controls">
