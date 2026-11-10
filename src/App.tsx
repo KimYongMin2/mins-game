@@ -1,28 +1,30 @@
-import { useState } from 'react'
+import { Suspense, lazy, useState } from 'react'
 import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router'
-import { ArcheryPage } from './games/archery/ArcheryPage'
-import { ArmwrestlePage } from './games/armwrestle/ArmwrestlePage'
-import { BattingPage } from './games/batting/BattingPage'
-import { BombPage } from './games/bomb/BombPage'
-import { FightPage } from './games/fight/FightPage'
-import { MemoryPage } from './games/memory/MemoryPage'
-import { NumbaseballPage } from './games/numbaseball/NumbaseballPage'
-import { OmokPage } from './games/omok/OmokPage'
-import { RoulettePage } from './games/roulette/RoulettePage'
-import { SurvivalPage } from './games/survival/SurvivalPage'
-import { ArtilleryPage } from './games/artillery/ArtilleryPage'
-import { NunchiPage } from './games/nunchi/NunchiPage'
-import { TilesPage } from './games/tiles/TilesPage'
-import { VolleyPage } from './games/volley/VolleyPage'
-import { YutPage } from './games/yut/YutPage'
-import { ZolaballPage } from './games/zolaball/ZolaballPage'
 import { MainPage } from './pages/MainPage'
-import { MeetingPage } from './pages/meeting/MeetingPage'
 import { NicknamePage } from './pages/NicknamePage'
 import { loadNickname } from './shared/storage/nickname'
 import { setSwitchTargets } from './shared/nav'
 import { GAMES } from './pages/gameList'
 import { playerRange } from './pages/PlayerDots'
+
+// 게임·회의방 화면은 들어갈 때 받는다 (사용자 요청 — 처음에 16개 게임을 한꺼번에 받아 첫 화면이 느렸음)
+const ArcheryPage = lazy(() => import('./games/archery/ArcheryPage').then((m) => ({ default: m.ArcheryPage })))
+const ArmwrestlePage = lazy(() => import('./games/armwrestle/ArmwrestlePage').then((m) => ({ default: m.ArmwrestlePage })))
+const BattingPage = lazy(() => import('./games/batting/BattingPage').then((m) => ({ default: m.BattingPage })))
+const BombPage = lazy(() => import('./games/bomb/BombPage').then((m) => ({ default: m.BombPage })))
+const FightPage = lazy(() => import('./games/fight/FightPage').then((m) => ({ default: m.FightPage })))
+const MemoryPage = lazy(() => import('./games/memory/MemoryPage').then((m) => ({ default: m.MemoryPage })))
+const NumbaseballPage = lazy(() => import('./games/numbaseball/NumbaseballPage').then((m) => ({ default: m.NumbaseballPage })))
+const OmokPage = lazy(() => import('./games/omok/OmokPage').then((m) => ({ default: m.OmokPage })))
+const RoulettePage = lazy(() => import('./games/roulette/RoulettePage').then((m) => ({ default: m.RoulettePage })))
+const SurvivalPage = lazy(() => import('./games/survival/SurvivalPage').then((m) => ({ default: m.SurvivalPage })))
+const ArtilleryPage = lazy(() => import('./games/artillery/ArtilleryPage').then((m) => ({ default: m.ArtilleryPage })))
+const NunchiPage = lazy(() => import('./games/nunchi/NunchiPage').then((m) => ({ default: m.NunchiPage })))
+const TilesPage = lazy(() => import('./games/tiles/TilesPage').then((m) => ({ default: m.TilesPage })))
+const VolleyPage = lazy(() => import('./games/volley/VolleyPage').then((m) => ({ default: m.VolleyPage })))
+const YutPage = lazy(() => import('./games/yut/YutPage').then((m) => ({ default: m.YutPage })))
+const ZolaballPage = lazy(() => import('./games/zolaball/ZolaballPage').then((m) => ({ default: m.ZolaballPage })))
+const MeetingPage = lazy(() => import('./pages/meeting/MeetingPage').then((m) => ({ default: m.MeetingPage })))
 
 // 대기실 '게임 바꾸기'에서 고를 수 있는 게임 (친구 대전 되는 게임만, shared는 게임 목록을 몰라서 여기서 넣어 줌)
 setSwitchTargets(
@@ -43,6 +45,7 @@ function App() {
 
   return (
     <BrowserRouter>
+      <Suspense fallback={<div className="page-loading" role="status">불러오는 중…</div>}>
       <Routes>
         <Route
           path="/"
@@ -121,6 +124,7 @@ function App() {
         />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
+      </Suspense>
     </BrowserRouter>
   )
 }

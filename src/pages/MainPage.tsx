@@ -13,7 +13,7 @@ import { RoomPicker } from '../shared/ui/RoomPicker'
 import { GAMES, type GameEntry } from './gameList'
 import { OpenRooms } from './OpenRooms'
 import { PlayerDots } from './PlayerDots'
-import { loadStats } from './stats'
+import type { GameStat } from './stats'
 
 // 메인 화면 (unslop 방향: 동네 문방구 오락기·보드게임 상자. 겉은 조용하게, 색은 게임 표지에만, 인원은 사람 점):
 // 위: 로고 · 내 정보 → 크게 '이어서 하기'(최근 게임, 없으면 오늘의 추천) → 거르기(전체 · 1:1 · 여럿이 · 혼자) → 표지 카드들 → 수다방.
@@ -70,7 +70,16 @@ function PlayButtons({ game, onGo, onFriends, onDark = false }: { game: GameEntr
 
 /** 내 전적: 평소엔 한 줄 요약(전체 판 수 · 많이 한 게임)으로 접어 두고 누르면 펼침 (사용자 요청 — 길어지면 아래 캐릭터 꾸미기가 안 보였음) */
 function MyStats() {
-  const [stats] = useState(loadStats)
+  // 각 게임 기록을 읽는 코드는 게임 폴더라 창을 열 때만 받는다 (첫 화면을 가볍게)
+  const [stats, setStats] = useState<GameStat[] | null>(null)
+  useEffect(() => {
+    let alive = true
+    void import('./stats').then((m) => alive && setStats(m.loadStats()))
+    return () => {
+      alive = false
+    }
+  }, [])
+  if (!stats) return null
   const played = stats.filter((s) => s.played > 0).sort((a, b) => b.played - a.played)
   const total = played.reduce((n, s) => n + s.played, 0)
   const titleOf = (id: string) => GAMES.find((x) => x.id === id)!.title

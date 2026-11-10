@@ -1922,3 +1922,12 @@ html {
   font-size: 0.875rem;
   font-weight: 700;
 }
+
+/* 게임 화면을 받는 동안 */
+.page-loading {
+  display: grid;
+  place-items: center;
+  min-height: 60dvh;
+  color: var(--ink-soft);
+  font-weight: 700;
+}
