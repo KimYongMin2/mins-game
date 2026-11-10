@@ -3,7 +3,8 @@ import { THROW_LABEL, type Throw } from '../rules/throw'
 // 윷가락 넷. 평평한 면(배)이 위면 밝게 X 무늬, 둥근 면(등)이 위면 진하게. 빽도는 표시 있는 가락 하나만 배.
 // 던진 직후 잠깐 흔들린다.
 
-const FLAT: Record<Throw, readonly boolean[]> = {
+/** 결과마다 가락 넷이 배(평평한 면)가 위인지. 0번 가락에 빽도 표시 (3D 던지기 Pieces3D도 같이 씀) */
+export const FLAT: Record<Throw, readonly boolean[]> = {
   backdo: [true, false, false, false],
   do: [false, true, false, false],
   gae: [true, true, false, false],

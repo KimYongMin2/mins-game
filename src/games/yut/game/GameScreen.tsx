@@ -309,6 +309,7 @@ export function GameScreen(props: Props) {
                 selected={chosenMove ? selected : null}
                 me={rowOf(v, me)}
                 colors={v.teams ? TEAM_COLORS : PLAYER_COLORS}
+                toss={last ? { result: last.result, seq: last.seq, at: screen.throwAt, color: colorOf(v, last.player) } : null}
                 onReady={() => setFigures(true)}
               />
             </Suspense>
