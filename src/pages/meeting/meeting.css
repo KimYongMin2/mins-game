@@ -322,3 +322,44 @@
 .meet-list__voice {
   margin-top: 16px;
 }
+
+/* 목소리 설정 창 (VoicePanel VoiceSettingsDialog) — 메인의 아래에서 올라오는 창(.sheet)과 같은 모양 */
+.meet-settings {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.meet-settings__title {
+  font-size: 1.375rem;
+  font-weight: 800;
+}
+.meet-settings__note {
+  margin: -8px 0 0;
+  padding: 8px 12px;
+  border-radius: 6px;
+  background: var(--raised);
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: var(--ink-soft);
+}
+.meet-settings__buttons {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.meet-settings__buttons .button {
+  min-height: 48px;
+}
+.meet-test__button {
+  width: 100%;
+  min-height: 48px;
+}
+.meet-voice__now {
+  margin-left: 6px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--ink-soft);
+}
+.button--primary .meet-voice__now {
+  color: rgba(255, 255, 255, 0.85);
+}

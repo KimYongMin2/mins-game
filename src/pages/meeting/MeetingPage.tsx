@@ -8,7 +8,8 @@ import { type Member, type Room, RoomError, createRoom, joinRoom, makeRoomCode }
 import { advertiseRoom, cleanId, cleanList, cleanName, isInt, watchRooms } from '../../shared/online/roomList'
 import { readLocal, writeLocal } from '../../shared/storage/local'
 import { loadNickname } from '../../shared/storage/nickname'
-import { VoicePicker, VoiceTest } from './VoicePanel'
+import { VoiceSettingsDialog } from './VoicePanel'
+import { VOICE_EFFECTS } from '../../shared/call/voiceFx'
 import './meeting.css'
 
 // 회의방: 열린 방 목록에서 골라 들어가 음성 통화. 방장이 방을 만들 때 이름과 전체 공개/비공개(코드)를 정한다.
@@ -155,6 +156,12 @@ type RoomProps = Joined & {
 
 /** 방을 닫고 마이크를 끄는 건 부르는 쪽(MeetingPage)이 한다 */
 function MeetingRoom({ room, name, pin, nickname, voice, settings, onSettings, onVoice, onLeave }: RoomProps) {
+  // 목소리 설정 창: 열려 있는 동안 다른 사람에게 내 소리를 안 보낸다 (사용자 요청)
+  const [voiceOpen, setVoiceOpen] = useState(false)
+  const openVoice = (open: boolean) => {
+    setVoiceOpen(open)
+    voice?.setSending(!open)
+  }
   const [members, setMembers] = useState<Member[]>([])
   const [blocked, setBlocked] = useState(false)
   const [asking, setAsking] = useState(false)
@@ -327,13 +334,13 @@ function MeetingRoom({ room, name, pin, nickname, voice, settings, onSettings, o
             >
               {micOn ? '🎤 마이크 끄기' : '🔇 마이크 켜기'}
             </button>
-            {/* 목소리 변조: 다른 사람에겐 표시 안 함 */}
-            <div className="meet-voice" aria-label="내 목소리">
-              <span className="meet-voice__label">내 목소리</span>
-              <VoicePicker settings={settings} onChange={onSettings} />
-              {/* 들어보는 동안엔 다른 사람에게 내 소리를 안 보낸다 */}
-              <VoiceTest settings={settings} getRaw={async () => voice.rawTrack} onBusy={(busy) => voice.setSending(!busy)} />
-            </div>
+            {/* 목소리 변조: 설정 창에서 (다른 사람에겐 표시 안 함). 창이 열려 있는 동안 내 소리는 안 나감 */}
+            <button type="button" className="button meet__big" onClick={() => openVoice(true)}>
+              ⚙️ 목소리 설정 <span className="meet-voice__now">지금: {VOICE_EFFECTS.find((e) => e.id === settings.effect)?.label}</span>
+            </button>
+            {voiceOpen && (
+              <VoiceSettingsDialog inRoom settings={settings} onSave={onSettings} onClose={() => openVoice(false)} getRaw={async () => voice.rawTrack} />
+            )}
           </>
         ) : (
           <>
@@ -396,6 +403,7 @@ type ListProps = {
 }
 
 function RoomList({ onJoin, onCreate, error, settings, onSettings }: ListProps) {
+  const [voiceOpen, setVoiceOpen] = useState(false)
   const [rooms, setRooms] = useState<RoomInfo[] | null>(null)
   const [offline, setOffline] = useState(false)
   const [asking, setAsking] = useState<string | null>(null)
@@ -472,12 +480,11 @@ function RoomList({ onJoin, onCreate, error, settings, onSettings }: ListProps) 
           })}
         </ul>
       )}
-      {/* 들어가기 전에 목소리 효과를 골라 들어볼 수 있다. 고른 효과로 방에 들어간다 */}
-      <div className="meet-voice meet-list__voice" aria-label="내 목소리">
-        <span className="meet-voice__label">내 목소리 미리 골라 보기</span>
-        <VoicePicker settings={settings} onChange={onSettings} />
-        <VoiceTest settings={settings} getRaw={rawMic} release={(t) => t.stop()} />
-      </div>
+      {/* 들어가기 전에 목소리 효과를 골라 들어볼 수 있다. 저장한 효과로 방에 들어간다 */}
+      <button type="button" className="button meet-list__voice" onClick={() => setVoiceOpen(true)}>
+        ⚙️ 목소리 설정 <span className="meet-voice__now">지금: {VOICE_EFFECTS.find((e) => e.id === settings.effect)?.label}</span>
+      </button>
+      {voiceOpen && <VoiceSettingsDialog settings={settings} onSave={onSettings} onClose={() => setVoiceOpen(false)} getRaw={rawMic} release={(t) => t.stop()} />}
       <ul className="meet__notes">
         <li>들어갈 때 마이크 사용을 허락해 주세요 (거절하면 듣기만)</li>
         <li>이어폰을 끼면 소리가 울리지 않아요</li>
