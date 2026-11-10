@@ -6,9 +6,9 @@ import type { Member, Room } from '../../shared/online/room'
 import { loadNickname } from '../../shared/storage/nickname'
 import type { TeamPick } from '../../shared/team/teams'
 import { GroupLobby } from '../../shared/ui/GroupLobby'
-import { RematchReady } from '../../shared/ui/Ready'
+import { type ModeSpec, RematchReady } from '../../shared/ui/Ready'
 import { SoundToggle } from '../../shared/ui/SoundToggle'
-import { MAX_PLAYERS, MIN_PLAYERS } from './constants'
+import { MAX_PLAYERS, MIN_PLAYERS, PIECE_COUNTS } from './constants'
 import { GameScreen } from './game/GameScreen'
 import type { YutMsg } from './play/pvp'
 import { type YutRecord, type GameSummary, addGame, loadRecord, saveRecord } from './records'
@@ -91,6 +91,13 @@ export function YutPage() {
 
   const inGame = screen.kind === 'bot-game' || screen.kind === 'pvp-game'
   const isHost = room?.role === 'host'
+  // 방 안에서 방장이 말 개수를 바꿀 수 있다 (사용자 요청 — 처음엔 시작 화면에서만). 고른 것은 기기 기록에 남음
+  const piecesMode: ModeSpec = {
+    label: '말',
+    options: PIECE_COUNTS.map((n) => ({ value: n, label: `${n}개` })),
+    value: record.pieceCount,
+    onChange: (n) => update({ ...record, pieceCount: Number(n) }),
+  }
   // 다시 하기 전 준비 (사용자 요청): 방에 있는 친구가 모두 [준비]해야 방장이 다시 하기
   const friendGuests = members.filter((m) => m.role === 'guest')
   const readyCount = friendGuests.filter((m) => m.ready).length
@@ -128,6 +135,7 @@ export function YutPage() {
           capacity={MAX_PLAYERS}
           minPlayers={MIN_PLAYERS}
           teams
+          mode={piecesMode}
           onConnected={setRoom}
           onStart={(with_, bots, teams) => room && startPvp(room, with_, bots, teams)}
           onBack={() => {
@@ -162,7 +170,7 @@ export function YutPage() {
           retryLocked={screen.summary.mode === 'pvp' && !allReady}
           readySlot={
             screen.summary.mode === 'pvp' && room ? (
-              <RematchReady room={room} allReady={allReady} waitText={`친구들이 준비하길 기다려요 (${readyCount}/${friendGuests.length})`} />
+              <RematchReady room={room} allReady={allReady} waitText={`친구들이 준비하길 기다려요 (${readyCount}/${friendGuests.length})`} mode={piecesMode} />
             ) : undefined
           }
           canRetry={screen.summary.mode === 'bot' || Math.min(MAX_PLAYERS, members.length + 1 + pvpBots) >= MIN_PLAYERS}

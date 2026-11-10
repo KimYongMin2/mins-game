@@ -92,29 +92,53 @@ export function advertiseRoom<T extends object>(listId: string, info: T): Advert
   }
 }
 
-/** 목록을 지켜본다. 바뀔 때마다 지금 열린 방들. 연결 못 하면 onError. 멈추는 함수를 돌려준다 */
+/**
+ * 목록을 지켜본다. 바뀔 때마다 지금 열린 방들. 연결 못 하면 onError. 멈추는 함수를 돌려준다.
+ * 같은 목록을 여러 곳에서 지켜봐도(메인 '지금 열린 방' + 게임 창 방 목록) 채널은 하나만 열고 나눠 쓴다
+ * (같은 채널을 또 열면 앞의 것을 닫아 버려서 한쪽이 계속 '불러오는 중'이었음)
+ */
+type Watch = { listeners: Set<{ onRooms: (rooms: object[]) => void; onError: () => void }>; channel: RealtimeChannel | null; rooms: object[] | null; failed: boolean; stopped: boolean }
+const watches = new Map<string, Watch>()
+
 export function watchRooms<T extends object>(listId: string, onRooms: (rooms: T[]) => void, onError: () => void): () => void {
-  let stopped = false
-  let channel: RealtimeChannel | null = null
-  void channelFor(listId)
-    .then((ch) => {
-      if (stopped) return close(ch)
-      channel = ch
-      ch.on('presence', { event: 'sync' }, () => {
-        if (stopped) return
-        onRooms(Object.values(ch.presenceState<T>()).flatMap((metas) => metas.slice(0, 1)))
+  const listener = { onRooms: onRooms as (rooms: object[]) => void, onError }
+  let w = watches.get(listId)
+  if (!w) {
+    const watch: Watch = { listeners: new Set(), channel: null, rooms: null, failed: false, stopped: false }
+    w = watch
+    watches.set(listId, watch)
+    const emit = (ch: RealtimeChannel) => {
+      watch.rooms = Object.values(ch.presenceState<object>()).flatMap((metas) => metas.slice(0, 1))
+      for (const l of watch.listeners) l.onRooms(watch.rooms)
+    }
+    void channelFor(listId)
+      .then((ch) => {
+        if (watch.stopped) return close(ch)
+        watch.channel = ch
+        ch.on('presence', { event: 'sync' }, () => {
+          if (!watch.stopped) emit(ch)
+        })
+        ch.subscribe((status) => {
+          if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') console.warn('[list] 목록 접속 재시도', status)
+          // 처음 접속 전엔 빈 목록으로 알려 '불러오는 중'을 끝낸다
+          if (status === 'SUBSCRIBED' && !watch.stopped) emit(ch)
+        })
       })
-      ch.subscribe((status) => {
-        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') console.warn('[list] 목록 접속 재시도', status)
-        // 처음 접속 전엔 빈 목록으로 알려 '불러오는 중'을 끝낸다
-        if (status === 'SUBSCRIBED' && !stopped) onRooms(Object.values(ch.presenceState<T>()).flatMap((metas) => metas.slice(0, 1)))
+      .catch(() => {
+        watch.failed = true
+        if (!watch.stopped) for (const l of watch.listeners) l.onError()
       })
-    })
-    .catch(() => {
-      if (!stopped) onError()
-    })
+  }
+  const watch = w
+  watch.listeners.add(listener)
+  // 이미 받은 목록이 있으면 바로 알려 준다
+  if (watch.rooms) queueMicrotask(() => watch.listeners.has(listener) && onRooms(watch.rooms as T[]))
+  if (watch.failed) queueMicrotask(() => watch.listeners.has(listener) && onError())
   return () => {
-    stopped = true
-    if (channel) void close(channel)
+    watch.listeners.delete(listener)
+    if (watch.listeners.size > 0) return
+    watch.stopped = true
+    watches.delete(listId)
+    if (watch.channel) void close(watch.channel)
   }
 }

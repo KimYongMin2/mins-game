@@ -6,7 +6,7 @@ import { type ListedRoom, type Member, type Room, RoomError, channelCode, create
 import { encodeLook } from '../art3d/animalKinds'
 import { loadLook } from '../storage/avatar'
 import { TEAM_COLORS, TEAM_NAMES, type Team, type TeamPick, assignTeams, teamsReady } from '../team/teams'
-import { ReadyButton, readyCount as countReady } from './Ready'
+import { type ModeSpec, ModePicker, ReadyButton, readyCount as countReady } from './Ready'
 import { InviteButton } from './Invite'
 import { RoomBadge, RoomPicker } from './RoomPicker'
 
@@ -31,6 +31,8 @@ type Props<M> = {
   onStart: (members: Member[], bots: number, teams: TeamPick | null, friendlyFire: boolean) => void
   /** 돌아가기 (연결된 방이 있으면 이미 닫은 뒤) */
   onBack: () => void
+  /** 방 안에서 방장이 바꾸는 모드 (예: 윷놀이 말 개수) — 친구 화면엔 고른 것이 보이고, 바뀌면 친구 준비가 풀림 */
+  mode?: ModeSpec
 }
 
 type View =
@@ -51,7 +53,7 @@ const myAvatar = () => {
   return l ? encodeLook(l) : undefined
 }
 
-export function GroupLobby<M>({ gameId, nickname, capacity, minPlayers, teams: canTeam = false, friendlyFire: canFriendlyFire = false, onConnected, onStart, onBack }: Props<M>) {
+export function GroupLobby<M>({ gameId, nickname, capacity, minPlayers, teams: canTeam = false, friendlyFire: canFriendlyFire = false, onConnected, onStart, onBack, mode }: Props<M>) {
   const [view, setView] = useState<View>({ kind: 'menu' })
   const [room, setRoom] = useState<Room<M> | null>(null)
   const [members, setMembers] = useState<Member[]>([])
@@ -186,6 +188,7 @@ export function GroupLobby<M>({ gameId, nickname, capacity, minPlayers, teams: c
         </ul>
         {isHost ? (
           <>
+            <ModePicker room={room} mode={mode} />
             {canTeam && (
               <div className="group-lobby__mode" role="group" aria-label="개인전 / 팀전">
                 <button type="button" className={`button button--small${teamMode ? '' : ' group-lobby__mode--on'}`} onClick={() => setTeamMode(false)}>
@@ -238,7 +241,14 @@ export function GroupLobby<M>({ gameId, nickname, capacity, minPlayers, teams: c
             </button>
           </>
         ) : (
-          hostGone ? <p className="pvp-lobby__status">방장이 나갔어요</p> : <ReadyButton room={room} />
+          hostGone ? (
+            <p className="pvp-lobby__status">방장이 나갔어요</p>
+          ) : (
+            <>
+              <ModePicker room={room} hostInfo={members.find((m) => m.role === 'host')?.info} />
+              <ReadyButton room={room} resetKey={members.find((m) => m.role === 'host')?.info} />
+            </>
+          )
         )}
         <button type="button" className="button button--small pvp-lobby__back" onClick={leave}>
           나가기

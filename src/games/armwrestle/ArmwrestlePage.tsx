@@ -6,7 +6,7 @@ import { withDirectLink } from '../../shared/online/directLink'
 import type { Peer, Room } from '../../shared/online/room'
 import { loadNickname } from '../../shared/storage/nickname'
 import { PvpLobby } from '../../shared/ui/PvpLobby'
-import { DuelReadyRoom, RematchReady, usePeerReady } from '../../shared/ui/Ready'
+import { DuelReadyRoom, type ModeSpec, RematchReady, usePeerReady } from '../../shared/ui/Ready'
 import { SoundToggle } from '../../shared/ui/SoundToggle'
 import { GameScreen } from './game/GameScreen'
 import type { Event } from './constants'
@@ -42,6 +42,16 @@ export function ArmwrestlePage() {
   const [pvp, setPvp] = useState<Pvp | null>(null)
   // 친구 대전 준비 (사용자 요청): 친구가 [준비]해야 방장이 [게임 시작]·[다시 하기]를 누를 수 있다
   const peerReady = usePeerReady(pvp?.room ?? null)
+  // 방 안에서 방장이 종목을 바꿀 수 있다 (사용자 요청 — 처음엔 시작 화면에서만). 고른 종목은 기기 기록에 남아 다음에도 그대로
+  const eventMode: ModeSpec<Event> = {
+    label: '종목',
+    options: [
+      { value: 'mash', label: '연타전' },
+      { value: 'timing', label: '타이밍전' },
+    ],
+    value: record.event,
+    onChange: (event) => update({ ...record, event }),
+  }
   /** 방장: [게임 시작]을 눌렀는지 · 친구 화면이 듣고 있는지('ready' 메시지를 받았는지) */
   const goRef = useRef(false)
   const listeningRef = useRef(false)
@@ -176,6 +186,7 @@ export function ArmwrestlePage() {
             me={loadNickname() ?? '나'}
             peer={pvp.peer.nickname}
             peerReady={peerReady}
+            mode={eventMode as ModeSpec}
             onStart={() => {
               goRef.current = true
               if (listeningRef.current) startPvp(pvp.room)
@@ -201,7 +212,7 @@ export function ArmwrestlePage() {
           peerGone={peerGone}
           onRetry={() => peerReady && startPvp(pvp.room)}
           retryLocked={!peerReady}
-          readySlot={<RematchReady room={pvp.room} allReady={peerReady} waitText={`${pvp.peer.nickname}님이 준비하길 기다려요`} />}
+          readySlot={<RematchReady room={pvp.room} allReady={peerReady} waitText={`${pvp.peer.nickname}님이 준비하길 기다려요`} mode={eventMode as ModeSpec} />}
           onMenu={leavePvp}
         />
       )}

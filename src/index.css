@@ -1701,3 +1701,48 @@ p {
   font-variant-numeric: tabular-nums;
   text-align: right;
 }
+
+/* 방 안에서 방장이 바꾸는 모드 (shared/ui/Ready ModePicker) */
+.mode-pick {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+.mode-pick__label {
+  font-size: 0.9375rem;
+  font-weight: 800;
+}
+.mode-pick__options {
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+  border-radius: 6px;
+  background: var(--raised);
+}
+.mode-pick__option {
+  height: 36px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--ink-soft);
+  font: inherit;
+  font-size: 0.9375rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+.mode-pick__option--on {
+  background: var(--card);
+  color: var(--ink);
+  box-shadow: 0 1px 2px rgba(31, 27, 22, 0.12);
+}
+.mode-pick__info {
+  margin: 0;
+  padding: 8px 12px;
+  border-radius: 6px;
+  background: var(--raised);
+  font-size: 0.9375rem;
+  font-weight: 700;
+  text-align: center;
+}

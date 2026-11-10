@@ -11,11 +11,12 @@ export type RoomRole = 'host' | 'guest'
 
 /** avatar = 상대가 고른 캐릭터 글자 (자기 신고라 쓰는 쪽에서 decodeLook으로 검사) */
 /** ready = 친구가 [준비]를 눌렀는지 (방장은 준비 없음, 게임 시작만) */
-export type Peer = { nickname: string; avatar?: string; ready?: boolean }
+/** info = 방장이 방 안에서 고른 모드 글자 (예: '종목: 연타전') — 친구 화면에 보여 줌 */
+export type Peer = { nickname: string; avatar?: string; ready?: boolean; info?: string }
 
 /** 방에 있는 사람 (나 빼고). id는 방 안에서만 쓰는 접속 번호 */
 /** avatar = 그 사람이 고른 캐릭터 (자기 신고라 쓰는 쪽에서 검사) */
-export type Member = { id: string; nickname: string; role: RoomRole; avatar?: string; ready?: boolean }
+export type Member = { id: string; nickname: string; role: RoomRole; avatar?: string; ready?: boolean; info?: string }
 
 /** 헷갈리는 글자(0·O·1·I·L)는 뺀다 */
 const CODE_CHARS = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'
@@ -37,7 +38,7 @@ export function normalizeCode(input: string): string | null {
   return [...code].every((c) => CODE_CHARS.includes(c)) ? code : null
 }
 
-type Meta = { role: RoomRole; nickname: string; /** 들어온 시각 (먼저 온 사람이 자리를 가진다) */ joinedAt: number; avatar?: string; /** 친구가 [준비]를 눌렀는지 */ ready?: boolean; /** 준비를 바꾼 시각 (보낸 사람 시계) */ readyAt?: number }
+type Meta = { role: RoomRole; nickname: string; /** 들어온 시각 (먼저 온 사람이 자리를 가진다) */ joinedAt: number; avatar?: string; /** 친구가 [준비]를 눌렀는지 */ ready?: boolean; /** 준비를 바꾼 시각 (보낸 사람 시계) */ readyAt?: number; /** 방장이 고른 모드 글자 */ info?: string }
 
 type Other = Meta & { key: string }
 
@@ -115,6 +116,8 @@ export interface Room<M> {
   setPlaying(playing: boolean): void
   /** 친구: 준비했는지 사람 목록(presence)으로 알린다 (사용자 요청 — 모두 준비해야 방장이 시작). 다시 붙을 때도 그대로 */
   setReady(ready: boolean): void
+  /** 방장: 방 안에서 고른 모드를 사람 목록으로 알린다 (친구 화면에 표시, 바뀌면 친구 준비가 풀림) */
+  setInfo(info: string): void
   leave(): void
 }
 
@@ -218,12 +221,13 @@ async function open<M>(gameId: string, code: string, meta: Meta, { capacity = 2,
     publish()
     updateListing()
   })
+  const infoOf = (o: Other) => (o.role === 'host' && typeof o.info === 'string' && o.info ? { info: o.info.replace(/[\u0000-\u001f]/g, '').slice(0, 40) } : {})
   function publish() {
     const others = lastOthers
     const next = others[0]
-      ? { nickname: others[0].nickname, ...(typeof others[0].avatar === 'string' ? { avatar: others[0].avatar.slice(0, 48) } : {}), ...(readyOf(others[0]) ? { ready: true } : {}) }
+      ? { nickname: others[0].nickname, ...(typeof others[0].avatar === 'string' ? { avatar: others[0].avatar.slice(0, 48) } : {}), ...(readyOf(others[0]) ? { ready: true } : {}), ...infoOf(others[0]) }
       : null
-    if ((next === null) !== (peer === null) || next?.nickname !== peer?.nickname || next?.avatar !== peer?.avatar || next?.ready !== peer?.ready) {
+    if ((next === null) !== (peer === null) || next?.nickname !== peer?.nickname || next?.avatar !== peer?.avatar || next?.ready !== peer?.ready || next?.info !== peer?.info) {
       peer = next
       for (const fn of peerFns) fn(peer)
     }
@@ -233,6 +237,7 @@ async function open<M>(gameId: string, code: string, meta: Meta, { capacity = 2,
       role: o.role,
       ...(typeof o.avatar === 'string' ? { avatar: o.avatar.slice(0, 48) } : {}),
       ...(readyOf(o) ? { ready: true } : {}),
+      ...infoOf(o),
     }))
     if (JSON.stringify(nextMembers) !== JSON.stringify(members)) {
       members = nextMembers
@@ -292,6 +297,11 @@ async function open<M>(gameId: string, code: string, meta: Meta, { capacity = 2,
       meta.readyAt = Date.now()
       void channel.track(meta)
       void channel.send({ type: 'broadcast', event: 'ready', payload: { from: myKey, ready, at: meta.readyAt } })
+    },
+    setInfo(info) {
+      if (meta.role !== 'host' || meta.info === info) return
+      meta.info = info
+      void channel.track(meta)
     },
     setPlaying(playing) {
       if (!advert || !listed || listed.playing === playing) return

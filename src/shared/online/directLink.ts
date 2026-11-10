@@ -237,6 +237,7 @@ export function withDirectLink<M>(room: Room<M>, opts: Options<M> = {}): DirectR
     onMembers: (fn) => room.onMembers(fn),
     setPlaying: (p) => room.setPlaying(p),
     setReady: (r) => room.setReady(r),
+    setInfo: (i) => room.setInfo(i),
     status: () => status,
     linkCount: () => count,
     onStatus(fn) {
