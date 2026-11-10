@@ -25,16 +25,85 @@ export type Vec = { x: number; y: number }
 /** 지형: x = 0, 1, … COLS 자리의 땅 높이 */
 export type Terrain = number[]
 
-/** 언덕 지형: 크기가 다른 물결 몇 개를 겹친다 */
-export function makeTerrain(rng: Rng): Terrain {
+/**
+ * 지형 모양 (판마다 무작위, 사용자 요청 — 처음엔 늘 물결 언덕이라 비슷해 보였음):
+ * 언덕(물결) · 큰 산(가운데 높은 봉우리) · 골짜기(양끝 높고 가운데 낮음) · 쌍봉 · 고원(평평한 대지 몇 개) · 울퉁불퉁
+ */
+export const TERRAIN_SHAPES = ['hills', 'mountain', 'valley', 'twin', 'mesa', 'rough'] as const
+export type TerrainShape = (typeof TERRAIN_SHAPES)[number]
+/** 땅 색·하늘 (판마다 무작위): 풀밭 · 사막 · 눈밭 · 노을 · 밤 */
+export const LAND_THEMES = ['grass', 'desert', 'snow', 'sunset', 'night'] as const
+export type LandTheme = (typeof LAND_THEMES)[number]
+export type Land = { shape: TerrainShape; theme: LandTheme }
+
+const pickOf = <T,>(rng: Rng, list: readonly T[]): T => list[Math.floor(rng.next() * list.length) % list.length]
+const smooth = (e0: number, e1: number, x: number) => {
+  const t = Math.min(1, Math.max(0, (x - e0) / (e1 - e0)))
+  return t * t * (3 - 2 * t)
+}
+
+/** 판 하나의 땅: 모양·색을 고르고 지형을 만든다 */
+export function makeLand(rng: Rng): { land: Land; terrain: Terrain } {
+  const shape = pickOf(rng, TERRAIN_SHAPES)
+  const theme = pickOf(rng, LAND_THEMES)
+  return { land: { shape, theme }, terrain: makeTerrain(rng, shape) }
+}
+
+/** 지형: 모양마다 큰 틀을 잡고, 크기가 다른 물결을 겹쳐 자연스럽게 */
+export function makeTerrain(rng: Rng, shape: TerrainShape = 'hills'): Terrain {
+  const wave = (amp: number, len: number) => ({ amp, len, phase: rng.next() * Math.PI * 2 })
+  const big = shape === 'hills' ? 16 + rng.next() * 10 : shape === 'rough' ? 10 + rng.next() * 6 : 4 + rng.next() * 4
   const waves = [
-    { amp: 16 + rng.next() * 10, len: 120 + rng.next() * 80, phase: rng.next() * Math.PI * 2 },
-    { amp: 7 + rng.next() * 6, len: 45 + rng.next() * 25, phase: rng.next() * Math.PI * 2 },
-    { amp: 2 + rng.next() * 3, len: 14 + rng.next() * 8, phase: rng.next() * Math.PI * 2 },
+    wave(big, 120 + rng.next() * 80),
+    wave(shape === 'rough' ? 10 + rng.next() * 5 : shape === 'mesa' ? 1.5 : 5 + rng.next() * 5, 45 + rng.next() * 25),
+    wave(shape === 'rough' ? 4 + rng.next() * 3 : 2 + rng.next() * 3, 14 + rng.next() * 8),
   ]
-  const base = 38 + rng.next() * 14
-  return Array.from({ length: COLS + 1 }, (_, x) => {
-    const h = waves.reduce((sum, w) => sum + w.amp * Math.sin((x / w.len) * Math.PI * 2 + w.phase), base)
+  const W = COLS
+  let frame: (x: number) => number
+  switch (shape) {
+    case 'mountain': {
+      const c = W / 2 + (rng.next() - 0.5) * 40
+      const height = 34 + rng.next() * 12
+      const width = 22 + rng.next() * 14
+      const base = 26 + rng.next() * 8
+      frame = (x) => base + height * Math.exp(-(((x - c) / width) ** 2))
+      break
+    }
+    case 'valley': {
+      const edge = 62 + rng.next() * 12
+      const low = 22 + rng.next() * 8
+      frame = (x) => low + (edge - low) * (Math.abs(x / W - 0.5) * 2) ** 1.6
+      break
+    }
+    case 'twin': {
+      const base = 26 + rng.next() * 6
+      const peaks = [W * (0.3 + (rng.next() - 0.5) * 0.08), W * (0.7 + (rng.next() - 0.5) * 0.08)]
+      const hs = [26 + rng.next() * 14, 26 + rng.next() * 14]
+      const width = 16 + rng.next() * 8
+      frame = (x) => base + peaks.reduce((sum, c, i) => sum + hs[i] * Math.exp(-(((x - c) / width) ** 2)), 0)
+      break
+    }
+    case 'mesa': {
+      // 높이가 다른 평평한 대지 3~4개, 사이는 부드러운 비탈
+      const n = 3 + Math.floor(rng.next() * 2)
+      const levels = Array.from({ length: n }, () => 26 + rng.next() * 40)
+      const seg = W / n
+      frame = (x) => {
+        const i = Math.min(n - 1, Math.floor(x / seg))
+        const local = x - i * seg
+        let h = levels[i]
+        if (i > 0) h += (levels[i - 1] - levels[i]) * (1 - smooth(0, 9, local))
+        return h
+      }
+      break
+    }
+    default: {
+      const base = 38 + rng.next() * 14
+      frame = () => base
+    }
+  }
+  return Array.from({ length: W + 1 }, (_, x) => {
+    const h = waves.reduce((sum, w) => sum + w.amp * Math.sin((x / w.len) * Math.PI * 2 + w.phase), frame(x))
     return Math.round(Math.min(TERRAIN_MAX, Math.max(TERRAIN_MIN, h)) * 10) / 10
   })
 }

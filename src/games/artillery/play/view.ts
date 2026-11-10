@@ -1,20 +1,22 @@
 // 화면에 그릴 것. 방장은 심판 상태에서 만들고, 친구는 방장이 보낸 것을 받는다 (시간은 '남은 ms'로 주고받음).
 // 내 차례에 겨누는 것(draft)은 각 기기가 들고 있다가 심판에게 보낸다 (내 화면엔 바로 보이게).
 import { ANGLE_MAX, ANGLE_MIN, CHARGE_MS, MOVE_MAX, POWER_MAX, POWER_MIN, STEP, WORLD_W } from '../constants'
-import type { Shot, Terrain } from '../rules/physics'
+import type { Land, Shot, Terrain } from '../rules/physics'
+import type { Look } from '../../../shared/art3d/animalKinds'
 import type { Team } from '../../../shared/team/teams'
 import { type Boom, type EngineState, ranksOf, winnerTeam } from './engine'
 
 export type PhaseKind = EngineState['phase']['kind']
 
 export type ArtilleryView = {
-  players: { id: string; name: string }[]
+  players: { id: string; name: string; avatar?: Look }[]
   /** 팀전이면 사람마다 팀 */
   teams: Team[] | null
   /** 팀전에서 끝났으면 이긴 팀 */
   winTeam: Team | null
   tanks: { x: number; hp: number; alive: boolean; angle: number; power: number }[]
   terrain: Terrain
+  land: Land
   turn: number
   turnNo: number
   wind: number
@@ -34,11 +36,12 @@ export type ArtilleryView = {
 export function toView(s: EngineState): ArtilleryView {
   const { phase, now } = s
   return {
-    players: s.players.map(({ id, name }) => ({ id, name })),
+    players: s.players.map(({ id, name, avatar }) => ({ id, name, ...(avatar ? { avatar } : {}) })),
     teams: s.teams,
     winTeam: s.phase.kind === 'done' ? winnerTeam(s) : null,
     tanks: s.tanks.map(({ x, hp, alive, angle, power }) => ({ x, hp, alive, angle, power })),
     terrain: s.terrain,
+    land: s.land,
     turn: s.turn,
     turnNo: s.turnNo,
     wind: s.wind,

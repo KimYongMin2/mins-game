@@ -1,4 +1,7 @@
-import { useEffect, useReducer, useRef, useState } from 'react'
+import { Suspense, lazy, useEffect, useReducer, useRef, useState } from 'react'
+import { assignLooks, decodeLook } from '../../../shared/art3d/animalKinds'
+import { canWebGL } from '../../../shared/art3d/webgl'
+import { loadLook } from '../../../shared/storage/avatar'
 import type { Member, Room } from '../../../shared/online/room'
 import { randomSeed } from '../../../shared/random'
 import { TEAM_COLORS, TEAM_NAMES, type Team, type TeamPick, planTeams, teamOutcome } from '../../../shared/team/teams'
@@ -7,6 +10,9 @@ import type { BotLevel } from '../bot/artilleryBot'
 import { MOVE_SPEED, PLAYER_COLORS, POWER_MAX, TURN_MS, WIND_MAX, WORLD_W } from '../constants'
 import { AngleDial } from '../field/AngleDial'
 import { Battlefield } from '../field/Battlefield'
+
+// 대포에 탄 3D 동물 (2D 전장 위에 겹침). three.js는 이때만 불러온다
+const Riders3D = lazy(() => import('../field/Riders3D').then((m) => ({ default: m.Riders3D })))
 import { type EngineAction, type EngineState, type Player, createEngine, engineReducer } from '../play/engine'
 import type { ArtilleryMsg } from '../play/pvp'
 import { type ArtilleryView, type ScreenAction, type ScreenState, canAim, chargePower, createScreen, fuelLeft, myIndex, screenReducer, toView, viewChanged } from '../play/view'
@@ -65,6 +71,12 @@ function initHost(props: Props): HostState {
       ...BOT_NAMES.slice(0, props.bots).map((name, i) => ({ id: `bot${i}`, name, kind: 'bot' as const })),
     ]
   }
+  // 3D 캐릭터: 나·친구는 고른 동물과 꾸미기(겹쳐도 됨), 안 고른 사람과 봇은 남은 동물
+  const chosen = players.map((p) =>
+    p.kind === 'user' ? (loadLook() ?? undefined) : p.kind === 'remote' && props.mode === 'host' ? decodeLook(props.members.find((m) => m.id === p.id)?.avatar) : undefined,
+  )
+  const looks = assignLooks(chosen)
+  players = players.map((p, i) => ({ ...p, avatar: looks[i] }))
   // 친구 대전 봇은 일반
   // 팀전: 두 팀이 번갈아 앉게(차례가 오게) 자리를 다시 늘어놓는다
   let teams: Team[] | null = null
@@ -135,6 +147,9 @@ export function GameScreen(props: Props) {
   const isGuest = props.mode === 'guest'
   const [host, hostDispatch] = useReducer(hostReducer, props, initHost)
   const [guest, guestDispatch] = useReducer(screenReducer, undefined, () => createScreen(props.mode === 'guest' ? props.room.myId : '', performance.now()))
+  const [use3D] = useState(canWebGL)
+  /** 3D 동물이 그려지기 시작하면 이름표를 위로 */
+  const [riders, setRiders] = useState(false)
   const screen = isGuest ? guest : host.screen
   const dispatch = (a: Exclude<ScreenAction, { type: 'view' | 'tick' }>) => (isGuest ? guestDispatch(a) : hostDispatch(a))
   const dispatchRef = useRef(dispatch)
@@ -358,7 +373,12 @@ export function GameScreen(props: Props) {
         {v && v.phase !== 'countdown' && v.phase !== 'done' && <Wind wind={v.wind} />}
       </div>
       <div className="at-view">
-        <Battlefield screen={screen} />
+        <Battlefield screen={screen} riders={riders} />
+        {use3D && (
+          <Suspense fallback={null}>
+            <Riders3D screen={screen} onReady={() => setRiders(true)} />
+          </Suspense>
+        )}
       </div>
       <div className="at-timer" aria-hidden>
         <div className="at-timer__fill" style={{ transform: `scaleX(${v?.phase === 'aim' ? left / TURN_MS : 0})` }} />

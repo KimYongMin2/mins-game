@@ -18,12 +18,14 @@ import {
   WIND_MAX,
   WORLD_W,
 } from '../constants'
-import { type Shot, type Terrain, type Vec, explode, makeTerrain, simulateShot } from '../rules/physics'
+import { type Land, type Shot, type Terrain, type Vec, explode, makeLand, simulateShot } from '../rules/physics'
+import type { Look } from '../../../shared/art3d/animalKinds'
 import { type Team, lastTeam, sameTeam } from '../../../shared/team/teams'
 
 /** user = 이 기기, bot = 봇, remote = 방에 들어온 친구 */
 export type PlayerKind = 'user' | 'bot' | 'remote'
-export type Player = { id: string; name: string; kind: PlayerKind }
+/** avatar = 3D 캐릭터 (시작할 때 정해 둠, 대포에 타고 있음) */
+export type Player = { id: string; name: string; kind: PlayerKind; avatar?: Look }
 
 export type Tank = { x: number; hp: number; alive: boolean; angle: number; power: number }
 
@@ -49,6 +51,8 @@ export type EngineState = {
   friendlyFire: boolean
   tanks: Tank[]
   terrain: Terrain
+  /** 지형 모양·땅 색 (판마다 무작위) */
+  land: Land
   /** 지금 차례인 사람 */
   turn: number
   /** 몇 번째 차례인지 (친구 메시지가 옛 차례 것인지 가릴 때) */
@@ -89,7 +93,7 @@ function startSpots(rng: Rng, n: number): number[] {
 
 export function createEngine(opts: { now: number; seed: number; players: Player[]; teams?: Team[] | null; friendlyFire?: boolean; level?: BotLevel }): EngineState {
   const rng = createRng(opts.seed)
-  const terrain = makeTerrain(rng)
+  const { land, terrain } = makeLand(rng)
   const spots = startSpots(rng, opts.players.length)
   const tanks = spots.map((x) => ({ x, hp: HP, alive: true, angle: x < WORLD_W / 2 ? 45 : 135, power: 60 }))
   const turn = Math.floor(rng.next() * opts.players.length)
@@ -102,6 +106,7 @@ export function createEngine(opts: { now: number; seed: number; players: Player[
     friendlyFire: !!opts.friendlyFire,
     tanks,
     terrain,
+    land,
     turn,
     turnNo: 0,
     wind: 0,

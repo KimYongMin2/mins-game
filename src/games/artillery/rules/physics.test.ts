@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { createRng } from '../../../shared/random'
 import { COLS, CRATER_R, DAMAGE_R, MAX_DAMAGE, TANK_CY, TERRAIN_MAX, TERRAIN_MIN } from '../constants'
-import { blastDamage, carve, explode, heightAt, makeTerrain, simulateShot, tankCenter, tankPose, tankTilt } from './physics'
+import { TERRAIN_SHAPES, blastDamage, carve, explode, heightAt, makeLand, makeTerrain, simulateShot, tankCenter, tankPose, tankTilt } from './physics'
 
 const flat = (h = 30) => Array.from({ length: COLS + 1 }, () => h)
 
@@ -108,5 +108,27 @@ describe('대포가 땅에 얹힘', () => {
     for (let dx = -5; dx <= 5; dx += 0.5) expect(heightAt(peak, 103 + dx)).toBeLessThanOrEqual(p.y + dx * Math.tan(p.tilt) + 1e-9)
     const pit = Array.from({ length: COLS + 1 }, (_, i) => (Math.abs(i - 100) <= 2 ? 40 : 50))
     expect(tankPose(pit, 100).y).toBe(50)
+  })
+})
+
+describe('지형 모양', () => {
+  it('모양마다 범위 안이고 같은 시드면 같다', () => {
+    for (const shape of TERRAIN_SHAPES)
+      for (let seed = 1; seed < 30; seed++) {
+        const t = makeTerrain(createRng(seed), shape)
+        expect(t.every((h) => h >= TERRAIN_MIN && h <= TERRAIN_MAX)).toBe(true)
+        expect(t).toEqual(makeTerrain(createRng(seed), shape))
+      }
+  })
+  it('판마다 모양·땅 색이 골고루 나온다', () => {
+    const shapes = new Set<string>()
+    const themes = new Set<string>()
+    for (let seed = 1; seed < 200; seed++) {
+      const { land } = makeLand(createRng(seed))
+      shapes.add(land.shape)
+      themes.add(land.theme)
+    }
+    expect(shapes.size).toBe(6)
+    expect(themes.size).toBe(5)
   })
 })
