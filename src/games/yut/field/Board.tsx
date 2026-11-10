@@ -1,4 +1,4 @@
-import type { PointerEvent } from 'react'
+import type { PointerEvent, ReactNode } from 'react'
 import { CORNERS, NODE_XY, nodeOf } from '../rules/board'
 import type { From, Piece } from '../rules/moves'
 
@@ -24,6 +24,10 @@ type Props = {
   lastTo: number | 'out' | null
   onSelect: (from: From | null) => void
   onConfirm: () => void
+  /** 말을 3D 동물(Pieces3D)로 세우면: 동그라미는 발밑 받침으로 납작하게, 업힌 수는 옆 아래 배지로 (동물에 안 가리게) */
+  figures?: boolean
+  /** 윷판 위에 겹칠 것 (3D 말 층) */
+  children?: ReactNode
 }
 
 const onBoard = (p: Piece): p is Exclude<Piece, 'home' | 'out'> => p !== 'home' && p !== 'out'
@@ -36,7 +40,7 @@ const LINES = [
   'M270 30L30 270',
 ]
 
-export function Board({ pieces, movable, selected, target, me, colors = PLAYER_COLORS, lastTo, onSelect, onConfirm }: Props) {
+export function Board({ pieces, movable, selected, target, me, colors = PLAYER_COLORS, lastTo, onSelect, onConfirm, figures = false, children }: Props) {
   const targetNode = target === 'out' ? 0 : target
   // 갈 칸을 누르면 옮기고, 움직일 수 있는 말을 누르면 그 말을 고르고(다시 누르면 풀기), 나머지는 풀기
   function tap(node: number | null) {
@@ -65,6 +69,7 @@ export function Board({ pieces, movable, selected, target, me, colors = PLAYER_C
     return best
   }
   return (
+    <div className="yt-board-box">
     <svg
       className="yt-board"
       viewBox="0 0 300 300"
@@ -117,12 +122,29 @@ export function Board({ pieces, movable, selected, target, me, colors = PLAYER_C
           return (
             <g key={`${player}-${node}`} className={`yt-piece${cls}`}>
               {/* 판 위에 놓인 말: 아래 그림자 + 빛 받은 면 */}
-              <ellipse className="yt-piece__shadow" cx={x + 2} cy={y + 4} rx={canPick ? 14 : 12} ry={(canPick ? 14 : 12) * 0.8} />
-              <circle cx={x} cy={y} r={canPick ? 14 : 12} fill={`url(#yt-piece-${player})`} />
-              {count > 1 && (
-                <text x={x} y={y + 5}>
-                  {count}
-                </text>
+              {figures ? (
+                // 3D 동물 발밑 받침 + 업힌 수 배지
+                <>
+                  <ellipse cx={x} cy={y + 2} rx={canPick ? 15 : 13} ry={(canPick ? 15 : 13) * 0.55} fill={`url(#yt-piece-${player})`} />
+                  {count > 1 && (
+                    <g className="yt-piece__badge">
+                      <circle cx={x + 13} cy={y + 8} r={7.5} fill={colors[player]} />
+                      <text x={x + 13} y={y + 12}>
+                        {count}
+                      </text>
+                    </g>
+                  )}
+                </>
+              ) : (
+                <>
+                  <ellipse className="yt-piece__shadow" cx={x + 2} cy={y + 4} rx={canPick ? 14 : 12} ry={(canPick ? 14 : 12) * 0.8} />
+                  <circle cx={x} cy={y} r={canPick ? 14 : 12} fill={`url(#yt-piece-${player})`} />
+                  {count > 1 && (
+                    <text x={x} y={y + 5}>
+                      {count}
+                    </text>
+                  )}
+                </>
               )}
             </g>
           )
@@ -138,5 +160,7 @@ export function Board({ pieces, movable, selected, target, me, colors = PLAYER_C
         </g>
       )}
     </svg>
+    {children}
+    </div>
   )
 }

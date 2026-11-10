@@ -1,4 +1,7 @@
-import { useEffect, useReducer, useRef, useState } from 'react'
+import { Suspense, lazy, useEffect, useReducer, useRef, useState } from 'react'
+import { assignLooks, decodeLook } from '../../../shared/art3d/animalKinds'
+import { canWebGL } from '../../../shared/art3d/webgl'
+import { loadLook } from '../../../shared/storage/avatar'
 import type { Member, Room } from '../../../shared/online/room'
 import { randomSeed } from '../../../shared/random'
 import { TEAM_COLORS, TEAM_NAMES, type Team, type TeamPick, planTeams, teamOutcome } from '../../../shared/team/teams'
@@ -6,6 +9,9 @@ import { loadNickname } from '../../../shared/storage/nickname'
 import { DECIDE_MS } from '../constants'
 import { Board, PLAYER_COLORS } from '../field/Board'
 import { Sticks } from '../field/Sticks'
+
+// 말 = 3D 동물 (2D 윷판 위에 겹침). three.js는 이때만 불러온다
+const Pieces3D = lazy(() => import('../field/Pieces3D').then((m) => ({ default: m.Pieces3D })))
 import { type EngineAction, type EngineState, type Player, createEngine, engineReducer } from '../play/engine'
 import type { YutMsg } from '../play/pvp'
 import { type ScreenAction, type ScreenState, type YutView, createScreen, myIndex, myMove, myThrow, screenReducer, toView, viewChanged } from '../play/view'
@@ -59,6 +65,12 @@ function initHost(props: Props): HostState {
     ]
     pieceCount = props.pieceCount
   }
+  // 3D 캐릭터: 나·친구는 고른 동물과 꾸미기(겹쳐도 됨), 안 고른 사람과 봇은 남은 동물
+  const chosen = players.map((p) =>
+    p.kind === 'user' ? (loadLook() ?? undefined) : p.kind === 'remote' && props.mode === 'host' ? decodeLook(props.members.find((m) => m.id === p.id)?.avatar) : undefined,
+  )
+  const looks = assignLooks(chosen)
+  players = players.map((p, i) => ({ ...p, avatar: looks[i] }))
   // 팀전: 두 팀이 번갈아 앉게(차례가 오게) 자리를 다시 늘어놓는다
   let teams: Team[] | null = null
   if (props.mode === 'host' && props.teams) {
@@ -207,6 +219,9 @@ export function GameScreen(props: Props) {
 
   // 쌓인 결과 중 무엇을 쓸지 (내 차례에 고름). 고른 게 없어지면 첫 번째로
   const [chosen, setChosen] = useState(0)
+  const [use3D] = useState(canWebGL)
+  /** 3D 동물 말이 그려지기 시작하면 2D 말 동그라미를 받침으로만 */
+  const [figures, setFigures] = useState(false)
   const v = screen.view
   const me = myIndex(screen)
   const canMoveNow = myMove(screen)
@@ -284,7 +299,21 @@ export function GameScreen(props: Props) {
           lastTo={v.lastMove?.to ?? null}
           onSelect={setSelected}
           onConfirm={() => chosenMove && doMove(chosenMove.from)}
-        />
+          figures={figures}
+        >
+          {use3D && (
+            <Suspense fallback={null}>
+              <Pieces3D
+                view={v}
+                movable={moves.flatMap((m) => (m.from === 'home' ? [] : [m.from]))}
+                selected={chosenMove ? selected : null}
+                me={rowOf(v, me)}
+                colors={v.teams ? TEAM_COLORS : PLAYER_COLORS}
+                onReady={() => setFigures(true)}
+              />
+            </Suspense>
+          )}
+        </Board>
       </div>
 
       <div className="yt-status">

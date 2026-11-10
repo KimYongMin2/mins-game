@@ -4,9 +4,10 @@ import type { From, Piece } from '../rules/moves'
 import type { Throw } from '../rules/throw'
 import type { EngineState } from './engine'
 import type { Team } from '../../../shared/team/teams'
+import type { Look } from '../../../shared/art3d/animalKinds'
 
 export type YutView = {
-  players: { id: string; name: string }[]
+  players: { id: string; name: string; avatar?: Look }[]
   /** 팀전이면 사람마다 팀 (pieces는 팀마다 한 줄) */
   teams: Team[] | null
   left: boolean[]
@@ -26,7 +27,7 @@ export type YutView = {
 
 export function toView(s: EngineState): YutView {
   return {
-    players: s.players.map(({ id, name }) => ({ id, name })),
+    players: s.players.map(({ id, name, avatar }) => ({ id, name, ...(avatar ? { avatar } : {}) })),
     teams: s.teams,
     left: s.left,
     pieces: s.pieces,

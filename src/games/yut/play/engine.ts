@@ -1,6 +1,7 @@
 // 윷놀이 심판. 방장 기기(또는 봇 연습)에서만 돈다. 시간(now)과 시드 난수를 상태에 담은 순수 리듀서.
 // 차례: 던질 수 있는 만큼 던지고(윷·모·잡기면 한 번 더) → 쌓인 결과를 하나씩 골라 말을 옮긴다 → 다 쓰면 다음 사람.
 import { createRng } from '../../../shared/random'
+import type { Look } from '../../../shared/art3d/animalKinds'
 import { type Team, lastTeam } from '../../../shared/team/teams'
 import { chooseBotMove } from '../bot/yutBot'
 import { BOT_THINK_MS, DECIDE_MS, DONE_MS, INTRO_MS, THROW_SHOW_MS } from '../constants'
@@ -11,7 +12,8 @@ import { type Throw, isBonus, throwYut } from '../rules/throw'
 /** user = 이 기기, bot = 봇, remote = 방에 들어온 친구 */
 export type PlayerKind = 'user' | 'bot' | 'remote'
 
-export type Player = { id: string; name: string; kind: PlayerKind }
+/** avatar = 3D 캐릭터 (시작할 때 정해 둠, 말이 이 동물로 보임) */
+export type Player = { id: string; name: string; kind: PlayerKind; avatar?: Look }
 
 export type Phase =
   | { kind: 'intro'; until: number }
