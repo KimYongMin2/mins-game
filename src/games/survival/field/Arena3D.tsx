@@ -199,9 +199,12 @@ export function Arena3D({ screen, onPointer }: Props) {
     const pieces: Piece[] = first.players.map((p, i) => {
       const rig = makeAnimal(p.avatar ?? plainLook(ANIMALS[i % ANIMALS.length]), colorOf(i), { team: !!first.teams })
       rig.root.scale.setScalar(RIG_SCALE)
+      // 총은 오른손에 쥠 (armL = 캐릭터 기준 오른팔). 팔이 내려가 있으면 총구가 아래, 겨누면 팔과 같이 앞으로
       const gun = makeGun()
-      gun.position.set(0, 1.32, 0.62)
-      rig.root.add(gun)
+      gun.rotation.x = Math.PI / 2
+      gun.position.set(0, -0.62, 0.06)
+      gun.scale.setScalar(0.85)
+      rig.armL.add(gun)
       rig.root.visible = false
       scene.add(rig.root)
       // 맞으면 발밑에 빨간 ✕

@@ -773,9 +773,7 @@ export function makeAnimal(lookIn: Look, shirt: string, opts: { team?: boolean }
         bob = 0
         break
       case 'aim':
-        // 두 손을 앞으로 뻗어 총을 겨눔
-        ax = -1.5
-        az = 0.28
+        // 오른손(armL — 캐릭터 기준 오른쪽, 얼굴이 +z라 -x 쪽)으로 총을 앞으로 겨누고 왼손은 안쪽으로 받침 (아래에서 따로)
         bob = 0
         break
       case 'cheer':
@@ -787,10 +785,11 @@ export function makeAnimal(lookIn: Look, shirt: string, opts: { team?: boolean }
     // 한 손 번쩍: 오른손만 위로
     const raise = pose === 'raise'
     if (raise) bob = Math.abs(Math.sin(t * 5)) * 0.06
-    armL.rotation.x = ease(armL.rotation.x, ax)
-    armR.rotation.x = ease(armR.rotation.x, raise ? -0.2 : ax)
-    armL.rotation.z = ease(armL.rotation.z, -az)
-    armR.rotation.z = ease(armR.rotation.z, raise ? 2.85 : az)
+    const aim = pose === 'aim'
+    armL.rotation.x = ease(armL.rotation.x, aim ? -1.5 : ax)
+    armR.rotation.x = ease(armR.rotation.x, raise ? -0.2 : aim ? -1.3 : ax)
+    armL.rotation.z = ease(armL.rotation.z, aim ? 0.3 : -az)
+    armR.rotation.z = ease(armR.rotation.z, raise ? 2.85 : aim ? -0.85 : az)
     bodyG.rotation.x = ease(bodyG.rotation.x, lean, 0.12)
     // 가라앉기·기울기는 따로 부드럽게 따라가고, 살랑임·떨림은 그 위에 더한다 (같이 섞으면 매 프레임 쌓여서 8배쯤 커졌음)
     sunk = ease(sunk, sink, 0.12)
