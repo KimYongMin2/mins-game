@@ -7,6 +7,7 @@ import { encodeLook } from '../art3d/animalKinds'
 import { loadLook } from '../storage/avatar'
 import { TEAM_COLORS, TEAM_NAMES, type Team, type TeamPick, assignTeams, teamsReady } from '../team/teams'
 import { ReadyButton } from './Ready'
+import { InviteButton } from './Invite'
 import { RoomBadge, RoomPicker } from './RoomPicker'
 
 // 여럿이 하는 게임의 대기실: 열린 방 목록에서 고르거나 방 만들기(이름 · 전체 공개 / 비공개 코드) → 모인 사람 목록.
@@ -35,7 +36,7 @@ type Props<M> = {
 type View =
   | { kind: 'menu' }
   | { kind: 'busy'; text: string }
-  | { kind: 'waiting'; name: string; pin: string | null }
+  | { kind: 'waiting'; id: string; name: string; pin: string | null }
   | { kind: 'error'; text: string }
 
 const ERROR_TEXT: Record<RoomError['reason'], string> = {
@@ -72,13 +73,13 @@ export function GroupLobby<M>({ gameId, nickname, capacity, minPlayers, teams: c
     return room.onMembers(setMembers)
   }, [room])
 
-  function connected(r: Room<M>, name: string, pin: string | null) {
+  function connected(r: Room<M>, id: string, name: string, pin: string | null) {
     if (!mountedRef.current) {
       r.leave()
       return
     }
     setRoom(r)
-    setView({ kind: 'waiting', name, pin })
+    setView({ kind: 'waiting', id, name, pin })
     onConnected(r)
   }
 
@@ -106,7 +107,7 @@ export function GroupLobby<M>({ gameId, nickname, capacity, minPlayers, teams: c
     setView({ kind: 'busy', text: '방을 만드는 중…' })
     try {
       const id = makeRoomCode()
-      connected(await createRoom<M>(gameId, nickname, { avatar: myAvatar(), capacity, code: channelCode(id, pin), listing: { id, name, locked: !!pin } }), name, pin)
+      connected(await createRoom<M>(gameId, nickname, { avatar: myAvatar(), capacity, code: channelCode(id, pin), listing: { id, name, locked: !!pin } }), id, name, pin)
     } catch (e) {
       fail(e)
     }
@@ -115,7 +116,7 @@ export function GroupLobby<M>({ gameId, nickname, capacity, minPlayers, teams: c
   async function join(r: ListedRoom, pin: string | null) {
     setView({ kind: 'busy', text: '방에 들어가는 중…' })
     try {
-      connected(await joinRoom<M>(gameId, channelCode(r.id, pin), nickname, { avatar: myAvatar(), capacity }), r.name, pin)
+      connected(await joinRoom<M>(gameId, channelCode(r.id, pin), nickname, { avatar: myAvatar(), capacity }), r.id, r.name, pin)
     } catch (e) {
       fail(e, !!pin)
     }
@@ -158,6 +159,7 @@ export function GroupLobby<M>({ gameId, nickname, capacity, minPlayers, teams: c
     return (
       <section className="pvp-lobby">
         <RoomBadge name={view.name} pin={view.pin} />
+        {count < capacity && <InviteButton room={{ id: view.id, name: view.name }} pin={view.pin} />}
         <span className="pvp-lobby__wait">
           {count}/{capacity}명
         </span>

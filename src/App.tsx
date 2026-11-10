@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { BrowserRouter, Navigate, Route, Routes } from 'react-router'
+import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router'
 import { ArcheryPage } from './games/archery/ArcheryPage'
 import { ArmwrestlePage } from './games/armwrestle/ArmwrestlePage'
 import { BattingPage } from './games/batting/BattingPage'
@@ -21,6 +21,12 @@ import { MeetingPage } from './pages/meeting/MeetingPage'
 import { NicknamePage } from './pages/NicknamePage'
 import { loadNickname } from './shared/storage/nickname'
 
+/** 닉네임이 없으면 닉네임 화면으로. 정한 뒤 원래 주소(초대 링크의 ?mode=pvp&join=… 포함)로 돌아오게 들고 간다 */
+function ToNickname() {
+  const location = useLocation()
+  return <Navigate to="/nickname" replace state={{ from: location.pathname + location.search }} />
+}
+
 function App() {
   const [nickname, setNickname] = useState(loadNickname)
 
@@ -30,77 +36,77 @@ function App() {
         <Route
           path="/"
           element={
-            nickname ? <MainPage nickname={nickname} /> : <Navigate to="/nickname" replace />
+            nickname ? <MainPage nickname={nickname} /> : <ToNickname />
           }
         />
         <Route path="/nickname" element={<NicknamePage onSaved={setNickname} />} />
         <Route
           path="/games/zolaball"
-          element={nickname ? <ZolaballPage /> : <Navigate to="/nickname" replace />}
+          element={nickname ? <ZolaballPage /> : <ToNickname />}
         />
         <Route
           path="/games/archery"
-          element={nickname ? <ArcheryPage /> : <Navigate to="/nickname" replace />}
+          element={nickname ? <ArcheryPage /> : <ToNickname />}
         />
         <Route
           path="/games/batting"
-          element={nickname ? <BattingPage /> : <Navigate to="/nickname" replace />}
+          element={nickname ? <BattingPage /> : <ToNickname />}
         />
         <Route
           path="/games/fight"
-          element={nickname ? <FightPage /> : <Navigate to="/nickname" replace />}
+          element={nickname ? <FightPage /> : <ToNickname />}
         />
         <Route
           path="/games/memory"
-          element={nickname ? <MemoryPage /> : <Navigate to="/nickname" replace />}
+          element={nickname ? <MemoryPage /> : <ToNickname />}
         />
         <Route
           path="/games/armwrestle"
-          element={nickname ? <ArmwrestlePage /> : <Navigate to="/nickname" replace />}
+          element={nickname ? <ArmwrestlePage /> : <ToNickname />}
         />
         <Route
           path="/games/bomb"
-          element={nickname ? <BombPage /> : <Navigate to="/nickname" replace />}
+          element={nickname ? <BombPage /> : <ToNickname />}
         />
         <Route
           path="/games/nunchi"
-          element={nickname ? <NunchiPage /> : <Navigate to="/nickname" replace />}
+          element={nickname ? <NunchiPage /> : <ToNickname />}
         />
         <Route
           path="/games/yut"
-          element={nickname ? <YutPage /> : <Navigate to="/nickname" replace />}
+          element={nickname ? <YutPage /> : <ToNickname />}
         />
         <Route
           path="/games/tiles"
-          element={nickname ? <TilesPage /> : <Navigate to="/nickname" replace />}
+          element={nickname ? <TilesPage /> : <ToNickname />}
         />
         <Route
           path="/games/volley"
-          element={nickname ? <VolleyPage /> : <Navigate to="/nickname" replace />}
+          element={nickname ? <VolleyPage /> : <ToNickname />}
         />
         <Route
           path="/games/numbaseball"
-          element={nickname ? <NumbaseballPage /> : <Navigate to="/nickname" replace />}
+          element={nickname ? <NumbaseballPage /> : <ToNickname />}
         />
         <Route
           path="/games/omok"
-          element={nickname ? <OmokPage /> : <Navigate to="/nickname" replace />}
+          element={nickname ? <OmokPage /> : <ToNickname />}
         />
         <Route
           path="/games/survival"
-          element={nickname ? <SurvivalPage /> : <Navigate to="/nickname" replace />}
+          element={nickname ? <SurvivalPage /> : <ToNickname />}
         />
         <Route
           path="/games/roulette"
-          element={nickname ? <RoulettePage /> : <Navigate to="/nickname" replace />}
+          element={nickname ? <RoulettePage /> : <ToNickname />}
         />
         <Route
           path="/games/artillery"
-          element={nickname ? <ArtilleryPage /> : <Navigate to="/nickname" replace />}
+          element={nickname ? <ArtilleryPage /> : <ToNickname />}
         />
         <Route
           path="/meeting"
-          element={nickname ? <MeetingPage /> : <Navigate to="/nickname" replace />}
+          element={nickname ? <MeetingPage /> : <ToNickname />}
         />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

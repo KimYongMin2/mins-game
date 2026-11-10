@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router'
 import { clearPvpEntry, readPvpEntry } from '../nav'
 import { goHome } from './HomeLink'
 import { type ListedRoom, type Peer, type Room, RoomError, channelCode, createRoom, joinRoom, makeRoomCode } from '../online/room'
+import { InviteButton } from './Invite'
 import { RoomBadge, RoomPicker } from './RoomPicker'
 import { encodeLook } from '../art3d/animalKinds'
 import { loadLook } from '../storage/avatar'
@@ -26,7 +27,7 @@ type Props<M> = {
 type View =
   | { kind: 'menu' }
   | { kind: 'busy'; text: string }
-  | { kind: 'hosting'; name: string; pin: string | null }
+  | { kind: 'hosting'; id: string; name: string; pin: string | null }
   | { kind: 'error'; text: string }
 
 const ERROR_TEXT: Record<RoomError['reason'], string> = {
@@ -92,7 +93,7 @@ export function PvpLobby<M>({ gameId, nickname, onConnected, onBack }: Props<M>)
       const id = makeRoomCode()
       const room = await createRoom<M>(gameId, nickname, { avatar: myAvatar(), code: channelCode(id, pin), listing: { id, name, locked: !!pin } })
       roomRef.current = room
-      setView({ kind: 'hosting', name, pin })
+      setView({ kind: 'hosting', id, name, pin })
       handOff(room)
     } catch (e) {
       fail(e)
@@ -123,6 +124,7 @@ export function PvpLobby<M>({ gameId, nickname, onConnected, onBack }: Props<M>)
         <>
           <RoomBadge name={view.name} pin={view.pin} />
           <span className="pvp-lobby__wait">친구를 기다리는 중…</span>
+          <InviteButton room={{ id: view.id, name: view.name }} pin={view.pin} />
           <button type="button" className="button" onClick={cancel}>
             취소
           </button>

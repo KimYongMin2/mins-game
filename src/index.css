@@ -1496,3 +1496,20 @@ p {
   place-items: center;
   line-height: 1;
 }
+
+/* 초대 링크 보내기 (shared/ui/Invite) */
+.invite {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
+  width: 100%;
+}
+.invite__note {
+  margin: 0;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--ink-soft);
+  text-align: center;
+  word-break: break-all;
+}

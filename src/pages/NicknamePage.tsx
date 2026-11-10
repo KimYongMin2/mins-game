@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react'
-import { useNavigate } from 'react-router'
+import { useLocation, useNavigate } from 'react-router'
 import {
   NICKNAME_MAX_LENGTH,
   loadNickname,
@@ -17,6 +17,8 @@ type Props = {
 
 export function NicknamePage({ onSaved }: Props) {
   const navigate = useNavigate()
+  // 초대 링크로 왔으면 닉네임을 정한 뒤 그 링크로 (App의 ToNickname이 넘겨줌)
+  const from = (useLocation().state as { from?: string } | null)?.from
   const [existing] = useState(loadNickname)
   const [value, setValue] = useState(existing ?? '')
   const [error, setError] = useState<string | null>(null)
@@ -31,7 +33,7 @@ export function NicknamePage({ onSaved }: Props) {
     const nickname = value.trim()
     saveNickname(nickname)
     onSaved(nickname)
-    navigate('/', { replace: true })
+    navigate(from && from.startsWith('/') ? from : '/', { replace: true })
   }
 
   return (
