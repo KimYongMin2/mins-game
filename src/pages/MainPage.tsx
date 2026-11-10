@@ -269,6 +269,10 @@ export function MainPage({ nickname }: { nickname: string }) {
                 </details>
                 {sheet.game.play === 'pvp' ? (
                   <>
+                    <section className="game-sheet__part" aria-label="혼자 연습">
+                      <h3 className="game-sheet__label">혼자 연습</h3>
+                      <PlayButtons game={sheet.game} onGo={(path) => go(sheet.game, path)} />
+                    </section>
                     <section className="game-sheet__part" aria-label="친구랑 하기">
                       <h3 className="game-sheet__label">친구랑 하기</h3>
                       <RoomPicker
@@ -277,10 +281,6 @@ export function MainPage({ nickname }: { nickname: string }) {
                         onCreate={(name, pin) => go(sheet.game, pvpLink(sheet.game.path, { kind: 'create', name, pin }))}
                         onJoin={(r, pin) => go(sheet.game, pvpLink(sheet.game.path, { kind: 'join', room: r, pin }))}
                       />
-                    </section>
-                    <section className="game-sheet__part" aria-label="혼자 연습">
-                      <h3 className="game-sheet__label">혼자 연습</h3>
-                      <PlayButtons game={sheet.game} onGo={(path) => go(sheet.game, path)} />
                     </section>
                   </>
                 ) : (
