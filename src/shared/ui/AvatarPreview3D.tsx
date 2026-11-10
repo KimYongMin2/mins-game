@@ -6,14 +6,14 @@ import { createStage } from '../art3d/stage'
 
 // 내 캐릭터 미리 보기: 3D로 천천히 돌아간다. 꾸미기를 바꾸면 바로 새로 그림. (three.js라 고르는 창을 열 때만 불러옴)
 
-export function AvatarPreview3D({ look, shirt = '#2563eb' }: { look: Look; shirt?: string }) {
+export function AvatarPreview3D({ look, shirt = '#2563eb', background = '#f1e7d8', className = 'avatar-preview' }: { look: Look; shirt?: string; background?: string; className?: string }) {
   const hostRef = useRef<HTMLDivElement>(null)
   const key = encodeLook(look)
 
   useEffect(() => {
     const host = hostRef.current
     if (!host) return
-    const stage = createStage(host, { background: '#f1e7d8', fov: 30 })
+    const stage = createStage(host, { background, fov: 30 })
     stage.scene.fog = null
     const floor = new THREE.Mesh(new THREE.CircleGeometry(1.6, 48), new THREE.MeshStandardMaterial({ color: '#d9c4a3', roughness: 1 }))
     floor.rotation.x = -Math.PI / 2
@@ -43,7 +43,7 @@ export function AvatarPreview3D({ look, shirt = '#2563eb' }: { look: Look; shirt
       stage.dispose()
     }
     // 꾸미기가 바뀌면 새로 만든다
-  }, [key]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [key, background]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  return <div className="avatar-preview" ref={hostRef} aria-label="내 캐릭터 미리 보기" role="img" />
+  return <div className={className} ref={hostRef} aria-label="내 캐릭터 미리 보기" role="img" />
 }

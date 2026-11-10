@@ -45,26 +45,20 @@ function Row<T extends string>({ label, value, opt, onPick }: { label: string; v
   )
 }
 
-export function AvatarPicker() {
+/** 꾸미기 창 내용 (메인 화면 캐릭터 창에서 씀). 고를 때마다 바로 저장하고 onChange로 알린다 */
+export function AvatarEditor({ onChange, onDone }: { onChange?: (look: Look) => void; onDone: () => void }) {
   const [mine, setMine] = useState<Look | null>(loadLook)
-  const [open, setOpen] = useState(false)
   const [use3D] = useState(canWebGL)
   const look = mine ?? plainLook('bear')
+  const setOpen = (open: boolean) => !open && onDone()
 
   function update(next: Look) {
     saveLook(next)
     setMine(next)
+    onChange?.(next)
   }
 
   return (
-    <div className="avatar-pick">
-      <button type="button" className="button button--small avatar-pick__toggle" onClick={() => setOpen(!open)} aria-expanded={open}>
-        <span className="avatar-pick__emoji" aria-hidden>
-          {mine ? ANIMAL_EMOJI[mine.animal] : '❔'}
-        </span>
-        {mine ? `내 캐릭터: ${ANIMAL_NAMES[mine.animal]}` : '내 캐릭터 고르기'}
-      </button>
-      {open && (
         <div className="avatar-pick__panel">
           {use3D && (
             <Suspense fallback={<div className="avatar-preview" />}>
@@ -126,12 +120,27 @@ export function AvatarPicker() {
               />
             </label>
           )}
-          <p className="avatar-pick__note">폭탄 돌리기·러시안룰렛 3D 화면에서 내 캐릭터로 나와요. 친구와 같은 동물이어도 돼요.</p>
-          <button type="button" className="button button--small" onClick={() => setOpen(false)}>
+          <p className="avatar-pick__note">모든 3D 게임에서 내 캐릭터로 나오고, 친구 대전에선 친구 화면에도 이 모습으로 보여요. 친구와 같은 동물이어도 돼요.</p>
+          <button type="button" className="button button--primary" onClick={() => setOpen(false)}>
             다 했어요
           </button>
         </div>
-      )}
+  )
+}
+
+/** 예전 메인 화면의 접었다 펴는 캐릭터 고르기 (버튼 + 창) */
+export function AvatarPicker() {
+  const [mine, setMine] = useState<Look | null>(loadLook)
+  const [open, setOpen] = useState(false)
+  return (
+    <div className="avatar-pick">
+      <button type="button" className="button button--small avatar-pick__toggle" onClick={() => setOpen(!open)} aria-expanded={open}>
+        <span className="avatar-pick__emoji" aria-hidden>
+          {mine ? ANIMAL_EMOJI[mine.animal] : '❔'}
+        </span>
+        {mine ? `내 캐릭터: ${ANIMAL_NAMES[mine.animal]}` : '내 캐릭터 고르기'}
+      </button>
+      {open && <AvatarEditor onChange={setMine} onDone={() => setOpen(false)} />}
     </div>
   )
 }

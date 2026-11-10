@@ -10,6 +10,10 @@ export type GameEntry = {
   play: 'pvp' | 'solo'
   /** 몇 명이 하는지 (메인 카드에 표시) */
   players: string
+  /** 메인 타일 그림 (이모지) */
+  icon: string
+  /** 메인 타일 바탕 색 (위 → 아래 그라데이션) */
+  colors: readonly [string, string]
 }
 
 export const GAMES: GameEntry[] = [
@@ -21,6 +25,8 @@ export const GAMES: GameEntry[] = [
     ready: true,
     play: 'pvp',
     players: '2인',
+    icon: '⚾',
+    colors: ['#4ade80', '#15803d'],
   },
   {
     id: 'volley',
@@ -30,6 +36,8 @@ export const GAMES: GameEntry[] = [
     ready: true,
     play: 'pvp',
     players: '2인',
+    icon: '🏐',
+    colors: ['#38bdf8', '#0369a1'],
   },
   {
     id: 'fight',
@@ -39,6 +47,8 @@ export const GAMES: GameEntry[] = [
     ready: true,
     play: 'pvp',
     players: '2인',
+    icon: '🥊',
+    colors: ['#fb7185', '#be123c'],
   },
   {
     id: 'memory',
@@ -48,6 +58,8 @@ export const GAMES: GameEntry[] = [
     ready: true,
     play: 'pvp',
     players: '2인',
+    icon: '🃏',
+    colors: ['#34d399', '#047857'],
   },
   {
     id: 'armwrestle',
@@ -57,6 +69,8 @@ export const GAMES: GameEntry[] = [
     ready: true,
     play: 'pvp',
     players: '2인',
+    icon: '💪',
+    colors: ['#fdba74', '#c2410c'],
   },
   {
     id: 'bomb',
@@ -66,6 +80,8 @@ export const GAMES: GameEntry[] = [
     ready: true,
     play: 'pvp',
     players: '2~8인',
+    icon: '💣',
+    colors: ['#fcd34d', '#d97706'],
   },
   {
     id: 'nunchi',
@@ -75,6 +91,8 @@ export const GAMES: GameEntry[] = [
     ready: true,
     play: 'pvp',
     players: '3~6인',
+    icon: '👀',
+    colors: ['#c4b5fd', '#7c3aed'],
   },
   {
     id: 'survival',
@@ -84,6 +102,8 @@ export const GAMES: GameEntry[] = [
     ready: true,
     play: 'pvp',
     players: '2~8인',
+    icon: '⚡',
+    colors: ['#fde68a', '#ca8a04'],
   },
   {
     id: 'roulette',
@@ -93,6 +113,8 @@ export const GAMES: GameEntry[] = [
     ready: true,
     play: 'pvp',
     players: '2~8인',
+    icon: '🔫',
+    colors: ['#94a3b8', '#334155'],
   },
   {
     id: 'artillery',
@@ -102,6 +124,8 @@ export const GAMES: GameEntry[] = [
     ready: true,
     play: 'pvp',
     players: '2~4인',
+    icon: '💥',
+    colors: ['#bef264', '#4d7c0f'],
   },
   {
     id: 'yut',
@@ -111,6 +135,8 @@ export const GAMES: GameEntry[] = [
     ready: true,
     play: 'pvp',
     players: '2~4인',
+    icon: '🪵',
+    colors: ['#fbbf24', '#92400e'],
   },
   {
     id: 'tiles',
@@ -120,6 +146,8 @@ export const GAMES: GameEntry[] = [
     ready: true,
     play: 'pvp',
     players: '2~4인',
+    icon: '🔢',
+    colors: ['#93c5fd', '#1d4ed8'],
   },
   {
     id: 'numbaseball',
@@ -129,6 +157,8 @@ export const GAMES: GameEntry[] = [
     ready: true,
     play: 'pvp',
     players: '2인',
+    icon: '🧮',
+    colors: ['#f9a8d4', '#be185d'],
   },
   {
     id: 'omok',
@@ -138,6 +168,8 @@ export const GAMES: GameEntry[] = [
     ready: true,
     play: 'pvp',
     players: '2인',
+    icon: '⚫',
+    colors: ['#e9c08a', '#8a5a24'],
   },
   {
     id: 'batting',
@@ -147,6 +179,8 @@ export const GAMES: GameEntry[] = [
     ready: true,
     play: 'solo',
     players: '1인',
+    icon: '🏟️',
+    colors: ['#a5b4fc', '#4338ca'],
   },
   {
     id: 'archery',
@@ -156,5 +190,7 @@ export const GAMES: GameEntry[] = [
     ready: true,
     play: 'solo',
     players: '1인',
+    icon: '🏹',
+    colors: ['#fca5a5', '#b91c1c'],
   },
 ]
