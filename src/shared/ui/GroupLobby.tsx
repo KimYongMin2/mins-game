@@ -173,7 +173,7 @@ export function GroupLobby<M>({ gameId, nickname, capacity, minPlayers, teams: c
               <span className="group-lobby__name">
                 {m.nickname} {m.role === 'host' && <span>(방장)</span>}
               </span>
-              {m.role === 'guest' && <span className={`group-lobby__ready${m.ready ? ' group-lobby__ready--on' : ''}`}>{m.ready ? '✅ 준비' : '준비 중'}</span>}
+              {m.role === 'guest' && <span className={`group-lobby__ready${m.ready ? ' group-lobby__ready--on' : ''}`}>{m.ready ? '준비 완료' : '준비 중'}</span>}
               {teamChip(1 + i)}
             </li>
           ))}

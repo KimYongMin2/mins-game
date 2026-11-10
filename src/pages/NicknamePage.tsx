@@ -6,10 +6,10 @@ import {
   saveNickname,
   validateNickname,
 } from '../shared/storage/nickname'
-import { ANIMALS, ANIMAL_EMOJI } from '../shared/art3d/animalKinds'
+import { GAMES } from './gameList'
 
-/** 위에 줄지어 통통 뛰는 동물들 */
-const PARADE = ANIMALS.slice(0, 8)
+/** 위에 깔리는 게임 표지 몇 장 (진짜 경기 장면) */
+const COVERS = GAMES.filter((g) => g.ready).slice(0, 8)
 
 type Props = {
   onSaved: (nickname: string) => void
@@ -36,17 +36,15 @@ export function NicknamePage({ onSaved }: Props) {
 
   return (
     <main className="page page--center nickname">
-      <div className="nickname__parade" aria-hidden>
-        {PARADE.map((a, i) => (
-          <span key={a} style={{ animationDelay: `${i * 0.12}s` }}>
-            {ANIMAL_EMOJI[a]}
-          </span>
+      <div className="nickname__covers" aria-hidden>
+        {COVERS.map((g) => (
+          <img key={g.id} src={`/covers/${g.id}.jpg`} alt="" loading="lazy" decoding="async" />
         ))}
       </div>
       <div className="nickname__card">
       <span className="nickname__logo">MINS GAME</span>
-      <h1 className="title">{existing ? '닉네임 변경' : '반가워요!'}</h1>
-      <p className="subtitle">친구들에게 보일 닉네임을 정해 주세요.</p>
+      <h1 className="title">{existing ? '닉네임 변경' : '반가워요'}</h1>
+      <p className="subtitle">친구들에게 보일 이름을 정해 주세요</p>
 
       <form className="nickname__form" onSubmit={handleSubmit} noValidate>
         <input

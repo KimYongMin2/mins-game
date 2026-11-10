@@ -43,7 +43,7 @@ export function ReadyButton({ room, note }: { room: ReadyRoom; note?: string }) 
   return (
     <div className="ready">
       <button type="button" className={`button ready__button${ready ? ' ready__button--on' : ' button--primary'}`} onClick={toggle} aria-pressed={ready}>
-        {ready ? '✅ 준비 완료 (누르면 취소)' : '준비'}
+        {ready ? '준비 완료 · 누르면 취소' : '준비'}
       </button>
       <p className="ready__note">{ready ? '방장이 시작하길 기다려요…' : (note ?? '준비를 누르면 방장이 시작할 수 있어요')}</p>
     </div>
@@ -57,7 +57,7 @@ export function StartButton({ canStart, waitText, label = '게임 시작', onSta
       <button type="button" className="button button--primary ready__button" disabled={!canStart} onClick={onStart}>
         {label}
       </button>
-      <p className="ready__note">{canStart ? '모두 준비했어요!' : waitText}</p>
+      <p className="ready__note">{canStart ? '모두 준비했어요' : waitText}</p>
     </div>
   )
 }
@@ -77,7 +77,7 @@ export function DuelReadyRoom({ room, me, peer, peerReady, onStart }: { room: Re
         </li>
         <li className="ready-room__person">
           <span className="ready-room__name">{peer}</span>
-          <span className={`ready-room__tag${!host ? ' ready-room__tag--host' : peerReady ? ' ready-room__tag--ready' : ''}`}>{!host ? '방장' : peerReady ? '✅ 준비' : '준비 중…'}</span>
+          <span className={`ready-room__tag${!host ? ' ready-room__tag--host' : peerReady ? ' ready-room__tag--ready' : ''}`}>{!host ? '방장' : peerReady ? '준비 완료' : '준비 중'}</span>
         </li>
       </ul>
       {host ? <StartButton canStart={peerReady} waitText={`${peer}님이 준비하길 기다려요`} onStart={onStart} /> : <ReadyButton room={room} />}
@@ -88,5 +88,5 @@ export function DuelReadyRoom({ room, me, peer, peerReady, onStart }: { room: Re
 /** 다시 하기 전 (결과 화면): 친구는 [준비], 방장은 누가 준비했는지. 방장의 [다시 하기]는 게임이 모두 준비했을 때만 켠다 */
 export function RematchReady({ room, waitText, allReady }: { room: ReadyRoom; waitText: string; allReady: boolean }) {
   if (room.role === 'guest') return <ReadyButton room={room} note="준비를 누르면 방장이 다시 시작할 수 있어요" />
-  return <p className="ready__note ready__note--host">{allReady ? '✅ 모두 준비했어요! 다시 하기를 누르세요' : waitText}</p>
+  return <p className="ready__note ready__note--host">{allReady ? '모두 준비했어요 · 다시 하기를 누르세요' : waitText}</p>
 }

@@ -75,7 +75,7 @@ export const GAMES: GameEntry[] = [
   {
     id: 'bomb',
     title: '폭탄 돌리기',
-    description: '터지기 전에 옆 사람에게!',
+    description: '터지기 전에 옆 사람에게',
     path: '/games/bomb',
     ready: true,
     play: 'pvp',

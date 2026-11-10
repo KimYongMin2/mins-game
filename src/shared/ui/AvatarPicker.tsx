@@ -75,9 +75,6 @@ export function AvatarEditor({ onChange, onDone }: { onChange?: (look: Look) => 
                 className={`avatar-pick__item${mine?.animal === a ? ' avatar-pick__item--on' : ''}`}
                 onClick={() => update({ ...look, animal: a })}
               >
-                <span className="avatar-pick__emoji" aria-hidden>
-                  {ANIMAL_EMOJI[a]}
-                </span>
                 {ANIMAL_NAMES[a]}
               </button>
             ))}
