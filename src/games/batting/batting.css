@@ -22,7 +22,7 @@
   max-width: min(100%, calc((100dvh - 230px) * 360 / 430));
   margin: 0 auto;
   border: 2px solid var(--line);
-  border-radius: 14px;
+  border-radius: 6px;
   overflow: hidden;
   background: var(--paper);
 }
@@ -168,7 +168,7 @@
   line-height: 1.1;
   background: var(--paper);
   padding: 0 10px;
-  border-radius: 10px;
+  border-radius: 5px;
 }
 
 .bt-banner__title--hr {
@@ -267,7 +267,7 @@
   min-height: 0;
   padding: 10px 8px;
   border-color: var(--muted-line);
-  border-radius: 12px;
+  border-radius: 6px;
 }
 
 .bt-choice__option--on {
@@ -298,7 +298,7 @@
   flex-direction: column;
   padding: 12px;
   border: 1.5px solid var(--muted-line);
-  border-radius: 12px;
+  border-radius: 6px;
 }
 
 .bt-start__record dt {
@@ -344,7 +344,7 @@
   gap: 2px;
   padding: 16px;
   border: 2px solid var(--line);
-  border-radius: 14px;
+  border-radius: 6px;
   font-variant-numeric: tabular-nums;
 }
 

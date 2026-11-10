@@ -166,7 +166,7 @@
   aspect-ratio: 1;
   margin: 8px auto 0;
   border: 2px solid var(--line);
-  border-radius: 14px;
+  border-radius: 6px;
   overflow: hidden;
   background: var(--paper);
 }
@@ -217,7 +217,7 @@
   gap: 6px;
   padding: 4px 10px 4px 6px;
   border: 2px solid var(--line);
-  border-radius: 12px;
+  border-radius: 6px;
   background: var(--paper);
   pointer-events: none;
 }
@@ -258,7 +258,7 @@
   justify-content: center;
   padding: 4px 10px;
   border: 2px solid var(--line);
-  border-radius: 12px;
+  border-radius: 6px;
   background: var(--paper);
   font-variant-numeric: tabular-nums;
   pointer-events: none;
@@ -295,7 +295,7 @@
   line-height: 1.1;
   background: var(--paper);
   padding: 0 10px;
-  border-radius: 10px;
+  border-radius: 5px;
 }
 
 .ar-banner__title--gold {
@@ -427,7 +427,7 @@
   flex-direction: column;
   padding: 10px 4px;
   border: 2px solid var(--line);
-  border-radius: 12px;
+  border-radius: 6px;
 }
 
 .ar-start__rounds strong {
@@ -452,7 +452,7 @@
   flex-direction: column;
   padding: 12px;
   border: 1.5px solid var(--muted-line);
-  border-radius: 12px;
+  border-radius: 6px;
 }
 
 .ar-start__record dt {
@@ -498,7 +498,7 @@
   gap: 2px;
   padding: 16px;
   border: 2px solid var(--line);
-  border-radius: 14px;
+  border-radius: 6px;
   font-variant-numeric: tabular-nums;
 }
 
