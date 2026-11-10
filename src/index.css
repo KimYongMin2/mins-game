@@ -1746,3 +1746,49 @@ p {
   font-weight: 700;
   text-align: center;
 }
+
+/* 스크롤바 (사용자 요청 — 기본 회색 막대가 밉다): 얇고 둥근 먹색 손잡이, 바탕은 비움.
+   파이어폭스·크롬은 scrollbar-color, 사파리·예전 크롬은 ::-webkit-scrollbar. 폰은 원래 겹쳐 뜨는 얇은 막대라 그대로 */
+html {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(31, 27, 22, 0.28) transparent;
+  /* 내용 길이에 따라 스크롤바가 생겼다 없어져도 화면이 옆으로 밀리지 않게 */
+  scrollbar-gutter: stable;
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(31, 27, 22, 0.28) transparent;
+}
+
+*:hover {
+  scrollbar-color: rgba(31, 27, 22, 0.45) transparent;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  border: 3px solid transparent;
+  border-radius: 999px;
+  background: rgba(31, 27, 22, 0.28) padding-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(31, 27, 22, 0.5) padding-box;
+}
+
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* 아래에서 올라오는 창 안은 더 얇게 */
+.sheet__panel::-webkit-scrollbar {
+  width: 8px;
+}
