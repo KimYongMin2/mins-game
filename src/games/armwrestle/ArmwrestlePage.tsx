@@ -168,7 +168,7 @@ export function ArmwrestlePage() {
           key={screen.key}
           event={screen.event}
           difficulty={record.difficulty}
-          pvp={{ room: pvp.room, peerName: pvp.peer.nickname }}
+          pvp={{ room: pvp.room, peerName: pvp.peer.nickname, peerAvatar: pvp.peer.avatar }}
           onFinish={finish}
           onQuit={leavePvp}
         />

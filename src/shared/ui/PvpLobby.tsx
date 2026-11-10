@@ -1,6 +1,14 @@
 import { useEffect, useRef, useState } from 'react'
 import { type ListedRoom, type Peer, type Room, RoomError, channelCode, createRoom, joinRoom, makeRoomCode } from '../online/room'
 import { RoomBadge, RoomPicker } from './RoomPicker'
+import { encodeLook } from '../art3d/animalKinds'
+import { loadLook } from '../storage/avatar'
+
+/** 내 캐릭터를 방에 실어 보낸다 (상대 화면에 내가 고른 캐릭터로 보이게) */
+const myAvatar = () => {
+  const l = loadLook()
+  return l ? encodeLook(l) : undefined
+}
 
 // 친구 대전 대기실(1:1): 열린 방 목록에서 고르거나 방 만들기(이름 · 전체 공개 / 비공개 코드).
 // 둘이 모이면 onConnected로 방을 넘긴다. 게임 규칙은 모른다.
@@ -65,7 +73,7 @@ export function PvpLobby<M>({ gameId, nickname, onConnected, onBack }: Props<M>)
     setView({ kind: 'busy', text: '방을 만드는 중…' })
     try {
       const id = makeRoomCode()
-      const room = await createRoom<M>(gameId, nickname, { code: channelCode(id, pin), listing: { id, name, locked: !!pin } })
+      const room = await createRoom<M>(gameId, nickname, { avatar: myAvatar(), code: channelCode(id, pin), listing: { id, name, locked: !!pin } })
       roomRef.current = room
       setView({ kind: 'hosting', name, pin })
       handOff(room)
@@ -77,7 +85,7 @@ export function PvpLobby<M>({ gameId, nickname, onConnected, onBack }: Props<M>)
   async function join(r: ListedRoom, pin: string | null) {
     setView({ kind: 'busy', text: '방에 들어가는 중…' })
     try {
-      const room = await joinRoom<M>(gameId, channelCode(r.id, pin), nickname)
+      const room = await joinRoom<M>(gameId, channelCode(r.id, pin), nickname, { avatar: myAvatar() })
       roomRef.current = room
       setView({ kind: 'busy', text: '방장과 연결하는 중…' })
       handOff(room)

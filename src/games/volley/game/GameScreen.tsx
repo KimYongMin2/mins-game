@@ -1,5 +1,5 @@
 import { Suspense, lazy, useEffect, useRef, useState } from 'react'
-import { ANIMALS, type Look, plainLook } from '../../../shared/art3d/animalKinds'
+import { type Look, opponentLook, plainLook } from '../../../shared/art3d/animalKinds'
 import { canWebGL } from '../../../shared/art3d/webgl'
 import { loadLook } from '../../../shared/storage/avatar'
 import type { DirectRoom } from '../../../shared/online/directLink'
@@ -20,15 +20,15 @@ import { type SoundName, playSound } from '../sounds'
 
 type Props =
   | { mode: 'bot'; level: BotLevel; onFinish: (s: GameSummary) => void }
-  | { mode: 'pvp'; room: DirectRoom<VolleyMsg>; peerName: string; server: Side; peerGone: boolean; onFinish: (s: GameSummary) => void; onQuit: () => void }
+  | { mode: 'pvp'; room: DirectRoom<VolleyMsg>; peerName: string; peerAvatar?: string; server: Side; peerGone: boolean; onFinish: (s: GameSummary) => void; onQuit: () => void }
 
 // 선수만 3D 동물 (야구처럼 2D 코트 위에 겹침). three.js는 이때만 불러온다
 const Players3D = lazy(() => import('../field/Players3D').then((m) => ({ default: m.Players3D })))
 
-/** 나 = 고른 캐릭터, 상대 = 겹치지 않는 다른 동물 */
-function volleyLooks(): { me: Look; foe: Look } {
+/** 나 = 고른 캐릭터, 상대 = 친구가 고른 캐릭터 (봇·안 고름이면 겹치지 않는 다른 동물) */
+function volleyLooks(peerAvatar?: string): { me: Look; foe: Look } {
   const mine = loadLook() ?? plainLook('bear')
-  return { me: mine, foe: plainLook(ANIMALS.filter((a) => a !== mine.animal)[1]) }
+  return { me: mine, foe: opponentLook(mine.animal, peerAvatar, 1) }
 }
 
 const STEP_MS = 1000 / STEP_HZ
@@ -80,7 +80,7 @@ export function GameScreen(props: Props) {
     propsRef.current = props
   })
   const [use3D] = useState(canWebGL)
-  const [looks] = useState(volleyLooks)
+  const [looks] = useState(() => volleyLooks(props.mode === 'pvp' ? props.peerAvatar : undefined))
   /** 3D 선수가 그려지기 시작하면 2D 선수를 끄고 공을 3D 위에 따로 그린다 */
   const [players3D, setPlayers3D] = useState(false)
 

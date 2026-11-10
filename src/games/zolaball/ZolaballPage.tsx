@@ -198,7 +198,7 @@ export function ZolaballPage() {
         <MatchScreen
           key={screen.key}
           config={screen.config}
-          pvp={{ room: pvp.room, peerName: pvp.peer.nickname }}
+          pvp={{ room: pvp.room, peerName: pvp.peer.nickname, peerAvatar: pvp.peer.avatar }}
           onFinish={finishPvp}
           onQuit={leavePvp}
         />

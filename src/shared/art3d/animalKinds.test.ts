@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { asAnimal, assignAnimals } from './animalKinds'
+import { asAnimal, assignAnimals, encodeLook, opponentLook, plainLook } from './animalKinds'
 
 describe('동물 정하기', () => {
   it('고른 건 그대로, 안 고른 사람은 남은 동물을 차례로', () => {
@@ -22,5 +22,17 @@ describe('꾸미기', () => {
     expect(decodeLook('cat.none.none.none.base.uniform.red.500')?.number).toBe(99)
     expect(decodeLook('dragon.cap')).toBeUndefined()
     expect(assignLooks([l, undefined]).map((x) => x.animal)).toEqual(['tiger', 'bear'])
+  })
+})
+
+describe('1:1 상대 캐릭터', () => {
+  it('친구가 고른 캐릭터면 그대로 (나와 같은 동물이어도)', () => {
+    const friend = { ...plainLook('bear'), hat: 'crown' as const }
+    expect(opponentLook('bear', encodeLook(friend))).toEqual(friend)
+  })
+  it('안 골랐거나 이상한 값이면 내 동물과 안 겹치는 동물', () => {
+    expect(opponentLook('bear').animal).not.toBe('bear')
+    expect(opponentLook('bear', 'dragon.x').animal).not.toBe('bear')
+    expect(opponentLook('cat', undefined, 1).animal).toBe('fox')
   })
 })

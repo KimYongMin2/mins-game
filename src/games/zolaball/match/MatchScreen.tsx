@@ -36,7 +36,7 @@ import { TimerBar } from './TimerBar'
 type Props = {
   config: MatchConfig
   /** 친구 대전이면 방과 상대 이름 */
-  pvp?: { room: Room<BaseballMsg>; peerName: string }
+  pvp?: { room: Room<BaseballMsg>; peerName: string; peerAvatar?: string }
   onFinish: (summary: MatchSummary) => void
   /** 친구 대전 중 상대가 나갔을 때 '나가기' */
   onQuit?: () => void
@@ -108,7 +108,7 @@ export function MatchScreen({ config, pvp, onFinish, onQuit }: Props) {
   const [peerGone, setPeerGone] = useState(false)
   // 3D 야구장 (WebGL이 안 되는 기기는 예전 2D 그림)
   const [use3D] = useState(canWebGL)
-  const [team] = useState(teamLooks)
+  const [team] = useState(() => teamLooks(pvp?.peerAvatar))
   // 3D 층이 다 불러와지면 2D 선수를 끈다
   const [players3D, setPlayers3D] = useState(false)
 

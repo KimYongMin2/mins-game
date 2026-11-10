@@ -124,6 +124,17 @@ export type Look = { animal: AnimalKind; hat: Hat; glasses: Glasses; neck: Neck;
 
 export const plainLook = (animal: AnimalKind): Look => ({ animal, hat: 'none', glasses: 'none', neck: 'none', fur: 'base', outfit: 'shirt', tint: 'red', number: 7 })
 
+/**
+ * 1:1 게임의 상대 캐릭터: 친구 대전이면 친구가 고른 것(방으로 받은 글자, 나와 같은 동물이어도 그대로).
+ * 봇이거나 친구가 안 골랐으면 내 동물과 안 겹치는 동물 (nth로 게임마다 다른 동물)
+ */
+export function opponentLook(mine: AnimalKind, peerAvatar?: string, nth = 0): Look {
+  const picked = decodeLook(peerAvatar)
+  if (picked) return picked
+  const others = ANIMALS.filter((a) => a !== mine)
+  return plainLook(others[nth % others.length])
+}
+
 /** 등번호 0~99 */
 export const clampNumber = (n: unknown): number => {
   const x = Math.floor(Number(n))

@@ -9,7 +9,8 @@ import { getRealtimeClient } from './supabase'
 
 export type RoomRole = 'host' | 'guest'
 
-export type Peer = { nickname: string }
+/** avatar = 상대가 고른 캐릭터 글자 (자기 신고라 쓰는 쪽에서 decodeLook으로 검사) */
+export type Peer = { nickname: string; avatar?: string }
 
 /** 방에 있는 사람 (나 빼고). id는 방 안에서만 쓰는 접속 번호 */
 /** avatar = 그 사람이 고른 캐릭터 (자기 신고라 쓰는 쪽에서 검사) */
@@ -195,10 +196,10 @@ async function open<M>(gameId: string, code: string, meta: Meta, { capacity = 2,
   })
   channel.on('presence', { event: 'sync' }, () => {
     const others = othersIn(channel.presenceState<Meta>(), myKey)
-    const next = others[0] ? { nickname: others[0].nickname } : null
+    const next = others[0] ? { nickname: others[0].nickname, ...(typeof others[0].avatar === 'string' ? { avatar: others[0].avatar.slice(0, 48) } : {}) } : null
     synced = true
     syncWaiters.splice(0).forEach((w) => w())
-    if ((next === null) !== (peer === null) || next?.nickname !== peer?.nickname) {
+    if ((next === null) !== (peer === null) || next?.nickname !== peer?.nickname || next?.avatar !== peer?.avatar) {
       peer = next
       for (const fn of peerFns) fn(peer)
     }

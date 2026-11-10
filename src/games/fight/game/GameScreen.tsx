@@ -4,7 +4,7 @@ import { loadNickname } from '../../../shared/storage/nickname'
 import { randomSeed } from '../../../shared/random'
 import { CHOOSE_MS, DONE_MS, type Difficulty, MAX_LIFE, MAX_STACKS, MAX_TURNS, REVEAL_MS, SMASH_COST } from '../constants'
 import { FightView, type FighterShow } from '../field/FightView'
-import { ANIMALS, type Look, plainLook } from '../../../shared/art3d/animalKinds'
+import { type Look, opponentLook, plainLook } from '../../../shared/art3d/animalKinds'
 import { canWebGL } from '../../../shared/art3d/webgl'
 import { loadLook } from '../../../shared/storage/avatar'
 import { type MatchState, type MatchSummary, createMatch, matchReducer, summarizeMatch } from '../play/matchState'
@@ -15,16 +15,16 @@ import { playSound } from '../sounds'
 // 3D 링 (WebGL이 안 되거나 불러오는 동안은 2D). three.js는 이때만 불러온다
 const FightView3D = lazy(() => import('../field/FightView3D').then((m) => ({ default: m.FightView3D })))
 
-/** 나 = 고른 캐릭터, 상대 = 겹치지 않는 다른 동물 */
-function fightLooks(): readonly [Look, Look] {
+/** 나 = 고른 캐릭터, 상대 = 친구가 고른 캐릭터 (봇·안 고름이면 겹치지 않는 다른 동물) */
+function fightLooks(peerAvatar?: string): readonly [Look, Look] {
   const mine = loadLook() ?? plainLook('bear')
-  return [mine, plainLook(ANIMALS.filter((a) => a !== mine.animal)[2])]
+  return [mine, opponentLook(mine.animal, peerAvatar, 2)]
 }
 
 type Props = {
   difficulty: Difficulty
   /** 친구 대전이면 방과 상대 이름 */
-  pvp?: { room: Room<FightMsg>; peerName: string }
+  pvp?: { room: Room<FightMsg>; peerName: string; peerAvatar?: string }
   onFinish: (summary: MatchSummary) => void
   /** 친구 대전 중 상대가 나갔을 때 '나가기' */
   onQuit?: () => void
@@ -97,7 +97,7 @@ export function GameScreen({ difficulty, pvp, onFinish, onQuit }: Props) {
   const done = state.phase.kind === 'done'
   const [peerGone, setPeerGone] = useState(false)
   const [use3D] = useState(canWebGL)
-  const [looks] = useState(fightLooks)
+  const [looks] = useState(() => fightLooks(pvp?.peerAvatar))
 
   // 친구 대전: 받은 메시지를 경기에 넣고, 상대가 나가면 알린다
   useEffect(() => {

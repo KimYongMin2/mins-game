@@ -184,7 +184,7 @@ export function FightPage() {
         <GameScreen
           key={screen.key}
           difficulty={record.difficulty}
-          pvp={{ room: pvp.room, peerName: pvp.peer.nickname }}
+          pvp={{ room: pvp.room, peerName: pvp.peer.nickname, peerAvatar: pvp.peer.avatar }}
           onFinish={finishPvp}
           onQuit={leavePvp}
         />

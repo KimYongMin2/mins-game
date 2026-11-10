@@ -151,6 +151,7 @@ export function VolleyPage() {
           mode="pvp"
           room={pvp.room}
           peerName={pvp.peer.nickname}
+          peerAvatar={pvp.peer.avatar}
           server={screen.server}
           peerGone={peerGone}
           onFinish={finish}

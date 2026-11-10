@@ -1,5 +1,5 @@
 import { Suspense, lazy, useEffect, useReducer, useRef, useState } from 'react'
-import { ANIMALS, type Look, plainLook } from '../../../shared/art3d/animalKinds'
+import { type Look, opponentLook, plainLook } from '../../../shared/art3d/animalKinds'
 import { canWebGL } from '../../../shared/art3d/webgl'
 import { loadLook } from '../../../shared/storage/avatar'
 import { eventTime } from '../../../shared/input/eventTime'
@@ -13,10 +13,10 @@ import { ArmView } from '../field/ArmView'
 // 3D 팔씨름 (WebGL이 안 되거나 불러오는 동안은 2D). three.js는 이때만 불러온다
 const ArmView3D = lazy(() => import('../field/ArmView3D').then((m) => ({ default: m.ArmView3D })))
 
-/** 나 = 고른 캐릭터, 상대 = 겹치지 않는 다른 동물 */
-function armLooks(): readonly [Look, Look] {
+/** 나 = 고른 캐릭터, 상대 = 친구가 고른 캐릭터 (봇·안 고름이면 겹치지 않는 다른 동물) */
+function armLooks(peerAvatar?: string): readonly [Look, Look] {
   const mine = loadLook() ?? plainLook('bear')
-  return [mine, plainLook(ANIMALS.filter((a) => a !== mine.animal)[3])]
+  return [mine, opponentLook(mine.animal, peerAvatar, 3)]
 }
 import { type MatchState, type MatchSummary, createMatch, matchReducer, phaseLeft, summarizeMatch, zoneOf } from '../play/matchState'
 import { type ArmMsg, guestActionOf, guestPressOut, hostActionOf, hostSync, phaseChanged } from '../play/pvp'
@@ -28,7 +28,7 @@ type Props = {
   event: Event
   difficulty: Difficulty
   /** 친구 대전이면 방과 상대 이름 */
-  pvp?: { room: Room<ArmMsg>; peerName: string }
+  pvp?: { room: Room<ArmMsg>; peerName: string; peerAvatar?: string }
   onFinish: (summary: MatchSummary) => void
   /** 친구 대전 중 상대가 나갔을 때 '나가기' */
   onQuit?: () => void
@@ -104,7 +104,7 @@ function Gauge({ state }: { state: MatchState }) {
 
 export function GameScreen({ event, difficulty, pvp, onFinish, onQuit }: Props) {
   const [use3D] = useState(canWebGL)
-  const [looks] = useState(armLooks)
+  const [looks] = useState(() => armLooks(pvp?.peerAvatar))
   const [state, dispatch] = useReducer(matchReducer, undefined, () =>
     createMatch({
       now: performance.now(),
