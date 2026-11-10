@@ -609,9 +609,7 @@
   transform: translate(-50%, -50%);
   font-size: clamp(2.25rem, 13vw, 4rem);
   font-weight: 900;
-  -webkit-text-stroke: 2px #fff;
-  paint-order: stroke fill;
-  text-shadow: 0 3px 0 rgba(0, 0, 0, 0.25), 0 0 14px rgba(255, 255, 255, 0.9);
+  text-shadow: var(--outline-white), 0 4px 0 rgba(0, 0, 0, 0.25), 0 0 14px rgba(255, 255, 255, 0.9);
   opacity: 0;
   animation: yt-toss-label 2.5s ease-out forwards;
   pointer-events: none;

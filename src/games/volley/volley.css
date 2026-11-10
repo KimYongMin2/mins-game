@@ -107,8 +107,7 @@
   font-size: clamp(2rem, 8vw, 3.5rem);
   font-weight: 900;
   color: #fff;
-  -webkit-text-stroke: 2px #1f2937;
-  text-shadow: 0 4px 0 #1f2937;
+  text-shadow: var(--outline-md), 0 5px 0 #1f1b16;
   pointer-events: none;
 }
 

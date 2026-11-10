@@ -271,20 +271,19 @@
   font-size: clamp(2rem, 9vw, 3rem);
   font-weight: 900;
   line-height: 1.1;
-  background: var(--paper);
-  padding: 0 10px;
-  border-radius: 5px;
+  color: #fff;
+  text-shadow: var(--outline-lg), 0 6px 0 rgba(31, 27, 22, 0.35);
 }
 
 .ft-banner .ft-banner__win {
-  color: var(--accent);
+  color: #ffd43b;
 }
 
 .ft-banner span {
   font-size: 0.9375rem;
-  color: var(--ink-soft);
-  background: var(--paper);
-  padding: 0 6px;
+  font-weight: 800;
+  color: #fff;
+  text-shadow: var(--outline-sm);
 }
 
 .ft-timer {
@@ -597,14 +596,11 @@
 .ft-view3d__secret {
   font-size: 30px;
   color: #e0e7ff;
-  -webkit-text-stroke: 1px #1e1b4b;
-  text-shadow: 0 2px 4px #000;
+  text-shadow: var(--outline-sm), 0 3px 4px #000;
 }
 .ft-view3d__pop {
   font-size: 20px;
-  -webkit-text-stroke: 1px #111827;
-  paint-order: stroke fill;
-  text-shadow: 0 2px 3px rgba(0, 0, 0, 0.6);
+  text-shadow: var(--outline-sm), 0 3px 3px rgba(0, 0, 0, 0.6);
 }
 .ft-view3d__pop--good {
   color: #fde047;

@@ -219,7 +219,9 @@
   font-size: 1.75rem;
   font-weight: 900;
   pointer-events: none;
-  text-shadow: 0 0 6px var(--paper), 0 0 6px var(--paper);
+  /* 흰 번짐 대신 흰 글씨 + 먹 테두리 */
+  color: #fff;
+  text-shadow: var(--outline-md), 0 5px 0 rgba(31, 27, 22, 0.35);
 }
 
 .aw-banner--count {
@@ -229,13 +231,14 @@
 
 .aw-banner--go,
 .aw-banner--win {
-  color: var(--accent);
+  color: #ffd43b;
 }
 
 .aw-banner--done span {
-  font-size: 0.875rem;
-  font-weight: 500;
-  color: var(--ink-soft);
+  font-size: 0.9375rem;
+  font-weight: 800;
+  color: #fff;
+  text-shadow: var(--outline-sm);
 }
 
 .aw-foe-grade {
