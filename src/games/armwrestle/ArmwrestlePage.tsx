@@ -183,6 +183,7 @@ export function ArmwrestlePage() {
         ) : (
           <DuelReadyRoom
             room={pvp.room}
+            gameId="armwrestle"
             me={loadNickname() ?? '나'}
             peer={pvp.peer.nickname}
             peerReady={peerReady}

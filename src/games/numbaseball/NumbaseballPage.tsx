@@ -179,6 +179,7 @@ export function NumbaseballPage() {
         ) : (
           <DuelReadyRoom
             room={pvp.room}
+            gameId="numbaseball"
             me={loadNickname() ?? '나'}
             peer={pvp.peer.nickname}
             peerReady={peerReady}

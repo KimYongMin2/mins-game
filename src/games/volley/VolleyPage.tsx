@@ -156,6 +156,7 @@ export function VolleyPage() {
         ) : (
           <DuelReadyRoom
             room={pvp.room}
+            gameId="volley"
             me={loadNickname() ?? '나'}
             peer={pvp.peer.nickname}
             peerReady={peerReady}

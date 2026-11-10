@@ -203,6 +203,7 @@ export function ZolaballPage() {
         ) : (
           <DuelReadyRoom
             room={pvp.room}
+            gameId="zolaball"
             me={loadNickname() ?? '나'}
             peer={pvp.peer.nickname}
             peerReady={peerReady}

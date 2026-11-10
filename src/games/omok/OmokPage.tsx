@@ -161,6 +161,7 @@ export function OmokPage() {
         ) : (
           <DuelReadyRoom
             room={pvp.room}
+            gameId="omok"
             me={loadNickname() ?? '나'}
             peer={pvp.peer.nickname}
             peerReady={peerReady}

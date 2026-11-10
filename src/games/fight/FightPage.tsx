@@ -189,6 +189,7 @@ export function FightPage() {
         ) : (
           <DuelReadyRoom
             room={pvp.room}
+            gameId="fight"
             me={loadNickname() ?? '나'}
             peer={pvp.peer.nickname}
             peerReady={peerReady}

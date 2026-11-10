@@ -1841,3 +1841,70 @@ html {
 .my-stats[open] .my-stats__list {
   margin-top: 8px;
 }
+
+/* 대기실 '게임 바꾸기' (shared/ui/GameSwitch) */
+.game-switch {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+  width: 100%;
+}
+.game-switch__toggle {
+  align-self: center;
+}
+.game-switch__list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+  padding: 8px;
+  border: 1px solid var(--hair);
+  border-radius: 8px;
+  background: var(--card);
+}
+.game-switch__item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  min-height: 40px;
+  padding: 0 10px;
+  border: 1px solid var(--hair-strong);
+  border-radius: 6px;
+  background: var(--paper);
+  color: var(--ink);
+  font: inherit;
+  cursor: pointer;
+}
+.game-switch__item:hover:not(:disabled) {
+  background: var(--raised);
+}
+.game-switch__item:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.game-switch__title {
+  font-size: 0.9375rem;
+  font-weight: 800;
+}
+.game-switch__size {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--ink-soft);
+}
+.game-switch__note {
+  grid-column: 1 / -1;
+  margin: 2px 0 0;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--ink-soft);
+}
+.game-switch__moving {
+  margin: 0;
+  padding: 8px 12px;
+  border-radius: 6px;
+  background: var(--raised);
+  font-size: 0.9375rem;
+  font-weight: 700;
+  text-align: center;
+}

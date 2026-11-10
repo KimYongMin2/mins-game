@@ -6,7 +6,7 @@ import type { ListedRoom } from './online/room'
 //   ?mode=pvp&join=<방id>&name=..&pin=.. 메인에서 고른 방에 바로 들어가기
 // 들어온 뒤엔 주소에서 지워서(새로 고침·뒤로 가기 때 다시 방에 들어가지 않게) 한 번만 쓴다.
 
-export type PvpEntry = { kind: 'list' } | { kind: 'create'; name: string; pin: string | null } | { kind: 'join'; room: Pick<ListedRoom, 'id' | 'name'>; pin: string | null }
+export type PvpEntry = { kind: 'list' } | { kind: 'create'; name: string; pin: string | null; /** 정해진 방 번호 (게임 바꾸기 — 친구들이 같은 번호로 따라옴) */ id?: string } | { kind: 'join'; room: Pick<ListedRoom, 'id' | 'name'>; pin: string | null }
 
 const params = () => (typeof window === 'undefined' ? new URLSearchParams() : new URLSearchParams(window.location.search))
 
@@ -24,7 +24,10 @@ export function readPvpEntry(): PvpEntry | null {
 export function parsePvpEntry(q: URLSearchParams): PvpEntry | null {
   if (q.get('mode') !== 'pvp') return null
   const pin = /^\d{4}$/.test(q.get('pin') ?? '') ? q.get('pin') : null
-  if (q.get('create') === '1') return { kind: 'create', name: clean(q.get('name'), 20) || '방', pin }
+  if (q.get('create') === '1') {
+    const id = clean(q.get('id'), 12)
+    return { kind: 'create', name: clean(q.get('name'), 20) || '방', pin, ...(/^[A-Z0-9]{4,12}$/.test(id) ? { id } : {}) }
+  }
   const id = clean(q.get('join'), 16)
   if (id) return { kind: 'join', room: { id, name: clean(q.get('name'), 20) }, pin }
   return { kind: 'list' }
@@ -42,6 +45,7 @@ export function pvpLink(path: string, entry: PvpEntry): string {
   if (entry.kind === 'create') {
     q.set('create', '1')
     q.set('name', entry.name)
+    if (entry.id) q.set('id', entry.id)
   } else if (entry.kind === 'join') {
     q.set('join', entry.room.id)
     q.set('name', entry.room.name)
@@ -49,3 +53,11 @@ export function pvpLink(path: string, entry: PvpEntry): string {
   if (entry.kind !== 'list' && entry.pin) q.set('pin', entry.pin)
   return `${path}?${q.toString()}`
 }
+
+/** 대기실 '게임 바꾸기'에서 고를 수 있는 게임들 (메인 목록이 넣어 줌 — shared는 게임을 몰라서) */
+export type SwitchTarget = { id: string; title: string; path: string; min: number; max: number }
+let targets: SwitchTarget[] = []
+export function setSwitchTargets(list: SwitchTarget[]): void {
+  targets = list
+}
+export const switchTargets = (): SwitchTarget[] => targets

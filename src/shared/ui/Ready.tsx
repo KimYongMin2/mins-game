@@ -1,5 +1,8 @@
 import { useEffect, useState } from 'react'
 import type { Member, Peer, Room } from '../online/room'
+import { GameSwitch } from './GameSwitch'
+
+type SwitchableRoom = Pick<Room<never>, 'code' | 'name' | 'sendMove' | 'onMove'>
 
 // 친구 대전 '준비' (사용자 요청, 2026-11-10): 친구는 [준비]를 눌러야 하고, 방장은 준비 없이 모두 준비했을 때만 [게임 시작].
 // 다음 판(다시 하기)도 매번 다시 준비. 준비 여부는 방 사람 목록(presence)으로 알린다 — 게임 규칙은 모른다.
@@ -113,7 +116,7 @@ export function StartButton({ canStart, waitText, label = '게임 시작', onSta
 }
 
 /** 1:1 게임 대기 화면: 나 · 상대 이름과 준비 표시, 친구는 [준비], 방장은 [게임 시작] */
-export function DuelReadyRoom({ room, me, peer, peerReady, onStart, mode }: { room: ReadyRoom; me: string; peer: string; peerReady: boolean; onStart: () => void; mode?: ModeSpec }) {
+export function DuelReadyRoom({ room, me, peer, peerReady, onStart, mode, gameId }: { room: ReadyRoom & SwitchableRoom; me: string; peer: string; peerReady: boolean; onStart: () => void; mode?: ModeSpec; gameId?: string }) {
   const host = room.role === 'host'
   const hostInfo = useHostInfo(room)
   return (
@@ -132,6 +135,7 @@ export function DuelReadyRoom({ room, me, peer, peerReady, onStart, mode }: { ro
         </li>
       </ul>
       <ModePicker room={room} mode={mode} hostInfo={hostInfo} />
+      {gameId && <GameSwitch room={room} gameId={gameId} people={2} />}
       {host ? <StartButton canStart={peerReady} waitText={`${peer}님이 준비하길 기다려요`} onStart={onStart} /> : <ReadyButton room={room} resetKey={hostInfo} />}
     </div>
   )

@@ -20,6 +20,17 @@ import { MainPage } from './pages/MainPage'
 import { MeetingPage } from './pages/meeting/MeetingPage'
 import { NicknamePage } from './pages/NicknamePage'
 import { loadNickname } from './shared/storage/nickname'
+import { setSwitchTargets } from './shared/nav'
+import { GAMES } from './pages/gameList'
+import { playerRange } from './pages/PlayerDots'
+
+// 대기실 '게임 바꾸기'에서 고를 수 있는 게임 (친구 대전 되는 게임만, shared는 게임 목록을 몰라서 여기서 넣어 줌)
+setSwitchTargets(
+  GAMES.filter((g) => g.ready && g.play === 'pvp').map((g) => {
+    const [min, max] = playerRange(g.players)
+    return { id: g.id, title: g.title, path: g.path, min, max }
+  }),
+)
 
 /** 닉네임이 없으면 닉네임 화면으로. 정한 뒤 원래 주소(초대 링크의 ?mode=pvp&join=… 포함)로 돌아오게 들고 간다 */
 function ToNickname() {

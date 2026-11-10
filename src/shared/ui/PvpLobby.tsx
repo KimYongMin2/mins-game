@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router'
 import { clearPvpEntry, readPvpEntry } from '../nav'
 import { goHome } from './HomeLink'
 import { type ListedRoom, type Peer, type Room, RoomError, channelCode, createRoom, joinRoom, makeRoomCode } from '../online/room'
+import { GameSwitch } from './GameSwitch'
 import { InviteButton } from './Invite'
 import { type ModeSpec, ModePicker } from './Ready'
 import { RoomBadge, RoomPicker } from './RoomPicker'
@@ -75,7 +76,7 @@ export function PvpLobby<M>({ gameId, nickname, onConnected, onBack, mode }: Pro
     if (autoRef.current || !entry) return
     autoRef.current = true
     clearPvpEntry()
-    if (entry.kind === 'create') void host(entry.name, entry.pin)
+    if (entry.kind === 'create') void host(entry.name, entry.pin, entry.id)
     else if (entry.kind === 'join') void join(entry.room as ListedRoom, entry.pin)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -90,10 +91,10 @@ export function PvpLobby<M>({ gameId, nickname, onConnected, onBack, mode }: Pro
     setView({ kind: 'error', text })
   }
 
-  async function host(name: string, pin: string | null) {
+  async function host(name: string, pin: string | null, fixedId?: string) {
     setView({ kind: 'busy', text: '방을 만드는 중…' })
     try {
-      const id = makeRoomCode()
+      const id = fixedId ?? makeRoomCode()
       const room = await createRoom<M>(gameId, nickname, { avatar: myAvatar(), code: channelCode(id, pin), listing: { id, name, locked: !!pin } })
       roomRef.current = room
       setView({ kind: 'hosting', id, name, pin })
@@ -128,6 +129,7 @@ export function PvpLobby<M>({ gameId, nickname, onConnected, onBack, mode }: Pro
           <RoomBadge name={view.name} pin={view.pin} />
           <span className="pvp-lobby__wait">친구를 기다리는 중…</span>
           {roomRef.current && <ModePicker room={roomRef.current} mode={mode} />}
+          {roomRef.current && <GameSwitch room={roomRef.current} gameId={gameId} people={1} />}
           <InviteButton room={{ id: view.id, name: view.name }} pin={view.pin} />
           <button type="button" className="button" onClick={cancel}>
             취소

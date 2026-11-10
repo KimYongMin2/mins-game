@@ -7,6 +7,7 @@ import { encodeLook } from '../art3d/animalKinds'
 import { loadLook } from '../storage/avatar'
 import { TEAM_COLORS, TEAM_NAMES, type Team, type TeamPick, assignTeams, teamsReady } from '../team/teams'
 import { type ModeSpec, ModePicker, ReadyButton, readyCount as countReady } from './Ready'
+import { GameSwitch } from './GameSwitch'
 import { InviteButton } from './Invite'
 import { RoomBadge, RoomPicker } from './RoomPicker'
 
@@ -93,7 +94,7 @@ export function GroupLobby<M>({ gameId, nickname, capacity, minPlayers, teams: c
     if (autoRef.current || !entry) return
     autoRef.current = true
     clearPvpEntry()
-    if (entry.kind === 'create') void host(entry.name, entry.pin)
+    if (entry.kind === 'create') void host(entry.name, entry.pin, entry.id)
     else if (entry.kind === 'join') void join(entry.room as ListedRoom, entry.pin)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -105,10 +106,10 @@ export function GroupLobby<M>({ gameId, nickname, capacity, minPlayers, teams: c
     setView({ kind: 'error', text })
   }
 
-  async function host(name: string, pin: string | null) {
+  async function host(name: string, pin: string | null, fixedId?: string) {
     setView({ kind: 'busy', text: '방을 만드는 중…' })
     try {
-      const id = makeRoomCode()
+      const id = fixedId ?? makeRoomCode()
       connected(await createRoom<M>(gameId, nickname, { avatar: myAvatar(), capacity, code: channelCode(id, pin), listing: { id, name, locked: !!pin } }), id, name, pin)
     } catch (e) {
       fail(e)
@@ -160,6 +161,7 @@ export function GroupLobby<M>({ gameId, nickname, capacity, minPlayers, teams: c
       <section className="pvp-lobby">
         <RoomBadge name={view.name} pin={view.pin} />
         {count < capacity && <InviteButton room={{ id: view.id, name: view.name }} pin={view.pin} />}
+        <GameSwitch room={room} gameId={gameId} people={members.length + 1} />
         <span className="pvp-lobby__wait">
           {count}/{capacity}명
         </span>

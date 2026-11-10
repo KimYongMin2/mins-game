@@ -110,6 +110,8 @@ function fakeRooms() {
     onPeer: () => () => {},
     setReady: () => {},
     setInfo: () => {},
+    sendMove: () => {},
+    onMove: () => () => {},
     // 상대 한 명이 방에 있다
     onMembers: (fn) => {
       queueMicrotask(() => fn([i === 0 ? { id: 'guest-1', nickname: '친구', role: 'guest' } : { id: 'host-1', nickname: '방장', role: 'host' }]))
@@ -227,6 +229,8 @@ describe('여럿이 하는 방 (방장 ↔ 친구 각자)', () => {
         onPeer: () => () => {},
     setReady: () => {},
     setInfo: () => {},
+    sendMove: () => {},
+    onMove: () => () => {},
         onMembers: (fn) => {
           queueMicrotask(() => fn(ids.filter((x) => x !== id).map((x) => ({ id: x, nickname: x, role: x.startsWith('host') ? 'host' : 'guest' }))))
           return () => {}

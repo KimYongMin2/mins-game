@@ -100,8 +100,13 @@ export const PIN_LENGTH = 4
 /** 방 채널 코드: 비공개면 코드를 붙여서, 코드가 틀리면 다른(빈) 채널이 된다 (서버가 검사하는 건 아님) */
 export const channelCode = (id: string, pin: string | null) => (pin ? `${id}-${pin}` : id)
 
+/** 방장이 대기실에서 게임을 바꿀 때 친구들에게 보내는 '여기로 옮겨' (같은 이름·코드로 새 게임 방) */
+export type RoomMove = { path: string; id: string; name: string; pin: string | null }
+
 export interface Room<M> {
   code: string
+  /** 방 목록에 올린 이름 (방장만) */
+  name?: string
   role: RoomRole
   /** 내 접속 번호 (Member.id와 같은 종류) */
   myId: string
@@ -118,6 +123,10 @@ export interface Room<M> {
   setReady(ready: boolean): void
   /** 방장: 방 안에서 고른 모드를 사람 목록으로 알린다 (친구 화면에 표시, 바뀌면 친구 준비가 풀림) */
   setInfo(info: string): void
+  /** 방장: 다른 게임 방으로 다 같이 옮기자고 알린다 (게임 메시지와 따로) */
+  sendMove(move: RoomMove): void
+  /** 친구: 방장이 보낸 '여기로 옮겨' (방장이 보낸 것만) */
+  onMove(fn: (move: RoomMove) => void): () => void
   leave(): void
 }
 
@@ -214,6 +223,16 @@ async function open<M>(gameId: string, code: string, meta: Meta, { capacity = 2,
     readySignals.set(p.from, { ready: p.ready, at: p.at })
     publish()
   })
+  // 게임 바꾸기: 방장(사람 목록의 방장 줄)이 보낸 것만 받는다
+  const moveFns = new Set<(move: RoomMove) => void>()
+  channel.on('broadcast', { event: 'move' }, ({ payload }) => {
+    const p = payload as { from?: unknown; path?: unknown; id?: unknown; name?: unknown; pin?: unknown }
+    if (typeof p.from !== 'string' || !lastOthers.some((o) => o.key === p.from && o.role === 'host')) return
+    if (typeof p.path !== 'string' || !/^\/games\/[a-z]+$/.test(p.path) || typeof p.id !== 'string' || !/^[A-Z0-9]{4,12}$/.test(p.id)) return
+    const name = typeof p.name === 'string' ? p.name.replace(/[\u0000-\u001f]/g, '').slice(0, 20) : ''
+    const pin = typeof p.pin === 'string' && /^\d{4}$/.test(p.pin) ? p.pin : null
+    for (const fn of moveFns) fn({ path: p.path, id: p.id, name, pin })
+  })
   channel.on('presence', { event: 'sync' }, () => {
     lastOthers = othersIn(channel.presenceState<Meta>(), myKey)
     synced = true
@@ -266,6 +285,7 @@ async function open<M>(gameId: string, code: string, meta: Meta, { capacity = 2,
 
   const room: Room<M> = {
     code,
+    ...(listing ? { name: listing.name } : {}),
     role: meta.role,
     myId: myKey,
     send(msg) {
@@ -298,6 +318,14 @@ async function open<M>(gameId: string, code: string, meta: Meta, { capacity = 2,
       void channel.track(meta)
       void channel.send({ type: 'broadcast', event: 'ready', payload: { from: myKey, ready, at: meta.readyAt } })
     },
+    sendMove(move) {
+      if (meta.role !== 'host') return
+      void channel.send({ type: 'broadcast', event: 'move', payload: { from: myKey, ...move } })
+    },
+    onMove(fn) {
+      moveFns.add(fn)
+      return () => moveFns.delete(fn)
+    },
     setInfo(info) {
       if (meta.role !== 'host' || meta.info === info) return
       meta.info = info
@@ -315,6 +343,7 @@ async function open<M>(gameId: string, code: string, meta: Meta, { capacity = 2,
       messageFns.clear()
       peerFns.clear()
       memberFns.clear()
+      moveFns.clear()
       void supabase.removeChannel(channel)
     },
   }
