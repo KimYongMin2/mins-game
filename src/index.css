@@ -1792,3 +1792,52 @@ html {
 .sheet__panel::-webkit-scrollbar {
   width: 8px;
 }
+
+/* 내 전적 접기 (누르면 펼침) */
+.my-stats__toggle {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 48px;
+  padding: 8px 12px;
+  border: 1px solid var(--hair);
+  border-radius: 8px;
+  background: var(--card);
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+}
+.my-stats__toggle::-webkit-details-marker {
+  display: none;
+}
+.my-stats__toggle::after {
+  content: '';
+  flex-shrink: 0;
+  width: 7px;
+  height: 7px;
+  margin-left: auto;
+  border-right: 2px solid var(--ink-soft);
+  border-bottom: 2px solid var(--ink-soft);
+  transform: translateY(-2px) rotate(45deg);
+  transition: transform 120ms var(--ease);
+}
+.my-stats[open] .my-stats__toggle::after {
+  transform: translateY(1px) rotate(-135deg);
+}
+.my-stats__head {
+  flex-shrink: 0;
+  font-size: 1rem;
+  font-weight: 800;
+}
+.my-stats__top {
+  min-width: 0;
+  overflow: hidden;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--ink-soft);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.my-stats[open] .my-stats__list {
+  margin-top: 8px;
+}

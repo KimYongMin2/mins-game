@@ -68,36 +68,49 @@ function PlayButtons({ game, onGo, onFriends, onDark = false }: { game: GameEntr
   )
 }
 
-/** 내 전적: 해 본 게임만, 많이 한 순 */
+/** 내 전적: 평소엔 한 줄 요약(전체 판 수 · 많이 한 게임)으로 접어 두고 누르면 펼침 (사용자 요청 — 길어지면 아래 캐릭터 꾸미기가 안 보였음) */
 function MyStats() {
   const [stats] = useState(loadStats)
   const played = stats.filter((s) => s.played > 0).sort((a, b) => b.played - a.played)
   const total = played.reduce((n, s) => n + s.played, 0)
+  const titleOf = (id: string) => GAMES.find((x) => x.id === id)!.title
+  if (played.length === 0) {
+    return (
+      <section className="my-stats" aria-label="내 전적">
+        <p className="my-stats__empty">내 전적 · 아직 한 게임이 없어요</p>
+      </section>
+    )
+  }
   return (
-    <section className="my-stats" aria-label="내 전적">
-      <h3 className="game-sheet__label">
-        내 전적 <span className="my-stats__total">{total}판</span>
-      </h3>
-      {played.length === 0 ? (
-        <p className="my-stats__empty">아직 한 게임이 없어요</p>
-      ) : (
-        <ul className="my-stats__list">
-          {played.map((s) => {
-            const g = GAMES.find((x) => x.id === s.id)!
-            return (
-              <li key={s.id} className="my-stats__row">
-                <img className="my-stats__cover" src={cover(g)} alt="" loading="lazy" />
-                <span className="my-stats__name">{g.title}</span>
-                <span className="my-stats__lines">
-                  {s.pvp && <span>친구 {s.pvp}</span>}
-                  {s.bot && <span>{g.play === 'solo' ? s.bot : `봇 ${s.bot}`}</span>}
-                </span>
-              </li>
-            )
-          })}
-        </ul>
-      )}
-    </section>
+    <details className="my-stats">
+      <summary className="my-stats__toggle">
+        <span className="my-stats__head">
+          내 전적 <span className="my-stats__total">{total}판</span>
+        </span>
+        <span className="my-stats__top">
+          {played
+            .slice(0, 2)
+            .map((s) => titleOf(s.id))
+            .join(' · ')}
+          {played.length > 2 && ` 외 ${played.length - 2}개`}
+        </span>
+      </summary>
+      <ul className="my-stats__list">
+        {played.map((s) => {
+          const g = GAMES.find((x) => x.id === s.id)!
+          return (
+            <li key={s.id} className="my-stats__row">
+              <img className="my-stats__cover" src={cover(g)} alt="" loading="lazy" />
+              <span className="my-stats__name">{g.title}</span>
+              <span className="my-stats__lines">
+                {s.pvp && <span>친구 {s.pvp}</span>}
+                {s.bot && <span>{g.play === 'solo' ? s.bot : `봇 ${s.bot}`}</span>}
+              </span>
+            </li>
+          )
+        })}
+      </ul>
+    </details>
   )
 }
 
