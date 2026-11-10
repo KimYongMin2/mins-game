@@ -4,6 +4,7 @@ import { clearPvpEntry, readPvpEntry } from '../nav'
 import { goHome } from './HomeLink'
 import { type ListedRoom, type Peer, type Room, RoomError, channelCode, createRoom, joinRoom, makeRoomCode } from '../online/room'
 import { InviteButton } from './Invite'
+import { type ModeSpec, ModePicker } from './Ready'
 import { RoomBadge, RoomPicker } from './RoomPicker'
 import { encodeLook } from '../art3d/animalKinds'
 import { loadLook } from '../storage/avatar'
@@ -22,6 +23,8 @@ type Props<M> = {
   nickname: string
   onConnected: (room: Room<M>, peer: Peer) => void
   onBack: () => void
+  /** 방장이 방 안에서 바꾸는 모드 (예: 팔씨름 종목) — 친구를 기다리는 동안에도 고를 수 있게 */
+  mode?: ModeSpec
 }
 
 type View =
@@ -36,7 +39,7 @@ const ERROR_TEXT: Record<RoomError['reason'], string> = {
   offline: '서버에 연결하지 못했어요. 인터넷 연결을 확인해 주세요',
 }
 
-export function PvpLobby<M>({ gameId, nickname, onConnected, onBack }: Props<M>) {
+export function PvpLobby<M>({ gameId, nickname, onConnected, onBack, mode }: Props<M>) {
   const [view, setView] = useState<View>({ kind: 'menu' })
   const roomRef = useRef<Room<M> | null>(null)
   const handedOff = useRef(false)
@@ -124,6 +127,7 @@ export function PvpLobby<M>({ gameId, nickname, onConnected, onBack }: Props<M>)
         <>
           <RoomBadge name={view.name} pin={view.pin} />
           <span className="pvp-lobby__wait">친구를 기다리는 중…</span>
+          {roomRef.current && <ModePicker room={roomRef.current} mode={mode} />}
           <InviteButton room={{ id: view.id, name: view.name }} pin={view.pin} />
           <button type="button" className="button" onClick={cancel}>
             취소

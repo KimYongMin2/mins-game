@@ -165,7 +165,7 @@ export function NumbaseballPage() {
         />
       )}
       {screen.kind === 'lobby' && (
-        <PvpLobby<NumbaseballMsg> gameId="numbaseball" nickname={loadNickname() ?? '익명'} onConnected={connected} onBack={toStart} />
+        <PvpLobby<NumbaseballMsg> gameId="numbaseball" nickname={loadNickname() ?? '익명'} onConnected={connected} onBack={toStart} mode={lengthMode as ModeSpec} />
       )}
       {screen.kind === 'pvp-wait' &&
         pvp &&

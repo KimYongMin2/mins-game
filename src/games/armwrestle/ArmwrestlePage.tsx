@@ -169,7 +169,7 @@ export function ArmwrestlePage() {
       )}
       {screen.kind === 'calibrate' && <CalibrateScreen onDone={toStart} />}
       {screen.kind === 'lobby' && (
-        <PvpLobby<ArmMsg> gameId="armwrestle" nickname={loadNickname() ?? '익명'} onConnected={connected} onBack={toStart} />
+        <PvpLobby<ArmMsg> gameId="armwrestle" nickname={loadNickname() ?? '익명'} onConnected={connected} onBack={toStart} mode={eventMode as ModeSpec} />
       )}
       {screen.kind === 'pvp-wait' &&
         pvp &&
