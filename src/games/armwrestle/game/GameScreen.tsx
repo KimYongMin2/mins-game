@@ -1,4 +1,7 @@
-import { useEffect, useReducer, useRef, useState } from 'react'
+import { Suspense, lazy, useEffect, useReducer, useRef, useState } from 'react'
+import { ANIMALS, type Look, plainLook } from '../../../shared/art3d/animalKinds'
+import { canWebGL } from '../../../shared/art3d/webgl'
+import { loadLook } from '../../../shared/storage/avatar'
 import { eventTime } from '../../../shared/input/eventTime'
 import type { Room } from '../../../shared/online/room'
 import { LinkBadge } from '../../../shared/ui/LinkBadge'
@@ -6,6 +9,15 @@ import { randomSeed } from '../../../shared/random'
 import { loadNickname } from '../../../shared/storage/nickname'
 import { DONE_MS, type Difficulty, type Event, ROUND_MS, WINS_NEEDED } from '../constants'
 import { ArmView } from '../field/ArmView'
+
+// 3D 팔씨름 (WebGL이 안 되거나 불러오는 동안은 2D). three.js는 이때만 불러온다
+const ArmView3D = lazy(() => import('../field/ArmView3D').then((m) => ({ default: m.ArmView3D })))
+
+/** 나 = 고른 캐릭터, 상대 = 겹치지 않는 다른 동물 */
+function armLooks(): readonly [Look, Look] {
+  const mine = loadLook() ?? plainLook('bear')
+  return [mine, plainLook(ANIMALS.filter((a) => a !== mine.animal)[3])]
+}
 import { type MatchState, type MatchSummary, createMatch, matchReducer, phaseLeft, summarizeMatch, zoneOf } from '../play/matchState'
 import { type ArmMsg, guestActionOf, guestPressOut, hostActionOf, hostSync, phaseChanged } from '../play/pvp'
 import { type InputKind, inputKindOf, loadLatency } from '../input/latency'
@@ -91,6 +103,8 @@ function Gauge({ state }: { state: MatchState }) {
 }
 
 export function GameScreen({ event, difficulty, pvp, onFinish, onQuit }: Props) {
+  const [use3D] = useState(canWebGL)
+  const [looks] = useState(armLooks)
   const [state, dispatch] = useReducer(matchReducer, undefined, () =>
     createMatch({
       now: performance.now(),
@@ -243,7 +257,13 @@ export function GameScreen({ event, difficulty, pvp, onFinish, onQuit }: Props) 
       </div>
 
       <div className="aw-view-wrap">
-        <ArmView pos={shownPos} straining={pulling} now={state.now} names={names} winner={winner} />
+        {use3D ? (
+          <Suspense fallback={<ArmView pos={shownPos} straining={pulling} now={state.now} names={names} winner={winner} />}>
+            <ArmView3D pos={shownPos} straining={pulling} names={names} winner={winner} looks={looks} />
+          </Suspense>
+        ) : (
+          <ArmView pos={shownPos} straining={pulling} now={state.now} names={names} winner={winner} />
+        )}
         {/* 남은 시간: 두 졸라맨 사이 위쪽에 크게 ('당겨!'가 뜨는 동안은 숨김) */}
         {pulling && state.now - phase.start >= 500 && (
           <span className={`aw-clock${phaseLeft(state) <= 3000 ? ' aw-clock--low' : ''}`}>{Math.ceil(phaseLeft(state) / 1000)}</span>
