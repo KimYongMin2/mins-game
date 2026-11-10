@@ -11,6 +11,7 @@ import { AvatarFace } from '../shared/ui/AvatarFace'
 import { IconChevronRight, IconMic, IconX } from '../shared/ui/icons'
 import { RoomPicker } from '../shared/ui/RoomPicker'
 import { GAMES, type GameEntry } from './gameList'
+import { OpenRooms } from './OpenRooms'
 import { PlayerDots } from './PlayerDots'
 
 // 메인 화면 (unslop 방향: 동네 문방구 오락기·보드게임 상자. 겉은 조용하게, 색은 게임 표지에만, 인원은 사람 점):
@@ -148,6 +149,8 @@ export function MainPage({ nickname }: { nickname: string }) {
           <PlayButtons game={hero} onGo={(path) => go(hero, path)} onFriends={() => setSheet({ kind: 'game', game: hero })} onDark />
         </div>
       </section>
+
+      <OpenRooms games={READY.filter((g) => g.play === 'pvp')} onJoin={(g, room, pin) => go(g, pvpLink(g.path, { kind: 'join', room, pin }))} />
 
       <section className="shelf-section" aria-label="게임">
         <div className="shelf-head">
