@@ -279,20 +279,21 @@ export function Stadium3D(props: Props) {
     function frame() {
       const p = propsRef.current
       const t = performance.now() / 1000
-      // 투수: 와인드업(0~1) → 놓기(1) → 팔로스루(1~2)
+      // 투수(우완): 와인드업(0~1) → 놓기(1) → 팔로스루(1~2). 장면을 좌우로 뒤집어 그려서 던지는 팔은 armR
+      // (armL로 했더니 공은 오른손 쪽에서 나오는데 왼팔로 던지는 것처럼 보였음)
       pitcher.update(t, 'idle', 'calm')
       const pose = p.pitcher
       if (pose > 0 && pose < 2.2) {
         if (pose <= 1) {
-          pitcher.armL.rotation.x = 2.6 * pose
-          pitcher.armR.rotation.x = -0.9 * pose
-          pitcher.body.rotation.y = 0.55 * pose
+          pitcher.armR.rotation.x = 2.6 * pose
+          pitcher.armL.rotation.x = -0.9 * pose
+          pitcher.body.rotation.y = -0.55 * pose
           pitcher.body.rotation.x = -0.12 * pose
         } else {
           const f = Math.min(1, (pose - 1) * 4)
-          pitcher.armL.rotation.x = 2.6 - f * 4.2
-          pitcher.armR.rotation.x = -0.9 + f * 0.9
-          pitcher.body.rotation.y = 0.55 - f * 0.9
+          pitcher.armR.rotation.x = 2.6 - f * 4.2
+          pitcher.armL.rotation.x = -0.9 + f * 0.9
+          pitcher.body.rotation.y = -0.55 + f * 0.9
           pitcher.body.rotation.x = 0.35 * f * Math.max(0, 1 - (pose - 1.4))
         }
       }
