@@ -7,7 +7,8 @@ import { readLocal, writeLocal } from '../shared/storage/local'
 import { loadRecent, pushRecent } from '../shared/storage/recent'
 import { AvatarEditor } from '../shared/ui/AvatarPicker'
 import { markFromHome } from '../shared/ui/HomeLink'
-import { IconChevronRight, IconMic, IconUser, IconX } from '../shared/ui/icons'
+import { AvatarFace } from '../shared/ui/AvatarFace'
+import { IconChevronRight, IconMic, IconX } from '../shared/ui/icons'
 import { RoomPicker } from '../shared/ui/RoomPicker'
 import { GAMES, type GameEntry } from './gameList'
 import { PlayerDots } from './PlayerDots'
@@ -130,7 +131,7 @@ export function MainPage({ nickname }: { nickname: string }) {
           MINS<b>GAME</b>
         </span>
         <button type="button" className="me-chip" onClick={() => setSheet({ kind: 'me' })}>
-          <IconUser size={16} />
+          <AvatarFace look={look} size={32} />
           <span className="me-chip__name">{nickname}</span>
         </button>
       </header>
