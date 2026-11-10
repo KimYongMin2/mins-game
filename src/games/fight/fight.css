@@ -568,3 +568,49 @@
   font-size: 0.8125rem;
   color: var(--ink-soft);
 }
+
+/* 3D 링 (field/FightView3D): 같은 비율 칸에 3D + 글자를 HTML로 겹침 */
+.ft-view3d {
+  position: relative;
+  overflow: hidden;
+}
+.ft-view3d__stage {
+  position: absolute;
+  inset: 0;
+}
+.ft-view3d__tag,
+.ft-view3d__name {
+  position: absolute;
+  left: 0;
+  top: 0;
+  pointer-events: none;
+  white-space: nowrap;
+  font-weight: 900;
+  text-align: center;
+}
+.ft-view3d__name {
+  font-size: 13px;
+  color: #e0e7ff;
+  text-shadow: 0 1px 2px #000;
+}
+.ft-view3d__secret {
+  font-size: 30px;
+  color: #e0e7ff;
+  -webkit-text-stroke: 1px #1e1b4b;
+  text-shadow: 0 2px 4px #000;
+}
+.ft-view3d__pop {
+  font-size: 20px;
+  -webkit-text-stroke: 1px #111827;
+  paint-order: stroke fill;
+  text-shadow: 0 2px 3px rgba(0, 0, 0, 0.6);
+}
+.ft-view3d__pop--good {
+  color: #fde047;
+}
+.ft-view3d__pop--bad {
+  color: #f87171;
+}
+.ft-view3d__pop--plain {
+  color: #f8fafc;
+}

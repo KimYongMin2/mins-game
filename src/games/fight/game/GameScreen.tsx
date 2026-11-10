@@ -1,13 +1,25 @@
-import { useEffect, useReducer, useRef, useState } from 'react'
+import { Suspense, lazy, useEffect, useReducer, useRef, useState } from 'react'
 import type { Room } from '../../../shared/online/room'
 import { loadNickname } from '../../../shared/storage/nickname'
 import { randomSeed } from '../../../shared/random'
 import { CHOOSE_MS, DONE_MS, type Difficulty, MAX_LIFE, MAX_STACKS, MAX_TURNS, REVEAL_MS, SMASH_COST } from '../constants'
 import { FightView, type FighterShow } from '../field/FightView'
+import { ANIMALS, type Look, plainLook } from '../../../shared/art3d/animalKinds'
+import { canWebGL } from '../../../shared/art3d/webgl'
+import { loadLook } from '../../../shared/storage/avatar'
 import { type MatchState, type MatchSummary, createMatch, matchReducer, summarizeMatch } from '../play/matchState'
 import { type FightMsg, guestActionOf, guestPickMsg, hostActionOf, hostOutbox } from '../play/pvp'
 import { type Fighter, STANCES, STANCE_COST, STANCE_LABEL, type Stance, canChoose } from '../rules/turn'
 import { playSound } from '../sounds'
+
+// 3D 링 (WebGL이 안 되거나 불러오는 동안은 2D). three.js는 이때만 불러온다
+const FightView3D = lazy(() => import('../field/FightView3D').then((m) => ({ default: m.FightView3D })))
+
+/** 나 = 고른 캐릭터, 상대 = 겹치지 않는 다른 동물 */
+function fightLooks(): readonly [Look, Look] {
+  const mine = loadLook() ?? plainLook('bear')
+  return [mine, plainLook(ANIMALS.filter((a) => a !== mine.animal)[2])]
+}
 
 type Props = {
   difficulty: Difficulty
@@ -84,6 +96,8 @@ export function GameScreen({ difficulty, pvp, onFinish, onQuit }: Props) {
   )
   const done = state.phase.kind === 'done'
   const [peerGone, setPeerGone] = useState(false)
+  const [use3D] = useState(canWebGL)
+  const [looks] = useState(fightLooks)
 
   // 친구 대전: 받은 메시지를 경기에 넣고, 상대가 나가면 알린다
   useEffect(() => {
@@ -156,6 +170,7 @@ export function GameScreen({ difficulty, pvp, onFinish, onQuit }: Props) {
   const left = choosing ? Math.max(0, phase.until - now) : 0
   const reveal = phase.kind === 'reveal' ? Math.min(1, 1 - (phase.until - now) / REVEAL_MS) : null
   const names = [loadNickname() ?? '나', pvp?.peerName ?? '봇'] as const
+  const shows = [showOf(state, 0), showOf(state, 1)] as const
 
   return (
     <div className="ft-game">
@@ -168,7 +183,13 @@ export function GameScreen({ difficulty, pvp, onFinish, onQuit }: Props) {
       </div>
 
       <div className="ft-view-wrap">
-        <FightView fighters={[showOf(state, 0), showOf(state, 1)]} reveal={reveal} now={now} names={names} />
+        {use3D ? (
+          <Suspense fallback={<FightView fighters={shows} reveal={reveal} now={now} names={names} />}>
+            <FightView3D fighters={shows} reveal={reveal} now={now} names={names} looks={looks} winner={phase.kind === 'done' ? phase.winner : null} />
+          </Suspense>
+        ) : (
+          <FightView fighters={shows} reveal={reveal} now={now} names={names} />
+        )}
         <Banner state={state} />
       </div>
 
