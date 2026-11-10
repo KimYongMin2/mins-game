@@ -7,8 +7,8 @@ import { type Ball, type Player, type Side, type SimState } from '../play/sim'
 // 만화풍 선수(굵은 외곽선, 머리띠, 나 파랑·상대 빨강), 흰·노랑 배구공에 빛 테두리·꼬리, 공 그림자(떨어질 자리 짐작용).
 // mirror면 좌우를 뒤집어 그린다 (친구 쪽 기기에서 자기가 왼쪽에 보이게).
 
-const VIEW_H = 12
-const GROUND = 11
+export const VIEW_H = 12
+export const GROUND = 11
 const OUT = 0.07
 const Y = (y: number) => GROUND - y
 
@@ -23,6 +23,11 @@ type Props = {
   trail: { x: number; y: number }[]
   /** 화면 흔들림 (m) */
   shake: number
+  /**
+   * all = 다 그림 · back = 하늘·모래·네트·그림자만 (3D 선수 층 아래) · front = 공·번쩍만 (3D 선수 층 위, 투명 바탕).
+   * 3D 동물 선수(Players3D)를 쓰면 back과 front 사이에 끼운다
+   */
+  part?: 'all' | 'back' | 'front'
 }
 
 function Athlete({ p, color, ball, hitAge }: { p: Player; color: string; ball: Ball; hitAge: number }) {
@@ -96,14 +101,22 @@ function BallArt({ ball, trail }: { ball: Ball; trail: Props['trail'] }) {
   )
 }
 
-export function Court({ sim, me, mirror, trail, shake }: Props) {
+export function Court({ sim, me, mirror, trail, shake, part = 'all' }: Props) {
   const { ball, players, lastHit } = sim
   const hitAge = (side: Side) => (lastHit && lastHit.kind === 'spike' && lastHit.player === side ? sim.tick - lastHit.tick : 99)
   const spikeAge = lastHit?.kind === 'spike' ? sim.tick - lastHit.tick : 99
   const shadowScale = 1 - Math.min(ball.y / 11, 0.7)
   const above = ball.y - BALL_R > GROUND
   return (
-    <svg className="vb-court" viewBox={`0 0 ${COURT_W} ${VIEW_H}`} role="img" aria-label="배구 코트">
+    <svg
+      className={part === 'front' ? 'vb-court vb-court--front' : 'vb-court'}
+      viewBox={`0 0 ${COURT_W} ${VIEW_H}`}
+      role={part === 'front' ? undefined : 'img'}
+      aria-label={part === 'front' ? undefined : '배구 코트'}
+      aria-hidden={part === 'front' || undefined}
+    >
+      {part !== 'front' && (
+      <>
       <defs>
         <linearGradient id="vb-sky" x1="0" y1="0" x2="0" y2="1">
           <stop offset="0" stopColor="#60a5fa" />
@@ -128,8 +141,12 @@ export function Court({ sim, me, mirror, trail, shake }: Props) {
       ))}
       <rect x={0} y={GROUND - 1.6} width={COURT_W} height={1.6} fill="#38bdf8" />
       <path d={Array.from({ length: 9 }, (_, i) => `M${i * 2 + 0.3} ${GROUND - 1.1} q0.35 -0.15 0.7 0`).join(' ')} stroke="#e0f2fe" strokeWidth={0.05} fill="none" />
+      </>
+      )}
       <g transform={`translate(${shake} 0)`}>
         <g transform={mirror ? `translate(${COURT_W} 0) scale(-1 1)` : undefined}>
+          {part !== 'front' && (
+          <>
           {/* 모래 */}
           <rect x={0} y={GROUND} width={COURT_W} height={VIEW_H - GROUND} fill="#f4d58d" stroke={TOON_OUTLINE} strokeWidth={OUT} />
           <path d={Array.from({ length: 24 }, (_, i) => `M${i * 0.7 + 0.2} ${GROUND + 0.3 + (i % 3) * 0.18} h0.06`).join(' ')} stroke="#d4a54a" strokeWidth={0.07} strokeLinecap="round" />
@@ -139,9 +156,12 @@ export function Court({ sim, me, mirror, trail, shake }: Props) {
           <rect x={NET_X - 0.06} y={Y(NET_H) - 0.2} width={0.12} height={NET_H + 0.2} fill="#9ca3af" stroke={TOON_OUTLINE} strokeWidth={OUT} />
           <rect x={NET_X - NET_HALF} y={Y(NET_H)} width={NET_HALF * 2} height={NET_H * 0.55} fill="url(#vb-mesh)" stroke={TOON_OUTLINE} strokeWidth={OUT * 0.8} />
           <rect x={NET_X - NET_HALF - 0.05} y={Y(NET_H) - 0.08} width={NET_HALF * 2 + 0.1} height={0.16} rx={0.05} fill="#fff" stroke={TOON_OUTLINE} strokeWidth={OUT * 0.8} />
-          {players.map((p, i) => (
-            <Athlete key={i} p={p} color={i === me ? TEAM_COLORS.me : TEAM_COLORS.foe} ball={ball} hitAge={hitAge(i as Side)} />
-          ))}
+          {part === 'all' &&
+            players.map((p, i) => <Athlete key={i} p={p} color={i === me ? TEAM_COLORS.me : TEAM_COLORS.foe} ball={ball} hitAge={hitAge(i as Side)} />)}
+          </>
+          )}
+          {part !== 'back' && (
+          <>
           {above ? (
             // 화면 위로 나간 공: 위쪽에 화살표
             <path d={`M${ball.x} 0.15 l-0.3 0.45 h0.6 Z`} fill="#fff" stroke={TOON_OUTLINE} strokeWidth={0.05} />
@@ -150,6 +170,8 @@ export function Court({ sim, me, mirror, trail, shake }: Props) {
           )}
           {spikeAge < 8 && (
             <path d={starPath(ball.x, Y(ball.y), 0.9 - spikeAge * 0.06, 8, 0.4)} fill="#fff7ae" stroke="#f59e0b" strokeWidth={0.05} opacity={1 - spikeAge / 8} />
+          )}
+          </>
           )}
         </g>
       </g>

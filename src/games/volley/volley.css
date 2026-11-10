@@ -88,6 +88,17 @@
   height: auto;
 }
 
+/* 3D 동물 선수 층 (field/Players3D)과 그 위 공 층: 2D 코트 위에 겹침 */
+.vb-players3d,
+.vb-court--front {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.vb-court--front {
+  height: 100%;
+}
+
 .vb-banner {
   position: absolute;
   inset: 0;
