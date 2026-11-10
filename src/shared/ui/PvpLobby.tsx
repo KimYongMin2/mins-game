@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
+import { useNavigate } from 'react-router'
+import { clearPvpEntry, readPvpEntry } from '../nav'
 import { type ListedRoom, type Peer, type Room, RoomError, channelCode, createRoom, joinRoom, makeRoomCode } from '../online/room'
 import { RoomBadge, RoomPicker } from './RoomPicker'
 import { encodeLook } from '../art3d/animalKinds'
@@ -60,6 +62,20 @@ export function PvpLobby<M>({ gameId, nickname, onConnected, onBack }: Props<M>)
     })
   }
 
+  // 메인 게임 창에서 고르고 들어왔으면(주소 꼬리) 바로 방 만들기·들어가기, '돌아가기'는 메인으로 (사용자 요청)
+  const navigate = useNavigate()
+  const [entry] = useState(readPvpEntry)
+  const autoRef = useRef(false)
+  useEffect(() => {
+    if (autoRef.current || !entry) return
+    autoRef.current = true
+    clearPvpEntry()
+    if (entry.kind === 'create') void host(entry.name, entry.pin)
+    else if (entry.kind === 'join') void join(entry.room as ListedRoom, entry.pin)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+  const goBack = () => (entry ? navigate('/') : onBack())
+
   function fail(e: unknown, wrongPin = false) {
     if (!(e instanceof RoomError)) console.warn('[room] 방 접속 오류', e)
     // 반쯤 열린 방이 남아 있으면 닫는다 (다시 시도할 때 부딪히지 않게)
@@ -115,7 +131,7 @@ export function PvpLobby<M>({ gameId, nickname, onConnected, onBack }: Props<M>)
       ) : (
         <RoomPicker gameId={gameId} nickname={nickname} onCreate={(name, pin) => void host(name, pin)} onJoin={(r, pin) => void join(r, pin)} error={view.kind === 'error' ? view.text : undefined} />
       )}
-      <button type="button" className="button button--small pvp-lobby__back" onClick={onBack}>
+      <button type="button" className="button button--small pvp-lobby__back" onClick={goBack}>
         돌아가기
       </button>
     </section>

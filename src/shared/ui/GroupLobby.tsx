@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
+import { useNavigate } from 'react-router'
+import { clearPvpEntry, readPvpEntry } from '../nav'
 import { type ListedRoom, type Member, type Room, RoomError, channelCode, createRoom, joinRoom, makeRoomCode } from '../online/room'
 import { encodeLook } from '../art3d/animalKinds'
 import { loadLook } from '../storage/avatar'
@@ -79,6 +81,20 @@ export function GroupLobby<M>({ gameId, nickname, capacity, minPlayers, teams: c
     onConnected(r)
   }
 
+  // 메인 게임 창에서 고르고 들어왔으면(주소 꼬리) 바로 방 만들기·들어가기, '돌아가기'는 메인으로 (사용자 요청)
+  const navigate = useNavigate()
+  const [entry] = useState(readPvpEntry)
+  const autoRef = useRef(false)
+  useEffect(() => {
+    if (autoRef.current || !entry) return
+    autoRef.current = true
+    clearPvpEntry()
+    if (entry.kind === 'create') void host(entry.name, entry.pin)
+    else if (entry.kind === 'join') void join(entry.room as ListedRoom, entry.pin)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+  const goBack = () => (entry ? navigate('/') : onBack())
+
   function fail(e: unknown, wrongPin = false) {
     if (!(e instanceof RoomError)) console.warn('[room] 방 접속 오류', e)
     const text = e instanceof RoomError ? (e.reason === 'not-found' && wrongPin ? '코드가 틀렸어요 (방이 없어졌을 수도 있어요)' : ERROR_TEXT[e.reason]) : ERROR_TEXT.offline
@@ -106,7 +122,7 @@ export function GroupLobby<M>({ gameId, nickname, capacity, minPlayers, teams: c
 
   function leave() {
     room?.leave()
-    onBack()
+    goBack()
   }
 
   if (view.kind === 'waiting' && room) {
@@ -237,7 +253,7 @@ export function GroupLobby<M>({ gameId, nickname, capacity, minPlayers, teams: c
       ) : (
         <RoomPicker gameId={gameId} nickname={nickname} onCreate={(name, pin) => void host(name, pin)} onJoin={(r, pin) => void join(r, pin)} error={view.kind === 'error' ? view.text : undefined} />
       )}
-      <button type="button" className="button button--small pvp-lobby__back" onClick={onBack}>
+      <button type="button" className="button button--small pvp-lobby__back" onClick={goBack}>
         돌아가기
       </button>
     </section>

@@ -653,6 +653,23 @@ p {
   font-weight: 600;
 }
 
+.game-sheet__label {
+  margin-top: 10px;
+  font-family: var(--display);
+  font-size: 1.2rem;
+  font-weight: 400;
+}
+
+.game-sheet__rooms {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.game-sheet .play-buttons {
+  margin-top: 4px;
+}
+
 .game-sheet__modes {
   font-size: 0.875rem;
   color: var(--ink-soft);

@@ -4,14 +4,17 @@ import { ANIMAL_EMOJI, ANIMAL_NAMES, type Look } from '../shared/art3d/animalKin
 import { loadLook } from '../shared/storage/avatar'
 import { readLocal, writeLocal } from '../shared/storage/local'
 import { loadRecent, pushRecent } from '../shared/storage/recent'
+import { pvpLink } from '../shared/nav'
 import { AvatarEditor } from '../shared/ui/AvatarPicker'
+import { RoomPicker } from '../shared/ui/RoomPicker'
 import { GAMES, type GameEntry } from './gameList'
 
 // 메인 화면 (사용자 요청으로 다시 짬 — '색만 바뀐 것 같다', 구조를 바꿔도 되고 규칙만 그대로):
 // 게임 선반처럼. 표지는 이모지가 아니라 각 게임의 진짜 경기 장면(public/covers, 직접 찍은 화면).
 // 위: 로고 · 내 캐릭터 칩(누르면 내 정보·꾸미기) → 크게 '이어서 하기'(최근 게임, 없으면 오늘의 추천)
-// → 거르기(전체 · 1:1 · 여럿이 · 혼자) → 표지 카드들 → 수다방. 카드를 누르면 게임 창이 올라와 [친구랑 하기]/[봇이랑]으로 바로 들어간다.
-// [친구랑 하기]는 ?mode=pvp 로 시작 화면을 건너뛰고 바로 방 목록.
+// → 거르기(전체 · 1:1 · 여럿이 · 혼자) → 표지 카드들 → 수다방. 카드를 누르면 게임 창이 올라온다.
+// 게임 창 안에 그 게임의 **열린 방 목록 + 방 만들기**가 바로 있다 (사용자 요청 — 따로 있던 방 목록 화면을 밖으로 꺼냄).
+// 방을 고르거나 만들면 그 게임으로 가서 바로 방에 들어간다(주소 꼬리 ?mode=pvp&join=… / &create=…, shared/nav.ts).
 
 type Filter = 'all' | 'duo' | 'group' | 'solo'
 const FILTERS: { id: Filter; label: string }[] = [
@@ -45,11 +48,11 @@ function Cover({ game, className }: { game: GameEntry; className: string }) {
 }
 
 /** 바로 들어가기 버튼 둘: 친구랑(방 목록) / 봇이랑·혼자(시작 화면) */
-function PlayButtons({ game, onGo }: { game: GameEntry; onGo: (path: string) => void }) {
+function PlayButtons({ game, onGo, onFriends }: { game: GameEntry; onGo: (path: string) => void; onFriends?: () => void }) {
   return (
     <div className="play-buttons">
-      {game.play === 'pvp' && (
-        <button type="button" className="button button--primary" onClick={() => onGo(`${game.path}?mode=pvp`)}>
+      {game.play === 'pvp' && onFriends && (
+        <button type="button" className="button button--primary" onClick={onFriends}>
           친구랑 하기
         </button>
       )}
@@ -114,7 +117,7 @@ export function MainPage({ nickname }: { nickname: string }) {
           <p className="hero__desc">
             {hero.description} · {hero.players}
           </p>
-          <PlayButtons game={hero} onGo={(path) => go(hero, path)} />
+          <PlayButtons game={hero} onGo={(path) => go(hero, path)} onFriends={() => setSheet({ kind: 'game', game: hero })} />
         </div>
       </section>
 
@@ -171,8 +174,26 @@ export function MainPage({ nickname }: { nickname: string }) {
                   <span className={`card__players card__players--${sizeOf(sheet.game)}`}>{sheet.game.players}</span>
                 </div>
                 <p className="game-sheet__desc">{sheet.game.description}</p>
-                <p className="game-sheet__modes">{sheet.game.play === 'pvp' ? '친구 대전 · 봇 대전' : '혼자 기록 도전 · 랭킹'}</p>
-                <PlayButtons game={sheet.game} onGo={(path) => go(sheet.game, path)} />
+                {sheet.game.play === 'pvp' ? (
+                  <>
+                    <section className="game-sheet__rooms" aria-label="친구랑 하기">
+                      <h3 className="game-sheet__label">친구랑 하기</h3>
+                      <RoomPicker
+                        gameId={sheet.game.id}
+                        nickname={nickname}
+                        onCreate={(name, pin) => go(sheet.game, pvpLink(sheet.game.path, { kind: 'create', name, pin }))}
+                        onJoin={(r, pin) => go(sheet.game, pvpLink(sheet.game.path, { kind: 'join', room: r, pin }))}
+                      />
+                    </section>
+                    <h3 className="game-sheet__label">혼자 연습</h3>
+                    <PlayButtons game={sheet.game} onGo={(path) => go(sheet.game, path)} />
+                  </>
+                ) : (
+                  <>
+                    <p className="game-sheet__modes">혼자 기록 도전 · 랭킹</p>
+                    <PlayButtons game={sheet.game} onGo={(path) => go(sheet.game, path)} />
+                  </>
+                )}
               </div>
             ) : (
               <div className="me-sheet">
