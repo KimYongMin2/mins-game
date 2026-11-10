@@ -647,3 +647,242 @@
 .nb-mark--o {
   background: #fca5a5;
 }
+
+/* ===== 디자인 (사용자 요청 — 흰 바탕 선만 있던 화면을 야구장 느낌으로) =====
+   위쪽 야구장 띠(하늘·외야 펜스·잔디) 양쪽 끝에 3D 동물(shared/art3d/DuelStrip3D), 결과는 야구공 불빛,
+   기록표는 크림색 기록지, 입력 칸은 실밥 있는 야구공, 키패드는 눌리는 둥근 버튼. 판정 색은 그대로 S 노랑 · B 초록 · OUT 빨강 */
+.nb-stage {
+  position: relative;
+}
+.nb-stage--3d {
+  min-height: 92px;
+  display: flex;
+  align-items: center;
+  border: 2px solid var(--line);
+  border-radius: 14px;
+  overflow: hidden;
+  background:
+    linear-gradient(180deg, transparent 58%, #facc15 58% 60%, #166534 60% 74%, #4ade80 74% 76%, #22c55e 76%),
+    repeating-linear-gradient(90deg, transparent 0 22px, rgba(255, 255, 255, 0.08) 22px 44px),
+    linear-gradient(180deg, #7dd3fc, #e0f2fe);
+}
+.nb-stage--3d .nb-hud {
+  position: relative;
+  width: 100%;
+  padding: 6px 8px;
+}
+.nb-hud--3d {
+  padding-inline: 19% !important;
+}
+.nb-hud--3d.nb-hud--solo {
+  padding-right: 8px !important;
+}
+.nb-hud--3d .nb-score,
+.nb-hud--3d .nb-turn {
+  background: rgba(255, 255, 255, 0.88);
+  border-radius: 12px;
+}
+.nb-hud--3d .nb-turn {
+  padding: 2px 8px;
+}
+.nb-players3d {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+/* 방금 부른 결과: 말풍선 카드 */
+.nb-flash {
+  min-height: 60px;
+  border: 0;
+  background: #fff;
+  box-shadow: 0 2px 0 #e5e7eb, 0 4px 14px rgba(15, 23, 42, 0.08);
+  border-radius: 16px;
+}
+.nb-flash--on {
+  border: 0;
+  box-shadow: 0 0 0 2px var(--line), 0 4px 14px rgba(15, 23, 42, 0.12);
+}
+.nb-flash--solved {
+  background: linear-gradient(135deg, #fff7d1, #ffe9a8);
+  box-shadow: 0 0 0 2px #f59e0b, 0 0 18px rgba(245, 158, 11, 0.45);
+}
+.nb-flash__who {
+  font-size: 1.0625rem;
+  color: var(--ink);
+}
+
+/* 판정 불빛 = 야구공 (켜지면 색이 차고 빛남) */
+.nb-lamp {
+  position: relative;
+  width: 16px;
+  height: 16px;
+  border: 0;
+  background: radial-gradient(circle at 35% 30%, #fff, #e5e7eb 75%);
+  box-shadow: inset 0 -1px 2px rgba(0, 0, 0, 0.15);
+}
+.nb-lamp--s.nb-lamp--on {
+  background: radial-gradient(circle at 35% 30%, #fff7c2, #facc15 60%, #ca8a04);
+  box-shadow: 0 0 8px rgba(250, 204, 21, 0.8);
+}
+.nb-lamp--b.nb-lamp--on {
+  background: radial-gradient(circle at 35% 30%, #d9fbe5, #22c55e 60%, #15803d);
+  box-shadow: 0 0 8px rgba(34, 197, 94, 0.7);
+}
+.nb-lamp--o.nb-lamp--on {
+  background: radial-gradient(circle at 35% 30%, #ffe1e1, #ef4444 60%, #b91c1c);
+  box-shadow: 0 0 8px rgba(239, 68, 68, 0.7);
+}
+.nb-lamps__row b {
+  font-size: 0.8125rem;
+  font-weight: 900;
+}
+
+/* 기록표: 크림색 기록지, 머리는 빨간 띠 */
+.nb-table {
+  border: 2px solid var(--line);
+  border-radius: 14px;
+  background:
+    repeating-linear-gradient(180deg, transparent 0 35px, rgba(180, 130, 70, 0.14) 35px 36px),
+    #fffaf0;
+}
+.nb-table__head {
+  background: #b91c1c;
+  border-bottom: 0;
+}
+.nb-table__title,
+.nb-table__title--active,
+.nb-table__sub {
+  color: #fff;
+}
+.nb-table__sub {
+  opacity: 0.85;
+}
+.nb-table__title--active::after,
+.nb-table--cols2 .nb-table__title--active:last-child::after {
+  background: #fde047;
+}
+.nb-trow {
+  min-height: 36px;
+}
+.nb-trow__n {
+  font-weight: 800;
+  color: #b45309;
+}
+.nb-cell__digits {
+  color: #1e293b;
+}
+.nb-mark {
+  padding: 1px 6px;
+  border-radius: 999px;
+  font-size: 0.875rem;
+  font-weight: 900;
+}
+.nb-cell--solved {
+  background: #fde68a;
+}
+
+/* 내 숫자 정하기 안내 카드 */
+.nb-setup {
+  border: 0;
+  background: #fff;
+  border-radius: 16px;
+  box-shadow: 0 2px 0 #e5e7eb, 0 4px 14px rgba(15, 23, 42, 0.08);
+}
+
+/* 입력 칸 = 실밥 있는 야구공 */
+.nb-slot {
+  position: relative;
+  width: 56px;
+  height: 56px;
+  overflow: hidden;
+  border: 2px solid #1f2937;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #fff, #f3f1ea 70%, #ddd8cb);
+  color: #1e293b;
+}
+.nb-slot::before,
+.nb-slot::after {
+  content: '';
+  position: absolute;
+  top: -10%;
+  width: 70%;
+  height: 120%;
+  border-radius: 50%;
+  border: 2px dashed #dc2626;
+  pointer-events: none;
+}
+.nb-slot::before {
+  left: -48%;
+}
+.nb-slot::after {
+  right: -48%;
+}
+.nb-slot--next {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.3);
+  animation: nb-bob 1s ease-in-out infinite;
+}
+@keyframes nb-bob {
+  50% {
+    transform: translateY(-3px);
+  }
+}
+
+/* 키패드: 눌리는 둥근 버튼 */
+.nb-key {
+  min-height: 50px;
+  border: 0;
+  border-radius: 14px;
+  background: linear-gradient(180deg, #ffffff, #f1f5f9);
+  box-shadow:
+    0 0 0 2px #1f2937,
+    0 4px 0 #1f2937;
+  transition: transform 0.05s, box-shadow 0.05s;
+}
+.nb-key:active:not(:disabled) {
+  transform: translateY(3px);
+  box-shadow:
+    0 0 0 2px #1f2937,
+    0 1px 0 #1f2937;
+}
+.nb-key:disabled {
+  background: #f8fafc;
+  box-shadow:
+    0 0 0 2px #d1d5db,
+    0 2px 0 #d1d5db;
+}
+.nb-key--back {
+  background: linear-gradient(180deg, #fff7ed, #ffedd5);
+}
+.nb-key--go {
+  color: #fff;
+  background: linear-gradient(180deg, #ef4444, #dc2626);
+  box-shadow:
+    0 0 0 2px #7f1d1d,
+    0 4px 0 #7f1d1d;
+}
+.nb-key--go::before {
+  content: '⚾ ';
+}
+.nb-key--go:active:not(:disabled) {
+  box-shadow:
+    0 0 0 2px #7f1d1d,
+    0 1px 0 #7f1d1d;
+}
+.nb-key--go:disabled {
+  color: #fff;
+  background: #d1d5db;
+  box-shadow:
+    0 0 0 2px #cbd5e1,
+    0 2px 0 #cbd5e1;
+}
+.nb-keypad {
+  gap: 8px;
+  padding-bottom: 4px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .nb-slot--next {
+    animation: none;
+  }
+}

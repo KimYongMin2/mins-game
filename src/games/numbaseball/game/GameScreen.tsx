@@ -1,4 +1,8 @@
-import { useEffect, useReducer, useRef, useState } from 'react'
+import { Suspense, lazy, useEffect, useReducer, useRef, useState } from 'react'
+import { type Look, opponentLook, plainLook } from '../../../shared/art3d/animalKinds'
+import type { Reaction } from '../../../shared/art3d/DuelStrip3D'
+import { canWebGL } from '../../../shared/art3d/webgl'
+import { loadLook } from '../../../shared/storage/avatar'
 import type { Room } from '../../../shared/online/room'
 import { randomSeed } from '../../../shared/random'
 import { loadNickname } from '../../../shared/storage/nickname'
@@ -9,12 +13,41 @@ import { type Digits, type Score, isSolved, scoreText } from '../rules/numbers'
 import { playSound } from '../sounds'
 import { Keypad } from './Keypad'
 
+// 위쪽 야구장 띠의 3D 동물 (WebGL이 안 되면 글자만). three.js는 이때만 불러온다
+const DuelStrip3D = lazy(() => import('../../../shared/art3d/DuelStrip3D').then((m) => ({ default: m.DuelStrip3D })))
+
+/** 나 = 고른 캐릭터, 상대 = 친구가 고른 캐릭터 (봇·안 고름이면 겹치지 않는 다른 동물). 혼자 하기는 나만 */
+function nbLooks(solo: boolean, peerAvatar?: string): Look[] {
+  const mine = loadLook() ?? plainLook('bear')
+  return solo ? [mine] : [mine, opponentLook(mine.animal, peerAvatar, 6)]
+}
+
+/** 장면마다 반응: 부르는 쪽 손 들기, 결과가 나오면 정답 만세 · OUT 놀람 · S/B 웃음, 끝나면 만세 / 눈 ✕ */
+function reactionsOf(state: MatchState): Reaction[] {
+  const { phase, turn } = state
+  const solved = (side: Side) => {
+    const g = state.guesses[side].at(-1)
+    return !!g?.score && isSolved(g.score, state.length)
+  }
+  const pair = (mine: Reaction, other: Reaction): Reaction[] => (turn === 0 ? [mine, other] : [other, mine])
+  if (phase.kind === 'done') return phase.winner === 'draw' ? ['wait', 'wait'] : phase.winner === 0 ? ['win', 'lose'] : ['lose', 'win']
+  if (phase.kind === 'setup') return [state.locked[0] ? 'okay' : 'turn', state.locked[1] ? 'okay' : 'turn']
+  if (phase.kind === 'result') {
+    const g = state.guesses[turn].at(-1)
+    if (!g?.score) return pair('turn', 'wait')
+    if (solved(turn)) return pair('good', 'bad')
+    return pair(g.score.strike + g.score.ball === 0 ? 'bad' : 'okay', 'wait')
+  }
+  if (phase.kind === 'intro') return ['wait', 'wait']
+  return pair('turn', 'wait')
+}
+
 type Props = {
   mode: Mode
   difficulty: Difficulty
   length: Length
   /** 친구 대전이면 방, 상대 이름, 방장이 정한 선공 (나 = 0) */
-  pvp?: { room: Room<NumbaseballMsg>; peerName: string; first: Side }
+  pvp?: { room: Room<NumbaseballMsg>; peerName: string; peerAvatar?: string; first: Side }
   onFinish: (summary: MatchSummary) => void
   /** 친구 대전 중 상대가 나갔을 때 '나가기' */
   onQuit?: () => void
@@ -146,6 +179,10 @@ export function GameScreen({ mode, difficulty, length, pvp, onFinish, onQuit }: 
   const [peerGone, setPeerGone] = useState(false)
   const done = state.phase.kind === 'done'
   const solo = mode === 'solo'
+  const [use3D] = useState(canWebGL)
+  const [looks] = useState(() => nbLooks(solo, pvp?.peerAvatar))
+  /** 3D 동물이 그려지기 시작하면 점수 글자를 동물 안쪽으로 */
+  const [figures, setFigures] = useState(false)
 
   // 친구 대전: 받은 메시지를 경기에 넣고, 상대가 나가면 알린다
   useEffect(() => {
@@ -225,7 +262,13 @@ export function GameScreen({ mode, difficulty, length, pvp, onFinish, onQuit }: 
 
   return (
     <div className="nb-game">
-      <div className="nb-hud">
+      <div className={`nb-stage${use3D ? ' nb-stage--3d' : ''}`}>
+      {use3D && (
+        <Suspense fallback={null}>
+          <DuelStrip3D className="nb-players3d" looks={looks} reactions={reactionsOf(state)} onReady={() => setFigures(true)} />
+        </Suspense>
+      )}
+      <div className={`nb-hud${figures ? ' nb-hud--3d' : ''}${solo ? ' nb-hud--solo' : ''}`}>
         <div className={`nb-score nb-score--me${state.turn === 0 && !done && !setup ? ' nb-score--active' : ''}`}>
           <span className="nb-score__name">{me}</span>
           <strong>
@@ -245,6 +288,7 @@ export function GameScreen({ mode, difficulty, length, pvp, onFinish, onQuit }: 
         ) : (
           <span />
         )}
+      </div>
       </div>
 
       <div className="nb-timer" aria-hidden>
