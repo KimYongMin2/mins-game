@@ -243,14 +243,18 @@ export function Stadium3D(props: Props) {
     const batPivot = new THREE.Group()
     batPivot.position.set(0, 1.45, 0.35)
     batter.body.add(batPivot)
-    const bat = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.035, 1.25, 14), new THREE.MeshStandardMaterial({ color: '#c8955a', roughness: 0.45 }))
-    bat.position.y = 0.55
+    const bat = new THREE.Mesh(new THREE.CylinderGeometry(0.085, 0.04, 1.35, 14), new THREE.MeshStandardMaterial({ color: '#c8955a', roughness: 0.45 }))
+    bat.position.y = 0.6
     bat.castShadow = true
     batPivot.add(bat)
     const UP = new THREE.Vector3(0, 1, 0)
-    const READY = new THREE.Vector3(-0.45, 0.85, -0.25).normalize()
-    const HIT = new THREE.Vector3(0.05, 0.1, 1).normalize()
-    const FOLLOW = new THREE.Vector3(0.85, 0.4, -0.35).normalize()
+    // 방향은 타자 몸 기준. 타자가 홈 쪽을 보면 몸의 +x가 우타는 포수 쪽, 좌타는 투수 쪽이라 swingSign으로 맞춘다
+    // (처음엔 부호가 반대라 방망이가 몸 뒤에 숨어 안 보이다가 투수 반대쪽으로 휘둘렀음)
+    const swingSign = side < 0 ? 1 : -1
+    // 준비: 뒤쪽 어깨 위로 세워 포수 쪽으로 · 맞히는 순간: 홈 위로 수평 · 마무리: 투수 쪽으로 감아 돌림
+    const READY = new THREE.Vector3(0.2 * swingSign, 0.95, 0.35).normalize()
+    const HIT = new THREE.Vector3(-0.05 * swingSign, 0.1, 1).normalize()
+    const FOLLOW = new THREE.Vector3(-0.85 * swingSign, 0.4, -0.35).normalize()
     const qa = new THREE.Quaternion()
     const qb = new THREE.Quaternion()
 
@@ -300,10 +304,11 @@ export function Stadium3D(props: Props) {
       }
       const prog = p.swing ? p.swing.progress : -1
       if (prog < 0) {
-        batter.body.rotation.y = -0.35 + Math.sin(t * 3) * 0.03
+        batter.body.rotation.y = swingSign * 0.35 + Math.sin(t * 3) * 0.03
         batPivot.quaternion.setFromUnitVectors(UP, READY)
       } else {
-        batter.body.rotation.y = -0.35 + Math.min(1, prog * 1.6) * 1.7
+        // 몸을 투수 쪽으로 열며 돈다
+        batter.body.rotation.y = swingSign * (0.35 - Math.min(1, prog * 1.6) * 1.7)
         if (prog < 0.25) {
           qa.setFromUnitVectors(UP, READY)
           qb.setFromUnitVectors(UP, HIT)
