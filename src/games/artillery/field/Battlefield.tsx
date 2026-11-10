@@ -22,6 +22,8 @@ const sy = (y: number) => WORLD_H - y
 
 /** 예상 궤적: 처음 조금만 (바람 빼고) */
 const GUIDE_S = 0.45
+/** 예상 궤적은 늘 이 힘으로 그린다 (사용자 요청 — 지난번 힘으로 그렸더니 약하게 쏜 다음 차례엔 점선이 거의 안 보였음) */
+const GUIDE_POWER = 70
 /** 폭발이 커지는·사라지는 시간 */
 const BLAST_GROW_MS = 320
 const BLAST_FADE_MS = 750
@@ -151,7 +153,7 @@ export function Battlefield({ screen, riders = false }: Props) {
   const shake = shakeOf(screen)
 
   const theme = THEMES[v.land?.theme ?? 'grass']
-  const guide = canAim(screen) && screen.draft ? guidePoints(v.terrain, screen.draft.x, screen.draft.angle, screen.draft.power) : []
+  const guide = canAim(screen) && screen.draft ? guidePoints(v.terrain, screen.draft.x, screen.draft.angle, GUIDE_POWER) : []
 
   return (
     <svg
