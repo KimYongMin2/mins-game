@@ -17,7 +17,11 @@ const clean = (x: string | null, max: number) => (x ?? '').replace(/[\u0000-\u00
 
 /** 주소에 담긴 방 만들기·들어가기 (없으면 목록). 읽기만 한다 */
 export function readPvpEntry(): PvpEntry | null {
-  const q = params()
+  return parsePvpEntry(params())
+}
+
+/** 주소 꼬리 → 할 일 (테스트용으로 따로) */
+export function parsePvpEntry(q: URLSearchParams): PvpEntry | null {
   if (q.get('mode') !== 'pvp') return null
   const pin = /^\d{4}$/.test(q.get('pin') ?? '') ? q.get('pin') : null
   if (q.get('create') === '1') return { kind: 'create', name: clean(q.get('name'), 20) || '방', pin }

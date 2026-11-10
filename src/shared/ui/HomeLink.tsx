@@ -24,9 +24,14 @@ export function goHome(navigate: NavigateFunction): void {
   } catch {
     from = null
   }
-  // (라우터의 기록 번호는 메인을 처음 연 뒤 0부터라 믿을 수 없어서, 메인이 남긴 표시만 본다)
-  if (from === window.location.pathname && window.history.length > 1) navigate(-1)
+  if (homeMove(from, window.location.pathname, window.history.length) === 'back') navigate(-1)
   else navigate('/', { replace: true })
+}
+
+/** 메인에서 들어온 그 게임이면 기록을 되돌아가고, 아니면 지금 기록을 메인으로 바꾼다
+ *  (라우터의 기록 번호는 메인을 처음 연 뒤 0부터라 믿을 수 없어서, 메인이 남긴 표시만 본다) */
+export function homeMove(from: string | null, pathname: string, historyLength: number): 'back' | 'replace' {
+  return from === pathname && historyLength > 1 ? 'back' : 'replace'
 }
 
 export function HomeLink({ className, children }: { className?: string; children: ReactNode }) {

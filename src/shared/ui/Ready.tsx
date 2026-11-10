@@ -24,9 +24,14 @@ export function useMembersReady(room: ReadyRoom | null): { all: boolean; ready: 
     if (!room) return
     return room.onMembers(setMembers)
   }, [room])
+  return { ...readyCount(members), members }
+}
+
+/** 방장 빼고 친구들이 몇 명 준비했는지와 모두 준비했는지 (봇은 사람 목록에 없어 늘 준비로 침) */
+export function readyCount(members: readonly Pick<Member, 'role' | 'ready'>[]): { all: boolean; ready: number; total: number } {
   const guests = members.filter((m) => m.role === 'guest')
   const ready = guests.filter((m) => m.ready).length
-  return { all: ready === guests.length, ready, total: guests.length, members }
+  return { all: ready === guests.length, ready, total: guests.length }
 }
 
 /** 친구 쪽 [준비] / [준비 취소] 버튼 */
