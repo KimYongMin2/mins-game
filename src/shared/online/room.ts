@@ -37,7 +37,7 @@ export function normalizeCode(input: string): string | null {
   return [...code].every((c) => CODE_CHARS.includes(c)) ? code : null
 }
 
-type Meta = { role: RoomRole; nickname: string; /** 들어온 시각 (먼저 온 사람이 자리를 가진다) */ joinedAt: number; avatar?: string; /** 친구가 [준비]를 눌렀는지 */ ready?: boolean }
+type Meta = { role: RoomRole; nickname: string; /** 들어온 시각 (먼저 온 사람이 자리를 가진다) */ joinedAt: number; avatar?: string; /** 친구가 [준비]를 눌렀는지 */ ready?: boolean; /** 준비를 바꾼 시각 (보낸 사람 시계) */ readyAt?: number }
 
 type Other = Meta & { key: string }
 
@@ -197,13 +197,32 @@ async function open<M>(gameId: string, code: string, meta: Meta, { capacity = 2,
   channel.on('broadcast', { event: 'msg' }, ({ payload }) => {
     for (const fn of messageFns) fn(payload as M)
   })
+  // 준비 신호: presence는 반영까지 1~2초 걸려서, 준비를 바꾸면 방 메시지('ready' 이벤트, 게임 메시지와 따로)로도 바로 보낸다.
+  // 사람마다 둘 중 최신(보낸 사람 시계로 바꾼 시각이 늦은 것)을 쓴다
+  let lastOthers: Other[] = []
+  const readySignals = new Map<string, { ready: boolean; at: number }>()
+  const readyOf = (o: Other) => {
+    const sig = readySignals.get(o.key)
+    return sig && sig.at >= (o.readyAt ?? 0) ? sig.ready : o.ready === true
+  }
+  channel.on('broadcast', { event: 'ready' }, ({ payload }) => {
+    const p = payload as { from?: unknown; ready?: unknown; at?: unknown }
+    if (typeof p.from !== 'string' || typeof p.ready !== 'boolean' || typeof p.at !== 'number' || !Number.isFinite(p.at)) return
+    readySignals.set(p.from, { ready: p.ready, at: p.at })
+    publish()
+  })
   channel.on('presence', { event: 'sync' }, () => {
-    const others = othersIn(channel.presenceState<Meta>(), myKey)
-    const next = others[0]
-      ? { nickname: others[0].nickname, ...(typeof others[0].avatar === 'string' ? { avatar: others[0].avatar.slice(0, 48) } : {}), ...(others[0].ready === true ? { ready: true } : {}) }
-      : null
+    lastOthers = othersIn(channel.presenceState<Meta>(), myKey)
     synced = true
     syncWaiters.splice(0).forEach((w) => w())
+    publish()
+    updateListing()
+  })
+  function publish() {
+    const others = lastOthers
+    const next = others[0]
+      ? { nickname: others[0].nickname, ...(typeof others[0].avatar === 'string' ? { avatar: others[0].avatar.slice(0, 48) } : {}), ...(readyOf(others[0]) ? { ready: true } : {}) }
+      : null
     if ((next === null) !== (peer === null) || next?.nickname !== peer?.nickname || next?.avatar !== peer?.avatar || next?.ready !== peer?.ready) {
       peer = next
       for (const fn of peerFns) fn(peer)
@@ -213,14 +232,13 @@ async function open<M>(gameId: string, code: string, meta: Meta, { capacity = 2,
       nickname: o.nickname,
       role: o.role,
       ...(typeof o.avatar === 'string' ? { avatar: o.avatar.slice(0, 48) } : {}),
-      ...(o.ready === true ? { ready: true } : {}),
+      ...(readyOf(o) ? { ready: true } : {}),
     }))
     if (JSON.stringify(nextMembers) !== JSON.stringify(members)) {
       members = nextMembers
       for (const fn of memberFns) fn(members)
     }
-    updateListing()
-  })
+  }
 
   try {
     await subscribe(channel, meta)
@@ -271,7 +289,9 @@ async function open<M>(gameId: string, code: string, meta: Meta, { capacity = 2,
       if (meta.role !== 'guest' || !!meta.ready === ready) return
       // meta는 다시 붙을 때 다시 보내는 것과 같은 객체라 고쳐 두면 그대로 간다
       meta.ready = ready
+      meta.readyAt = Date.now()
       void channel.track(meta)
+      void channel.send({ type: 'broadcast', event: 'ready', payload: { from: myKey, ready, at: meta.readyAt } })
     },
     setPlaying(playing) {
       if (!advert || !listed || listed.playing === playing) return
