@@ -1,7 +1,13 @@
-import { useEffect, useReducer, useRef } from 'react'
+import { Suspense, lazy, useEffect, useReducer, useRef, useState } from 'react'
 import { randomSeed } from '../../../shared/random'
 import { AUTO_RELEASE_MS, ROUNDS, SHOT_CLOCK_WARN_MS, TOTAL_ARROWS } from '../constants'
 import { SideView } from '../field/SideView'
+import { plainLook } from '../../../shared/art3d/animalKinds'
+import { canWebGL } from '../../../shared/art3d/webgl'
+import { loadLook } from '../../../shared/storage/avatar'
+
+// 실사풍 3D 사로 (위쪽 띠). three.js는 이때만 불러온다, 불러오는 동안·WebGL이 안 되면 예전 선화
+const Range3D = lazy(() => import('../field/Range3D').then((m) => ({ default: m.Range3D })))
 import { TargetView } from '../field/TargetView'
 import { viewHalfSize } from '../field/view'
 import { useBowControls } from '../input/useBowControls'
@@ -126,6 +132,8 @@ export function GameScreen({ onFinish }: Props) {
   const distance = currentDistance(state)
   const done = state.phase.kind === 'done'
   const wrapRef = useRef<HTMLDivElement>(null)
+  const [use3D] = useState(canWebGL)
+  const [look] = useState(() => loadLook() ?? plainLook('bear'))
 
   const { pointerHandlers, heldArrows } = useBowControls({
     onPress: () => dispatch({ type: 'press', at: performance.now() }),
@@ -193,6 +201,8 @@ export function GameScreen({ onFinish }: Props) {
     phase.kind === 'flying' && phase.shot.impact
       ? { to: phase.shot.impact, progress: (now - phase.startAt) / (phase.until - phase.startAt) }
       : null
+  const sideDraw = phase.kind === 'drawing' ? drawProgress(holdMsOf(state)) : 0
+  const sideArrow = flying ? Math.min(flying.progress, 1) : null
   const clock = shotClockLeft(state)
   const tier = WIND_TIERS[state.wind.tier]
 
@@ -207,11 +217,13 @@ export function GameScreen({ onFinish }: Props) {
         </span>
       </div>
 
-      <SideView
-        distance={distance}
-        draw={phase.kind === 'drawing' ? drawProgress(holdMsOf(state)) : 0}
-        arrowProgress={flying ? Math.min(flying.progress, 1) : null}
-      />
+      {use3D ? (
+        <Suspense fallback={<SideView distance={distance} draw={sideDraw} arrowProgress={sideArrow} />}>
+          <Range3D distance={distance} draw={sideDraw} arrowProgress={sideArrow} look={look} />
+        </Suspense>
+      ) : (
+        <SideView distance={distance} draw={sideDraw} arrowProgress={sideArrow} />
+      )}
 
       <div className="ar-target-wrap ar-target-wrap--game" ref={wrapRef} {...pointerHandlers}>
         <TargetView

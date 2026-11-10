@@ -113,7 +113,7 @@ describe('팀전', () => {
       expect(w).not.toBeNull()
       teams.forEach((t, i) => t !== w && expect(s.tanks[i].alive).toBe(false))
     }
-  })
+  }, 20_000) // 봇끼리 끝까지 6판이라 오래 걸림 (지형 종류를 늘린 뒤 한꺼번에 돌리면 5초를 넘기기도 함)
 })
 
 describe('팀전 같은 팀 공격', () => {
