@@ -426,13 +426,13 @@
   display: flex;
   flex-direction: column;
   padding: 10px 4px;
-  border: 2px solid var(--line);
+  border: 1px solid var(--hair-strong);
   border-radius: 6px;
 }
 
 .ar-start__rounds strong {
   font-size: 1.25rem;
-  font-weight: 900;
+  font-weight: 800;
 }
 
 .ar-start__rounds span {
@@ -451,7 +451,7 @@
   display: flex;
   flex-direction: column;
   padding: 12px;
-  border: 1.5px solid var(--muted-line);
+  border: 1px solid var(--hair);
   border-radius: 6px;
 }
 
@@ -463,7 +463,7 @@
 .ar-start__record dd {
   margin: 0;
   font-size: 1.5rem;
-  font-weight: 900;
+  font-weight: 800;
   font-variant-numeric: tabular-nums;
 }
 
@@ -497,14 +497,14 @@
   align-items: center;
   gap: 2px;
   padding: 16px;
-  border: 2px solid var(--line);
+  border: 1px solid var(--hair-strong);
   border-radius: 6px;
   font-variant-numeric: tabular-nums;
 }
 
 .ar-result__headline strong {
   font-size: 3rem;
-  font-weight: 900;
+  font-weight: 800;
   line-height: 1.1;
 }
 
@@ -554,7 +554,7 @@
   padding: 0 2px;
   text-align: center;
   font-weight: 800;
-  border: 1.5px solid var(--muted-line);
+  border: 1px solid var(--hair);
   border-radius: 6px;
 }
 
@@ -570,7 +570,7 @@
 .ar-result__sub {
   width: 3em;
   text-align: right;
-  font-weight: 900;
+  font-weight: 800;
   font-size: 1.125rem;
 }
 

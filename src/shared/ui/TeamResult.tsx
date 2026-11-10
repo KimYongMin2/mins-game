@@ -20,7 +20,7 @@ export function TeamResult({ outcome, detail }: { outcome: TeamOutcome; detail?:
           <div key={t} className={`team-result__team${t === winner ? ' team-result__team--win' : ''}`} style={{ borderColor: TEAM_COLORS[t] }}>
             <strong style={{ color: TEAM_COLORS[t] }}>
               {TEAM_NAMES[t]}
-              {t === winner ? ' 🏆' : ''}
+              {t === winner ? ' · 승리' : ''}
             </strong>
             <ul>
               {members

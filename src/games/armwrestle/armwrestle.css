@@ -448,7 +448,7 @@
   list-style: none;
   text-align: left;
   font-size: 0.875rem;
-  border: 1.5px solid var(--muted-line);
+  border: 1px solid var(--hair);
   border-radius: 6px;
   display: grid;
   gap: 4px;
@@ -470,13 +470,14 @@
 }
 
 .aw-start__option--on {
-  border-color: var(--line);
-  box-shadow: 3px 3px 0 var(--line);
+  border-color: var(--ink);
+  background: var(--raised);
+  box-shadow: none;
 }
 
 .aw-start__name {
   font-size: 1.25rem;
-  font-weight: 900;
+  font-weight: 800;
 }
 
 .aw-start__desc {
@@ -496,7 +497,7 @@
   display: flex;
   flex-direction: column;
   padding: 12px;
-  border: 1.5px solid var(--muted-line);
+  border: 1px solid var(--hair);
   border-radius: 6px;
 }
 
@@ -508,7 +509,7 @@
 .aw-start__record dd {
   margin: 0;
   font-size: 1.25rem;
-  font-weight: 900;
+  font-weight: 800;
   font-variant-numeric: tabular-nums;
 }
 
@@ -537,14 +538,14 @@
   align-items: center;
   gap: 4px;
   padding: 20px 16px;
-  border: 2px solid var(--line);
+  border: 1px solid var(--hair-strong);
   border-radius: 6px;
   text-align: center;
 }
 
 .aw-result__headline strong {
   font-size: 3rem;
-  font-weight: 900;
+  font-weight: 800;
   line-height: 1.1;
 }
 

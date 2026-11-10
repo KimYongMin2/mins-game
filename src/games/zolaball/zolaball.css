@@ -415,12 +415,12 @@
 }
 
 .zb-menu__option:hover {
-  box-shadow: 4px 4px 0 var(--line);
+  box-shadow: none;
 }
 
 .zb-menu__label {
   font-size: 1.5rem;
-  font-weight: 900;
+  font-weight: 800;
 }
 
 .zb-menu__desc {
@@ -455,14 +455,14 @@
   align-items: center;
   gap: 2px;
   padding: 16px;
-  border: 2px solid var(--line);
+  border: 1px solid var(--hair-strong);
   border-radius: 6px;
   font-variant-numeric: tabular-nums;
 }
 
 .zb-result__headline strong {
   font-size: 2.25rem;
-  font-weight: 900;
+  font-weight: 800;
   line-height: 1.2;
 }
 
@@ -802,13 +802,13 @@
   align-items: center;
   gap: 4px;
   padding: 20px 16px;
-  border: 2px solid var(--line);
+  border: 1px solid var(--hair-strong);
   border-radius: 6px;
 }
 
 .zb-pvp-result__headline strong {
   font-size: 3rem;
-  font-weight: 900;
+  font-weight: 800;
   line-height: 1.1;
 }
 

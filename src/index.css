@@ -1092,6 +1092,9 @@ p {
 }
 
 .room-pick__name {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;

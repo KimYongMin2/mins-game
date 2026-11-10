@@ -67,8 +67,8 @@ function RoomList({ gameId, onJoin, onCreate, error }: { gameId: string; onJoin:
                 }}
               >
                 <span className="room-pick__name">
-                  {r.locked && '🔒 '}
                   {r.name}
+                  {r.locked && <span className="open-rooms__lock">비공개</span>}
                 </span>
                 <span className="room-pick__count">{r.playing ? '게임 중' : r.count >= r.capacity ? '가득' : `${r.count}/${r.capacity}명`}</span>
               </button>
@@ -135,7 +135,7 @@ function CreateForm({ nickname, onCreate, onBack }: { nickname: string; onCreate
               className={`button${locked === v ? ' button--primary' : ''}`}
               onClick={() => setLocked(v)}
             >
-              {v ? '🔒 비공개' : '전체 공개'}
+              {v ? '비공개' : '전체 공개'}
             </button>
           ))}
         </div>
@@ -175,7 +175,7 @@ export function RoomBadge({ name, pin }: { name: string; pin: string | null }) {
       <span className="pvp-lobby__label">
         {pin ? (
           <>
-            🔒 비공개 · 코드 <b className="room-pick__pin">{pin}</b> — 친구에게 코드를 알려 주세요
+            비공개 · 코드 <b className="room-pick__pin">{pin}</b> — 친구에게 코드를 알려 주세요
           </>
         ) : (
           '전체 공개 — 친구가 목록에서 눌러 들어와요'
