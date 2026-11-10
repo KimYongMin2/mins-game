@@ -3,6 +3,7 @@ import { type ListedRoom, type Member, type Room, RoomError, channelCode, create
 import { encodeLook } from '../art3d/animalKinds'
 import { loadLook } from '../storage/avatar'
 import { TEAM_COLORS, TEAM_NAMES, type Team, type TeamPick, assignTeams, teamsReady } from '../team/teams'
+import { ReadyButton } from './Ready'
 import { RoomBadge, RoomPicker } from './RoomPicker'
 
 // 여럿이 하는 게임의 대기실: 열린 방 목록에서 고르거나 방 만들기(이름 · 전체 공개 / 비공개 코드) → 모인 사람 목록.
@@ -133,6 +134,10 @@ export function GroupLobby<M>({ gameId, nickname, capacity, minPlayers, teams: c
       )
     }
     const ready = !teamOf || teamsReady(teamOf)
+    // 준비 (사용자 요청): 친구가 모두 [준비]해야 방장이 시작할 수 있다. 봇은 늘 준비
+    const guests = members.filter((m) => m.role === 'guest')
+    const readyCount = guests.filter((m) => m.ready).length
+    const allReady = readyCount === guests.length
     return (
       <section className="pvp-lobby">
         <RoomBadge name={view.name} pin={view.pin} />
@@ -151,6 +156,7 @@ export function GroupLobby<M>({ gameId, nickname, capacity, minPlayers, teams: c
               <span className="group-lobby__name">
                 {m.nickname} {m.role === 'host' && <span>(방장)</span>}
               </span>
+              {m.role === 'guest' && <span className={`group-lobby__ready${m.ready ? ' group-lobby__ready--on' : ''}`}>{m.ready ? '✅ 준비' : '준비 중'}</span>}
               {teamChip(1 + i)}
             </li>
           ))}
@@ -201,7 +207,7 @@ export function GroupLobby<M>({ gameId, nickname, capacity, minPlayers, teams: c
                 +
               </button>
             </div>
-            <button type="button" className="button button--primary pvp-lobby__big" disabled={count < minPlayers || !ready} onClick={() => {
+            <button type="button" className="button button--primary pvp-lobby__big" disabled={count < minPlayers || !ready || !allReady} onClick={() => {
                 room.setPlaying(true)
                 onStart(members, bots, teamOf ? Object.fromEntries(ids.map((id, k) => [id, teamOf[k]])) : null, !!teamOf && canFriendlyFire && friendlyFire)
               }}>
@@ -209,11 +215,13 @@ export function GroupLobby<M>({ gameId, nickname, capacity, minPlayers, teams: c
                 ? `${minPlayers}명부터 시작할 수 있어요`
                 : !ready
                   ? '두 팀에 한 명 이상씩 있어야 해요'
-                  : `${count}명으로 ${teamOf ? '팀전 ' : ''}시작${bots > 0 ? ` (봇 ${bots})` : ''}`}
+                  : !allReady
+                    ? `친구들이 준비하길 기다려요 (${readyCount}/${guests.length})`
+                    : `${count}명으로 ${teamOf ? '팀전 ' : ''}시작${bots > 0 ? ` (봇 ${bots})` : ''}`}
             </button>
           </>
         ) : (
-          <p className="pvp-lobby__status">{hostGone ? '방장이 나갔어요' : '방장이 시작하길 기다리는 중…'}</p>
+          hostGone ? <p className="pvp-lobby__status">방장이 나갔어요</p> : <ReadyButton room={room} />
         )}
         <button type="button" className="button button--small pvp-lobby__back" onClick={leave}>
           나가기

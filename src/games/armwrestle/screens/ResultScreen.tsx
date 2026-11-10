@@ -1,8 +1,13 @@
+import type { ReactNode } from 'react'
 import { DIFFICULTY_LABEL, EVENT_LABEL } from '../constants'
 import type { MatchSummary } from '../play/matchState'
 import { type ArmRecord, winRate } from '../records'
 
 type Props = {
+  /** 친구 대전 다시 하기 전 준비 (친구 [준비] 버튼 / 방장 쪽 준비 상태). 있으면 '방장이 다시 하기를…' 안내 대신 */
+  readySlot?: ReactNode
+  /** 방장: 친구가 아직 준비 안 했으면 다시 하기를 못 누름 */
+  retryLocked?: boolean
   summary: MatchSummary
   record: ArmRecord
   /** 친구 대전이면 상대 이름 */
@@ -15,7 +20,7 @@ type Props = {
 }
 
 /** 결과 화면 (봇 대전·친구 대전 같이 씀) */
-export function ResultScreen({ summary, record, peerName, isHost = true, peerGone = false, onRetry, onMenu }: Props) {
+export function ResultScreen({ summary, record, peerName, isHost = true, peerGone = false, onRetry, readySlot, retryLocked = false, onMenu }: Props) {
   const pvp = summary.mode === 'pvp'
   const level = record[summary.event][summary.difficulty]
   const rate = winRate(level)
@@ -43,12 +48,12 @@ export function ResultScreen({ summary, record, peerName, isHost = true, peerGon
         (peerGone ? (
           <p className="aw-result__note">{peerName}님이 나갔어요</p>
         ) : (
-          !isHost && <p className="aw-result__note">방장이 다시 하기를 누르면 바로 시작해요</p>
+          (readySlot ?? (!isHost && <p className="aw-result__note">방장이 다시 하기를 누르면 바로 시작해요</p>))
         ))}
 
       <div className="aw-result__buttons">
         {isHost && (
-          <button type="button" className="button button--primary" onClick={onRetry} disabled={peerGone}>
+          <button type="button" className="button button--primary" onClick={onRetry} disabled={peerGone || retryLocked}>
             다시 하기
           </button>
         )}

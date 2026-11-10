@@ -5,6 +5,7 @@ import type { Member, Room } from '../../shared/online/room'
 import { loadNickname } from '../../shared/storage/nickname'
 import type { TeamPick } from '../../shared/team/teams'
 import { GroupLobby } from '../../shared/ui/GroupLobby'
+import { RematchReady } from '../../shared/ui/Ready'
 import { SoundToggle } from '../../shared/ui/SoundToggle'
 import { MAX_PLAYERS, MIN_PLAYERS } from './constants'
 import { GameScreen } from './game/GameScreen'
@@ -91,6 +92,10 @@ export function SurvivalPage() {
 
   const inGame = screen.kind === 'bot-game' || screen.kind === 'pvp-game'
   const isHost = room?.role === 'host'
+  // 다시 하기 전 준비 (사용자 요청): 방에 있는 친구가 모두 [준비]해야 방장이 다시 하기
+  const friendGuests = members.filter((m) => m.role === 'guest')
+  const readyCount = friendGuests.filter((m) => m.ready).length
+  const allReady = readyCount === friendGuests.length
 
   return (
     <main className="page sv-page">
@@ -148,10 +153,16 @@ export function SurvivalPage() {
           summary={screen.summary}
           record={record}
           isHost={screen.summary.mode === 'bot' || isHost}
+          retryLocked={screen.summary.mode === 'pvp' && !allReady}
+          readySlot={
+            screen.summary.mode === 'pvp' && room ? (
+              <RematchReady room={room} allReady={allReady} waitText={`친구들이 준비하길 기다려요 (${readyCount}/${friendGuests.length})`} />
+            ) : undefined
+          }
           canRetry={screen.summary.mode === 'bot' || Math.min(MAX_PLAYERS, members.length + 1 + pvpBots) >= MIN_PLAYERS}
           onRetry={() => {
             if (screen.summary.mode === 'bot') setScreen({ kind: 'bot-game', key: Date.now() })
-            else if (room) startPvp(room, members, pvpBots, pvpTeams)
+            else if (room && allReady) startPvp(room, members, pvpBots, pvpTeams)
           }}
           onMenu={screen.summary.mode === 'pvp' ? leaveRoom : toStart}
         />

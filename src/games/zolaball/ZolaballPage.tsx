@@ -4,6 +4,7 @@ import { installAudioUnlock } from '../../shared/audio/synth'
 import type { Peer, Room } from '../../shared/online/room'
 import { loadNickname } from '../../shared/storage/nickname'
 import { PvpLobby } from '../../shared/ui/PvpLobby'
+import { DuelReadyRoom, RematchReady, usePeerReady } from '../../shared/ui/Ready'
 import { SoundToggle } from '../../shared/ui/SoundToggle'
 import { MatchScreen } from './match/MatchScreen'
 import type { MatchConfig, MatchSummary } from './match/matchState'
@@ -44,6 +45,11 @@ export function ZolaballPage() {
   const [record, setRecord] = useState<ZolaballRecord>(() => loadRecord())
   const [upload, setUpload] = useState<UploadStatus>('saving')
   const [pvp, setPvp] = useState<Pvp | null>(null)
+  // 친구 대전 준비 (사용자 요청): 친구가 [준비]해야 방장이 [게임 시작]·[다시 하기]를 누를 수 있다
+  const peerReady = usePeerReady(pvp?.room ?? null)
+  /** 방장: [게임 시작]을 눌렀는지 · 친구 화면이 듣고 있는지('ready' 메시지를 받았는지) */
+  const goRef = useRef(false)
+  const listeningRef = useRef(false)
   const [peerGone, setPeerGone] = useState(false)
   useEffect(installAudioUnlock, [])
   // 지난번에 못 올린 기록이 있으면 다시 보낸다.
@@ -84,7 +90,10 @@ export function ZolaballPage() {
       if (room.role === 'guest' && msg.t === 'start') {
         setScreen({ kind: 'pvp-match', config: pvpConfig(msg.guestSide), key: Date.now() })
       }
-      if (room.role === 'host' && msg.t === 'ready' && screenRef.current.kind === 'pvp-wait') startPvp(room)
+      if (room.role === 'host' && msg.t === 'ready' && screenRef.current.kind === 'pvp-wait') {
+        listeningRef.current = true
+        if (goRef.current) startPvp(room)
+      }
     })
     const offPeer = room.onPeer((peer) => setPeerGone(!peer))
     return () => {
@@ -118,11 +127,14 @@ export function ZolaballPage() {
   function connected(room: Room<BaseballMsg>, peer: Peer) {
     setPvp({ room, peer })
     setPeerGone(false)
+    goRef.current = false
+    listeningRef.current = false
     setScreen({ kind: 'pvp-wait' })
   }
 
   /** 방장: 선공·후공을 무작위로 정해 알리고 시작 */
   function startPvp(room: Room<BaseballMsg>) {
+    goRef.current = false
     const hostSide: Side = Math.random() < 0.5 ? 'away' : 'home'
     room.send({ t: 'start', guestSide: otherSide(hostSide) })
     setScreen({ kind: 'pvp-match', config: pvpConfig(hostSide), key: Date.now() })
@@ -188,10 +200,16 @@ export function ZolaballPage() {
             </button>
           </div>
         ) : (
-          <p className="zb-pvp-wait">
-            {pvp.room.role === 'host' ? `${pvp.peer.nickname}님이 들어왔어요` : `${pvp.peer.nickname}님 방에 들어왔어요`}. 곧
-            시작해요…
-          </p>
+          <DuelReadyRoom
+            room={pvp.room}
+            me={loadNickname() ?? '나'}
+            peer={pvp.peer.nickname}
+            peerReady={peerReady}
+            onStart={() => {
+              goRef.current = true
+              if (listeningRef.current) startPvp(pvp.room)
+            }}
+          />
         )
       )}
       {screen.kind === 'pvp-match' && pvp && (
@@ -210,7 +228,9 @@ export function ZolaballPage() {
           peerName={pvp.peer.nickname}
           isHost={pvp.room.role === 'host'}
           peerGone={peerGone}
-          onRetry={() => startPvp(pvp.room)}
+          onRetry={() => peerReady && startPvp(pvp.room)}
+          retryLocked={!peerReady}
+          readySlot={<RematchReady room={pvp.room} allReady={peerReady} waitText={`${pvp.peer.nickname}님이 준비하길 기다려요`} />}
           onLeave={leavePvp}
         />
       )}

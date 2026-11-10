@@ -5,6 +5,7 @@ import { withDirectLink } from '../../shared/online/directLink'
 import type { Peer, Room } from '../../shared/online/room'
 import { loadNickname } from '../../shared/storage/nickname'
 import { PvpLobby } from '../../shared/ui/PvpLobby'
+import { DuelReadyRoom, RematchReady, usePeerReady } from '../../shared/ui/Ready'
 import { SoundToggle } from '../../shared/ui/SoundToggle'
 import { GameScreen } from './game/GameScreen'
 import type { Event } from './constants'
@@ -38,6 +39,11 @@ export function ArmwrestlePage() {
   const [screen, setScreen] = useState<Screen>({ kind: 'start' })
   const [record, setRecord] = useState<ArmRecord>(() => loadRecord())
   const [pvp, setPvp] = useState<Pvp | null>(null)
+  // 친구 대전 준비 (사용자 요청): 친구가 [준비]해야 방장이 [게임 시작]·[다시 하기]를 누를 수 있다
+  const peerReady = usePeerReady(pvp?.room ?? null)
+  /** 방장: [게임 시작]을 눌렀는지 · 친구 화면이 듣고 있는지('ready' 메시지를 받았는지) */
+  const goRef = useRef(false)
+  const listeningRef = useRef(false)
   const [peerGone, setPeerGone] = useState(false)
   useEffect(installAudioUnlock, [])
 
@@ -70,7 +76,10 @@ export function ArmwrestlePage() {
       if (room.role === 'guest' && msg.t === 'start') {
         setScreen({ kind: 'pvp-game', key: Date.now(), event: msg.event })
       }
-      if (room.role === 'host' && msg.t === 'ready' && screenRef.current.kind === 'pvp-wait') startPvp(room)
+      if (room.role === 'host' && msg.t === 'ready' && screenRef.current.kind === 'pvp-wait') {
+        listeningRef.current = true
+        if (goRef.current) startPvp(room)
+      }
     })
     const offPeer = room.onPeer((peer) => setPeerGone(!peer))
     return () => {
@@ -100,11 +109,14 @@ export function ArmwrestlePage() {
     // 되도록 기기끼리 직접 (WebRTC). 친구가 누른 게 방장에게 빨리 가야 공평해서
     setPvp({ room: withDirectLink(room), peer })
     setPeerGone(false)
+    goRef.current = false
+    listeningRef.current = false
     setScreen({ kind: 'pvp-wait' })
   }
 
   /** 방장: 내가 고른 종목으로 친구와 시작 */
   function startPvp(room: Room<ArmMsg>) {
+    goRef.current = false
     const { event } = recordRef.current
     room.send({ t: 'start', event })
     setScreen({ kind: 'pvp-game', key: Date.now(), event })
@@ -158,10 +170,16 @@ export function ArmwrestlePage() {
             </button>
           </div>
         ) : (
-          <p className="aw-pvp-wait">
-            {pvp.room.role === 'host' ? `${pvp.peer.nickname}님이 들어왔어요` : `${pvp.peer.nickname}님 방에 들어왔어요`}. 곧
-            시작해요…
-          </p>
+          <DuelReadyRoom
+            room={pvp.room}
+            me={loadNickname() ?? '나'}
+            peer={pvp.peer.nickname}
+            peerReady={peerReady}
+            onStart={() => {
+              goRef.current = true
+              if (listeningRef.current) startPvp(pvp.room)
+            }}
+          />
         ))}
       {screen.kind === 'pvp-game' && pvp && (
         <GameScreen
@@ -180,7 +198,9 @@ export function ArmwrestlePage() {
           peerName={pvp.peer.nickname}
           isHost={pvp.room.role === 'host'}
           peerGone={peerGone}
-          onRetry={() => startPvp(pvp.room)}
+          onRetry={() => peerReady && startPvp(pvp.room)}
+          retryLocked={!peerReady}
+          readySlot={<RematchReady room={pvp.room} allReady={peerReady} waitText={`${pvp.peer.nickname}님이 준비하길 기다려요`} />}
           onMenu={leavePvp}
         />
       )}

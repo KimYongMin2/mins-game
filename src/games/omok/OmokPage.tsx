@@ -4,6 +4,7 @@ import { installAudioUnlock } from '../../shared/audio/synth'
 import type { Peer, Room } from '../../shared/online/room'
 import { loadNickname } from '../../shared/storage/nickname'
 import { PvpLobby } from '../../shared/ui/PvpLobby'
+import { DuelReadyRoom, RematchReady, usePeerReady } from '../../shared/ui/Ready'
 import { SoundToggle } from '../../shared/ui/SoundToggle'
 import { GameScreen } from './game/GameScreen'
 import type { Card, MatchSummary, Side } from './play/matchState'
@@ -32,6 +33,11 @@ export function OmokPage() {
   const [screen, setScreen] = useState<Screen>({ kind: 'start' })
   const [record, setRecord] = useState<OmokRecord>(() => loadRecord())
   const [pvp, setPvp] = useState<Pvp | null>(null)
+  // 친구 대전 준비 (사용자 요청): 친구가 [준비]해야 방장이 [게임 시작]·[다시 하기]를 누를 수 있다
+  const peerReady = usePeerReady(pvp?.room ?? null)
+  /** 방장: [게임 시작]을 눌렀는지 · 친구 화면이 듣고 있는지('ready' 메시지를 받았는지) */
+  const goRef = useRef(false)
+  const listeningRef = useRef(false)
   const [peerGone, setPeerGone] = useState(false)
   useEffect(installAudioUnlock, [])
 
@@ -62,7 +68,10 @@ export function OmokPage() {
       if (room.role === 'guest' && msg.t === 'start') {
         setScreen({ kind: 'pvp-game', key: Date.now(), picker: pickerOf(msg, 'guest'), blackCard: msg.blackCard })
       }
-      if (room.role === 'host' && msg.t === 'ready' && screenRef.current.kind === 'pvp-wait') startPvp(room)
+      if (room.role === 'host' && msg.t === 'ready' && screenRef.current.kind === 'pvp-wait') {
+        listeningRef.current = true
+        if (goRef.current) startPvp(room)
+      }
     })
     const offPeer = room.onPeer((peer) => setPeerGone(!peer))
     return () => {
@@ -91,11 +100,14 @@ export function OmokPage() {
   function connected(room: Room<OmokMsg>, peer: Peer) {
     setPvp({ room, peer })
     setPeerGone(false)
+    goRef.current = false
+    listeningRef.current = false
     setScreen({ kind: 'pvp-wait' })
   }
 
   /** 방장: 누가 카드를 고를지와 흑 카드를 무작위로 정해 친구에게 보내고 시작 */
   function startPvp(room: Room<OmokMsg>) {
+    goRef.current = false
     const msg = { t: 'start', guestPicks: Math.random() < 0.5, blackCard: Math.random() < 0.5 ? 0 : 1 } as const
     room.send(msg)
     setScreen({ kind: 'pvp-game', key: Date.now(), picker: pickerOf(msg, 'host'), blackCard: msg.blackCard })
@@ -146,10 +158,16 @@ export function OmokPage() {
             </button>
           </div>
         ) : (
-          <p className="om-pvp-wait">
-            {pvp.room.role === 'host' ? `${pvp.peer.nickname}님이 들어왔어요` : `${pvp.peer.nickname}님 방에 들어왔어요`}. 곧
-            시작해요…
-          </p>
+          <DuelReadyRoom
+            room={pvp.room}
+            me={loadNickname() ?? '나'}
+            peer={pvp.peer.nickname}
+            peerReady={peerReady}
+            onStart={() => {
+              goRef.current = true
+              if (listeningRef.current) startPvp(pvp.room)
+            }}
+          />
         ))}
       {screen.kind === 'pvp-game' && pvp && (
         <GameScreen
@@ -168,7 +186,9 @@ export function OmokPage() {
           peerName={pvp.peer.nickname}
           isHost={pvp.room.role === 'host'}
           peerGone={peerGone}
-          onRetry={() => startPvp(pvp.room)}
+          onRetry={() => peerReady && startPvp(pvp.room)}
+          retryLocked={!peerReady}
+          readySlot={<RematchReady room={pvp.room} allReady={peerReady} waitText={`${pvp.peer.nickname}님이 준비하길 기다려요`} />}
           onMenu={leavePvp}
         />
       )}

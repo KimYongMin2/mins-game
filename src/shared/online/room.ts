@@ -10,11 +10,12 @@ import { getRealtimeClient } from './supabase'
 export type RoomRole = 'host' | 'guest'
 
 /** avatar = 상대가 고른 캐릭터 글자 (자기 신고라 쓰는 쪽에서 decodeLook으로 검사) */
-export type Peer = { nickname: string; avatar?: string }
+/** ready = 친구가 [준비]를 눌렀는지 (방장은 준비 없음, 게임 시작만) */
+export type Peer = { nickname: string; avatar?: string; ready?: boolean }
 
 /** 방에 있는 사람 (나 빼고). id는 방 안에서만 쓰는 접속 번호 */
 /** avatar = 그 사람이 고른 캐릭터 (자기 신고라 쓰는 쪽에서 검사) */
-export type Member = { id: string; nickname: string; role: RoomRole; avatar?: string }
+export type Member = { id: string; nickname: string; role: RoomRole; avatar?: string; ready?: boolean }
 
 /** 헷갈리는 글자(0·O·1·I·L)는 뺀다 */
 const CODE_CHARS = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'
@@ -36,7 +37,7 @@ export function normalizeCode(input: string): string | null {
   return [...code].every((c) => CODE_CHARS.includes(c)) ? code : null
 }
 
-type Meta = { role: RoomRole; nickname: string; /** 들어온 시각 (먼저 온 사람이 자리를 가진다) */ joinedAt: number; avatar?: string }
+type Meta = { role: RoomRole; nickname: string; /** 들어온 시각 (먼저 온 사람이 자리를 가진다) */ joinedAt: number; avatar?: string; /** 친구가 [준비]를 눌렀는지 */ ready?: boolean }
 
 type Other = Meta & { key: string }
 
@@ -112,6 +113,8 @@ export interface Room<M> {
   onMembers(fn: (members: Member[]) => void): () => void
   /** 방 목록에 '게임 중'으로 표시 (목록에 올린 방만, 방장만) */
   setPlaying(playing: boolean): void
+  /** 친구: 준비했는지 사람 목록(presence)으로 알린다 (사용자 요청 — 모두 준비해야 방장이 시작). 다시 붙을 때도 그대로 */
+  setReady(ready: boolean): void
   leave(): void
 }
 
@@ -196,14 +199,22 @@ async function open<M>(gameId: string, code: string, meta: Meta, { capacity = 2,
   })
   channel.on('presence', { event: 'sync' }, () => {
     const others = othersIn(channel.presenceState<Meta>(), myKey)
-    const next = others[0] ? { nickname: others[0].nickname, ...(typeof others[0].avatar === 'string' ? { avatar: others[0].avatar.slice(0, 48) } : {}) } : null
+    const next = others[0]
+      ? { nickname: others[0].nickname, ...(typeof others[0].avatar === 'string' ? { avatar: others[0].avatar.slice(0, 48) } : {}), ...(others[0].ready === true ? { ready: true } : {}) }
+      : null
     synced = true
     syncWaiters.splice(0).forEach((w) => w())
-    if ((next === null) !== (peer === null) || next?.nickname !== peer?.nickname || next?.avatar !== peer?.avatar) {
+    if ((next === null) !== (peer === null) || next?.nickname !== peer?.nickname || next?.avatar !== peer?.avatar || next?.ready !== peer?.ready) {
       peer = next
       for (const fn of peerFns) fn(peer)
     }
-    const nextMembers = others.map((o) => ({ id: o.key, nickname: o.nickname, role: o.role, ...(typeof o.avatar === 'string' ? { avatar: o.avatar.slice(0, 48) } : {}) }))
+    const nextMembers = others.map((o) => ({
+      id: o.key,
+      nickname: o.nickname,
+      role: o.role,
+      ...(typeof o.avatar === 'string' ? { avatar: o.avatar.slice(0, 48) } : {}),
+      ...(o.ready === true ? { ready: true } : {}),
+    }))
     if (JSON.stringify(nextMembers) !== JSON.stringify(members)) {
       members = nextMembers
       for (const fn of memberFns) fn(members)
@@ -255,6 +266,12 @@ async function open<M>(gameId: string, code: string, meta: Meta, { capacity = 2,
         if (memberFns.has(fn)) fn(members)
       })
       return () => memberFns.delete(fn)
+    },
+    setReady(ready) {
+      if (meta.role !== 'guest' || !!meta.ready === ready) return
+      // meta는 다시 붙을 때 다시 보내는 것과 같은 객체라 고쳐 두면 그대로 간다
+      meta.ready = ready
+      void channel.track(meta)
     },
     setPlaying(playing) {
       if (!advert || !listed || listed.playing === playing) return

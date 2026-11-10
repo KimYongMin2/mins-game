@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import type { GameSummary, NunchiRecord } from '../records'
 import { TeamResult } from '../../../shared/ui/TeamResult'
 
@@ -8,12 +9,16 @@ type Props = {
   isHost: boolean
   /** 친구 대전에서 사람이 모자라면 다시 못 함 */
   canRetry: boolean
+  /** 친구 대전: 친구가 모두 준비하기 전엔 다시 하기를 못 누름 */
+  retryLocked?: boolean
+  /** 친구 대전 다시 하기 전 준비 (친구 [준비] 버튼 / 방장 쪽 준비 상태) */
+  readySlot?: ReactNode
   onRetry: () => void
   onMenu: () => void
 }
 
 /** 결과: 순위표 (같은 판에 탈락하면 같은 등수) */
-export function ResultScreen({ summary, record, isHost, canRetry, onRetry, onMenu }: Props) {
+export function ResultScreen({ summary, record, isHost, canRetry, retryLocked = false, readySlot, onRetry, onMenu }: Props) {
   const pvp = summary.mode === 'pvp'
   const t = record[summary.mode]
   const myName = summary.ranking.find((r) => r.rank === summary.rank)
@@ -41,11 +46,11 @@ export function ResultScreen({ summary, record, isHost, canRetry, onRetry, onMen
       <p className="nc-result__career">
         {pvp ? '친구 대전' : '봇 연습'} {t.games}판 · 우승 {t.wins}번
       </p>
-      {pvp && !isHost && <p className="nc-result__note">방장이 다시 하기를 누르면 바로 시작해요</p>}
+      {pvp && (readySlot ?? (!isHost && <p className="nc-result__note">방장이 다시 하기를 누르면 바로 시작해요</p>))}
 
       <div className="nc-result__buttons">
         {isHost && (
-          <button type="button" className="button button--primary" onClick={onRetry} disabled={!canRetry}>
+          <button type="button" className="button button--primary" onClick={onRetry} disabled={!canRetry || retryLocked}>
             {canRetry ? '다시 하기' : '사람이 모자라요'}
           </button>
         )}
