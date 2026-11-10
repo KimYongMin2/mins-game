@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router'
 import { clearPvpEntry, readPvpEntry } from '../nav'
+import { goHome } from './HomeLink'
 import { type ListedRoom, type Peer, type Room, RoomError, channelCode, createRoom, joinRoom, makeRoomCode } from '../online/room'
 import { RoomBadge, RoomPicker } from './RoomPicker'
 import { encodeLook } from '../art3d/animalKinds'
@@ -74,7 +75,7 @@ export function PvpLobby<M>({ gameId, nickname, onConnected, onBack }: Props<M>)
     else if (entry.kind === 'join') void join(entry.room as ListedRoom, entry.pin)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
-  const goBack = () => (entry ? navigate('/') : onBack())
+  const goBack = () => (entry ? goHome(navigate) : onBack())
 
   function fail(e: unknown, wrongPin = false) {
     if (!(e instanceof RoomError)) console.warn('[room] 방 접속 오류', e)

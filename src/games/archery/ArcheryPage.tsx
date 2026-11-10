@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Link } from 'react-router'
+import { HomeLink } from '../../shared/ui/HomeLink'
 import { installAudioUnlock } from '../../shared/audio/synth'
 import type { UploadStatus } from '../../shared/online/uploadQueue'
 import { loadNickname } from '../../shared/storage/nickname'
@@ -59,9 +59,9 @@ export function ArcheryPage() {
             그만하기
           </button>
         ) : (
-          <Link className="button button--small" to="/">
+          <HomeLink className="button button--small">
             나가기
-          </Link>
+          </HomeLink>
         )}
       </header>
 

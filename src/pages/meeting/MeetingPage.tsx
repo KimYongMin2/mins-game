@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Link } from 'react-router'
+import { HomeLink } from '../../shared/ui/HomeLink'
 import { levelContext, watchLevel } from '../../shared/call/level'
 import { LISTEN_VOLUME, Speaker } from '../../shared/call/speaker'
 import { DEFAULT_VOICE_SETTINGS, MIC_VOLUME, VoiceChanger, type VoiceSettings } from '../../shared/call/voiceFx'
@@ -609,9 +609,9 @@ export function MeetingPage() {
   return (
     <main className="page">
       <header className="meet__header">
-        <Link className="button button--small" to="/">
+        <HomeLink className="button button--small">
           ← 목록
-        </Link>
+        </HomeLink>
         <h1 className="title">회의방</h1>
       </header>
 

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Link } from 'react-router'
+import { HomeLink } from '../../shared/ui/HomeLink'
 import { wantsPvp } from '../../shared/nav'
 import { installAudioUnlock } from '../../shared/audio/synth'
 import type { Peer, Room } from '../../shared/online/room'
@@ -138,9 +138,9 @@ export function NumbaseballPage() {
             그만하기
           </button>
         ) : (
-          <Link className="button button--small" to="/">
+          <HomeLink className="button button--small">
             나가기
-          </Link>
+          </HomeLink>
         )}
       </header>
 

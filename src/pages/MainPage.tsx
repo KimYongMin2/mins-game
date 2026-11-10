@@ -6,6 +6,7 @@ import { readLocal, writeLocal } from '../shared/storage/local'
 import { loadRecent, pushRecent } from '../shared/storage/recent'
 import { pvpLink } from '../shared/nav'
 import { AvatarEditor } from '../shared/ui/AvatarPicker'
+import { markFromHome } from '../shared/ui/HomeLink'
 import { RoomPicker } from '../shared/ui/RoomPicker'
 import { GAMES, type GameEntry } from './gameList'
 
@@ -67,7 +68,31 @@ export function MainPage({ nickname }: { nickname: string }) {
   const navigate = useNavigate()
   const [filter, setFilter] = useState<Filter>(() => asFilter(readLocal('lobby-filter')))
   const [look, setLook] = useState<Look | null>(loadLook)
-  const [sheet, setSheet] = useState<{ kind: 'game'; game: GameEntry } | { kind: 'me' } | null>(null)
+  const [sheet, setSheetState] = useState<{ kind: 'game'; game: GameEntry } | { kind: 'me' } | null>(null)
+  // 창을 열면 기록을 하나 쌓아서, 폰 백키·브라우저 뒤로 가기는 창만 닫는다 (사용자 요청 — 백키가 이전 게임·대기실로 갔음)
+  type Sheet = typeof sheet
+  const setSheet = (next: Sheet) => {
+    const marked = !!(window.history.state as { sheet?: boolean } | null)?.sheet
+    if (next && !marked) window.history.pushState({ ...window.history.state, sheet: true }, '')
+    if (!next && marked) {
+      window.history.back() // popstate에서 닫힌다
+      return
+    }
+    setSheetState(next)
+  }
+  useEffect(() => {
+    // 창이 열린 채 새로 고침했으면 남은 표시를 지운다 (안 그러면 닫을 때 다른 페이지로 되돌아감)
+    if ((window.history.state as { sheet?: boolean } | null)?.sheet) {
+      const { sheet: _drop, ...rest } = window.history.state as Record<string, unknown>
+      void _drop
+      window.history.replaceState(rest, '')
+    }
+    const onPop = () => {
+      if (!(window.history.state as { sheet?: boolean } | null)?.sheet) setSheetState(null)
+    }
+    window.addEventListener('popstate', onPop)
+    return () => window.removeEventListener('popstate', onPop)
+  }, [])
   const [recent] = useState(loadRecent)
   useEffect(() => writeLocal('lobby-filter', filter), [filter])
 
@@ -86,7 +111,9 @@ export function MainPage({ nickname }: { nickname: string }) {
 
   const go = (game: GameEntry, path: string) => {
     pushRecent(game.id)
-    navigate(path)
+    markFromHome(path)
+    // 창이 열려 있으면 창 기록을 게임으로 바꾼다 (게임에서 돌아오면 바로 메인)
+    navigate(path, { replace: !!(window.history.state as { sheet?: boolean } | null)?.sheet })
   }
   const last = READY.find((g) => g.id === recent[0])
   const hero = last ?? todaysPick()
