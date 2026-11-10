@@ -48,6 +48,11 @@ export class VoiceMesh {
   private retries = new Map<string, number>()
   /** 방 목록에 뜨기 전에 온 연결 요청 */
   private pendingOffers = new Map<string, { sdp: string; at: number }>()
+  /**
+   * 아직 연결(link)이 없는 사람에게서 온 연결 경로 정보(ICE 후보). 방 목록에 뜨기 전에 온 요청을 들고 있는 동안
+   * 같이 온 후보도 들고 있다가, 요청을 받을 때 넣는다 (처음엔 버려서 첫 연결이 실패하고 몇 번 다시 시도한 뒤에야 이어졌음)
+   */
+  private earlyIce = new Map<string, RTCIceCandidateInit[]>()
   private closed = false
   private opts: Options
 
@@ -70,7 +75,10 @@ export class VoiceMesh {
     for (const id of ids) if (!this.links.has(id) && offersTo(this.opts.myId, id)) void this.offer(id)
     // 방 목록에 뜨기 전에 먼저 온 연결 요청 (막 들어온 사람): 이제 목록에 있으면 받는다
     for (const [id, p] of [...this.pendingOffers]) {
-      if (Date.now() - p.at > PENDING_OFFER_MS) this.pendingOffers.delete(id)
+      if (Date.now() - p.at > PENDING_OFFER_MS) {
+        this.pendingOffers.delete(id)
+        this.earlyIce.delete(id)
+      }
       else if (ids.includes(id)) {
         this.pendingOffers.delete(id)
         void this.answer(id, p.sdp)
@@ -114,6 +122,8 @@ export class VoiceMesh {
       return
     }
     if (msg.t === 'offer') {
+      // 새 요청이면 그 뒤에 오는 후보만 이 요청 것
+      this.earlyIce.set(msg.from, [])
       // 보안: 방 사람 목록(presence)에 없는 사람의 요청엔 응답하지 않는다 (목록에 안 보이게 붙어 몰래 듣는 것 막기).
       // 막 들어와 아직 목록에 안 뜬 사람일 수 있어 잠깐 들고 있다가 목록에 뜨면 받는다
       if (!this.members.includes(msg.from)) {
@@ -234,6 +244,9 @@ export class VoiceMesh {
   private async answer(id: string, sdp: string) {
     const l = this.link(id)
     const { pc } = l
+    // 요청을 들고 있는 동안 먼저 온 후보를 넣을 준비
+    l.pendingIce.push(...(this.earlyIce.get(id) ?? []))
+    this.earlyIce.delete(id)
     try {
       await pc.setRemoteDescription({ type: 'offer', sdp })
       await this.remoteReady(l)
@@ -269,7 +282,12 @@ export class VoiceMesh {
 
   private async addIce(id: string, candidate: RTCIceCandidateInit) {
     const l = this.links.get(id)
-    if (!l) return
+    if (!l) {
+      // 요청을 들고 있는 사람의 후보면 모아 둔다 (너무 많이는 안 쌓음)
+      const early = this.earlyIce.get(id)
+      if (early && early.length < 60) early.push(candidate)
+      return
+    }
     if (!l.remoteSet) l.pendingIce.push(candidate)
     else await l.pc.addIceCandidate(candidate).catch(() => {})
   }

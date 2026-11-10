@@ -152,6 +152,20 @@ describe('음성 통화 (메시)', () => {
     expect(sent.filter((m) => m.t === 'answer' && m.to === 'spy')).toHaveLength(1)
   })
 
+  it('막 들어와 목록에 뜨기 전에 온 요청의 연결 경로(ICE)도 들고 있다가 받을 때 넣는다 (처음엔 버려서 첫 연결이 실패했음)', async () => {
+    const { meshes } = network(['b'])
+    const b = meshes.get('b')!
+    b.setMembers([])
+    b.receive({ t: 'offer', from: 'new', to: 'b', sdp: 'offer' })
+    b.receive({ t: 'ice', from: 'new', to: 'b', candidate: { candidate: 'c1' } })
+    b.receive({ t: 'ice', from: 'new', to: 'b', candidate: { candidate: 'c2' } })
+    await settle()
+    b.setMembers(['new'])
+    await settle()
+    const pc = (b as unknown as { links: Map<string, { pc: FakePc }> }).links.get('new')!.pc
+    expect(pc.ice).toBe(2)
+  })
+
   it('보안: 이미 잘 이어진 사람 이름으로 온 새 연결 요청은 무시 (사칭해 가로채기 막기)', async () => {
     const { meshes, sent } = network(['a', 'b'])
     meshes.get('a')!.setMembers(['b'])
