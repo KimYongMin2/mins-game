@@ -206,6 +206,14 @@ export function MainPage({ nickname }: { nickname: string }) {
                   <PlayerDots players={sheet.game.players} />
                   <span>{modesOf(sheet.game)}</span>
                 </div>
+                <details className="howto">
+                  <summary className="howto__toggle">조작법</summary>
+                  <ul className="howto__list">
+                    {sheet.game.howto.map((line) => (
+                      <li key={line}>{line}</li>
+                    ))}
+                  </ul>
+                </details>
                 {sheet.game.play === 'pvp' ? (
                   <>
                     <section className="game-sheet__part" aria-label="친구랑 하기">

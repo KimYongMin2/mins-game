@@ -1593,3 +1593,52 @@ p {
   color: var(--brand);
   font-variant-numeric: tabular-nums;
 }
+
+/* 메인 게임 창 [조작법] (누를 때만 펼침) */
+.howto {
+  margin-top: 4px;
+}
+.howto__toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 36px;
+  padding: 0 12px;
+  border: 1px solid var(--hair-strong);
+  border-radius: 6px;
+  background: var(--card);
+  font-size: 0.9375rem;
+  font-weight: 700;
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+}
+.howto__toggle::-webkit-details-marker {
+  display: none;
+}
+.howto__toggle::after {
+  content: '';
+  width: 6px;
+  height: 6px;
+  margin-left: 2px;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: translateY(-2px) rotate(45deg);
+  transition: transform 120ms var(--ease);
+}
+.howto[open] .howto__toggle::after {
+  transform: translateY(1px) rotate(-135deg);
+}
+.howto__list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 8px 0 0;
+  padding: 12px 12px 12px 28px;
+  border: 1px solid var(--hair);
+  border-radius: 6px;
+  background: var(--card);
+  font-size: 0.9375rem;
+  font-weight: 600;
+  line-height: 1.45;
+}

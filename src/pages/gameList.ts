@@ -14,6 +14,8 @@ export type GameEntry = {
   icon: string
   /** 메인 타일 바탕 색 (위 → 아래 그라데이션) */
   colors: readonly [string, string]
+  /** 메인 게임 창의 [조작법] (누를 때만 펼침, 3~4줄 — 규칙 설명이지 규칙을 바꾸는 게 아님) */
+  howto: readonly string[]
 }
 
 export const GAMES: GameEntry[] = [
@@ -27,6 +29,7 @@ export const GAMES: GameEntry[] = [
     players: '2인',
     icon: '⚾',
     colors: ['#4ade80', '#15803d'],
+    howto: ["칠 때: 공이 홈에 닿는 순간 스윙 (PC 스페이스바 · 폰 [스윙])", "던질 때: 구종 1~4와 높이 ↑↓를 고르면 던짐 (5초 넘기면 무작위)", "볼에 휘두르면 헛스윙 · 타이밍이 정확할수록 안타 → 홈런", "2이닝, 점수 많은 쪽 승리 (같으면 무승부)"],
   },
   {
     id: 'volley',
@@ -38,6 +41,7 @@ export const GAMES: GameEntry[] = [
     players: '2인',
     icon: '🏐',
     colors: ['#38bdf8', '#0369a1'],
+    howto: ["PC ← → 이동 · ↑ 점프 · 스페이스 치기 / 폰 왼쪽 방향패드 + [치기]", "공중에서 치기 = 스파이크 (←→ 빠르게 · ↑ 위로 · ↓ 아래로)", "땅에서 방향키 + 치기 = 몸 날리기", "공이 상대 코트에 떨어지면 1점, 15점 먼저"],
   },
   {
     id: 'fight',
@@ -49,6 +53,7 @@ export const GAMES: GameEntry[] = [
     players: '2인',
     icon: '🥊',
     colors: ['#fb7185', '#be123c'],
+    howto: ["2초마다 준비 · 방어 · 타격 · 강타 중 하나를 둘이 동시에 고름", "준비 = 기 +1 · 타격은 기 1개 · 강타는 기 3개", "방어는 타격을 막지만 강타에 뚫림", "생명력 3을 먼저 깎으면 승리"],
   },
   {
     id: 'memory',
@@ -60,6 +65,7 @@ export const GAMES: GameEntry[] = [
     players: '2인',
     icon: '🃏',
     colors: ['#34d399', '#047857'],
+    howto: ["카드를 두 장씩 뒤집어 같은 그림이면 가져가고 한 번 더", "틀리면 다시 덮이고 상대 차례", "한 장에 10초 (넘기면 아무 카드나 열림)", "11쌍 중 더 많이 가져가면 승리"],
   },
   {
     id: 'armwrestle',
@@ -71,6 +77,7 @@ export const GAMES: GameEntry[] = [
     players: '2인',
     icon: '💪',
     colors: ['#fdba74', '#c2410c'],
+    howto: ["연타전: [당기기]를 빠르게 많이 (손가락 하나씩)", "타이밍전: 막대가 노란 과녁에 올 때 누르기 (한 번 지나갈 때 한 번)", "손을 내 쪽 끝까지 당기면 그 판 승리", "3판 2선승, 한 판 15초"],
   },
   {
     id: 'bomb',
@@ -82,6 +89,7 @@ export const GAMES: GameEntry[] = [
     players: '2~8인',
     icon: '💣',
     colors: ['#fcd34d', '#d97706'],
+    howto: ["폭탄을 들면 바로 옆(왼쪽·오른쪽) 사람에게 던지기", "폰은 버튼·옆 사람 누르기 · PC는 ← →", "터질 때 들고 있으면 탈락 (언제 터질지는 아무도 모름)", "마지막까지 남으면 우승"],
   },
   {
     id: 'nunchi',
@@ -93,6 +101,7 @@ export const GAMES: GameEntry[] = [
     players: '3~6인',
     icon: '👀',
     colors: ['#c4b5fd', '#7c3aed'],
+    howto: ["'시작!' 뒤에 원할 때 [외치기] (한 판에 한 번)", "0.3초 안에 둘 이상 겹치면 그 사람들 탈락", "끝까지 버티다 혼자 남아도 탈락 · 10초 안에 안 눌러도 탈락", "둘 남으면 결승 가위바위보"],
   },
   {
     id: 'survival',
@@ -104,6 +113,7 @@ export const GAMES: GameEntry[] = [
     players: '2~8인',
     icon: '⚡',
     colors: ['#fde68a', '#ca8a04'],
+    howto: ["맵을 눌러 숨을 자리 → 총 쏠 방향을 골라 [확정]", "모두 정하면 공개, 레이저가 처음 맞은 사람이 탈락", "모래주머니 벽 뒤는 안전 · 남은 사람이 적으면 맵이 줄어듦", "마지막 한 명이 우승"],
   },
   {
     id: 'roulette',
@@ -115,6 +125,7 @@ export const GAMES: GameEntry[] = [
     players: '2~8인',
     icon: '🔫',
     colors: ['#94a3b8', '#334155'],
+    howto: ["내 차례면 쏠 사람(나도 됨)을 고르고 [방아쇠 당기기]", "빈 칸이면 지목된 사람 차례 · 나를 쐈으면 한 번 더", "맞으면 탈락, 쏜 사람이 계속", "마지막 한 명이 우승"],
   },
   {
     id: 'artillery',
@@ -126,6 +137,7 @@ export const GAMES: GameEntry[] = [
     players: '2~4인',
     icon: '💥',
     colors: ['#bef264', '#4d7c0f'],
+    howto: ["다이얼을 돌려 각도, [꾹 눌러 힘 모으기]를 떼는 순간의 힘으로 발사", "◀ ▶ 로 조금 움직일 수 있음 · PC ←→ 이동 · ↑↓ 각도", "바람 화살표를 보고 겨냥 · 떨어진 자리 근처가 다침", "체력 100, 마지막까지 남으면 우승"],
   },
   {
     id: 'yut',
@@ -137,6 +149,7 @@ export const GAMES: GameEntry[] = [
     players: '2~4인',
     icon: '🪵',
     colors: ['#fbbf24', '#92400e'],
+    howto: ["[윷 던지기] → 결과를 고르고 말을 눌러 갈 칸을 누르기", "윷·모, 상대 말을 잡으면 한 번 더", "꺾이는 칸에 딱 멈추면 지름길 · 내 말끼리 겹치면 업기", "말을 먼저 다 내보내면 우승"],
   },
   {
     id: 'tiles',
@@ -148,6 +161,7 @@ export const GAMES: GameEntry[] = [
     players: '2~4인',
     icon: '🔢',
     colors: ['#93c5fd', '#1d4ed8'],
+    howto: ["같은 색 연속 3장(작은 숫자부터) 또는 같은 숫자 다른 색 3~4장으로 줄 만들기", "처음엔 내 타일로만 합 30 이상 내야 함", "그 뒤엔 바닥 줄을 쪼개고 다시 짜서 끼워 넣기 · 못 내면 1장 가져오기", "손패를 먼저 다 털면 우승"],
   },
   {
     id: 'numbaseball',
@@ -159,6 +173,7 @@ export const GAMES: GameEntry[] = [
     players: '2인',
     icon: '🧮',
     colors: ['#f9a8d4', '#be185d'],
+    howto: ["서로 다른 숫자 3~4개(맨 앞 0 안 됨)로 내 숫자를 숨김", "번갈아 상대 숫자를 불러 S(자리까지)·B(숫자만)·OUT으로 힌트", "한 번에 30초 · 먼저 다 맞히면 승리 (같은 횟수면 무승부)", "키패드나 PC 숫자키 · Enter로 부르기"],
   },
   {
     id: 'omok',
@@ -170,6 +185,7 @@ export const GAMES: GameEntry[] = [
     players: '2인',
     icon: '⚫',
     colors: ['#e9c08a', '#8a5a24'],
+    howto: ["카드로 흑·백을 정하고 흑이 먼저", "자리를 누르고 [착수하기]로 두기 (한 수 30초)", "가로·세로·대각선 다섯 개를 먼저 이으면 승리", "흑은 쌍삼·쌍사·장목 금지 (✕ 표시)"],
   },
   {
     id: 'batting',
@@ -181,6 +197,7 @@ export const GAMES: GameEntry[] = [
     players: '1인',
     icon: '🏟️',
     colors: ['#a5b4fc', '#4338ca'],
+    howto: ["공이 들어올 칸을 타이밍 맞춰 누르기 (공 하나에 한 번)", "맞은 위치와 타이밍으로 비거리가 정해짐", "공 10개, 비거리 합계가 점수", "빨랐어요 / 늦었어요로 감 잡기"],
   },
   {
     id: 'archery',
@@ -192,5 +209,6 @@ export const GAMES: GameEntry[] = [
     players: '1인',
     icon: '🏹',
     colors: ['#fca5a5', '#b91c1c'],
+    howto: ["누른 채로 끌어 조준 → 떼면 발사 (PC 스페이스바 + 방향키)", "바람 방향·세기를 보고 조준을 옮기기", "오래 당기고 있으면 흔들림이 커짐 · 한 발 10초", "30·50·70·100m 10발, 점수 합계"],
   },
 ]
