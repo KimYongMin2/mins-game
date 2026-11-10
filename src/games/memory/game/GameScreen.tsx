@@ -2,7 +2,7 @@ import { Suspense, lazy, useEffect, useReducer, useRef, useState } from 'react'
 import { ANIMAL_EMOJI, type Look, opponentLook, plainLook } from '../../../shared/art3d/animalKinds'
 import { canWebGL } from '../../../shared/art3d/webgl'
 import { loadLook } from '../../../shared/storage/avatar'
-import type { Reaction } from '../field/Players3D'
+import type { Reaction } from '../../../shared/art3d/DuelStrip3D'
 import type { Room } from '../../../shared/online/room'
 import { randomSeed } from '../../../shared/random'
 import { loadNickname } from '../../../shared/storage/nickname'
@@ -13,7 +13,7 @@ import { type MemoryMsg, actionOf, outbox } from '../play/pvp'
 import { playSound } from '../sounds'
 
 // 위쪽 띠의 3D 동물 두 명 (WebGL이 안 되면 글자만). three.js는 이때만 불러온다
-const Players3D = lazy(() => import('../field/Players3D').then((m) => ({ default: m.Players3D })))
+const DuelStrip3D = lazy(() => import('../../../shared/art3d/DuelStrip3D').then((m) => ({ default: m.DuelStrip3D })))
 
 /** 나 = 고른 캐릭터, 상대 = 친구가 고른 캐릭터 (봇·안 고름이면 겹치지 않는 다른 동물) */
 function memoryLooks(peerAvatar?: string): readonly [Look, Look] {
@@ -26,7 +26,7 @@ function reactionsOf(state: MatchState): readonly [Reaction, Reaction] {
   const { phase, turn } = state
   const pick = (mine: Reaction, other: Reaction): [Reaction, Reaction] => (turn === 0 ? [mine, other] : [other, mine])
   if (phase.kind === 'done') return phase.winner === 'draw' ? ['wait', 'wait'] : phase.winner === 0 ? ['win', 'lose'] : ['lose', 'win']
-  if (phase.kind === 'showing') return pick(phase.match ? 'match' : 'miss', 'wait')
+  if (phase.kind === 'showing') return pick(phase.match ? 'good' : 'bad', 'wait')
   return pick('turn', 'wait')
 }
 
@@ -141,7 +141,7 @@ export function GameScreen({ difficulty, pvp, onFinish, onQuit }: Props) {
       <div className={`mm-stage${use3D ? ' mm-stage--3d' : ''}`}>
       {use3D && (
         <Suspense fallback={null}>
-          <Players3D looks={looks} reactions={reactionsOf(state)} onReady={() => setFigures(true)} />
+          <DuelStrip3D className="mm-players3d" looks={looks} reactions={reactionsOf(state)} onReady={() => setFigures(true)} />
         </Suspense>
       )}
       <div className={`mm-hud${figures ? ' mm-hud--3d' : ''}`}>

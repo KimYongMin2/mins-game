@@ -508,3 +508,41 @@
   text-align: center;
   color: var(--ink-soft);
 }
+
+/* 위쪽 띠: 양쪽 끝에 3D 동물 (shared/art3d/DuelStrip3D), 이름·돌 색 글자는 그 안쪽에 겹침. 바둑 두는 방 (다다미·나무 벽) */
+.om-stage {
+  position: relative;
+}
+.om-stage--3d {
+  min-height: 92px;
+  display: flex;
+  align-items: center;
+  border: 2px solid var(--line);
+  border-radius: 14px;
+  overflow: hidden;
+  background:
+    linear-gradient(180deg, transparent 72%, #6b4423 72% 76%, #c9b27a 76%),
+    repeating-linear-gradient(90deg, rgba(120, 72, 30, 0.12) 0 2px, transparent 2px 38px),
+    linear-gradient(180deg, #f3e2bf, #e7cf9c);
+}
+.om-stage--3d .om-hud {
+  position: relative;
+  width: 100%;
+  padding: 6px 8px;
+}
+.om-hud--3d {
+  padding-inline: 19% !important;
+}
+.om-hud--3d .om-score {
+  background: rgba(255, 255, 255, 0.85);
+}
+.om-players3d {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.om-stage--3d ~ .om-board,
+.om-stage--3d ~ * .om-board {
+  max-width: calc(100vh - 292px);
+  max-width: calc(100dvh - 292px);
+}

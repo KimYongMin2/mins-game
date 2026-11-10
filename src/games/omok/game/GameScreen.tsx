@@ -1,4 +1,8 @@
-import { useEffect, useReducer, useRef, useState } from 'react'
+import { Suspense, lazy, useEffect, useReducer, useRef, useState } from 'react'
+import { type Look, opponentLook, plainLook } from '../../../shared/art3d/animalKinds'
+import type { Reaction } from '../../../shared/art3d/DuelStrip3D'
+import { canWebGL } from '../../../shared/art3d/webgl'
+import { loadLook } from '../../../shared/storage/avatar'
 import type { Room } from '../../../shared/online/room'
 import { randomSeed } from '../../../shared/random'
 import { loadNickname } from '../../../shared/storage/nickname'
@@ -9,11 +13,30 @@ import { BLACK, CENTER, EMPTY, forbiddenKind, xyOf } from '../rules/renju'
 import { playSound } from '../sounds'
 import { Board } from './Board'
 
+// 위쪽 띠의 3D 동물 두 명 (WebGL이 안 되면 글자만). three.js는 이때만 불러온다
+const DuelStrip3D = lazy(() => import('../../../shared/art3d/DuelStrip3D').then((m) => ({ default: m.DuelStrip3D })))
+
+/** 나 = 고른 캐릭터, 상대 = 친구가 고른 캐릭터 (봇·안 고름이면 겹치지 않는 다른 동물) */
+function omokLooks(peerAvatar?: string): readonly [Look, Look] {
+  const mine = loadLook() ?? plainLook('bear')
+  return [mine, opponentLook(mine.animal, peerAvatar, 5)]
+}
+
+/** 장면마다 두 사람 반응: 카드 고르는 쪽·두는 쪽은 손 들기, 끝나면 만세 / 눈 ✕ */
+function reactionsOf(state: MatchState): readonly [Reaction, Reaction] {
+  const { phase } = state
+  const who = (side: Side, r: Reaction): [Reaction, Reaction] => (side === 0 ? [r, 'wait'] : ['wait', r])
+  if (phase.kind === 'done') return phase.winner === 'draw' ? ['wait', 'wait'] : phase.winner === 0 ? ['win', 'lose'] : ['lose', 'win']
+  if (phase.kind === 'pick') return who(state.picker, 'turn')
+  if (phase.kind === 'reveal') return who(state.black ?? 0, 'okay')
+  return who(state.turn, 'turn')
+}
+
 type Props = {
   mode: Mode
   difficulty: Difficulty
   /** 친구 대전이면 방, 상대 이름, 방장이 정한 카드 고를 쪽(나 = 0)과 흑 카드 */
-  pvp?: { room: Room<OmokMsg>; peerName: string; picker: Side; blackCard: Card }
+  pvp?: { room: Room<OmokMsg>; peerName: string; peerAvatar?: string; picker: Side; blackCard: Card }
   onFinish: (summary: MatchSummary) => void
   /** 친구 대전 중 상대가 나갔을 때 '나가기' */
   onQuit?: () => void
@@ -96,6 +119,10 @@ export function GameScreen({ mode, difficulty, pvp, onFinish, onQuit }: Props) {
     createMatch({ now: performance.now(), seed: randomSeed(), mode, difficulty, picker: pvp?.picker, blackCard: pvp?.blackCard }),
   )
   const [peerGone, setPeerGone] = useState(false)
+  const [use3D] = useState(canWebGL)
+  const [looks] = useState(() => omokLooks(pvp?.peerAvatar))
+  /** 3D 동물이 그려지기 시작하면 이름 글자를 동물 안쪽으로 */
+  const [figures, setFigures] = useState(false)
   /** 금수 자리를 눌렀을 때 안내 (그 판 상태일 때만 보여줌) */
   const [notice, setNotice] = useState<{ moves: number; text: string } | null>(null)
   const done = state.phase.kind === 'done'
@@ -229,10 +256,17 @@ export function GameScreen({ mode, difficulty, pvp, onFinish, onQuit }: Props) {
 
   return (
     <div className="om-game">
-      <div className="om-hud">
-        {score(0, me)}
-        <TurnInfo state={state} foe={foe} />
-        {score(1, foe)}
+      <div className={`om-stage${use3D ? ' om-stage--3d' : ''}`}>
+        {use3D && (
+          <Suspense fallback={null}>
+            <DuelStrip3D className="om-players3d" looks={looks} reactions={reactionsOf(state)} onReady={() => setFigures(true)} />
+          </Suspense>
+        )}
+        <div className={`om-hud${figures ? ' om-hud--3d' : ''}`}>
+          {score(0, me)}
+          <TurnInfo state={state} foe={foe} />
+          {score(1, foe)}
+        </div>
       </div>
 
       <div className="om-timer" aria-hidden>

@@ -156,7 +156,7 @@ export function OmokPage() {
           key={screen.key}
           mode="pvp"
           difficulty={record.difficulty}
-          pvp={{ room: pvp.room, peerName: pvp.peer.nickname, picker: screen.picker, blackCard: screen.blackCard }}
+          pvp={{ room: pvp.room, peerName: pvp.peer.nickname, peerAvatar: pvp.peer.avatar, picker: screen.picker, blackCard: screen.blackCard }}
           onFinish={finish}
           onQuit={leavePvp}
         />

@@ -165,7 +165,7 @@ export function NumbaseballPage() {
           mode="pvp"
           difficulty={record.difficulty}
           length={screen.length}
-          pvp={{ room: pvp.room, peerName: pvp.peer.nickname, first: screen.first }}
+          pvp={{ room: pvp.room, peerName: pvp.peer.nickname, peerAvatar: pvp.peer.avatar, first: screen.first }}
           onFinish={finish}
           onQuit={leavePvp}
         />

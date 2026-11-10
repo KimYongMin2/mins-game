@@ -1,26 +1,30 @@
 import { useEffect, useRef } from 'react'
 import * as THREE from 'three'
-import type { Look } from '../../../shared/art3d/animalKinds'
-import { type AnimalRig, makeAnimal } from '../../../shared/art3d/animals'
+import type { Look } from './animalKinds'
+import { type AnimalRig, makeAnimal } from './animals'
 
-// 짝맞추기 위쪽 띠: 카드 테이블 너머 양쪽 끝에 두 사람의 3D 동물이 상반신으로 앉아 카드를 내려다본다 (사용자 요청 — 고도화).
-// 왼쪽 나(파랑), 오른쪽 상대(빨강). 점수·차례 글자는 GameScreen이 이 위에 겹친다.
-// 반응: 내 차례 = 한 손 들기, 기다림 = 가만히, 맞힘 = 만세, 틀림 = 놀람, 이김 = 만세, 짐 = 눈 ✕
+// 1:1 게임 위쪽 띠: 양쪽 끝에 두 사람의 3D 동물이 상반신으로 서서 가운데(판·카드) 쪽을 본다. 게임 규칙은 모른다.
+// 짝맞추기에서 처음 만들고 오목·숫자야구도 같이 씀. 왼쪽 나(파랑), 오른쪽 상대(빨강). 혼자 하기면 looks 하나(왼쪽만).
+// 점수·차례 글자는 게임이 이 위에 겹친다 (담는 칸 크기에 맞춰 늘고 줆).
+// 반응: turn = 한 손 들기 · wait = 가만히 · good = 만세 · okay = 한 손 들고 웃음 · bad = 놀람 · win = 만세 · lose = 눈 ✕
 
-export type Reaction = 'turn' | 'wait' | 'match' | 'miss' | 'win' | 'lose'
+export type Reaction = 'turn' | 'wait' | 'good' | 'okay' | 'bad' | 'win' | 'lose'
 
 type Props = {
-  looks: readonly [Look, Look]
-  reactions: readonly [Reaction, Reaction]
+  looks: readonly Look[]
+  reactions: readonly Reaction[]
+  /** 셔츠 색 (기본 나 파랑·상대 빨강) */
+  colors?: readonly string[]
+  className?: string
   onReady?: () => void
 }
 
-const COLORS = ['#2563eb', '#dc2626'] as const
+const COLORS = ['#2563eb', '#dc2626']
 const FOV = 24
 const CAM_Z = 6
 const LOOK_Y = 1.72
 
-export function Players3D(props: Props) {
+export function DuelStrip3D(props: Props) {
   const hostRef = useRef<HTMLDivElement>(null)
   const propsRef = useRef(props)
   useEffect(() => {
@@ -48,7 +52,7 @@ export function Players3D(props: Props) {
     camera.lookAt(0, LOOK_Y, 0)
 
     const rigs: AnimalRig[] = propsRef.current.looks.map((look, i) => {
-      const rig = makeAnimal(look, COLORS[i], { team: true })
+      const rig = makeAnimal(look, (propsRef.current.colors ?? COLORS)[i], { team: true })
       scene.add(rig.root)
       return rig
     })
@@ -75,9 +79,9 @@ export function Players3D(props: Props) {
         // 양쪽 끝에서 가운데(카드) 쪽을 보며 조금 숙임
         rig.root.position.set(side * (halfW - 1.15), 0, 0)
         rig.root.rotation.y = -side * 0.55
-        const r = reactions[i]
-        const pose = r === 'match' || r === 'win' ? 'cheer' : r === 'turn' ? 'raise' : r === 'miss' ? 'scared' : 'idle'
-        const mood = r === 'match' || r === 'win' ? 'happy' : r === 'miss' ? 'scared' : r === 'lose' ? 'ko' : 'calm'
+        const r = reactions[i] ?? 'wait'
+        const pose = r === 'good' || r === 'win' ? 'cheer' : r === 'turn' || r === 'okay' ? 'raise' : r === 'bad' ? 'scared' : 'idle'
+        const mood = r === 'good' || r === 'win' || r === 'okay' ? 'happy' : r === 'bad' ? 'scared' : r === 'lose' ? 'ko' : 'calm'
         rig.update(t + i * 1.9, pose, mood)
         rig.body.rotation.x = r === 'wait' || r === 'turn' ? 0.12 : rig.body.rotation.x
       })
@@ -96,5 +100,5 @@ export function Players3D(props: Props) {
     }
   }, [key])
 
-  return <div className="mm-players3d" ref={hostRef} aria-hidden />
+  return <div className={props.className ?? 'duel-strip3d'} ref={hostRef} aria-hidden />
 }
