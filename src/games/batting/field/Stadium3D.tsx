@@ -108,47 +108,54 @@ function buildStadium(root: THREE.Group) {
     line(s * 0.45, -0.9, s * 1.7, -0.9, 0.06)
     line(s * 0.45, 0.9, s * 1.7, 0.9, 0.06)
   }
-  // 외야 펜스 (짙은 초록 + 노란 윗줄) — 부채꼴로
-  const wallM = new THREE.MeshStandardMaterial({ color: '#1f4d33', roughness: 0.8 })
-  const yellow = new THREE.MeshStandardMaterial({ color: '#f2c230', roughness: 0.5 })
-  for (let a = -0.85; a <= 0.85; a += 0.05) {
-    const r = 115
-    const x = Math.sin(a) * r
-    const z = Math.cos(a) * r
-    const seg = new THREE.Mesh(new THREE.BoxGeometry(6.2, 3.2, 0.5), wallM)
-    seg.position.set(x, 1.6, z)
-    seg.rotation.y = a
-    root.add(seg)
-    const top = new THREE.Mesh(new THREE.BoxGeometry(6.2, 0.25, 0.55), yellow)
-    top.position.set(x, 3.25, z)
-    top.rotation.y = a
-    root.add(top)
+  // 외야 펜스·관중석은 같은 모양이 수백 개라 InstancedMesh로 한 번에 그린다
+  // (처음엔 하나씩 만들어 물체가 1,400개쯤 — 오래된 폰에서 버벅일 수 있어서 바꿈)
+  const dummy = new THREE.Object3D()
+  const place = (mesh: THREE.InstancedMesh, i: number, x: number, y: number, z: number, rotY: number) => {
+    dummy.position.set(x, y, z)
+    dummy.rotation.set(0, rotY, 0)
+    dummy.updateMatrix()
+    mesh.setMatrixAt(i, dummy.matrix)
   }
-  // 관중석: 펜스 뒤 계단 + 색색 관중 (작은 상자 여럿)
+  const angles: number[] = []
+  for (let a = -0.85; a <= 0.851; a += 0.05) angles.push(a)
+  // 외야 펜스 (짙은 초록 + 노란 윗줄) — 부채꼴로
+  const wall = new THREE.InstancedMesh(new THREE.BoxGeometry(6.2, 3.2, 0.5), new THREE.MeshStandardMaterial({ color: '#1f4d33', roughness: 0.8 }), angles.length)
+  const wallTop = new THREE.InstancedMesh(new THREE.BoxGeometry(6.2, 0.25, 0.55), new THREE.MeshStandardMaterial({ color: '#f2c230', roughness: 0.5 }), angles.length)
+  angles.forEach((a, i) => {
+    place(wall, i, Math.sin(a) * 115, 1.6, Math.cos(a) * 115, a)
+    place(wallTop, i, Math.sin(a) * 115, 3.25, Math.cos(a) * 115, a)
+  })
+  root.add(wall, wallTop)
+  // 관중석: 펜스 뒤 계단 + 색색 관중 (색마다 하나의 InstancedMesh)
   const stepM = new THREE.MeshStandardMaterial({ color: '#5b6573', roughness: 0.9 })
+  const ROWS = 8
+  const steps = new THREE.InstancedMesh(new THREE.BoxGeometry(6.3, 2.2, 3), stepM, ROWS * angles.length)
   const fanColors = ['#e03131', '#1971c2', '#f8f9fa', '#f08c00', '#2f9e44', '#ffd43b', '#862e9c', '#343a40']
   const fanGeo = new THREE.BoxGeometry(0.9, 1.1, 0.6)
-  const fanMats = fanColors.map((c) => new THREE.MeshStandardMaterial({ color: c, roughness: 0.8 }))
+  const fanSpots: { x: number; y: number; z: number; a: number }[][] = fanColors.map(() => [])
   let seed = 11
   const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647)
-  for (let row = 0; row < 8; row++) {
+  let k = 0
+  for (let row = 0; row < ROWS; row++) {
     const r = 121 + row * 3
     const y = 3.5 + row * 2.2
-    for (let a = -0.85; a <= 0.85; a += 0.05) {
-      const step = new THREE.Mesh(new THREE.BoxGeometry(6.3, 2.2, 3), stepM)
-      step.position.set(Math.sin(a) * r, y - 1.1, Math.cos(a) * r)
-      step.rotation.y = a
-      root.add(step)
-      for (let k = -2; k <= 2; k++) {
+    for (const a of angles) {
+      place(steps, k++, Math.sin(a) * r, y - 1.1, Math.cos(a) * r, a)
+      for (let j = -2; j <= 2; j++) {
         if (rnd() < 0.25) continue
-        const f = new THREE.Mesh(fanGeo, fanMats[Math.floor(rnd() * fanMats.length)])
-        const aa = a + k * 0.0095
-        f.position.set(Math.sin(aa) * (r - 0.4), y + 0.55, Math.cos(aa) * (r - 0.4))
-        f.rotation.y = aa
-        root.add(f)
+        const aa = a + j * 0.0095
+        fanSpots[Math.floor(rnd() * fanColors.length)].push({ x: Math.sin(aa) * (r - 0.4), y: y + 0.55, z: Math.cos(aa) * (r - 0.4), a: aa })
       }
     }
   }
+  root.add(steps)
+  fanColors.forEach((c, ci) => {
+    const spots = fanSpots[ci]
+    const fans = new THREE.InstancedMesh(fanGeo, new THREE.MeshStandardMaterial({ color: c, roughness: 0.8 }), spots.length)
+    spots.forEach((p, i) => place(fans, i, p.x, p.y, p.z, p.a))
+    root.add(fans)
+  })
   // 조명탑 둘
   for (const s of [-1, 1]) {
     const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.7, 38, 8), stepM)
