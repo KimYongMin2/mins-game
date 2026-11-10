@@ -1,7 +1,19 @@
-import { useEffect, useReducer, useRef } from 'react'
+import { Suspense, lazy, useEffect, useReducer, useRef, useState } from 'react'
 import { randomSeed } from '../../../shared/random'
 import { type Difficulty, type Hand, TOTAL_PITCHES } from '../constants'
 import { FrontView, type Mark } from '../field/FrontView'
+import { ANIMALS, type Look, plainLook } from '../../../shared/art3d/animalKinds'
+import { canWebGL } from '../../../shared/art3d/webgl'
+import { loadLook } from '../../../shared/storage/avatar'
+
+// 실사풍 3D 경기장·투수·타자 (뒤 배경). three.js는 이때만 불러온다
+const Stadium3D = lazy(() => import('../field/Stadium3D').then((m) => ({ default: m.Stadium3D })))
+
+/** 타자 = 내 캐릭터, 투수 = 다른 동물 */
+function battingLooks(): { batter: Look; pitcher: Look } {
+  const mine = loadLook() ?? plainLook('bear')
+  return { batter: mine, pitcher: plainLook(ANIMALS.filter((a) => a !== mine.animal)[0]) }
+}
 import { useZoneSwing } from '../input/useZoneSwing'
 import { battedBallPosition } from '../play/battedBall'
 import { PITCH_LABEL, type Pitch, type Vec3, ballPosition, cellCenter } from '../play/pitch'
@@ -116,6 +128,10 @@ export function GameScreen({ difficulty, hand, onFinish }: Props) {
     createSession({ now: performance.now(), seed: randomSeed(), difficulty, hand }),
   )
   const done = state.phase.kind === 'done'
+  const [use3D] = useState(canWebGL)
+  const [looks] = useState(battingLooks)
+  /** 3D 경기장이 그려지기 시작하면 2D 땅·사람을 끈다 */
+  const [stadium, setStadium] = useState(false)
 
   const pointer = useZoneSwing((point, at) => dispatch({ type: 'swing', point, at }))
 
@@ -183,8 +199,14 @@ export function GameScreen({ difficulty, hand, onFinish }: Props) {
         </span>
       </div>
 
-      <div className="bt-view-wrap">
+      <div className={`bt-view-wrap${stadium ? ' bt-view-wrap--3d' : ''}`}>
+        {use3D && (
+          <Suspense fallback={null}>
+            <Stadium3D hand={hand} pitcher={pitcherPoseOf(state)} swing={swing} looks={looks} onReady={() => setStadium(true)} />
+          </Suspense>
+        )}
         <FrontView
+          scene3d={stadium}
           hand={hand}
           pitcher={pitcherPoseOf(state)}
           ball={ball}

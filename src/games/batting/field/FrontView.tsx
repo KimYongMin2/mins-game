@@ -33,6 +33,8 @@ type Props = {
   /** 누르는 순간 그 자리에 잠깐 표시 */
   touched: ZonePoint | null
   onPointerDown?: (e: PointerEvent<SVGSVGElement>) => void
+  /** 뒤에 3D 경기장(Stadium3D)이 그려지면 땅·투수·타자는 빼고 존·공·궤적만 (투명 바탕) */
+  scene3d?: boolean
 }
 
 const ZONE = zoneRect()
@@ -195,13 +197,13 @@ function Trail({ points }: { points: Vec3[] }) {
   )
 }
 
-export function FrontView({ hand, pitcher, ball, swing, marks, trail, touched, onPointerDown }: Props) {
+export function FrontView({ hand, pitcher, ball, swing, marks, trail, touched, onPointerDown, scene3d = false }: Props) {
   // 카메라 뒤로 넘어간 공(뒤로 뜬 파울)은 그리지 않는다
   const b = ball && ball.z > -2 ? project(ball) : null
   return (
-    <svg className="bt-view" onPointerDown={onPointerDown} viewBox={`0 0 ${VIEW_W} ${VIEW_H}`} role="img" aria-label="타석에서 본 투수와 스트라이크 존">
-      <Ground />
-      <Pitcher pose={pitcher} />
+    <svg className={scene3d ? 'bt-view bt-view--3d' : 'bt-view'} onPointerDown={onPointerDown} viewBox={`0 0 ${VIEW_W} ${VIEW_H}`} role="img" aria-label="타석에서 본 투수와 스트라이크 존">
+      {!scene3d && <Ground />}
+      {!scene3d && <Pitcher pose={pitcher} />}
       <Zone touched={touched} />
       {marks.map((m, i) => {
         const p = project(m.at)
@@ -216,7 +218,7 @@ export function FrontView({ hand, pitcher, ball, swing, marks, trail, touched, o
       })}
       <Trail points={trail} />
       {b && <circle className="bt-ball" cx={b.x} cy={b.y} r={ballRadius(b.scale)} />}
-      <Batter hand={hand} swing={swing} />
+      {!scene3d && <Batter hand={hand} swing={swing} />}
     </svg>
   )
 }
