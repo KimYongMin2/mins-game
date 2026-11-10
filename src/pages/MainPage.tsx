@@ -13,6 +13,7 @@ import { RoomPicker } from '../shared/ui/RoomPicker'
 import { GAMES, type GameEntry } from './gameList'
 import { OpenRooms } from './OpenRooms'
 import { PlayerDots } from './PlayerDots'
+import { loadStats } from './stats'
 
 // 메인 화면 (unslop 방향: 동네 문방구 오락기·보드게임 상자. 겉은 조용하게, 색은 게임 표지에만, 인원은 사람 점):
 // 위: 로고 · 내 정보 → 크게 '이어서 하기'(최근 게임, 없으면 오늘의 추천) → 거르기(전체 · 1:1 · 여럿이 · 혼자) → 표지 카드들 → 수다방.
@@ -64,6 +65,39 @@ function PlayButtons({ game, onGo, onFriends, onDark = false }: { game: GameEntr
         {game.play === 'solo' ? '시작하기' : '봇이랑 하기'}
       </button>
     </div>
+  )
+}
+
+/** 내 전적: 해 본 게임만, 많이 한 순 */
+function MyStats() {
+  const [stats] = useState(loadStats)
+  const played = stats.filter((s) => s.played > 0).sort((a, b) => b.played - a.played)
+  const total = played.reduce((n, s) => n + s.played, 0)
+  return (
+    <section className="my-stats" aria-label="내 전적">
+      <h3 className="game-sheet__label">
+        내 전적 <span className="my-stats__total">{total}판</span>
+      </h3>
+      {played.length === 0 ? (
+        <p className="my-stats__empty">아직 한 게임이 없어요</p>
+      ) : (
+        <ul className="my-stats__list">
+          {played.map((s) => {
+            const g = GAMES.find((x) => x.id === s.id)!
+            return (
+              <li key={s.id} className="my-stats__row">
+                <img className="my-stats__cover" src={cover(g)} alt="" loading="lazy" />
+                <span className="my-stats__name">{g.title}</span>
+                <span className="my-stats__lines">
+                  {s.pvp && <span>친구 {s.pvp}</span>}
+                  {s.bot && <span>{g.play === 'solo' ? s.bot : `봇 ${s.bot}`}</span>}
+                </span>
+              </li>
+            )
+          })}
+        </ul>
+      )}
+    </section>
   )
 }
 
@@ -245,6 +279,7 @@ export function MainPage({ nickname }: { nickname: string }) {
                     닉네임 바꾸기
                   </Link>
                 </div>
+                <MyStats />
                 <h3 className="game-sheet__label">캐릭터 꾸미기</h3>
                 <AvatarEditor onChange={setLook} onDone={() => setSheet(null)} />
               </div>
