@@ -1,4 +1,8 @@
-import { useEffect, useReducer, useRef, useState } from 'react'
+import { Suspense, lazy, useEffect, useReducer, useRef, useState } from 'react'
+import { ANIMAL_EMOJI, type Look, opponentLook, plainLook } from '../../../shared/art3d/animalKinds'
+import { canWebGL } from '../../../shared/art3d/webgl'
+import { loadLook } from '../../../shared/storage/avatar'
+import type { Reaction } from '../field/Players3D'
 import type { Room } from '../../../shared/online/room'
 import { randomSeed } from '../../../shared/random'
 import { loadNickname } from '../../../shared/storage/nickname'
@@ -8,10 +12,28 @@ import { type MatchState, type MatchSummary, type Side, canFlip, createMatch, ma
 import { type MemoryMsg, actionOf, outbox } from '../play/pvp'
 import { playSound } from '../sounds'
 
+// 위쪽 띠의 3D 동물 두 명 (WebGL이 안 되면 글자만). three.js는 이때만 불러온다
+const Players3D = lazy(() => import('../field/Players3D').then((m) => ({ default: m.Players3D })))
+
+/** 나 = 고른 캐릭터, 상대 = 친구가 고른 캐릭터 (봇·안 고름이면 겹치지 않는 다른 동물) */
+function memoryLooks(peerAvatar?: string): readonly [Look, Look] {
+  const mine = loadLook() ?? plainLook('bear')
+  return [mine, opponentLook(mine.animal, peerAvatar, 4)]
+}
+
+/** 지금 장면에 맞는 두 사람의 반응 */
+function reactionsOf(state: MatchState): readonly [Reaction, Reaction] {
+  const { phase, turn } = state
+  const pick = (mine: Reaction, other: Reaction): [Reaction, Reaction] => (turn === 0 ? [mine, other] : [other, mine])
+  if (phase.kind === 'done') return phase.winner === 'draw' ? ['wait', 'wait'] : phase.winner === 0 ? ['win', 'lose'] : ['lose', 'win']
+  if (phase.kind === 'showing') return pick(phase.match ? 'match' : 'miss', 'wait')
+  return pick('turn', 'wait')
+}
+
 type Props = {
   difficulty: Difficulty
   /** 친구 대전이면 방, 상대 이름, 방장이 정한 덱 시드와 선공 (나 = 0) */
-  pvp?: { room: Room<MemoryMsg>; peerName: string; deckSeed: number; first: Side }
+  pvp?: { room: Room<MemoryMsg>; peerName: string; peerAvatar?: string; deckSeed: number; first: Side }
   onFinish: (summary: MatchSummary) => void
   /** 친구 대전 중 상대가 나갔을 때 '나가기' */
   onQuit?: () => void
@@ -48,6 +70,10 @@ export function GameScreen({ difficulty, pvp, onFinish, onQuit }: Props) {
   )
   const done = state.phase.kind === 'done'
   const [peerGone, setPeerGone] = useState(false)
+  const [use3D] = useState(canWebGL)
+  const [looks] = useState(() => memoryLooks(pvp?.peerAvatar))
+  /** 3D 동물이 그려지기 시작하면 점수 글자를 동물 안쪽으로 */
+  const [figures, setFigures] = useState(false)
 
   // 친구 대전: 받은 카드를 경기에 넣고, 상대가 나가면 알린다
   useEffect(() => {
@@ -112,7 +138,13 @@ export function GameScreen({ difficulty, pvp, onFinish, onQuit }: Props) {
 
   return (
     <div className="mm-game">
-      <div className="mm-hud">
+      <div className={`mm-stage${use3D ? ' mm-stage--3d' : ''}`}>
+      {use3D && (
+        <Suspense fallback={null}>
+          <Players3D looks={looks} reactions={reactionsOf(state)} onReady={() => setFigures(true)} />
+        </Suspense>
+      )}
+      <div className={`mm-hud${figures ? ' mm-hud--3d' : ''}`}>
         <div className={`mm-score mm-score--me${state.turn === 0 && !done ? ' mm-score--active' : ''}`}>
           <span className="mm-score__name">{names[0]}</span>
           <strong>{pairs[0]}쌍</strong>
@@ -122,6 +154,7 @@ export function GameScreen({ difficulty, pvp, onFinish, onQuit }: Props) {
           <span className="mm-score__name">{names[1]}</span>
           <strong>{pairs[1]}쌍</strong>
         </div>
+      </div>
       </div>
 
       <div className="mm-timer" aria-hidden>
@@ -160,7 +193,11 @@ export function GameScreen({ difficulty, pvp, onFinish, onQuit }: Props) {
                 <span className="mm-card__inner">
                   <span className="mm-card__back" />
                   {/* 덮인 카드는 그림을 아예 그리지 않는다 (화면 읽기 프로그램에 그림 이름이 새지 않게) */}
-                  <span className="mm-card__front">{faceUp && <CardFace face={card.face} />}</span>
+                  <span className="mm-card__front">
+                    {faceUp && <CardFace face={card.face} />}
+                    {/* 가져간 카드: 가져간 사람 동물 표시 */}
+                    {card.owner !== null && !isOpen && <span className="mm-card__owner">{ANIMAL_EMOJI[looks[card.owner].animal]}</span>}
+                  </span>
                 </span>
               </button>
             )

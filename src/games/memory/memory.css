@@ -263,7 +263,16 @@
 
 /* 가져간 카드: 흐리게, 누가 가져갔는지 테두리 색 */
 .mm-card--taken .mm-card__front {
-  opacity: 0.35;
+  opacity: 0.5;
+}
+
+/* 가져간 카드 구석에 가져간 사람 동물 */
+.mm-card__owner {
+  position: absolute;
+  right: 3px;
+  bottom: 2px;
+  font-size: 0.875rem;
+  line-height: 1;
 }
 
 .mm-card--by0 .mm-card__front {
@@ -457,4 +466,85 @@
 .mm-start__pvp-record {
   font-size: 0.8125rem;
   color: var(--ink-soft);
+}
+
+/* 위쪽 띠: 카드 테이블 너머 양쪽 끝에 3D 동물 (field/Players3D), 점수 글자는 그 안쪽에 겹침 */
+.mm-stage {
+  position: relative;
+}
+.mm-stage--3d {
+  min-height: 96px;
+  display: flex;
+  align-items: center;
+  border: 2px solid var(--line);
+  border-radius: 14px;
+  overflow: hidden;
+  background:
+    linear-gradient(180deg, transparent 70%, rgba(120, 53, 15, 0.35) 70% 74%, #78350f 74%),
+    linear-gradient(180deg, #fde7c4, #f6cf96);
+}
+.mm-stage--3d .mm-hud {
+  position: relative;
+  width: 100%;
+  padding: 6px 8px;
+}
+.mm-hud--3d {
+  /* 동물 자리만큼 안쪽으로 */
+  padding-inline: 19% !important;
+}
+.mm-hud--3d .mm-score {
+  background: rgba(255, 255, 255, 0.85);
+}
+.mm-players3d {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.mm-stage--3d ~ .mm-felt .mm-board {
+  --chrome: 300px;
+}
+
+/* 카드 연출: 뒤집을 때 살짝 들림, 맞으면 통 튀며 반짝, 틀리면 도리도리 */
+.mm-card__inner {
+  transition: transform 0.32s cubic-bezier(0.3, 1.4, 0.5, 1);
+}
+.mm-card--match .mm-card__inner {
+  animation: mm-pop 0.5s ease-out;
+}
+.mm-card--match .mm-card__front {
+  box-shadow:
+    0 0 0 2px #fde047,
+    0 0 14px 4px rgba(253, 224, 71, 0.85);
+}
+.mm-card--miss .mm-card__inner {
+  animation: mm-shake 0.4s ease-in-out 0.15s;
+}
+@keyframes mm-pop {
+  0% {
+    transform: rotateY(180deg) scale(1);
+  }
+  40% {
+    transform: rotateY(180deg) scale(1.14) translateY(-4px);
+  }
+  100% {
+    transform: rotateY(180deg) scale(1);
+  }
+}
+@keyframes mm-shake {
+  0%,
+  100% {
+    transform: rotateY(180deg) translateX(0);
+  }
+  25% {
+    transform: rotateY(180deg) translateX(-4px) rotateZ(-3deg);
+  }
+  75% {
+    transform: rotateY(180deg) translateX(4px) rotateZ(3deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .mm-card--match .mm-card__inner,
+  .mm-card--miss .mm-card__inner {
+    animation: none;
+  }
 }
