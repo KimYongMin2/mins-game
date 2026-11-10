@@ -54,7 +54,6 @@
   width: 12px;
   height: 12px;
   border-radius: 50%;
-  grid-row: span 2;
 }
 
 .yt-player__name {
@@ -66,8 +65,85 @@
 }
 
 .yt-player__count {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px 6px;
   font-size: 0.75rem;
   color: var(--ink-soft);
+}
+
+/* 남은 말·나간 말 (사용자 요청): 동물 얼굴 말 — 대기 = 색 테두리 · 판 위 = 흐리게 · 나감 = 금색 ✓ */
+.yt-player__team {
+  font-size: 0.75rem;
+  color: var(--ink-soft);
+}
+.yt-player__pieces {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px 8px;
+  margin-top: 2px;
+}
+.yt-pgroup {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+.yt-pgroup small {
+  margin-right: 2px;
+  font-size: 0.6875rem;
+  font-weight: 800;
+  color: var(--ink-soft);
+}
+.yt-pgroup em {
+  font-style: normal;
+  font-size: 0.75rem;
+  color: var(--muted-line);
+}
+.yt-pgroup--out small {
+  color: #b45309;
+}
+.yt-token {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border: 2.5px solid;
+  border-radius: 50%;
+  background: #fff;
+  font-size: 13px;
+  font-style: normal;
+  line-height: 1;
+}
+.yt-token--board {
+  opacity: 0.35;
+}
+.yt-token--out {
+  border-color: #d97706;
+  background: #fde68a;
+}
+.yt-token--out::after {
+  content: '✓';
+  position: absolute;
+  right: -5px;
+  bottom: -4px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #16a34a;
+  color: #fff;
+  font-size: 8px;
+  font-weight: 900;
+  line-height: 12px;
+  text-align: center;
+}
+.yt-player__face {
+  font-size: 1.25rem;
+  line-height: 1;
 }
 
 .yt-board-wrap {

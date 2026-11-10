@@ -1,5 +1,5 @@
 import { Suspense, lazy, useEffect, useReducer, useRef, useState } from 'react'
-import { assignLooks, decodeLook } from '../../../shared/art3d/animalKinds'
+import { ANIMAL_EMOJI, assignLooks, decodeLook } from '../../../shared/art3d/animalKinds'
 import { canWebGL } from '../../../shared/art3d/webgl'
 import { loadLook } from '../../../shared/storage/avatar'
 import type { Member, Room } from '../../../shared/online/room'
@@ -112,19 +112,41 @@ function PlayerBar({ v, me }: { v: YutView; me: number }) {
         const row = v.pieces[rowOf(v, i)]
         const home = row.filter((x) => x === 'home').length
         const out = row.filter((x) => x === 'out').length
+        const onBoard = row.length - home - out
+        const animal = p.avatar ? ANIMAL_EMOJI[p.avatar.animal] : null
+        const token = (kind: 'home' | 'board' | 'out', k: number) => (
+          <i key={`${kind}${k}`} className={`yt-token yt-token--${kind}`} style={kind === 'out' ? undefined : { borderColor: colorOf(v, i) }}>
+            {animal ?? ''}
+          </i>
+        )
         return (
           <li
             key={p.id}
             className={`yt-player${v.turn === i && v.phase === 'turn' ? ' yt-player--turn' : ''}${v.left[i] ? ' yt-player--left' : ''}`}
             style={{ borderColor: v.turn === i && v.phase === 'turn' ? colorOf(v, i) : undefined }}
           >
-            <span className="yt-player__dot" style={{ background: colorOf(v, i) }} />
+            {animal ? <span className="yt-player__face">{animal}</span> : <span className="yt-player__dot" style={{ background: colorOf(v, i) }} />}
             <span className="yt-player__name">
               {p.name}
               {i === me && ' (나)'}
+              {v.teams && <span className="yt-player__team"> · {TEAM_NAMES[v.teams[i]]}</span>}
             </span>
-            <span className="yt-player__count" aria-label={`대기 ${home}, 나감 ${out}`}>
-              {v.teams && `${TEAM_NAMES[v.teams[i]]} · `}대기 {home} · 나감 {out}/{row.length}
+            {/* 남은 말(아직 안 올린 대기 + 판 위)과 나간 말을 말 그림으로 (사용자 요청) */}
+            <span className="yt-player__pieces" aria-label={`대기 ${home}개, 판 위 ${onBoard}개, 나감 ${out}개`}>
+              <span className="yt-pgroup">
+                <small>대기</small>
+                {home === 0 ? <em>-</em> : Array.from({ length: home }, (_, k) => token('home', k))}
+              </span>
+              {onBoard > 0 && (
+                <span className="yt-pgroup">
+                  <small>판</small>
+                  {Array.from({ length: onBoard }, (_, k) => token('board', k))}
+                </span>
+              )}
+              <span className="yt-pgroup yt-pgroup--out">
+                <small>나감</small>
+                {out === 0 ? <em>-</em> : Array.from({ length: out }, (_, k) => token('out', k))}
+              </span>
             </span>
           </li>
         )
