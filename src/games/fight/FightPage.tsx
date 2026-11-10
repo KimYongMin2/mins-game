@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router'
+import { wantsPvp } from '../../shared/nav'
 import { installAudioUnlock } from '../../shared/audio/synth'
 import type { Peer, Room } from '../../shared/online/room'
 import type { UploadStatus } from '../../shared/online/uploadQueue'
@@ -35,7 +36,7 @@ type Screen =
 type Pvp = { room: Room<FightMsg>; peer: Peer }
 
 export function FightPage() {
-  const [screen, setScreen] = useState<Screen>({ kind: 'start' })
+  const [screen, setScreen] = useState<Screen>(() => (wantsPvp() ? { kind: 'lobby' } : { kind: 'start' }))
   const [record, setRecord] = useState<FightRecord>(() => loadRecord())
   const [games, setGames] = useState(0)
   const [upload, setUpload] = useState<UploadStatus>('saving')

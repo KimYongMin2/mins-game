@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router'
+import { wantsPvp } from '../../shared/nav'
 import { installAudioUnlock } from '../../shared/audio/synth'
 import type { Member, Room } from '../../shared/online/room'
 import { loadNickname } from '../../shared/storage/nickname'
@@ -27,7 +28,7 @@ type Screen =
   | { kind: 'result'; summary: GameSummary }
 
 export function RoulettePage() {
-  const [screen, setScreen] = useState<Screen>({ kind: 'start' })
+  const [screen, setScreen] = useState<Screen>(() => (wantsPvp() ? { kind: 'lobby' } : { kind: 'start' }))
   const [record, setRecord] = useState<RouletteRecord>(() => loadRecord())
   const [room, setRoom] = useState<Room<RouletteMsg> | null>(null)
   const [members, setMembers] = useState<Member[]>([])

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router'
+import { wantsPvp } from '../../shared/nav'
 import { installAudioUnlock } from '../../shared/audio/synth'
 import type { Peer, Room } from '../../shared/online/room'
 import { loadNickname } from '../../shared/storage/nickname'
@@ -30,7 +31,7 @@ type Screen =
 type Pvp = { room: Room<OmokMsg>; peer: Peer }
 
 export function OmokPage() {
-  const [screen, setScreen] = useState<Screen>({ kind: 'start' })
+  const [screen, setScreen] = useState<Screen>(() => (wantsPvp() ? { kind: 'lobby' } : { kind: 'start' }))
   const [record, setRecord] = useState<OmokRecord>(() => loadRecord())
   const [pvp, setPvp] = useState<Pvp | null>(null)
   // 친구 대전 준비 (사용자 요청): 친구가 [준비]해야 방장이 [게임 시작]·[다시 하기]를 누를 수 있다

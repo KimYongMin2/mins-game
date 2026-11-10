@@ -44,7 +44,7 @@ export function NicknamePage({ onSaved }: Props) {
         ))}
       </div>
       <div className="nickname__card">
-      <span className="nickname__logo">🎮 미니게임 모음</span>
+      <span className="nickname__logo">MINS GAME</span>
       <h1 className="title">{existing ? '닉네임 변경' : '반가워요!'}</h1>
       <p className="subtitle">친구들에게 보일 닉네임을 정해 주세요.</p>
 

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router'
+import { wantsPvp } from '../../shared/nav'
 import { installAudioUnlock } from '../../shared/audio/synth'
 import type { Peer, Room } from '../../shared/online/room'
 import { loadNickname } from '../../shared/storage/nickname'
@@ -41,7 +42,7 @@ const otherSide = (side: Side): Side => (side === 'away' ? 'home' : 'away')
 
 
 export function ZolaballPage() {
-  const [screen, setScreen] = useState<Screen>({ kind: 'menu' })
+  const [screen, setScreen] = useState<Screen>(() => (wantsPvp() ? { kind: 'lobby' } : { kind: 'menu' }))
   const [record, setRecord] = useState<ZolaballRecord>(() => loadRecord())
   const [upload, setUpload] = useState<UploadStatus>('saving')
   const [pvp, setPvp] = useState<Pvp | null>(null)

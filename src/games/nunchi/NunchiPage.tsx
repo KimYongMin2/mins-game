@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router'
+import { wantsPvp } from '../../shared/nav'
 import { installAudioUnlock } from '../../shared/audio/synth'
 import { withDirectLink } from '../../shared/online/directLink'
 import type { Member, Room } from '../../shared/online/room'
@@ -28,7 +29,7 @@ type Screen =
   | { kind: 'result'; summary: GameSummary }
 
 export function NunchiPage() {
-  const [screen, setScreen] = useState<Screen>({ kind: 'start' })
+  const [screen, setScreen] = useState<Screen>(() => (wantsPvp() ? { kind: 'lobby' } : { kind: 'start' }))
   const [record, setRecord] = useState<NunchiRecord>(() => loadRecord())
   const [room, setRoom] = useState<Room<NunchiMsg> | null>(null)
   const [members, setMembers] = useState<Member[]>([])

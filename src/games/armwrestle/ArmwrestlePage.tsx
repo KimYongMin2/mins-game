@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router'
+import { wantsPvp } from '../../shared/nav'
 import { installAudioUnlock } from '../../shared/audio/synth'
 import { withDirectLink } from '../../shared/online/directLink'
 import type { Peer, Room } from '../../shared/online/room'
@@ -36,7 +37,7 @@ type Screen =
 type Pvp = { room: Room<ArmMsg>; peer: Peer }
 
 export function ArmwrestlePage() {
-  const [screen, setScreen] = useState<Screen>({ kind: 'start' })
+  const [screen, setScreen] = useState<Screen>(() => (wantsPvp() ? { kind: 'lobby' } : { kind: 'start' }))
   const [record, setRecord] = useState<ArmRecord>(() => loadRecord())
   const [pvp, setPvp] = useState<Pvp | null>(null)
   // 친구 대전 준비 (사용자 요청): 친구가 [준비]해야 방장이 [게임 시작]·[다시 하기]를 누를 수 있다
