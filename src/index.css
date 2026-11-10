@@ -1517,61 +1517,7 @@ p {
   word-break: break-all;
 }
 
-/* 메인 '지금 열린 방' (pages/OpenRooms) */
-.open-rooms {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-.open-rooms__list {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-.open-rooms__room {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  width: 100%;
-  padding: 8px 12px 8px 8px;
-  border: 1px solid var(--hair);
-  border-radius: 8px;
-  background: var(--card);
-  color: inherit;
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-  transition: background-color 120ms var(--ease);
-}
-.open-rooms__room:hover {
-  background: var(--raised);
-}
-.open-rooms__cover {
-  flex-shrink: 0;
-  width: 64px;
-  height: 48px;
-  object-fit: cover;
-  border-radius: 4px;
-}
-.open-rooms__body {
-  display: flex;
-  flex: 1;
-  flex-direction: column;
-  min-width: 0;
-}
-.open-rooms__name {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  overflow: hidden;
-  font-size: 1rem;
-  font-weight: 800;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-}
+/* 비공개 방 표시 (방 목록 RoomPicker) */
 .open-rooms__lock {
   flex-shrink: 0;
   padding: 0 6px;
@@ -1580,18 +1526,6 @@ p {
   color: var(--ink-soft);
   font-size: 0.75rem;
   font-weight: 700;
-}
-.open-rooms__game {
-  font-size: 0.875rem;
-  font-weight: 600;
-  color: var(--ink-soft);
-}
-.open-rooms__count {
-  flex-shrink: 0;
-  font-size: 0.9375rem;
-  font-weight: 800;
-  color: var(--brand);
-  font-variant-numeric: tabular-nums;
 }
 
 /* 메인 게임 창 [조작법] (누를 때만 펼침) */

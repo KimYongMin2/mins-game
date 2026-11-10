@@ -11,7 +11,6 @@ import { AvatarFace } from '../shared/ui/AvatarFace'
 import { IconChevronRight, IconMic, IconX } from '../shared/ui/icons'
 import { RoomPicker } from '../shared/ui/RoomPicker'
 import { GAMES, type GameEntry } from './gameList'
-import { OpenRooms } from './OpenRooms'
 import { PlayerDots } from './PlayerDots'
 import type { GameStat } from './stats'
 
@@ -205,8 +204,6 @@ export function MainPage({ nickname }: { nickname: string }) {
           <PlayButtons game={hero} onGo={(path) => go(hero, path)} onFriends={() => setSheet({ kind: 'game', game: hero })} onDark />
         </div>
       </section>
-
-      <OpenRooms games={READY.filter((g) => g.play === 'pvp')} onJoin={(g, room, pin) => go(g, pvpLink(g.path, { kind: 'join', room, pin }))} />
 
       <section className="shelf-section" aria-label="게임">
         <div className="shelf-head">
