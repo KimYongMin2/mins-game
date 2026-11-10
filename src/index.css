@@ -1908,3 +1908,17 @@ html {
   font-weight: 700;
   text-align: center;
 }
+
+.game-switch__item--full {
+  opacity: 0.45;
+}
+.game-switch__warn {
+  grid-column: 1 / -1;
+  margin: 2px 0 0;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: #fde8e4;
+  color: #a12a12;
+  font-size: 0.875rem;
+  font-weight: 700;
+}

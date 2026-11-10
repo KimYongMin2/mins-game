@@ -210,7 +210,7 @@ export function NumbaseballPage() {
           peerGone={peerGone}
           onRetry={() => peerReady && startPvp(pvp.room)}
           retryLocked={!peerReady}
-          readySlot={<RematchReady room={pvp.room} allReady={peerReady} waitText={`${pvp.peer.nickname}님이 준비하길 기다려요`} mode={lengthMode as ModeSpec} />}
+          readySlot={<RematchReady room={pvp.room} gameId="numbaseball" people={2} allReady={peerReady} waitText={`${pvp.peer.nickname}님이 준비하길 기다려요`} mode={lengthMode as ModeSpec} />}
           onMenu={leavePvp}
         />
       )}

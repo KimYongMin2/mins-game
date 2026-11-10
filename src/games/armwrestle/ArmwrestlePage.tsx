@@ -213,7 +213,7 @@ export function ArmwrestlePage() {
           peerGone={peerGone}
           onRetry={() => peerReady && startPvp(pvp.room)}
           retryLocked={!peerReady}
-          readySlot={<RematchReady room={pvp.room} allReady={peerReady} waitText={`${pvp.peer.nickname}님이 준비하길 기다려요`} mode={eventMode as ModeSpec} />}
+          readySlot={<RematchReady room={pvp.room} gameId="armwrestle" people={2} allReady={peerReady} waitText={`${pvp.peer.nickname}님이 준비하길 기다려요`} mode={eventMode as ModeSpec} />}
           onMenu={leavePvp}
         />
       )}

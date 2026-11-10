@@ -142,19 +142,23 @@ export function DuelReadyRoom({ room, me, peer, peerReady, onStart, mode, gameId
 }
 
 /** 다시 하기 전 (결과 화면): 친구는 [준비], 방장은 누가 준비했는지. 방장의 [다시 하기]는 게임이 모두 준비했을 때만 켠다 */
-export function RematchReady({ room, waitText, allReady, mode }: { room: ReadyRoom; waitText: string; allReady: boolean; mode?: ModeSpec }) {
+export function RematchReady({ room, waitText, allReady, mode, gameId, people = 2 }: { room: ReadyRoom & SwitchableRoom; waitText: string; allReady: boolean; mode?: ModeSpec; gameId?: string; people?: number }) {
   const hostInfo = useHostInfo(room)
+  // 결과 화면에서도 게임 바꾸기 (사용자 요청) — 친구 쪽은 방장이 바꾸면 따라간다
+  const sw = gameId ? <GameSwitch room={room} gameId={gameId} people={people} /> : null
   if (room.role === 'guest')
     return (
       <>
         <ModePicker room={room} hostInfo={hostInfo} />
         <ReadyButton room={room} note="준비를 누르면 방장이 다시 시작할 수 있어요" resetKey={hostInfo} />
+        {sw}
       </>
     )
   return (
     <>
       <ModePicker room={room} mode={mode} />
       <p className="ready__note ready__note--host">{allReady ? '모두 준비했어요 · 다시 하기를 누르세요' : waitText}</p>
+      {sw}
     </>
   )
 }

@@ -157,7 +157,7 @@ export function SurvivalPage() {
           retryLocked={screen.summary.mode === 'pvp' && !allReady}
           readySlot={
             screen.summary.mode === 'pvp' && room ? (
-              <RematchReady room={room} allReady={allReady} waitText={`친구들이 준비하길 기다려요 (${readyCount}/${friendGuests.length})`} />
+              <RematchReady room={room} gameId="survival" people={members.length + 1} allReady={allReady} waitText={`친구들이 준비하길 기다려요 (${readyCount}/${friendGuests.length})`} />
             ) : undefined
           }
           canRetry={screen.summary.mode === 'bot' || Math.min(MAX_PLAYERS, members.length + 1 + pvpBots) >= MIN_PLAYERS}

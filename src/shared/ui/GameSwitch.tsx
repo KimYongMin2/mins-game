@@ -13,6 +13,7 @@ export function GameSwitch({ room, gameId, people }: { room: SwitchRoom; gameId:
   const navigate = useNavigate()
   const [open, setOpen] = useState(false)
   const [moving, setMoving] = useState<string | null>(null)
+  const [warn, setWarn] = useState<string | null>(null)
 
   // 친구: 방장이 옮기면 따라간다 (방장이 새 방을 여는 동안 조금 기다렸다가 — 들어가는 쪽도 몇 초는 방장을 기다려 줌)
   useEffect(() => {
@@ -37,7 +38,10 @@ export function GameSwitch({ room, gameId, people }: { room: SwitchRoom; gameId:
 
   return (
     <div className="game-switch">
-      <button type="button" className="button button--small game-switch__toggle" aria-expanded={open} onClick={() => setOpen(!open)}>
+      <button type="button" className="button button--small game-switch__toggle" aria-expanded={open} onClick={() => {
+          setOpen(!open)
+          setWarn(null)
+        }}>
         게임 바꾸기
       </button>
       {open && (
@@ -45,13 +49,25 @@ export function GameSwitch({ room, gameId, people }: { room: SwitchRoom; gameId:
           {options.map((t) => {
             const fits = people <= t.max
             return (
-              <button key={t.id} type="button" role="listitem" className="game-switch__item" disabled={!fits} onClick={() => go(t.path)}>
+              <button
+                key={t.id}
+                type="button"
+                role="listitem"
+                className={`game-switch__item${fits ? '' : ' game-switch__item--full'}`}
+                aria-disabled={!fits}
+                onClick={() => (fits ? go(t.path) : setWarn(`지금 ${people}명이 모여 있어서 ${t.title}(${t.min === t.max ? `${t.max}명` : `최대 ${t.max}명`})(으)로는 바꿀 수 없어요`))}
+              >
                 <span className="game-switch__title">{t.title}</span>
                 <span className="game-switch__size">{t.min === t.max ? `${t.min}명` : `${t.min}–${t.max}명`}</span>
               </button>
             )
           })}
-          <p className="game-switch__note">고르면 지금 모인 친구들이 다 같이 넘어가요 · 인원이 넘치는 게임은 고를 수 없어요</p>
+          {warn && (
+            <p className="game-switch__warn" role="alert">
+              {warn}
+            </p>
+          )}
+          <p className="game-switch__note">고르면 지금 모인 친구들이 다 같이 넘어가요 · 인원이 넘치는 게임은 바꿀 수 없어요</p>
         </div>
       )}
     </div>

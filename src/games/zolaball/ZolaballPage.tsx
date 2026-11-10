@@ -232,7 +232,7 @@ export function ZolaballPage() {
           peerGone={peerGone}
           onRetry={() => peerReady && startPvp(pvp.room)}
           retryLocked={!peerReady}
-          readySlot={<RematchReady room={pvp.room} allReady={peerReady} waitText={`${pvp.peer.nickname}님이 준비하길 기다려요`} />}
+          readySlot={<RematchReady room={pvp.room} gameId="zolaball" people={2} allReady={peerReady} waitText={`${pvp.peer.nickname}님이 준비하길 기다려요`} />}
           onLeave={leavePvp}
         />
       )}
