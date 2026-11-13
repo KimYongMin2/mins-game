@@ -405,6 +405,11 @@
   background: #fdecec;
 }
 
+/* 사이트 오락실 테마(결과 화면)에선 어두운 바탕에 맞게 */
+.arcade .bt-result__row--hr td {
+  background: rgba(255, 107, 94, 0.2);
+}
+
 .bt-result__detail {
   display: block;
   font-size: 0.75rem;

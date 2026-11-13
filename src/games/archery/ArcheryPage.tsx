@@ -49,8 +49,10 @@ export function ArcheryPage() {
 
   const toStart = () => setScreen({ kind: 'start' })
 
+  // 경기 중이 아니면(시작·대기실·결과) 사이트 공통 오락실 테마
+  const inGame = screen.kind === 'game'
   return (
-    <main className="page ar-page">
+    <main className={`page ar-page${inGame ? '' : ' arcade'}`}>
       <header className="ar-header">
         <h1 className="title">양궁</h1>
         <SoundToggle />

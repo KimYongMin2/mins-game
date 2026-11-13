@@ -99,7 +99,7 @@ export function SurvivalPage() {
   const allReady = readyCount === friendGuests.length
 
   return (
-    <main className="page sv-page">
+    <main className={`page sv-page${inGame ? '' : ' arcade'}`}>
       <header className="sv-header">
         <h1 className="title">서바이벌</h1>
         <SoundToggle />

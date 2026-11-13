@@ -142,7 +142,7 @@ export function ArmwrestlePage() {
   const inGame = screen.kind === 'game' || screen.kind === 'pvp-game'
 
   return (
-    <main className="page aw-page">
+    <main className={`page aw-page${inGame ? '' : ' arcade'}`}>
       <header className="aw-header">
         <h1 className="title">팔씨름</h1>
         <SoundToggle />

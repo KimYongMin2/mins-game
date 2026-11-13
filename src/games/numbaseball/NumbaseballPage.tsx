@@ -139,7 +139,7 @@ export function NumbaseballPage() {
   const inGame = screen.kind === 'game' || screen.kind === 'pvp-game'
 
   return (
-    <main className="page nb-page">
+    <main className={`page nb-page${inGame ? '' : ' arcade'}`}>
       <header className="nb-header">
         <h1 className="title">숫자야구</h1>
         <SoundToggle />

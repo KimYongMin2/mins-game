@@ -99,7 +99,7 @@ export function ArtilleryPage() {
   const allReady = readyCount === friendGuests.length
 
   return (
-    <main className="page sv-page">
+    <main className={`page sv-page${inGame ? '' : ' arcade'}`}>
       <header className="sv-header">
         <h1 className="title">탱크 대전</h1>
         <SoundToggle />

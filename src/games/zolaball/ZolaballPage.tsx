@@ -154,8 +154,10 @@ export function ZolaballPage() {
     toMenu()
   }
 
+  // 경기 중이 아니면(시작·대기실·결과) 사이트 공통 오락실 테마
+  const inGame = screen.kind === 'match' || screen.kind === 'pvp-match' || screen.kind === 'practice'
   return (
-    <main className="page zb-page">
+    <main className={`page zb-page${inGame ? '' : ' arcade'}`}>
       <header className="zb-header">
         <h1 className="title">
           야구{screen.kind === 'practice' && ' · 타격 연습'}

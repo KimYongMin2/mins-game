@@ -151,7 +151,7 @@ export function FightPage() {
   const inGame = screen.kind === 'game' || screen.kind === 'pvp-game'
 
   return (
-    <main className="page ft-page">
+    <main className={`page ft-page${inGame ? '' : ' arcade'}`}>
       <header className="ft-header">
         <h1 className="title">격투</h1>
         <SoundToggle />

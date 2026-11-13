@@ -583,6 +583,11 @@
   border-color: #d97706;
 }
 
+/* 사이트 오락실 테마(결과 화면)에선 어두운 바탕에 맞게 */
+.arcade .ar-result__arrow--gold {
+  background: rgba(255, 210, 63, 0.2);
+}
+
 .ar-result__sub {
   width: 3em;
   text-align: right;
