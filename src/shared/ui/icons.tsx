@@ -44,3 +44,15 @@ export const IconUser = (p: P) => (
     <path d="M20 21a8 8 0 0 0-16 0" />
   </Svg>
 )
+
+export const IconChevronLeft = (p: P) => (
+  <Svg {...p}>
+    <path d="m15 18-6-6 6-6" />
+  </Svg>
+)
+
+export const IconPlay = (p: P) => (
+  <Svg {...p}>
+    <path d="M6 3.5v17l14-8.5z" fill="currentColor" />
+  </Svg>
+)
