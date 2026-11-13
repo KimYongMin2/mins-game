@@ -99,7 +99,7 @@ export function RoulettePage() {
   const allReady = readyCount === friendGuests.length
 
   return (
-    <main className={`page rl-page${inGame ? '' : ' arcade'}`}>
+    <main className={`page rl-page arcade${inGame ? ' arcade--play' : ''}`}>
       <header className="rl-header">
         <h1 className="title">러시안룰렛</h1>
         <SoundToggle />

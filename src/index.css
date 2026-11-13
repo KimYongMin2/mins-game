@@ -276,6 +276,8 @@ p {
   --accent: #ff6b5e;
   --sun: #ffd23f;
   --edge: #4a43a0;
+  /* 게임 안 '나' 파랑 글씨: 남색 위에선 밝은 파랑 (밝은 칸 안에선 원래 파랑) */
+  --me-blue: #a5c4ff;
   --font: 'IBM Plex Sans KR', 'Pretendard Variable', Pretendard, system-ui, -apple-system, 'Apple SD Gothic Neo', sans-serif;
   --display: 'Black Han Sans', var(--font);
   color-scheme: dark;
@@ -441,6 +443,8 @@ html:has(.arcade) body {
   border-color: var(--brand);
   color: var(--brand);
 }
+
+/* 밝은 바탕 칸(경기 장면 위 점수 칸·카드·키패드 등)은 각 게임 CSS 맨 아래 '.arcade :is(…)'에서 예전 먹 글씨·종이색으로 되돌린다 */
 
 /* 게임 화면 제목 (시작·대기실·결과 위) */
 :where(.arcade) .title {

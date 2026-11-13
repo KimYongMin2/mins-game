@@ -123,7 +123,7 @@ export function OmokPage() {
   const inGame = screen.kind === 'game' || screen.kind === 'pvp-game'
 
   return (
-    <main className={`page om-page${inGame ? '' : ' arcade'}`}>
+    <main className={`page om-page arcade${inGame ? ' arcade--play' : ''}`}>
       <header className="om-header">
         <h1 className="title">오목</h1>
         <SoundToggle />

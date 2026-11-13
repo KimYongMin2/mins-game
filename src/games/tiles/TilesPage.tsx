@@ -98,7 +98,7 @@ export function TilesPage() {
   const allReady = readyCount === friendGuests.length
 
   return (
-    <main className={`page nt-page${inGame ? '' : ' arcade'}`}>
+    <main className={`page nt-page arcade${inGame ? ' arcade--play' : ''}`}>
       <header className="nt-header">
         <h1 className="title">숫자 잇기</h1>
         <SoundToggle />

@@ -124,7 +124,7 @@ export function MemoryPage() {
   const inGame = screen.kind === 'game' || screen.kind === 'pvp-game'
 
   return (
-    <main className={`page mm-page${inGame ? '' : ' arcade'}`}>
+    <main className={`page mm-page arcade${inGame ? ' arcade--play' : ''}`}>
       <header className="mm-header">
         <h1 className="title">짝맞추기</h1>
         <SoundToggle />

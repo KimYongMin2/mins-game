@@ -104,7 +104,7 @@ export function YutPage() {
   const allReady = readyCount === friendGuests.length
 
   return (
-    <main className={`page yt-page${inGame ? '' : ' arcade'}`}>
+    <main className={`page yt-page arcade${inGame ? ' arcade--play' : ''}`}>
       <header className="yt-header">
         <h1 className="title">윷놀이</h1>
         <SoundToggle />

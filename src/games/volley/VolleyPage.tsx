@@ -123,7 +123,7 @@ export function VolleyPage() {
   const inGame = screen.kind === 'game' || screen.kind === 'pvp-game'
 
   return (
-    <main className={`page vb-page${inGame ? '' : ' arcade'}`}>
+    <main className={`page vb-page arcade${inGame ? ' arcade--play' : ''}`}>
       <header className="vb-header">
         <h1 className="title">점프 배구</h1>
         <SoundToggle />

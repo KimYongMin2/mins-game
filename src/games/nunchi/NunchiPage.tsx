@@ -98,7 +98,7 @@ export function NunchiPage() {
   const allReady = readyCount === friendGuests.length
 
   return (
-    <main className={`page nc-page${inGame ? '' : ' arcade'}`}>
+    <main className={`page nc-page arcade${inGame ? ' arcade--play' : ''}`}>
       <header className="nc-header">
         <h1 className="title">눈치게임</h1>
         <SoundToggle />

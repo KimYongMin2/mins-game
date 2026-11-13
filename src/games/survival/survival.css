@@ -127,7 +127,7 @@
 
 .sv-result__ranking .sv-result__me {
   border-color: #2563eb;
-  color: #2563eb;
+  color: var(--me-blue, #2563eb);
 }
 
 .sv-result__career,

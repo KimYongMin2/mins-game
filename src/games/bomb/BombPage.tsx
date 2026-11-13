@@ -98,7 +98,7 @@ export function BombPage() {
   const allReady = readyCount === friendGuests.length
 
   return (
-    <main className={`page bm-page${inGame ? '' : ' arcade'}`}>
+    <main className={`page bm-page arcade${inGame ? ' arcade--play' : ''}`}>
       <header className="bm-header">
         <h1 className="title">폭탄 돌리기</h1>
         <SoundToggle />

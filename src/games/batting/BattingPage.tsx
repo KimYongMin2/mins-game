@@ -55,10 +55,10 @@ export function BattingPage() {
 
   const toStart = () => setScreen({ kind: 'start' })
 
-  // 경기 중이 아니면(시작·대기실·결과) 사이트 공통 오락실 테마
+  // 경기 중이면 arcade--play (경기 화면만 따로 다듬을 때)
   const inGame = screen.kind === 'game'
   return (
-    <main className={`page bt-page${inGame ? '' : ' arcade'}`}>
+    <main className={`page bt-page arcade${inGame ? ' arcade--play' : ''}`}>
       <header className="bt-header">
         <h1 className="title">배팅</h1>
         <SoundToggle />

@@ -98,11 +98,11 @@
 }
 
 .bm-seat--me {
-  color: #2563eb;
+  color: var(--me-blue, #2563eb);
 }
 
 .bm-seat--me:disabled {
-  color: #2563eb;
+  color: var(--me-blue, #2563eb);
 }
 
 .bm-seat--holding {
@@ -438,7 +438,7 @@
 
 .bm-result__ranking .bm-result__me {
   border-color: #2563eb;
-  color: #2563eb;
+  color: var(--me-blue, #2563eb);
 }
 
 .bm-result__career,
@@ -553,4 +553,19 @@
 
 .bm-view--3d .bm-banner span {
   color: #f5e6d3;
+}
+
+/* 오락실 테마(사이트 공통, 2026-11-13) 안에서도 밝은 바탕 칸은 예전 먹 글씨·종이색 그대로 */
+.arcade :is(.bm-table) {
+  --ink: #1f1b16;
+  --ink-soft: #463e35;
+  --ink-muted: #645b50;
+  --card: #fdfbf7;
+  --paper: #fff;
+  --raised: #efe9df;
+  --hair: rgba(31, 27, 22, 0.1);
+  --hair-strong: rgba(31, 27, 22, 0.18);
+  --muted-line: #ddd5c8;
+  --me-blue: #2563eb;
+  color: var(--ink);
 }
