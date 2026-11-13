@@ -34,6 +34,8 @@ const asFilter = (x: string | null): Filter => (x === 'duo' || x === 'group' || 
 const sizeOf = (g: GameEntry): Exclude<Filter, 'all'> => (g.players === '1인' ? 'solo' : g.players === '2인' ? 'duo' : 'group')
 const READY = GAMES.filter((g) => g.ready)
 const cover = (g: GameEntry) => `/covers/${g.id}.jpg`
+/** 큰 배너용 넓은 장면 (16:9, 글자 없이 다시 찍은 것). 없으면 표지 */
+const banner = (g: GameEntry) => `/banners/${g.id}.jpg`
 
 /** 오늘의 추천: 날짜마다 바뀜 (친구 대전 되는 게임 중) */
 function todaysPick(): GameEntry {
@@ -43,13 +45,11 @@ function todaysPick(): GameEntry {
 }
 
 /** 표지: 진짜 경기 장면. 파일이 없으면 그 게임 색으로만 채운 빈 칸 */
-function Cover({ game, className }: { game: GameEntry; className: string }) {
-  const [broken, setBroken] = useState(false)
-  return broken ? (
-    <span className={`${className} cover--fallback`} style={{ background: game.colors[1] }} aria-hidden />
-  ) : (
-    <img className={className} src={cover(game)} alt="" loading="lazy" decoding="async" onError={() => setBroken(true)} />
-  )
+function Cover({ game, className, wide = false }: { game: GameEntry; className: string; wide?: boolean }) {
+  const [step, setStep] = useState(0) // 0 = 넓은 장면(wide일 때) · 1 = 표지 · 2 = 없음
+  const at = wide ? step : Math.max(step, 1)
+  if (at >= 2) return <span className={`${className} cover--fallback`} style={{ background: game.colors[1] }} aria-hidden />
+  return <img className={className} src={at === 0 ? banner(game) : cover(game)} alt="" loading={wide ? 'eager' : 'lazy'} decoding="async" onError={() => setStep(at + 1)} />
 }
 
 /** 인원 글자: '2~8인' → '2~8명', '2인' → '1:1', '1인' → '혼자' */
@@ -216,7 +216,7 @@ export function MainPage({ nickname }: { nickname: string }) {
 
       {/* 큰 배너: 이어서 하기 / 오늘의 추천 */}
       <section className="banner" aria-label={last ? '이어서 하기' : '오늘의 추천'}>
-        <Cover game={hero} className="banner__cover" />
+        <Cover game={hero} className="banner__cover" wide />
         <div className="banner__shade" />
         <div className="banner__body">
           <span className="banner__rule" aria-hidden />
@@ -262,7 +262,7 @@ export function MainPage({ nickname }: { nickname: string }) {
               return (
                 <li key={g.id} id={`feat-${g.id}`} className={`feat__item${on ? ' feat__item--on' : ''}`}>
                   <button type="button" className="feat__card" onClick={() => (on ? enter(g) : setFeatId(g.id))} aria-label={on ? `${g.title} 들어가기` : `${g.title} 펼치기`}>
-                    <Cover game={g} className="feat__cover" />
+                    <Cover game={g} className="feat__cover" wide />
                     <span className="feat__shade" />
                     <span className="feat__text">
                       <span className="feat__rule" aria-hidden />
@@ -341,7 +341,7 @@ export function MainPage({ nickname }: { nickname: string }) {
             </button>
             {sheet.kind === 'game' ? (
               <div className="game-sheet">
-                <Cover game={sheet.game} className="game-sheet__cover" />
+                <Cover game={sheet.game} className="game-sheet__cover" wide />
                 <div className="game-sheet__body">
                   <div className="game-sheet__head">
                     <h2 className="game-sheet__title">{sheet.game.title}</h2>
