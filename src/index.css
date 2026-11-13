@@ -653,6 +653,7 @@ html:has(.arcade) body {
 }
 
 .banner__title {
+  word-break: keep-all;
   margin: 4px 0 0 -2px;
   font-family: var(--display);
   font-weight: 400;
@@ -665,6 +666,7 @@ html:has(.arcade) body {
 }
 
 .banner__desc {
+  word-break: keep-all;
   margin-top: 12px;
   max-width: 32em;
   font-size: 1.0625rem;
@@ -742,26 +744,31 @@ html:has(.arcade) body {
   transform-origin: left bottom;
 }
 
-/* 최근에 한 게임: 5개가 한 줄에 고정, 누른 카드가 커짐 (옆으로 넘기지 않음) */
+/* 최근에 한 게임: 5개 고정, 누른 카드가 커짐 (옆으로 넘기지 않음).
+   폰은 위아래로 쌓고 누른 줄이 커짐, 넓은 화면은 가로 한 줄. 글자는 늘 가로 한 줄(세로 글씨는 보기 싫다고 해서 뺌) */
 .mine__row {
   list-style: none;
   margin: 0;
   padding: 0;
   display: grid;
   gap: 6px;
-  height: 300px;
-  transition: grid-template-columns 220ms var(--ease);
+  height: 520px;
+  grid-template-rows: var(--tracks);
+  transition: grid-template-rows 220ms var(--ease), grid-template-columns 220ms var(--ease);
 }
 
 @media (min-width: 640px) {
   .mine__row {
     gap: 10px;
     height: 340px;
+    grid-template-rows: none;
+    grid-template-columns: var(--tracks);
   }
 }
 
 .mine__item {
   min-width: 0;
+  min-height: 0;
 }
 
 .mine__card {
@@ -794,38 +801,45 @@ html:has(.arcade) body {
 .mine__shade {
   position: absolute;
   inset: 0;
-  background: linear-gradient(180deg, rgba(20, 16, 50, 0.1) 30%, rgba(20, 16, 50, 0.88));
+  background: linear-gradient(90deg, rgba(20, 16, 50, 0.85), rgba(20, 16, 50, 0.2) 70%);
+}
+
+@media (min-width: 640px) {
+  .mine__shade {
+    background: linear-gradient(180deg, rgba(20, 16, 50, 0.1) 35%, rgba(20, 16, 50, 0.88));
+  }
 }
 
 .mine__text {
   position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 14px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 6px;
-}
-
-/* 좁은 카드: 세로 글씨 */
-.mine__item:not(.mine__item--on) .mine__title {
-  writing-mode: vertical-rl;
-  font-family: var(--display);
-  font-size: 1.125rem;
-  line-height: 1;
-  letter-spacing: 0.06em;
-}
-
-.mine__item:not(.mine__item--on) .mine__who {
-  display: none;
-}
-
-.mine__item--on .mine__text {
   left: 16px;
   right: 16px;
-  bottom: 20px;
+  bottom: 50%;
+  transform: translateY(50%);
+  display: flex;
+  flex-direction: column;
   align-items: flex-start;
+  gap: 4px;
+  word-break: keep-all;
+}
+
+@media (min-width: 640px) {
+  .mine__text {
+    left: 12px;
+    right: 12px;
+    bottom: 14px;
+    transform: none;
+  }
+}
+
+.mine__title {
+  max-width: 100%;
+  font-family: var(--display);
+  font-size: 1.25rem;
+  line-height: 1.1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .mine__who {
@@ -834,19 +848,23 @@ html:has(.arcade) body {
   color: var(--brand);
 }
 
+.mine__item--on .mine__text {
+  bottom: 20px;
+  transform: none;
+}
+
 .mine__item--on .mine__title {
-  font-family: var(--display);
   font-size: clamp(1.75rem, 6vw, 2.5rem);
-  line-height: 1;
-  transform: skewX(-9deg);
-  transform-origin: left bottom;
+  line-height: 1.15;
+  white-space: normal;
 }
 
 .mine__desc {
   max-width: 24em;
   font-size: 0.875rem;
   font-weight: 600;
-  color: rgba(255, 255, 255, 0.88);
+  line-height: 1.5;
+  color: rgba(255, 255, 255, 0.9);
 }
 
 .mine__go {

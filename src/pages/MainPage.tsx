@@ -244,7 +244,7 @@ export function MainPage({ nickname }: { nickname: string }) {
           <div className="sec-head">
             <h2 className="sec-head__title">{played.length ? '최근에 한 게임' : '이런 게임 어때요'}</h2>
           </div>
-          <ul className="mine__row" style={{ gridTemplateColumns: picks.map((g) => (g.id === openId ? '4fr' : '1fr')).join(' ') }}>
+          <ul className="mine__row" style={{ '--tracks': picks.map((g) => (g.id === openId ? '4fr' : '1fr')).join(' ') } as React.CSSProperties}>
             {picks.map((g) => {
               const on = g.id === openId
               return (
