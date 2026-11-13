@@ -609,6 +609,15 @@ html:has(.arcade) body {
   z-index: -2;
 }
 
+/* 폰: 그림 전체를 줄여 위쪽 오른편에 두고 글자는 아래 (잘라서 꽉 채우면 폭탄이 반만 보였음) */
+@media (max-width: 639px) {
+  svg.banner__cover {
+    inset: 0 0 auto auto;
+    width: 760px;
+    height: 428px;
+  }
+}
+
 .banner__shade {
   position: absolute;
   inset: 0;
@@ -733,56 +742,29 @@ html:has(.arcade) body {
   transform-origin: left bottom;
 }
 
-.round-btn {
-  display: inline-grid;
-  place-items: center;
-  width: 48px;
-  height: 48px;
-  border: 2px solid var(--edge);
-  border-radius: 50%;
-  background: var(--card);
-  color: var(--ink);
-  cursor: pointer;
-}
-
-.round-btn:hover {
-  border-color: var(--navy);
-}
-
-.feat__arrows {
-  display: flex;
-  gap: 10px;
-}
-
-/* 넘기기: 펼친 카드 하나 + 좁은 카드들 */
-.feat__rail {
+/* 최근에 한 게임: 5개가 한 줄에 고정, 누른 카드가 커짐 (옆으로 넘기지 않음) */
+.mine__row {
   list-style: none;
   margin: 0;
-  padding: 0 0 4px;
-  display: flex;
-  gap: 8px;
+  padding: 0;
+  display: grid;
+  gap: 6px;
   height: 300px;
-  overflow-x: auto;
-  scroll-snap-type: x proximity;
-  scrollbar-width: none;
+  transition: grid-template-columns 220ms var(--ease);
 }
 
-.feat__rail::-webkit-scrollbar {
-  display: none;
+@media (min-width: 640px) {
+  .mine__row {
+    gap: 10px;
+    height: 340px;
+  }
 }
 
-.feat__item {
-  flex: 0 0 84px;
-  height: 100%;
-  scroll-snap-align: start;
-  transition: flex-basis 260ms var(--ease);
+.mine__item {
+  min-width: 0;
 }
 
-.feat__item.feat__item--on {
-  flex-basis: min(78vw, 600px);
-}
-
-.feat__card {
+.mine__card {
   position: relative;
   display: block;
   width: 100%;
@@ -797,110 +779,94 @@ html:has(.arcade) body {
   cursor: pointer;
 }
 
-.feat__item--on .feat__card {
-  box-shadow: inset 0 -4px 0 var(--brand);
+.mine__item--on .mine__card {
+  box-shadow: inset 0 -5px 0 var(--brand);
 }
 
-.feat__cover {
+.mine__cover {
   position: absolute;
   inset: 0;
   width: 100%;
   height: 100%;
   object-fit: cover;
-  transition: transform 300ms var(--ease);
 }
 
-.feat__card:hover .feat__cover {
-  transform: scale(1.04);
-}
-
-.feat__shade {
+.mine__shade {
   position: absolute;
   inset: 0;
-  background: linear-gradient(180deg, rgba(20, 16, 50, 0.15), rgba(20, 16, 50, 0.85));
+  background: linear-gradient(180deg, rgba(20, 16, 50, 0.1) 30%, rgba(20, 16, 50, 0.88));
 }
 
-.feat__text {
+.mine__text {
   position: absolute;
-  left: 14px;
-  right: 14px;
-  top: 18px;
+  left: 0;
+  right: 0;
+  bottom: 14px;
   display: flex;
   flex-direction: column;
+  align-items: center;
   gap: 6px;
 }
 
-.feat__rule {
-  width: 22px;
-  height: 2px;
-  background: rgba(255, 255, 255, 0.8);
-}
-
-.feat__who {
-  font-size: 0.8125rem;
-  font-weight: 700;
-  color: rgba(255, 255, 255, 0.8);
-}
-
-.feat__title {
+/* 좁은 카드: 세로 글씨 */
+.mine__item:not(.mine__item--on) .mine__title {
+  writing-mode: vertical-rl;
   font-family: var(--display);
   font-size: 1.125rem;
-  line-height: 1.15;
-  word-break: keep-all;
+  line-height: 1;
+  letter-spacing: 0.06em;
+}
+
+.mine__item:not(.mine__item--on) .mine__who {
+  display: none;
+}
+
+.mine__item--on .mine__text {
+  left: 16px;
+  right: 16px;
+  bottom: 20px;
+  align-items: flex-start;
+}
+
+.mine__who {
+  font-size: 0.8125rem;
+  font-weight: 700;
+  color: var(--brand);
+}
+
+.mine__item--on .mine__title {
+  font-family: var(--display);
+  font-size: clamp(1.75rem, 6vw, 2.5rem);
+  line-height: 1;
   transform: skewX(-9deg);
   transform-origin: left bottom;
 }
 
-.feat__item--on .feat__text {
-  top: auto;
-  bottom: 22px;
-  right: 88px;
+.mine__desc {
+  max-width: 24em;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.88);
 }
 
-.feat__item--on .feat__title {
-  font-size: clamp(1.75rem, 6vw, 2.5rem);
-}
-
-.feat__play {
+.mine__go {
   position: absolute;
-  right: 20px;
-  bottom: 22px;
-  display: grid;
-  place-items: center;
-  width: 56px;
-  height: 56px;
-  border-radius: 50%;
-  background: #fff;
+  top: 14px;
+  right: 14px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 34px;
+  padding: 0 12px;
+  background: var(--brand);
   color: #1c1748;
+  font-size: 0.8125rem;
+  font-weight: 700;
 }
 
-.feat__dots {
-  display: flex;
-  justify-content: center;
-  gap: 8px;
-  margin-top: 14px;
-}
-
-.feat__dots i {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--edge);
-}
-
-.feat__dots i.on {
-  background: var(--navy);
-  width: 20px;
-  border-radius: 4px;
-}
-
-@media (min-width: 640px) {
-  .feat__rail {
-    height: 340px;
-  }
-
-  .feat__item {
-    flex-basis: 168px;
+@media (prefers-reduced-motion: reduce) {
+  .mine__row {
+    transition: none;
   }
 }
 

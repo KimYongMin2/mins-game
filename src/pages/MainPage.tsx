@@ -9,9 +9,10 @@ import { type Theme, loadTheme, saveTheme } from '../shared/storage/theme'
 import { AvatarEditor } from '../shared/ui/AvatarPicker'
 import { markFromHome } from '../shared/ui/HomeLink'
 import { AvatarFace } from '../shared/ui/AvatarFace'
-import { IconChevronLeft, IconChevronRight, IconMic, IconPlay, IconX } from '../shared/ui/icons'
+import { IconChevronRight, IconMic, IconPlay, IconX } from '../shared/ui/icons'
 import { RoomPicker } from '../shared/ui/RoomPicker'
 import { GAMES, type GameEntry } from './gameList'
+import { HeroArt } from './HeroArt'
 import { PlayerDots } from './PlayerDots'
 import type { GameStat } from './stats'
 
@@ -186,15 +187,10 @@ export function MainPage({ nickname }: { nickname: string }) {
   const last = READY.find((g) => g.id === recent[0])
   const hero = last ?? todaysPick()
   const shown = READY.filter((g) => filter === 'all' || sizeOf(g) === filter)
-  const friends = READY.filter((g) => g.play === 'pvp')
-  const [featId, setFeatId] = useState(friends[0].id)
-  const featAt = Math.max(0, friends.findIndex((g) => g.id === featId))
-  /** 넘기기: 앞뒤로 한 칸, 펼친 카드가 보이게 */
-  const feature = (i: number) => {
-    const g = friends[(i + friends.length) % friends.length]
-    setFeatId(g.id)
-    requestAnimationFrame(() => document.getElementById(`feat-${g.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'start' }))
-  }
+  // 최근에 한 게임 5개 (모자라면 친구 대전 게임으로 채움). 누르면 그 카드가 커지고, 커진 걸 누르면 들어감
+  const played = recent.map((id) => READY.find((g) => g.id === id)).filter((g): g is GameEntry => !!g)
+  const picks = [...played, ...READY.filter((g) => g.play === 'pvp' && !played.includes(g))].slice(0, 5)
+  const [openId, setOpenId] = useState(picks[0].id)
   /** 들어가기: 친구 대전 되는 게임은 게임 창, 혼자 하는 게임은 바로 시작 화면 */
   const enter = (g: GameEntry) => (g.play === 'pvp' ? setSheet({ kind: 'game', game: g }) : go(g, g.path))
 
@@ -216,7 +212,7 @@ export function MainPage({ nickname }: { nickname: string }) {
 
       {/* 큰 배너: 이어서 하기 / 오늘의 추천 */}
       <section className="banner" aria-label={last ? '이어서 하기' : '오늘의 추천'}>
-        <Cover game={hero} className="banner__cover" wide />
+        <HeroArt className="banner__cover" />
         <div className="banner__shade" />
         <div className="banner__body">
           <span className="banner__rule" aria-hidden />
@@ -243,35 +239,27 @@ export function MainPage({ nickname }: { nickname: string }) {
       </section>
 
       <div className="home__in">
-        {/* 친구랑 하기: 큰 카드 하나 + 좁은 카드들 */}
-        <section className="feat" aria-label="친구랑 하는 게임">
+        {/* 최근에 한 게임: 5개 고정, 누르면 커짐 */}
+        <section className="mine" aria-label={played.length ? '최근에 한 게임' : '이런 게임 어때요'}>
           <div className="sec-head">
-            <h2 className="sec-head__title">친구랑 하기</h2>
-            <div className="feat__arrows">
-              <button type="button" className="round-btn" onClick={() => feature(featAt - 1)} aria-label="이전 게임">
-                <IconChevronLeft size={20} />
-              </button>
-              <button type="button" className="round-btn" onClick={() => feature(featAt + 1)} aria-label="다음 게임">
-                <IconChevronRight size={20} />
-              </button>
-            </div>
+            <h2 className="sec-head__title">{played.length ? '최근에 한 게임' : '이런 게임 어때요'}</h2>
           </div>
-          <ul className="feat__rail">
-            {friends.map((g) => {
-              const on = g.id === featId
+          <ul className="mine__row" style={{ gridTemplateColumns: picks.map((g) => (g.id === openId ? '4fr' : '1fr')).join(' ') }}>
+            {picks.map((g) => {
+              const on = g.id === openId
               return (
-                <li key={g.id} id={`feat-${g.id}`} className={`feat__item${on ? ' feat__item--on' : ''}`}>
-                  <button type="button" className="feat__card" onClick={() => (on ? enter(g) : setFeatId(g.id))} aria-label={on ? `${g.title} 들어가기` : `${g.title} 펼치기`}>
-                    <Cover game={g} className="feat__cover" wide />
-                    <span className="feat__shade" />
-                    <span className="feat__text">
-                      <span className="feat__rule" aria-hidden />
-                      <span className="feat__who">{whoOf(g)}</span>
-                      <span className="feat__title">{g.title}</span>
+                <li key={g.id} className={`mine__item${on ? ' mine__item--on' : ''}`}>
+                  <button type="button" className="mine__card" onClick={() => (on ? enter(g) : setOpenId(g.id))} aria-expanded={on} aria-label={on ? `${g.title} 들어가기` : `${g.title} 크게 보기`}>
+                    <Cover game={g} className="mine__cover" wide />
+                    <span className="mine__shade" />
+                    <span className="mine__text">
+                      <span className="mine__who">{whoOf(g)}</span>
+                      <span className="mine__title">{g.title}</span>
+                      {on && <span className="mine__desc">{g.description}</span>}
                     </span>
                     {on && (
-                      <span className="feat__play" aria-hidden>
-                        <IconPlay size={22} />
+                      <span className="mine__go">
+                        <IconPlay size={14} /> 들어가기
                       </span>
                     )}
                   </button>
@@ -279,11 +267,6 @@ export function MainPage({ nickname }: { nickname: string }) {
               )
             })}
           </ul>
-          <div className="feat__dots" aria-hidden>
-            {friends.map((g) => (
-              <i key={g.id} className={g.id === featId ? 'on' : ''} />
-            ))}
-          </div>
         </section>
 
         {/* 전체 게임 목록 */}
