@@ -250,9 +250,13 @@ export function Stadium3D(props: Props) {
     batter.root.position.set(side * 0.95, 0, 0.9)
     batter.root.rotation.y = side < 0 ? Math.PI / 2 : -Math.PI / 2
     batter.head.rotation.y = side < 0 ? -1.1 : 1.1
+    // 두 손이 배트 손잡이를 같이 쥔다 (야구와 같이 — 처음엔 팔이 앞으로 뻗고 배트만 가슴에 붙어 있었음)
+    const GRIP = new THREE.Vector3(-0.08, 1.3, 0.5)
     const batPivot = new THREE.Group()
-    batPivot.position.set(0, 1.45, 0.35)
+    batPivot.position.copy(GRIP)
     batter.body.add(batPivot)
+    const DOWN = new THREE.Vector3(0, -1, 0)
+    const toGrip = new THREE.Vector3()
     const bat = new THREE.Mesh(new THREE.CylinderGeometry(0.085, 0.04, 1.35, 14), new THREE.MeshStandardMaterial({ color: '#c8955a', roughness: 0.45 }))
     bat.position.y = 0.6
     bat.castShadow = true
@@ -310,8 +314,9 @@ export function Stadium3D(props: Props) {
       // 타자: 준비 → 스윙 (몸 비틀기 + 배트 돌기)
       batter.update(t, 'idle', 'calm')
       for (const arm of [batter.armL, batter.armR]) {
-        arm.rotation.x = -1.25
-        arm.rotation.z = arm === batter.armL ? -0.15 : 0.15
+        toGrip.copy(GRIP).sub(arm.position)
+        arm.scale.y = Math.min(1.5, Math.max(1, toGrip.length() / 0.5))
+        arm.quaternion.setFromUnitVectors(DOWN, toGrip.normalize())
       }
       const prog = p.swing ? p.swing.progress : -1
       if (prog < 0) {

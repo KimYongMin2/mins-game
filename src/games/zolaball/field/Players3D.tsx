@@ -68,14 +68,19 @@ export function Players3D(props: Props) {
     batter.head.rotation.y = Math.PI / 2 - 0.25
 
     // 배트: 타자 몸에 붙여 몸이 도는 대로
+    // 두 손이 배트 손잡이를 같이 쥔다: 손잡이는 가슴 앞 가운데(GRIP), 두 팔이 매 프레임 거기를 향함
+    // (처음엔 배트만 가슴에 붙고 팔은 앞으로 뻗어 있어서 손이 배트를 안 잡고 있었음 — 사용자 '방망이 잘못 들고 있다')
+    const GRIP = new THREE.Vector3(-0.08, 1.3, 0.5)
     const batPivot = new THREE.Group()
-    batPivot.position.set(0, 1.45, 0.38)
+    batPivot.position.copy(GRIP)
     batter.body.add(batPivot)
+    const DOWN = new THREE.Vector3(0, -1, 0)
+    const toGrip = new THREE.Vector3()
     const bat = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.032, 1.05, 14), new THREE.MeshStandardMaterial({ color: '#c8955a', roughness: 0.45 }))
     bat.position.y = 0.45
     batPivot.add(bat)
     const UP = new THREE.Vector3(0, 1, 0)
-    const BAT_READY = new THREE.Vector3(-0.5, 0.86, -0.1).normalize()
+    const BAT_READY = new THREE.Vector3(-0.72, 0.66, -0.15).normalize()
     const BAT_HIT = new THREE.Vector3(0.05, 0.12, 1).normalize()
     const BAT_FOLLOW = new THREE.Vector3(0.85, 0.35, -0.4).normalize()
     const qa = new THREE.Quaternion()
@@ -133,8 +138,10 @@ export function Players3D(props: Props) {
       // 타자: 준비(포수 쪽으로 살짝 꼼) → 스윙(몸 비틀기 + 배트가 존을 지나 돌아감)
       batter.update(t, 'idle', 'calm')
       for (const arm of [batter.armL, batter.armR]) {
-        arm.rotation.x = -1.25
-        arm.rotation.z = arm === batter.armL ? -0.15 : 0.15
+        toGrip.copy(GRIP).sub(arm.position)
+        // 팔(어깨~손 0.5)이 손잡이까지 닿게 조금 늘림
+        arm.scale.y = Math.min(1.5, Math.max(1, toGrip.length() / 0.5))
+        arm.quaternion.setFromUnitVectors(DOWN, toGrip.normalize())
       }
       const prog = p.swing === null || p.swing === undefined ? -1 : p.swing
       if (prog < 0) {
