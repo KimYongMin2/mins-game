@@ -5,12 +5,14 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>미니게임 모음</title>
-    <meta name="theme-color" content="#f7f4ee" />
+    <meta name="theme-color" content="#f3f4f9" />
     <!-- 글꼴 (무료 OFL): 게임 화면은 Pretendard, 사이트 공통 화면(오락실 테마)은 IBM Plex Sans KR, 제목은 Black Han Sans -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=IBM+Plex+Sans+KR:wght@500;600;700&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css" />
+    <!-- 화면 테마(밝게/어둡게, 내 정보 창에서 고름)를 그리기 전에 건다 — shared/storage/theme.ts와 같은 저장 키 -->
+    <script>try{document.documentElement.dataset.theme=localStorage.getItem('mins-game:theme')==='dark'?'dark':'light'}catch(e){document.documentElement.dataset.theme='light'}</script>
     <!-- 카카오톡 인앱 브라우저면 바깥 브라우저로 다시 연다 (마이크·WebRTC가 잘 안 돼서) -->
     <script src="/kakao-escape.js"></script>
   </head>

@@ -5,6 +5,7 @@ import { pvpLink } from '../shared/nav'
 import { loadLook } from '../shared/storage/avatar'
 import { readLocal, writeLocal } from '../shared/storage/local'
 import { loadRecent, pushRecent } from '../shared/storage/recent'
+import { type Theme, loadTheme, saveTheme } from '../shared/storage/theme'
 import { AvatarEditor } from '../shared/ui/AvatarPicker'
 import { markFromHome } from '../shared/ui/HomeLink'
 import { AvatarFace } from '../shared/ui/AvatarFace'
@@ -109,6 +110,25 @@ function MyStats() {
   )
 }
 
+/** 화면 테마 고르기 (내 정보 창): 밝게 / 어둡게, 기기에 기억 */
+function ThemePicker() {
+  const [theme, setTheme] = useState<Theme>(loadTheme)
+  const pick = (t: Theme) => {
+    saveTheme(t)
+    setTheme(t)
+  }
+  return (
+    <div className="theme-pick" role="radiogroup" aria-label="화면 테마">
+      <span className="theme-pick__label">화면</span>
+      {(['light', 'dark'] as const).map((t) => (
+        <button key={t} type="button" role="radio" aria-checked={theme === t} className={`filters__chip${theme === t ? ' filters__chip--on' : ''}`} onClick={() => pick(t)}>
+          {t === 'light' ? '밝게' : '어둡게'}
+        </button>
+      ))}
+    </div>
+  )
+}
+
 type Sheet = { kind: 'game'; game: GameEntry } | { kind: 'me' } | null
 const sheetMarked = () => !!(window.history.state as { sheet?: boolean } | null)?.sheet
 
@@ -179,7 +199,7 @@ export function MainPage({ nickname }: { nickname: string }) {
   const enter = (g: GameEntry) => (g.play === 'pvp' ? setSheet({ kind: 'game', game: g }) : go(g, g.path))
 
   return (
-    <main className="home arcade lite">
+    <main className="home arcade">
       <header className="topnav">
         <div className="topnav__in">
           <span className="topnav__logo">MINS GAME</span>
@@ -366,6 +386,7 @@ export function MainPage({ nickname }: { nickname: string }) {
                     닉네임 바꾸기
                   </Link>
                 </div>
+                <ThemePicker />
                 <MyStats />
                 <h3 className="game-sheet__label">캐릭터 꾸미기</h3>
                 <AvatarEditor onChange={setLook} onDone={() => setSheet(null)} />

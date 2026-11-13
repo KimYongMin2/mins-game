@@ -614,7 +614,7 @@ export function MeetingPage() {
   }
 
   return (
-    <main className="page">
+    <main className="page arcade">
       <header className="meet__header">
         <HomeLink className="button button--small">
           ← 목록

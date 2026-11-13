@@ -38,7 +38,7 @@ export function NicknamePage({ onSaved }: Props) {
   }
 
   return (
-    <main className="page page--center nickname arcade lite">
+    <main className="page page--center nickname arcade">
       <span className="nickname__logo">MINS GAME</span>
       <div className="nickname__covers" aria-hidden>
         {COVERS.map((g) => (

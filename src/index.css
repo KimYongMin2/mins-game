@@ -278,6 +278,8 @@ p {
   --edge: #4a43a0;
   /* 게임 안 '나' 파랑 글씨: 남색 위에선 밝은 파랑 (밝은 칸 안에선 원래 파랑) */
   --me-blue: #a5c4ff;
+  /* 진한 채움·테두리 (밝은 테마는 남색, 어두운 테마는 밝은 글씨색) */
+  --navy: #f4f2ff;
   --font: 'IBM Plex Sans KR', 'Pretendard Variable', Pretendard, system-ui, -apple-system, 'Apple SD Gothic Neo', sans-serif;
   --display: 'Black Han Sans', var(--font);
   color-scheme: dark;
@@ -456,8 +458,8 @@ html:has(.arcade) body {
 
 /* ===== 메인 (pages/MainPage) — 게임 소개 사이트 구성, 밝은 바탕 (2026-11-13) =====
    고정 메뉴 줄 → 꽉 찬 큰 배너(기울인 큰 제목) → 큰 카드 + 좁은 카드 넘기기 → 썸네일 목록 → 수다방 띠 → 바닥글.
-   .lite = 오락실 테마의 밝은 판 (색 이름은 같고 값만 밝게) */
-.lite {
+   밝은 테마 = 오락실 테마의 밝은 판 (색 이름은 같고 값만 밝게). <html data-theme='light'|'dark'>, 고르는 곳은 내 정보 창 (shared/storage/theme.ts) */
+:root[data-theme='light'] .arcade {
   --bg: #f3f4f9;
   --card: #ffffff;
   --raised: #e8eaf3;
@@ -473,12 +475,12 @@ html:has(.arcade) body {
   color-scheme: light;
 }
 
-html:has(.lite),
-html:has(.lite) body {
+:root[data-theme='light']:has(.arcade),
+:root[data-theme='light']:has(.arcade) body {
   background: #f3f4f9;
 }
 
-:where(.lite) .input {
+:where(:root[data-theme='light'] .arcade) .input {
   background: #fff;
 }
 
@@ -505,7 +507,7 @@ html:has(.lite) body {
   position: sticky;
   top: 0;
   z-index: 20;
-  background: #fff;
+  background: var(--card);
   border-bottom: 1px solid var(--hair);
 }
 
@@ -531,7 +533,7 @@ html:has(.lite) body {
   font-family: var(--display);
   font-size: 1.375rem;
   line-height: 1;
-  color: var(--navy);
+  color: #1c1748;
   padding: 6px 8px 4px;
   background: var(--brand);
 }
@@ -565,7 +567,7 @@ html:has(.lite) body {
   padding: 0 12px 0 4px;
   border: 1px solid var(--hair-strong);
   border-radius: 20px;
-  background: #fff;
+  background: var(--card);
   color: var(--ink);
   font: inherit;
   font-size: 0.875rem;
@@ -594,7 +596,7 @@ html:has(.lite) body {
   height: min(72vh, 560px);
   min-height: 420px;
   overflow: hidden;
-  background: var(--navy);
+  background: #1c1748;
   isolation: isolate;
 }
 
@@ -738,7 +740,7 @@ html:has(.lite) body {
   height: 48px;
   border: 2px solid var(--edge);
   border-radius: 50%;
-  background: #fff;
+  background: var(--card);
   color: var(--ink);
   cursor: pointer;
 }
@@ -788,7 +790,7 @@ html:has(.lite) body {
   padding: 0;
   border: 0;
   overflow: hidden;
-  background: var(--navy);
+  background: #1c1748;
   color: #fff;
   font: inherit;
   text-align: left;
@@ -869,7 +871,7 @@ html:has(.lite) body {
   height: 56px;
   border-radius: 50%;
   background: #fff;
-  color: var(--navy);
+  color: #1c1748;
 }
 
 .feat__dots {
@@ -914,7 +916,7 @@ html:has(.lite) body {
   padding: 0 14px;
   border: 1px solid var(--hair-strong);
   border-radius: 18px;
-  background: #fff;
+  background: var(--card);
   color: var(--ink-soft);
   font: inherit;
   font-size: 0.875rem;
@@ -925,7 +927,7 @@ html:has(.lite) body {
 .filters__chip--on {
   border-color: var(--navy);
   background: var(--navy);
-  color: #fff;
+  color: var(--bg);
   font-weight: 700;
 }
 
@@ -992,7 +994,7 @@ html:has(.lite) body {
   padding-left: 2px;
   border-radius: 50%;
   background: #fff;
-  color: var(--navy);
+  color: #1c1748;
 }
 
 .thumb__title {
@@ -1017,39 +1019,96 @@ html:has(.lite) body {
   outline-offset: 2px;
 }
 
-.arcade.lite.nickname .title {
+:root[data-theme='light'] .arcade.nickname .title {
   color: var(--ink);
 }
 
-.arcade.lite .nickname__logo {
+:root[data-theme='light'] .arcade .nickname__logo {
   color: var(--navy);
   text-shadow: none;
   padding: 8px 12px 6px;
   background: var(--brand);
 }
 
-.arcade.lite .nickname__card {
+:root[data-theme='light'] .arcade .nickname__card {
   border: 1px solid var(--hair);
   border-top: 4px solid var(--brand);
 }
 
 /* 밝은 판에선 노랑·하늘 글씨 대신 남색 (흰 바탕에서 흐려서) */
-.arcade.lite :is(.room-pick__title, .room-pick__count, .me-sheet__name, .me-sheet .game-sheet__label, .avatar-pick__label),
-.arcade.lite .room-pick__item:first-child .room-pick__no {
+:root[data-theme='light'] .arcade :is(.room-pick__title, .room-pick__count, .me-sheet__name, .me-sheet .game-sheet__label, .avatar-pick__label),
+:root[data-theme='light'] .arcade .room-pick__item:first-child .room-pick__no {
   color: var(--navy);
 }
 
-.arcade.lite .game-sheet__who {
+:root[data-theme='light'] .arcade .game-sheet__who {
   border-color: var(--navy);
   color: var(--navy);
 }
 
-.arcade.lite .avatar-pick__swatch--on {
+:root[data-theme='light'] .arcade .avatar-pick__swatch--on {
   box-shadow: 0 0 0 3px var(--navy);
 }
 
-.arcade.lite .avatar-pick__item--on {
+:root[data-theme='light'] .arcade .avatar-pick__item--on {
   color: var(--navy);
+}
+
+:root[data-theme='light'] .arcade {
+  --me-blue: #2563eb;
+}
+
+/* 밝은 테마: 남색 바탕에 맞춰 쓴 밝은 글씨·어두운 칸을 되돌림 */
+:where(:root[data-theme='light'] .arcade) .title {
+  color: var(--ink);
+}
+
+:where(:root[data-theme='light'] .arcade) .error {
+  color: #dc2626;
+}
+
+:root[data-theme='light'] .arcade :is([class*='result__headline--win'], [class*='result__headline--best']) {
+  background: rgba(255, 210, 63, 0.22);
+}
+
+:root[data-theme='light'] .arcade :is([class*='result__headline--win'], [class*='result__headline--best']) strong,
+:root[data-theme='light'] .arcade [class*='result__ranking'] [class*='result__me'] {
+  color: var(--navy);
+}
+
+:root[data-theme='light'] .arcade [class*='result__ranking'] [class*='result__me'] {
+  border-color: var(--navy);
+}
+
+:root[data-theme='light'] .arcade .mode-pick__options {
+  background: var(--raised);
+}
+
+:root[data-theme='light'] .arcade .ready-room__tag {
+  background: var(--raised);
+}
+
+:root[data-theme='light'] .arcade :is(.ready-room__tag--ready, .group-lobby__ready--on) {
+  background: #dcfce7;
+  color: #15803d;
+}
+
+:root[data-theme='light'] .arcade :is(.nickname__card, .sheet__panel) {
+  box-shadow: 0 12px 32px -20px rgba(28, 23, 72, 0.35);
+}
+
+/* 화면 테마 고르기 (내 정보 창) */
+.theme-pick {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 20px;
+}
+
+.theme-pick__label {
+  margin-right: 6px;
+  font-size: 0.9375rem;
+  font-weight: 700;
 }
 
 /* 사람 점 인원 표기 */
@@ -1090,11 +1149,11 @@ html:has(.lite) body {
   opacity: 0.8;
 }
 
-.lite .dots__on {
+:root[data-theme='light'] .arcade .dots__on {
   background: var(--navy);
 }
 
-.lite .dots__off {
+:root[data-theme='light'] .arcade .dots__off {
   border-color: var(--ink-muted);
   opacity: 1;
 }
@@ -1109,7 +1168,8 @@ html:has(.lite) body {
   align-items: center;
   gap: 16px;
   padding: 20px;
-  background: var(--navy);
+  border: 2px solid var(--edge);
+  background: #1c1748;
   color: #fff;
   text-decoration: none;
 }
@@ -1122,7 +1182,7 @@ html:has(.lite) body {
   height: 48px;
   border-radius: 50%;
   background: var(--brand);
-  color: var(--navy);
+  color: #1c1748;
 }
 
 .talk__body {
@@ -1153,7 +1213,7 @@ html:has(.lite) body {
   margin-top: auto;
   padding: 24px 16px 32px;
   border-top: 1px solid var(--hair);
-  background: #fff;
+  background: var(--card);
   text-align: center;
   font-size: 0.8125rem;
   font-weight: 500;
