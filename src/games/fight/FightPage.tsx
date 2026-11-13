@@ -7,6 +7,7 @@ import type { UploadStatus } from '../../shared/online/uploadQueue'
 import { loadNickname } from '../../shared/storage/nickname'
 import { PvpLobby } from '../../shared/ui/PvpLobby'
 import { DuelReadyRoom, RematchReady, usePeerReady } from '../../shared/ui/Ready'
+import { PlayHeader } from '../../shared/ui/PlayHeader'
 import { SoundToggle } from '../../shared/ui/SoundToggle'
 import { GameScreen } from './game/GameScreen'
 import type { MatchSummary } from './play/matchState'
@@ -152,8 +153,7 @@ export function FightPage() {
 
   return (
     <main className={`page ft-page arcade${inGame ? ' arcade--play' : ''}`}>
-      <header className="ft-header">
-        <h1 className="title">격투</h1>
+      <PlayHeader className="ft-header" title="격투" playing={inGame}>
         <SoundToggle />
         {inGame ? (
           <button type="button" className="button button--small" onClick={screen.kind === 'pvp-game' ? leavePvp : toStart}>
@@ -164,7 +164,7 @@ export function FightPage() {
             나가기
           </HomeLink>
         )}
-      </header>
+      </PlayHeader>
 
       {screen.kind === 'start' && (
         <StartScreen

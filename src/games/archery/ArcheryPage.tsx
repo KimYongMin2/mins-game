@@ -3,6 +3,7 @@ import { HomeLink } from '../../shared/ui/HomeLink'
 import { installAudioUnlock } from '../../shared/audio/synth'
 import type { UploadStatus } from '../../shared/online/uploadQueue'
 import { loadNickname } from '../../shared/storage/nickname'
+import { PlayHeader } from '../../shared/ui/PlayHeader'
 import { SoundToggle } from '../../shared/ui/SoundToggle'
 import { GameScreen } from './game/GameScreen'
 import type { RoundSummary } from './play/roundState'
@@ -53,8 +54,7 @@ export function ArcheryPage() {
   const inGame = screen.kind === 'game'
   return (
     <main className={`page ar-page arcade${inGame ? ' arcade--play' : ''}`}>
-      <header className="ar-header">
-        <h1 className="title">양궁</h1>
+      <PlayHeader className="ar-header" title="양궁" playing={inGame}>
         <SoundToggle />
         {screen.kind === 'game' ? (
           <button type="button" className="button button--small" onClick={toStart}>
@@ -65,7 +65,7 @@ export function ArcheryPage() {
             나가기
           </HomeLink>
         )}
-      </header>
+      </PlayHeader>
 
       {screen.kind === 'start' && (
         <StartScreen record={record} onStart={start} onRanking={() => setScreen({ kind: 'ranking' })} />

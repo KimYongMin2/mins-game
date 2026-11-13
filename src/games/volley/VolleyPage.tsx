@@ -7,6 +7,7 @@ import type { Peer, Room } from '../../shared/online/room'
 import { loadNickname } from '../../shared/storage/nickname'
 import { PvpLobby } from '../../shared/ui/PvpLobby'
 import { DuelReadyRoom, RematchReady, usePeerReady } from '../../shared/ui/Ready'
+import { PlayHeader } from '../../shared/ui/PlayHeader'
 import { SoundToggle } from '../../shared/ui/SoundToggle'
 import { GameScreen } from './game/GameScreen'
 import type { VolleyMsg } from './play/net'
@@ -124,8 +125,7 @@ export function VolleyPage() {
 
   return (
     <main className={`page vb-page arcade${inGame ? ' arcade--play' : ''}`}>
-      <header className="vb-header">
-        <h1 className="title">점프 배구</h1>
+      <PlayHeader className="vb-header" title="점프 배구" playing={inGame}>
         <SoundToggle />
         {inGame ? (
           <button type="button" className="button button--small" onClick={screen.kind === 'pvp-game' ? leavePvp : toStart}>
@@ -136,7 +136,7 @@ export function VolleyPage() {
             나가기
           </HomeLink>
         )}
-      </header>
+      </PlayHeader>
 
       {screen.kind === 'start' && (
         <StartScreen record={record} onLevel={(level) => update({ ...record, level })} onBot={play} onPvp={() => setScreen({ kind: 'lobby' })} />

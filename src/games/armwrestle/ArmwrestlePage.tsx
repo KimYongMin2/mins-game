@@ -7,6 +7,7 @@ import type { Peer, Room } from '../../shared/online/room'
 import { loadNickname } from '../../shared/storage/nickname'
 import { PvpLobby } from '../../shared/ui/PvpLobby'
 import { DuelReadyRoom, type ModeSpec, RematchReady, usePeerReady } from '../../shared/ui/Ready'
+import { PlayHeader } from '../../shared/ui/PlayHeader'
 import { SoundToggle } from '../../shared/ui/SoundToggle'
 import { GameScreen } from './game/GameScreen'
 import type { Event } from './constants'
@@ -143,8 +144,7 @@ export function ArmwrestlePage() {
 
   return (
     <main className={`page aw-page arcade${inGame ? ' arcade--play' : ''}`}>
-      <header className="aw-header">
-        <h1 className="title">팔씨름</h1>
+      <PlayHeader className="aw-header" title="팔씨름" playing={inGame}>
         <SoundToggle />
         {inGame ? (
           <button type="button" className="button button--small" onClick={screen.kind === 'pvp-game' ? leavePvp : toStart}>
@@ -155,7 +155,7 @@ export function ArmwrestlePage() {
             나가기
           </HomeLink>
         )}
-      </header>
+      </PlayHeader>
 
       {screen.kind === 'start' && (
         <StartScreen

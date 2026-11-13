@@ -7,6 +7,7 @@ import { loadNickname } from '../../shared/storage/nickname'
 import type { TeamPick } from '../../shared/team/teams'
 import { GroupLobby } from '../../shared/ui/GroupLobby'
 import { RematchReady } from '../../shared/ui/Ready'
+import { PlayHeader } from '../../shared/ui/PlayHeader'
 import { SoundToggle } from '../../shared/ui/SoundToggle'
 import { MAX_PLAYERS, MIN_PLAYERS } from './constants'
 import { GameScreen } from './game/GameScreen'
@@ -100,8 +101,7 @@ export function RoulettePage() {
 
   return (
     <main className={`page rl-page arcade${inGame ? ' arcade--play' : ''}`}>
-      <header className="rl-header">
-        <h1 className="title">러시안룰렛</h1>
+      <PlayHeader className="rl-header" title="러시안룰렛" playing={inGame}>
         <SoundToggle />
         {inGame ? (
           <button type="button" className="button button--small" onClick={screen.kind === 'pvp-game' ? leaveRoom : toStart}>
@@ -112,7 +112,7 @@ export function RoulettePage() {
             나가기
           </HomeLink>
         )}
-      </header>
+      </PlayHeader>
 
       {screen.kind === 'start' && (
         <StartScreen

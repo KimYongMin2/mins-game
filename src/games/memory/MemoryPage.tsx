@@ -7,6 +7,7 @@ import { randomSeed } from '../../shared/random'
 import { loadNickname } from '../../shared/storage/nickname'
 import { PvpLobby } from '../../shared/ui/PvpLobby'
 import { DuelReadyRoom, RematchReady, usePeerReady } from '../../shared/ui/Ready'
+import { PlayHeader } from '../../shared/ui/PlayHeader'
 import { SoundToggle } from '../../shared/ui/SoundToggle'
 import { GameScreen } from './game/GameScreen'
 import type { MatchSummary, Side } from './play/matchState'
@@ -125,8 +126,7 @@ export function MemoryPage() {
 
   return (
     <main className={`page mm-page arcade${inGame ? ' arcade--play' : ''}`}>
-      <header className="mm-header">
-        <h1 className="title">짝맞추기</h1>
+      <PlayHeader className="mm-header" title="짝맞추기" playing={inGame}>
         <SoundToggle />
         {inGame ? (
           <button type="button" className="button button--small" onClick={screen.kind === 'pvp-game' ? leavePvp : toStart}>
@@ -137,7 +137,7 @@ export function MemoryPage() {
             나가기
           </HomeLink>
         )}
-      </header>
+      </PlayHeader>
 
       {screen.kind === 'start' && (
         <StartScreen

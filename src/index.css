@@ -1220,6 +1220,198 @@ html:has(.arcade) body {
   color: var(--ink-muted);
 }
 
+/* ===== 경기 화면 공통 틀 (2026-11-13 '오락기 캐비닛' 시안 — 규칙·3D 장면은 그대로, 둘레만) =====
+   게임 페이지 <main>이 경기 중이면 .arcade--play. 머리말은 [메뉴] 버튼 하나(shared/ui/PlayHeader),
+   경기 장면은 화면 끝까지(위아래 노란 줄), 시간 막대는 네모 칸, 버튼은 아래 그림자가 있는 키캡(누르면 쑥). */
+.arcade {
+  --key-shadow: #110d33;
+}
+
+:root[data-theme='light'] .arcade {
+  --key-shadow: #c2c5da;
+}
+
+.play-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  margin-bottom: 4px;
+}
+
+.play-bar__menu {
+  flex: none;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 2px solid var(--edge);
+  border-radius: 2px;
+  background: var(--card);
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.play-bar__menu i {
+  display: block;
+  width: 18px;
+  height: 2.5px;
+  background: currentColor;
+}
+
+.play-bar__title {
+  font-family: var(--display);
+  font-weight: 400;
+  font-size: 1.25rem;
+  line-height: 1;
+  color: var(--ink);
+}
+
+.play-menu {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: rgba(10, 8, 30, 0.6);
+  animation: fade 140ms var(--ease);
+}
+
+.play-menu__panel {
+  width: 100%;
+  max-width: 360px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 20px;
+  border-top: 4px solid var(--brand);
+  background: var(--card);
+  color: var(--ink);
+  box-shadow: 0 16px 40px -16px rgba(0, 0, 0, 0.5);
+}
+
+.play-menu__title {
+  font-family: var(--display);
+  font-weight: 400;
+  font-size: 1.75rem;
+  line-height: 1;
+}
+
+.play-menu__note {
+  font-size: 0.875rem;
+  color: var(--ink-soft);
+}
+
+.play-menu__back {
+  min-height: 52px;
+  margin-top: 6px;
+}
+
+.play-menu__items {
+  display: grid;
+  gap: 8px;
+}
+
+.play-menu__items .button {
+  width: 100%;
+  min-height: 48px;
+  font-size: 1rem;
+}
+
+/* 키캡 버튼 */
+:where(.arcade--play) .button {
+  border-width: 0;
+  background: var(--raised);
+  box-shadow: 0 5px 0 var(--key-shadow);
+  transition: transform 50ms var(--ease), box-shadow 50ms var(--ease), background-color 120ms var(--ease);
+}
+
+:where(.arcade--play) .button--primary {
+  background: var(--brand);
+  box-shadow: 0 5px 0 var(--brand-shadow);
+}
+
+:where(.arcade--play) .button:active:not(:disabled) {
+  transform: translateY(4px);
+  box-shadow: 0 1px 0 var(--key-shadow);
+}
+
+:where(.arcade--play) .button--primary:active:not(:disabled) {
+  box-shadow: 0 1px 0 var(--brand-shadow);
+}
+
+:where(.arcade--play) .button:disabled {
+  border: 2px dashed var(--edge);
+  background: transparent;
+  box-shadow: none;
+}
+
+.arcade--play .play-menu .button {
+  box-shadow: none;
+  border: 2px solid var(--edge);
+  background: var(--card);
+}
+
+.arcade--play .play-menu .button--primary {
+  border-color: var(--brand);
+  background: var(--brand);
+}
+
+/* 시간 막대: 네모 10칸 */
+.arcade--play :is([class$='-timer']):not(.zb-timer) {
+  height: 10px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: var(--raised);
+  overflow: hidden;
+  -webkit-mask: repeating-linear-gradient(90deg, #000 0 calc(10% - 3px), transparent calc(10% - 3px) 10%);
+  mask: repeating-linear-gradient(90deg, #000 0 calc(10% - 3px), transparent calc(10% - 3px) 10%);
+}
+
+.arcade--play :is([class$='-timer']):not(.zb-timer) > [class*='-timer__fill'] {
+  height: 100%;
+  border-radius: 0;
+}
+
+/* 경기 장면: 화면 끝까지, 위아래 노란 줄 (폰 가로 — 점프 배구처럼 코트를 화면에 꽉 채우는 배치 — 에선 안 함) */
+@media (orientation: portrait), (min-height: 561px) {
+  .arcade--play :is(.zb-field-wrap, .vb-view, .ft-view-wrap, .mm-felt, .aw-view-wrap, .bm-view, .nc-view, .sv3, .rl3, .at-view, .yt-board-wrap, .nt-felt, .bt-view-wrap, .ar-target-wrap) {
+    width: calc(100% + 32px);
+    max-width: none;
+    margin-inline: -16px;
+    border-radius: 0;
+    border-inline: 0;
+    border-block: 3px solid var(--brand);
+  }
+
+  .arcade--play :is(.mm-stage, .nb-stage, .om-stage, .ar-range3d) {
+    width: calc(100% + 32px);
+    max-width: none;
+    margin-inline: -16px;
+    border-radius: 0;
+    border-inline: 0;
+  }
+}
+
+/* 큰 글자 안내 (안타! · 막았다! 등) */
+.arcade--play :is([class$='-banner'], [class*='-banner '], [class$='-banner__title']) {
+  font-family: var(--display);
+  font-weight: 400;
+  letter-spacing: 0;
+}
+
+/* 조작 설명 한 줄: 작게 */
+.arcade--play [class$='-hint'] {
+  font-size: 0.75rem;
+  color: var(--ink-muted);
+}
+
 /* 아래에서 올라오는 창 (게임 창 · 내 정보) */
 .sheet {
   position: fixed;

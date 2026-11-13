@@ -7,6 +7,7 @@ import { loadNickname } from '../../shared/storage/nickname'
 import type { TeamPick } from '../../shared/team/teams'
 import { GroupLobby } from '../../shared/ui/GroupLobby'
 import { RematchReady } from '../../shared/ui/Ready'
+import { PlayHeader } from '../../shared/ui/PlayHeader'
 import { SoundToggle } from '../../shared/ui/SoundToggle'
 import { MAX_PLAYERS, MIN_PLAYERS } from './constants'
 import { GameScreen } from './game/GameScreen'
@@ -99,8 +100,7 @@ export function TilesPage() {
 
   return (
     <main className={`page nt-page arcade${inGame ? ' arcade--play' : ''}`}>
-      <header className="nt-header">
-        <h1 className="title">숫자 잇기</h1>
+      <PlayHeader className="nt-header" title="숫자 잇기" playing={inGame}>
         <SoundToggle />
         {inGame ? (
           <button type="button" className="button button--small" onClick={screen.kind === 'pvp-game' ? leaveRoom : toStart}>
@@ -111,7 +111,7 @@ export function TilesPage() {
             나가기
           </HomeLink>
         )}
-      </header>
+      </PlayHeader>
 
       {screen.kind === 'start' && (
         <StartScreen

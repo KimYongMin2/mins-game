@@ -3,6 +3,7 @@ import { HomeLink } from '../../shared/ui/HomeLink'
 import { installAudioUnlock } from '../../shared/audio/synth'
 import type { UploadStatus } from '../../shared/online/uploadQueue'
 import { loadNickname } from '../../shared/storage/nickname'
+import { PlayHeader } from '../../shared/ui/PlayHeader'
 import { SoundToggle } from '../../shared/ui/SoundToggle'
 import { GameScreen } from './game/GameScreen'
 import type { SessionSummary } from './play/session'
@@ -59,8 +60,7 @@ export function BattingPage() {
   const inGame = screen.kind === 'game'
   return (
     <main className={`page bt-page arcade${inGame ? ' arcade--play' : ''}`}>
-      <header className="bt-header">
-        <h1 className="title">배팅</h1>
+      <PlayHeader className="bt-header" title="배팅" playing={inGame}>
         <SoundToggle />
         {screen.kind === 'game' ? (
           <button type="button" className="button button--small" onClick={toStart}>
@@ -71,7 +71,7 @@ export function BattingPage() {
             나가기
           </HomeLink>
         )}
-      </header>
+      </PlayHeader>
 
       {screen.kind === 'start' && (
         <StartScreen record={record} onChange={(c) => update({ ...record, ...c })} onStart={start} onRanking={toRanking} />

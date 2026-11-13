@@ -8,6 +8,7 @@ import { loadNickname } from '../../shared/storage/nickname'
 import type { TeamPick } from '../../shared/team/teams'
 import { GroupLobby } from '../../shared/ui/GroupLobby'
 import { RematchReady } from '../../shared/ui/Ready'
+import { PlayHeader } from '../../shared/ui/PlayHeader'
 import { SoundToggle } from '../../shared/ui/SoundToggle'
 import { MAX_PLAYERS, MIN_PLAYERS } from './constants'
 import { GameScreen } from './game/GameScreen'
@@ -99,8 +100,7 @@ export function NunchiPage() {
 
   return (
     <main className={`page nc-page arcade${inGame ? ' arcade--play' : ''}`}>
-      <header className="nc-header">
-        <h1 className="title">눈치게임</h1>
+      <PlayHeader className="nc-header" title="눈치게임" playing={inGame}>
         <SoundToggle />
         {inGame ? (
           <button type="button" className="button button--small" onClick={screen.kind === 'pvp-game' ? leaveRoom : toStart}>
@@ -111,7 +111,7 @@ export function NunchiPage() {
             나가기
           </HomeLink>
         )}
-      </header>
+      </PlayHeader>
 
       {screen.kind === 'start' && (
         <StartScreen

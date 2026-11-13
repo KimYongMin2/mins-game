@@ -7,6 +7,7 @@ import { loadNickname } from '../../shared/storage/nickname'
 import type { TeamPick } from '../../shared/team/teams'
 import { GroupLobby } from '../../shared/ui/GroupLobby'
 import { type ModeSpec, RematchReady } from '../../shared/ui/Ready'
+import { PlayHeader } from '../../shared/ui/PlayHeader'
 import { SoundToggle } from '../../shared/ui/SoundToggle'
 import { MAX_PLAYERS, MIN_PLAYERS, PIECE_COUNTS } from './constants'
 import { GameScreen } from './game/GameScreen'
@@ -105,8 +106,7 @@ export function YutPage() {
 
   return (
     <main className={`page yt-page arcade${inGame ? ' arcade--play' : ''}`}>
-      <header className="yt-header">
-        <h1 className="title">윷놀이</h1>
+      <PlayHeader className="yt-header" title="윷놀이" playing={inGame}>
         <SoundToggle />
         {inGame ? (
           <button type="button" className="button button--small" onClick={screen.kind === 'pvp-game' ? leaveRoom : toStart}>
@@ -117,7 +117,7 @@ export function YutPage() {
             나가기
           </HomeLink>
         )}
-      </header>
+      </PlayHeader>
 
       {screen.kind === 'start' && (
         <StartScreen
