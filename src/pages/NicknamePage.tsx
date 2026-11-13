@@ -8,6 +8,7 @@ import {
 } from '../shared/storage/nickname'
 import { GAMES } from './gameList'
 
+// 오락실 테마(2026-11-13): 위에 간판 로고 → 게임 표지 8장 → 이름 정하는 칸(노란 테두리)
 /** 위에 깔리는 게임 표지 몇 장 (진짜 경기 장면) */
 const COVERS = GAMES.filter((g) => g.ready).slice(0, 8)
 
@@ -37,16 +38,16 @@ export function NicknamePage({ onSaved }: Props) {
   }
 
   return (
-    <main className="page page--center nickname">
+    <main className="page page--center nickname arcade">
+      <span className="nickname__logo">MINS GAME</span>
       <div className="nickname__covers" aria-hidden>
         {COVERS.map((g) => (
           <img key={g.id} src={`/covers/${g.id}.jpg`} alt="" loading="lazy" decoding="async" />
         ))}
       </div>
       <div className="nickname__card">
-      <span className="nickname__logo">MINS GAME</span>
       <h1 className="title">{existing ? '닉네임 변경' : '반가워요'}</h1>
-      <p className="subtitle">친구들에게 보일 이름을 정해 주세요</p>
+      <p className="subtitle">친구들에게 보일 이름을 정해 주세요. 나중에 바꿀 수 있어요.</p>
 
       <form className="nickname__form" onSubmit={handleSubmit} noValidate>
         <input

@@ -62,7 +62,7 @@ export function AvatarEditor({ onChange, onDone }: { onChange?: (look: Look) => 
         <div className="avatar-pick__panel">
           {use3D && (
             <Suspense fallback={<div className="avatar-preview" />}>
-              <AvatarPreview3D look={look} />
+              <AvatarPreview3D look={look} background="#3a338a" />
             </Suspense>
           )}
           <div className="avatar-pick__animals" role="radiogroup" aria-label="동물">

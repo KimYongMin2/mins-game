@@ -961,6 +961,61 @@ html:has(.arcade) body {
   }
 }
 
+/* 닉네임 화면 (오락실) */
+.arcade.nickname {
+  min-height: 100dvh;
+  gap: 20px;
+}
+
+.arcade .nickname__logo {
+  font-family: var(--display);
+  font-size: 2.5rem;
+  line-height: 1;
+  letter-spacing: 0.02em;
+  color: var(--brand);
+  text-shadow: 4px 4px 0 #e8473f;
+}
+
+.arcade .nickname__covers {
+  opacity: 1;
+}
+
+.arcade .nickname__covers img {
+  border: 2px solid var(--card);
+  border-radius: 2px;
+}
+
+.arcade .nickname__card {
+  align-items: stretch;
+  text-align: left;
+  border: 3px solid var(--brand);
+  border-radius: 2px;
+  background: var(--card);
+}
+
+.arcade.nickname .title {
+  font-family: var(--display);
+  font-weight: 400;
+  font-size: 2rem;
+  line-height: 1.1;
+  color: #fff;
+}
+
+.arcade.nickname .subtitle {
+  font-size: 0.9375rem;
+  color: var(--ink-soft);
+}
+
+.arcade .nickname__form .input {
+  height: 52px;
+  font-weight: 600;
+}
+
+.arcade .nickname__form .button {
+  min-height: 52px;
+  font-size: 1.0625rem;
+}
+
 /* 창 안의 공통 조각들 (조작법 · 내 전적 · 캐릭터 꾸미기)도 각지게 */
 .arcade .howto__toggle,
 .arcade .my-stats__toggle,
@@ -976,15 +1031,47 @@ html:has(.arcade) body {
   border: 2px solid var(--edge);
 }
 
+.arcade .avatar-pick__item,
+.arcade .avatar-pick__chip {
+  border-color: var(--edge);
+  background: transparent;
+}
+
+.arcade .avatar-pick__item--on {
+  border-color: var(--brand);
+  background: var(--raised);
+  color: var(--brand);
+}
+
 .arcade .avatar-pick__chip--on {
   border-color: var(--brand);
   background: var(--brand);
   color: #1c1748;
 }
 
-.arcade .avatar-pick__item--on {
-  border-color: var(--brand);
-  background: var(--raised);
+.arcade .avatar-pick__swatch {
+  border-color: var(--card);
+  box-shadow: 0 0 0 2px var(--edge);
+}
+
+.arcade .avatar-pick__swatch--on {
+  box-shadow: 0 0 0 3px var(--brand);
+}
+
+.arcade .avatar-pick__label {
+  color: var(--brand);
+}
+
+.arcade .my-stats,
+.arcade .my-stats__cover {
+  border-radius: 2px;
+}
+
+.arcade .me-sheet .game-sheet__label {
+  font-family: var(--display);
+  font-weight: 400;
+  font-size: 1.25rem;
+  color: var(--brand);
 }
 
 /* 예전 메인 카드·인원 배지 (다른 곳에서 쓸 수 있어 남겨 둠) */
