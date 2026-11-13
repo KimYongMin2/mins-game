@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { type ReactNode, useEffect, useState } from 'react'
 import { type ListedRoom, PIN_LENGTH, gameListId, readListedRoom } from '../online/room'
 import { ROOM_NAME_MAX, cleanList, watchRooms } from '../online/roomList'
 
@@ -17,15 +17,17 @@ type Props = {
   /** 목록에서 고름: 비공개면 입력한 코드 */
   onJoin: (room: ListedRoom, pin: string | null) => void
   error?: string
+  /** [방 만들기] 옆에 나란히 놓을 버튼 (메인 게임 창의 [봇이랑 연습]) */
+  side?: ReactNode
 }
 
-export function RoomPicker({ gameId, nickname, onCreate, onJoin, error }: Props) {
+export function RoomPicker({ gameId, nickname, onCreate, onJoin, error, side }: Props) {
   const [creating, setCreating] = useState(false)
   if (creating) return <CreateForm nickname={nickname} onCreate={onCreate} onBack={() => setCreating(false)} />
-  return <RoomList gameId={gameId} onJoin={onJoin} onCreate={() => setCreating(true)} error={error} />
+  return <RoomList gameId={gameId} onJoin={onJoin} onCreate={() => setCreating(true)} error={error} side={side} />
 }
 
-function RoomList({ gameId, onJoin, onCreate, error }: { gameId: string; onJoin: Props['onJoin']; onCreate: () => void; error?: string }) {
+function RoomList({ gameId, onJoin, onCreate, error, side }: { gameId: string; onJoin: Props['onJoin']; onCreate: () => void; error?: string; side?: ReactNode }) {
   const [rooms, setRooms] = useState<ListedRoom[] | null>(null)
   const [offline, setOffline] = useState(false)
   const [asking, setAsking] = useState<string | null>(null)
@@ -37,9 +39,12 @@ function RoomList({ gameId, onJoin, onCreate, error }: { gameId: string; onJoin:
   const sorted = [...(rooms ?? [])].sort((a, b) => Number(open(b)) - Number(open(a)) || b.at - a.at)
   return (
     <div className="room-pick">
-      <button type="button" className="button button--primary pvp-lobby__big" onClick={onCreate}>
-        + 방 만들기
-      </button>
+      <div className={`room-pick__actions${side ? ' room-pick__actions--two' : ''}`}>
+        {side}
+        <button type="button" className="button button--primary pvp-lobby__big" onClick={onCreate}>
+          방 만들기
+        </button>
+      </div>
       {error && (
         <p className="error pvp-lobby__error" role="alert">
           {error}
@@ -53,8 +58,8 @@ function RoomList({ gameId, onJoin, onCreate, error }: { gameId: string; onJoin:
       ) : sorted.length === 0 ? (
         <p className="room-pick__tip">열린 방이 없어요. 새로 만들어 보세요</p>
       ) : (
-        <ul className="room-pick__rooms">
-          {sorted.map((r) => (
+        <ol className="room-pick__rooms">
+          {sorted.map((r, i) => (
             <li key={r.id} className="room-pick__item">
               <button
                 type="button"
@@ -66,6 +71,7 @@ function RoomList({ gameId, onJoin, onCreate, error }: { gameId: string; onJoin:
                   setPin('')
                 }}
               >
+                <span className="room-pick__no">{i + 1}</span>
                 <span className="room-pick__name">
                   {r.name}
                   {r.locked && <span className="open-rooms__lock">비공개</span>}
@@ -97,7 +103,7 @@ function RoomList({ gameId, onJoin, onCreate, error }: { gameId: string; onJoin:
               )}
             </li>
           ))}
-        </ul>
+        </ol>
       )}
     </div>
   )

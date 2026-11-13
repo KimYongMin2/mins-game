@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router'
 import { ANIMAL_NAMES, type Look } from '../shared/art3d/animalKinds'
 import { pvpLink } from '../shared/nav'
@@ -14,9 +14,10 @@ import { GAMES, type GameEntry } from './gameList'
 import { PlayerDots } from './PlayerDots'
 import type { GameStat } from './stats'
 
-// 메인 화면 (unslop 방향: 동네 문방구 오락기·보드게임 상자. 겉은 조용하게, 색은 게임 표지에만, 인원은 사람 점):
-// 위: 로고 · 내 정보 → 크게 '이어서 하기'(최근 게임, 없으면 오늘의 추천) → 거르기(전체 · 1:1 · 여럿이 · 혼자) → 표지 카드들 → 수다방.
-// 표지는 각 게임의 진짜 경기 장면(public/covers). 카드를 누르면 게임 창이 올라오고 그 안에 그 게임의 열린 방 목록 + 방 만들기가 바로 있다.
+// 메인 화면 = 오락실 게임 선택창 (2026-11-13 frontend-design으로 다시 짬 — 사용자가 시안 'A 오락실 메인 + B 게임 창', 제목 글꼴 Black Han Sans를 고름):
+// 위: 로고 · 내 정보 → 크게 고른 게임(처음엔 이어서 하기 / 오늘의 추천) + [1P 혼자 연습] [2P 친구랑 대전] → 거르기 → 표지 칸들(누르면 노란 커서가 옮겨 가고 위에 크게) → 수다방.
+// PC는 방향키로 커서, Enter로 들어가기. 표지는 각 게임의 진짜 경기 장면(public/covers).
+// [2P 친구랑 대전]을 누르면 게임 창이 올라오고 그 안에 [봇이랑 연습] [방 만들기] + 열린 방 목록이 바로 있다.
 // 방을 고르거나 만들면 그 게임으로 가서 바로 방에 들어간다(주소 꼬리 ?mode=pvp&join=… / &create=…, shared/nav.ts).
 // 폰 백키: 창을 열 때 기록을 하나 쌓아 백키는 창만 닫는다.
 
@@ -32,7 +33,6 @@ const asFilter = (x: string | null): Filter => (x === 'duo' || x === 'group' || 
 const sizeOf = (g: GameEntry): Exclude<Filter, 'all'> => (g.players === '1인' ? 'solo' : g.players === '2인' ? 'duo' : 'group')
 const READY = GAMES.filter((g) => g.ready)
 const cover = (g: GameEntry) => `/covers/${g.id}.jpg`
-const modesOf = (g: GameEntry) => (g.play === 'pvp' ? '친구 대전 · 봇 대전' : '혼자 기록 도전 · 랭킹')
 
 /** 오늘의 추천: 날짜마다 바뀜 (친구 대전 되는 게임 중) */
 function todaysPick(): GameEntry {
@@ -51,21 +51,8 @@ function Cover({ game, className }: { game: GameEntry; className: string }) {
   )
 }
 
-/** 들어가기 버튼: 친구랑(게임 창 열기) / 봇이랑·시작(시작 화면) */
-function PlayButtons({ game, onGo, onFriends, onDark = false }: { game: GameEntry; onGo: (path: string) => void; onFriends?: () => void; onDark?: boolean }) {
-  return (
-    <div className="play-buttons">
-      {game.play === 'pvp' && onFriends && (
-        <button type="button" className="button button--primary" onClick={onFriends}>
-          친구랑 하기
-        </button>
-      )}
-      <button type="button" className={`button${game.play === 'solo' ? ' button--primary' : onDark ? ' button--on-dark' : ''}`} onClick={() => onGo(game.path)}>
-        {game.play === 'solo' ? '시작하기' : '봇이랑 하기'}
-      </button>
-    </div>
-  )
-}
+/** 인원 글자: '2~8인' → '2~8명', '2인' → '1:1', '1인' → '혼자' */
+const whoOf = (g: GameEntry) => (g.players === '2인' ? '1:1' : g.players === '1인' ? '혼자' : g.players.replace('인', '명'))
 
 /** 내 전적: 평소엔 한 줄 요약(전체 판 수 · 많이 한 게임)으로 접어 두고 누르면 펼침 (사용자 요청 — 길어지면 아래 캐릭터 꾸미기가 안 보였음) */
 function MyStats() {
@@ -177,60 +164,122 @@ export function MainPage({ nickname }: { nickname: string }) {
     navigate(path, { replace: sheetMarked() })
   }
   const last = READY.find((g) => g.id === recent[0])
-  const hero = last ?? todaysPick()
+  const first = last ?? todaysPick()
+  const [selId, setSelId] = useState(first.id)
+  const sel = READY.find((g) => g.id === selId) ?? first
   const shown = READY.filter((g) => filter === 'all' || sizeOf(g) === filter)
+  const spotRef = useRef<HTMLElement>(null)
+  const shelfRef = useRef<HTMLUListElement>(null)
+
+  // 표지를 누르면 커서만 옮기고, 위 큰 칸이 화면 밖이면 보이게 올린다
+  const pick = (g: GameEntry) => {
+    setSelId(g.id)
+    const box = spotRef.current?.getBoundingClientRect()
+    if (box && box.top < 0) spotRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
+  /** 들어가기: 친구 대전 되는 게임은 게임 창, 혼자 하는 게임은 바로 시작 화면 */
+  const enter = (g: GameEntry) => (g.play === 'pvp' ? setSheet({ kind: 'game', game: g }) : go(g, g.path))
+
+  // PC: 방향키로 커서, Enter로 들어가기 (창이 열려 있거나 글자를 치는 중이면 안 함)
+  const keys = useRef({ shown, sel, enter })
+  keys.current = { shown, sel, enter }
+  useEffect(() => {
+    if (sheet) return
+    const onKey = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement | null
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA')) return
+      const { shown: list, sel: cur, enter: open } = keys.current
+      if (e.key === 'Enter' && (!t || t === document.body)) {
+        e.preventDefault()
+        open(cur)
+        return
+      }
+      const step = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: 0, ArrowDown: 0 }[e.key]
+      if (step === undefined || list.length === 0) return
+      const cols = shelfRef.current ? getComputedStyle(shelfRef.current).gridTemplateColumns.split(' ').length : 4
+      const move = e.key === 'ArrowUp' ? -cols : e.key === 'ArrowDown' ? cols : step
+      const at = list.findIndex((g) => g.id === cur.id)
+      const next = at < 0 ? 0 : Math.min(list.length - 1, Math.max(0, at + move))
+      e.preventDefault()
+      setSelId(list[next].id)
+      document.getElementById(`tile-${list[next].id}`)?.scrollIntoView({ block: 'nearest' })
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [sheet])
 
   return (
-    <main className="home">
+    <main className="home arcade">
       <header className="home__bar">
-        <span className="home__logo">
-          MINS<b>GAME</b>
-        </span>
+        <span className="home__logo">MINS GAME</span>
         <button type="button" className="me-chip" onClick={() => setSheet({ kind: 'me' })}>
           <AvatarFace look={look} size={32} />
           <span className="me-chip__name">{nickname}</span>
         </button>
       </header>
 
-      {/* 이어서 하기 / 오늘의 추천: 경기 장면 위에 글자 */}
-      <section className="hero" aria-label={last ? '이어서 하기' : '오늘의 추천'}>
-        <Cover game={hero} className="hero__cover" />
-        <div className="hero__shade" />
-        <div className="hero__body">
-          <span className="hero__eyebrow">{last ? '이어서 하기' : '오늘의 추천'}</span>
-          <h1 className="hero__title">{hero.title}</h1>
-          <p className="hero__desc">{hero.description}</p>
-          <PlayerDots players={hero.players} />
-          <PlayButtons game={hero} onGo={(path) => go(hero, path)} onFriends={() => setSheet({ kind: 'game', game: hero })} onDark />
+      {/* 고른 게임: 경기 장면 위에 이름 + 들어가기 */}
+      <section className="spot" ref={spotRef} aria-label={`고른 게임 ${sel.title}`} aria-live="polite">
+        <span className="spot__art">
+          <Cover key={sel.id} game={sel} className="spot__cover" />
+          {sel.id === first.id && <span className="spot__tag">{last ? '이어서 하기' : '오늘의 추천'}</span>}
+        </span>
+        <div className="spot__body">
+          <h1 className="spot__title">{sel.title}</h1>
+          <p className="spot__desc">{sel.description}</p>
+          <PlayerDots players={sel.players} />
+          {sel.play === 'pvp' ? (
+            <div className="spot__buttons">
+              <button type="button" className="arc-button arc-button--cyan" onClick={() => go(sel, sel.path)}>
+                <b>1P</b>혼자 연습
+              </button>
+              <button type="button" className="arc-button" onClick={() => setSheet({ kind: 'game', game: sel })}>
+                <b>2P</b>친구랑 대전
+              </button>
+            </div>
+          ) : (
+            <div className="spot__buttons spot__buttons--one">
+              <button type="button" className="arc-button" onClick={() => go(sel, sel.path)}>
+                <b>1P</b>기록 도전 시작
+              </button>
+            </div>
+          )}
         </div>
       </section>
 
       <section className="shelf-section" aria-label="게임">
-        <div className="shelf-head">
-          <h2 className="shelf-head__title">게임 {shown.length}</h2>
-          <div className="filters" role="radiogroup" aria-label="인원으로 거르기">
-            {FILTERS.map((f) => (
-              <button key={f.id} type="button" role="radio" aria-checked={filter === f.id} className={`filters__chip${filter === f.id ? ' filters__chip--on' : ''}`} onClick={() => setFilter(f.id)}>
-                {f.label}
-              </button>
-            ))}
-          </div>
+        <div className="filters" role="radiogroup" aria-label="인원으로 거르기">
+          {FILTERS.map((f) => (
+            <button key={f.id} type="button" role="radio" aria-checked={filter === f.id} className={`filters__chip${filter === f.id ? ' filters__chip--on' : ''}`} onClick={() => setFilter(f.id)}>
+              {f.label}
+            </button>
+          ))}
         </div>
 
-        <ul className="shelf">
+        <ul className="shelf" ref={shelfRef}>
           {shown.map((g) => (
             <li key={g.id}>
-              <button type="button" className="card" onClick={() => setSheet({ kind: 'game', game: g })}>
-                <span className="card__art">
-                  <Cover game={g} className="card__cover" />
+              <button
+                type="button"
+                id={`tile-${g.id}`}
+                className={`tile${g.id === sel.id ? ' tile--on' : ''}`}
+                aria-pressed={g.id === sel.id}
+                onClick={() => (g.id === sel.id ? enter(g) : pick(g))}
+              >
+                <span className="tile__art">
+                  <Cover game={g} className="tile__cover" />
                 </span>
-                <span className="card__title">{g.title}</span>
-                <span className="card__desc">{g.description}</span>
-                <PlayerDots players={g.players} />
+                <span className="tile__title">{g.title}</span>
+                {g.id === sel.id && (
+                  <span className="tile__cursor" aria-hidden>
+                    1P
+                  </span>
+                )}
               </button>
             </li>
           ))}
         </ul>
+        <p className="shelf-tip">한 번 누르면 고르고, 고른 걸 한 번 더 누르면 들어가요</p>
       </section>
 
       <Link className="talk" to="/meeting">
@@ -246,46 +295,45 @@ export function MainPage({ nickname }: { nickname: string }) {
 
       {sheet && (
         <div className="sheet" role="dialog" aria-modal="true" aria-label={sheet.kind === 'me' ? '내 정보' : sheet.game.title} onClick={(e) => e.target === e.currentTarget && setSheet(null)}>
-          <div className="sheet__panel">
+          <div className={`sheet__panel${sheet.kind === 'game' ? ' sheet__panel--game' : ''}`}>
             <button type="button" className="sheet__close" onClick={() => setSheet(null)} aria-label="닫기">
               <IconX size={18} />
             </button>
             {sheet.kind === 'game' ? (
               <div className="game-sheet">
                 <Cover game={sheet.game} className="game-sheet__cover" />
-                <h2 className="game-sheet__title">{sheet.game.title}</h2>
-                <p className="game-sheet__desc">{sheet.game.description}</p>
-                <div className="game-sheet__meta">
-                  <PlayerDots players={sheet.game.players} />
-                  <span>{modesOf(sheet.game)}</span>
+                <div className="game-sheet__body">
+                  <div className="game-sheet__head">
+                    <h2 className="game-sheet__title">{sheet.game.title}</h2>
+                    <span className="game-sheet__who">{whoOf(sheet.game)}</span>
+                  </div>
+                  <p className="game-sheet__desc">{sheet.game.description}</p>
+                  <details className="howto">
+                    <summary className="howto__toggle">조작법 보기</summary>
+                    <ul className="howto__list">
+                      {sheet.game.howto.map((line) => (
+                        <li key={line}>{line}</li>
+                      ))}
+                    </ul>
+                  </details>
+                  {sheet.game.play === 'pvp' ? (
+                    <RoomPicker
+                      gameId={sheet.game.id}
+                      nickname={nickname}
+                      side={
+                        <button type="button" className="button pvp-lobby__big arc-practice" onClick={() => go(sheet.game, sheet.game.path)}>
+                          봇이랑 연습
+                        </button>
+                      }
+                      onCreate={(name, pin) => go(sheet.game, pvpLink(sheet.game.path, { kind: 'create', name, pin }))}
+                      onJoin={(r, pin) => go(sheet.game, pvpLink(sheet.game.path, { kind: 'join', room: r, pin }))}
+                    />
+                  ) : (
+                    <button type="button" className="button button--primary pvp-lobby__big" onClick={() => go(sheet.game, sheet.game.path)}>
+                      기록 도전 시작
+                    </button>
+                  )}
                 </div>
-                <details className="howto">
-                  <summary className="howto__toggle">조작법</summary>
-                  <ul className="howto__list">
-                    {sheet.game.howto.map((line) => (
-                      <li key={line}>{line}</li>
-                    ))}
-                  </ul>
-                </details>
-                {sheet.game.play === 'pvp' ? (
-                  <>
-                    <section className="game-sheet__part" aria-label="혼자 연습">
-                      <h3 className="game-sheet__label">혼자 연습</h3>
-                      <PlayButtons game={sheet.game} onGo={(path) => go(sheet.game, path)} />
-                    </section>
-                    <section className="game-sheet__part" aria-label="친구랑 하기">
-                      <h3 className="game-sheet__label">친구랑 하기</h3>
-                      <RoomPicker
-                        gameId={sheet.game.id}
-                        nickname={nickname}
-                        onCreate={(name, pin) => go(sheet.game, pvpLink(sheet.game.path, { kind: 'create', name, pin }))}
-                        onJoin={(r, pin) => go(sheet.game, pvpLink(sheet.game.path, { kind: 'join', room: r, pin }))}
-                      />
-                    </section>
-                  </>
-                ) : (
-                  <PlayButtons game={sheet.game} onGo={(path) => go(sheet.game, path)} />
-                )}
               </div>
             ) : (
               <div className="me-sheet">
