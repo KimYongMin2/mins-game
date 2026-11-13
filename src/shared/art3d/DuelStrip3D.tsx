@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react'
 import * as THREE from 'three'
 import type { Look } from './animalKinds'
 import { type AnimalRig, makeAnimal } from './animals'
+import { addRoomLight } from './stage'
 
 // 1:1 게임 위쪽 띠: 양쪽 끝에 두 사람의 3D 동물이 상반신으로 서서 가운데(판·카드) 쪽을 본다. 게임 규칙은 모른다.
 // 짝맞추기에서 처음 만들고 오목·숫자야구도 같이 씀. 왼쪽 나(파랑), 오른쪽 상대(빨강). 혼자 하기면 looks 하나(왼쪽만).
@@ -43,6 +44,7 @@ export function DuelStrip3D(props: Props) {
     renderer.domElement.style.cssText = 'display:block;width:100%;height:100%'
     host.appendChild(renderer.domElement)
     const scene = new THREE.Scene()
+    const dropRoomLight = addRoomLight(renderer, scene) // 털·나무에 은은한 반사 (실감 나게)
     scene.add(new THREE.HemisphereLight('#fff6e8', '#5a3a22', 1.15))
     const sun = new THREE.DirectionalLight('#fff4dc', 1.4)
     sun.position.set(2, 6, 8)
@@ -95,6 +97,7 @@ export function DuelStrip3D(props: Props) {
       cancelAnimationFrame(raf)
       ro.disconnect()
       rigs.forEach((r) => r.dispose())
+      dropRoomLight()
       renderer.dispose()
       renderer.domElement.remove()
     }

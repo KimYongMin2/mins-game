@@ -6,7 +6,7 @@ import { NODE_XY, nodeOf } from '../rules/board'
 import type { From, Piece } from '../rules/moves'
 import type { YutView } from '../play/view'
 import { THROW_LABEL, type Throw } from '../rules/throw'
-import { woodTexture } from '../../../shared/art3d/stage'
+import { addRoomLight, woodTexture } from '../../../shared/art3d/stage'
 import { FLAT } from './Sticks'
 
 // 2D 천 윷판(Board) 위에 겹치는 투명한 3D 층: 말을 그 사람(팀전이면 그 팀 첫 사람)의 동물로 세운다 (사용자 요청).
@@ -107,6 +107,7 @@ export function Pieces3D(props: Props) {
     renderer.domElement.style.cssText = 'display:block;width:100%;height:100%'
     host.appendChild(renderer.domElement)
     const scene = new THREE.Scene()
+    const dropRoomLight = addRoomLight(renderer, scene) // 털·나무에 은은한 반사 (실감 나게)
     scene.add(new THREE.HemisphereLight('#fff6e8', '#7a5a3a', 1.2))
     const sun = new THREE.DirectionalLight('#fff4dc', 1.3)
     sun.position.set(-80, 200, 300)
@@ -244,6 +245,7 @@ export function Pieces3D(props: Props) {
       cancelAnimationFrame(raf)
       ro.disconnect()
       rows.flat().forEach((f) => f.rig.dispose())
+      dropRoomLight()
       renderer.dispose()
       renderer.domElement.remove()
     }

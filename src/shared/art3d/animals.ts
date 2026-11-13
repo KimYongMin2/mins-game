@@ -741,6 +741,10 @@ export function makeAnimal(lookIn: Look, shirt: string, opts: { team?: boolean }
   const ease = (cur: number, to: number, k = 0.18) => cur + (to - cur) * k
   let sunk = 0
   let tilted = 0
+  // 살아 있는 느낌 (2026-11-13 '더 사실적이고 역동적이게'): 눈 깜빡임 · 숨쉬기 · 두리번 · 신나면 쭉 늘었다 찌그러짐.
+  // 캐릭터마다 박자가 달라 여럿이 서 있어도 똑같이 움직이지 않음
+  const seed = Math.random() * 10
+  let looked = 0 // 지난 프레임에 더한 두리번 각도 (게임이 정해 둔 고개 방향은 그대로 두려고 더했다 뺌)
 
   function update(t: number, pose: Pose, mood: Mood) {
     setMood(mood)
@@ -782,6 +786,9 @@ export function makeAnimal(lookIn: Look, shirt: string, opts: { team?: boolean }
         bob = Math.abs(Math.sin(t * 6)) * 0.18
         break
     }
+    // 가만히 서 있을 땐 팔도 살짝 흔들림
+    if (pose === 'idle') ax += Math.sin(t * 2.2 + seed) * 0.06
+    if (pose === 'scared') sink = -0.06
     // 한 손 번쩍: 오른손만 위로
     const raise = pose === 'raise'
     if (raise) bob = Math.abs(Math.sin(t * 5)) * 0.06
@@ -797,6 +804,17 @@ export function makeAnimal(lookIn: Look, shirt: string, opts: { team?: boolean }
     bodyG.position.y = sunk + bob
     bodyG.rotation.z = tilted + shake
     head.rotation.z = pose === 'idle' ? Math.sin(t * 1.3 + kind.length) * 0.06 : 0
+    // 두리번 (가만히 있을 때만)
+    head.rotation.y -= looked
+    looked = pose === 'idle' ? Math.sin(t * 0.45 + seed) * 0.16 + Math.sin(t * 1.7 + seed * 2) * 0.03 : ease(looked, 0, 0.2)
+    head.rotation.y += looked
+    // 숨쉬기 + 신날 때 늘었다 찌그러짐
+    const breathe = pose === 'ko' ? 0 : Math.sin(t * 2.1 + seed) * 0.014
+    const squash = pose === 'cheer' ? 0.93 + bob * 0.55 : 1
+    bodyG.scale.set(1 - breathe * 0.5 - (squash - 1) * 0.4, (1 + breathe) * squash, 1 - breathe * 0.5 - (squash - 1) * 0.4)
+    // 눈 깜빡임 (4초쯤마다 0.12초)
+    const blink = (t + seed) % 4.2 < 0.12 ? 0.12 : 1
+    eyes.scale.y = (shownMood === 'happy' ? 1.1 : 1) * blink
     // 꼬리: 신나면 빨리, 평소엔 천천히 흔들기, 쓰러지면 축
     const wag = pose === 'ko' ? 0 : mood === 'happy' ? Math.sin(t * 12) * 0.5 : mood === 'scared' ? Math.sin(t * 30) * 0.12 : Math.sin(t * 2.4) * 0.18
     tail.rotation.y = wag

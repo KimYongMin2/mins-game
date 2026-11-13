@@ -7,6 +7,7 @@ import { PLAYER_COLORS, TANK_CY, WORLD_H, WORLD_W } from '../constants'
 import { type ScreenState, myIndex } from '../play/view'
 import { tankPose } from '../rules/physics'
 import { shakeOf, tankDraws, tankShown } from './Battlefield'
+import { addRoomLight } from '../../../shared/art3d/stage'
 
 // 2D 전장(Battlefield) 위에 겹치는 투명한 3D 층: 대포 포탑 위로 동물이 상반신을 내밀고 타고 있다 (사용자 요청, 야구처럼 2D 위에 겹침).
 // 정사영 카메라를 SVG 범위(가로 0~WORLD_W, 높이 0~WORLD_H)와 똑같이 맞춰 같은 자리에 보인다.
@@ -47,6 +48,7 @@ export function Riders3D(props: Props) {
     renderer.domElement.style.cssText = 'display:block;width:100%;height:100%'
     host.appendChild(renderer.domElement)
     const scene = new THREE.Scene()
+    const dropRoomLight = addRoomLight(renderer, scene) // 털·나무에 은은한 반사 (실감 나게)
     scene.add(new THREE.HemisphereLight('#ffffff', '#8a6a4a', 1.15))
     const sun = new THREE.DirectionalLight('#fff4dc', 1.4)
     sun.position.set(30, 60, 50)
@@ -131,6 +133,7 @@ export function Riders3D(props: Props) {
       cancelAnimationFrame(raf)
       ro.disconnect()
       riders.forEach((r) => r.rig.dispose())
+      dropRoomLight()
       renderer.dispose()
       renderer.domElement.remove()
     }

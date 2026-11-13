@@ -118,6 +118,7 @@ export function Table3D({ screen, onPick }: Props) {
     let yaw = 0
     let lastPhase = ''
     let fireStart = 0
+    let bangedAt = -1
     let raf = 0
     const tmp = new THREE.Vector3()
     function frame() {
@@ -180,6 +181,12 @@ export function Table3D({ screen, onPick }: Props) {
         gun.hammer.rotation.x = tense ? -1.1 : -0.5
         gun.drum.rotation.y = view.pulls * (Math.PI / 3) + (tense ? Math.min(1, sinceFire / 200) * (Math.PI / 3) : 0)
         const bangT = f?.bang && shown ? (sinceFire - SUSPENSE_MS) / 500 : -1
+        // 탕! 한 번: 총구 불꽃 알갱이 + 카메라 크게 당김
+        if (bangT >= 0 && bangedAt !== fireStart) {
+          bangedAt = fireStart
+          stage.kick(1.2)
+          stage.burst(gun.flash.getWorldPosition(new THREE.Vector3()), { color: '#ffcf4a', count: 36, speed: 5, life: 0.6 })
+        }
         gun.flash.visible = bangT >= 0 && bangT < 1
         if (gun.flash.visible) {
           gun.flash.scale.setScalar(0.6 + bangT * 1.4)

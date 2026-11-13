@@ -67,7 +67,12 @@ export function Table3D({ screen }: { screen: ScreenState }) {
         const t = s.now / 1000
         // 겹치는 순간 화면이 살짝 흔들림
         const anyClash = view.presses.some((p) => p.collided)
-        if (anyClash && clashAt < 0) clashAt = s.now
+        if (anyClash && clashAt < 0) {
+          clashAt = s.now
+          // 겹침! 가운데에서 빨간 불똥 + 카메라 당김
+          stage.kick(0.7)
+          stage.burst(new THREE.Vector3(0, 1.6, 0), { color: '#ff6b5e', count: 34, speed: 4 })
+        }
         if (!anyClash) clashAt = -1
         if (view.phase !== lastPhase) lastPhase = view.phase
         const winners = view.phase === 'done' ? (view.teams && view.winTeam !== null ? view.players.map((_, i) => view.teams![i] === view.winTeam) : view.ranks.map((r) => r === 1)) : null

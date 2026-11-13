@@ -127,7 +127,16 @@ export function Table3D({ screen, onPick }: Props) {
         const meNow = myIndex(s)
         const canThrow = canThrowNow(s)
         const side = canThrow ? neighborsOf(view.alive, meNow) : null
-        if (view.phase === 'boom' && lastPhase !== 'boom') boomStart = s.now
+        if (view.phase === 'boom' && lastPhase !== 'boom') {
+          boomStart = s.now
+          // 펑: 카메라 크게 당기고 불똥·불꽃 알갱이
+          if (view.victim !== null) {
+            const at = handsWorld(view.victim)
+            stage.kick(1.3)
+            stage.burst(at, { color: '#ffb020', count: 46, speed: 5.5, size: 0.24, life: 0.9 })
+            stage.burst(at, { color: '#ff4d2e', count: 26, speed: 3.5, size: 0.3, life: 0.7 })
+          }
+        }
         lastPhase = view.phase
         const blastT = view.phase === 'boom' && view.victim !== null ? (s.now - boomStart) / BLAST_MS : -1
         const winners = view.phase === 'done' ? (view.teams && view.winner !== null ? view.players.map((_, i) => view.teams![i] === view.winner) : view.alive) : null

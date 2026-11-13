@@ -5,6 +5,7 @@ import { type AnimalRig, makeAnimal } from '../../../shared/art3d/animals'
 import { COURT_W } from '../constants'
 import type { Side, SimState } from '../play/sim'
 import { GROUND, VIEW_H } from './Court'
+import { addRoomLight } from '../../../shared/art3d/stage'
 
 // 2D 해변 코트(Court part="back") 위에 겹치는 투명한 3D 층: 두 선수만 동물 캐릭터로 그린다 (야구와 같은 방식).
 // 코트·공·네트·물리는 2D 그대로. 정사영 카메라를 SVG 범위(가로 0~COURT_W, 높이 −(VIEW_H−GROUND)~GROUND)와 똑같이 맞춰,
@@ -44,6 +45,7 @@ export function Players3D(props: Props) {
     renderer.domElement.style.cssText = 'display:block;width:100%;height:100%'
     host.appendChild(renderer.domElement)
     const scene = new THREE.Scene()
+    const dropRoomLight = addRoomLight(renderer, scene) // 털·나무에 은은한 반사 (실감 나게)
     scene.add(new THREE.HemisphereLight('#ffffff', '#e8c77a', 1.15))
     const sun = new THREE.DirectionalLight('#fff4dc', 1.5)
     sun.position.set(6, 12, 10)
@@ -134,6 +136,7 @@ export function Players3D(props: Props) {
       cancelAnimationFrame(raf)
       ro.disconnect()
       players.forEach(({ rig }) => rig.dispose())
+      dropRoomLight()
       renderer.dispose()
       renderer.domElement.remove()
     }

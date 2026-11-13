@@ -5,6 +5,7 @@ import { makeAnimal } from '../../../shared/art3d/animals'
 import { BATTER_X, MOUND_HEIGHT, PITCHER_DISTANCE, PLAYER_HEIGHT } from '../constants'
 import { type Camera, FIELD_ASPECT, screenUnit } from './camera'
 import { type Impact, shakeOf } from './impact'
+import { addRoomLight } from '../../../shared/art3d/stage'
 
 // 2D 야구장(Field) 위에 겹치는 투명한 3D 층: 투수·타자만 동물 캐릭터로 그린다.
 // 경기장·공·효과·카메라는 2D 그대로라 타이밍이 예전과 똑같다 (3D 경기장은 원근 때문에 너무 어려워서 되돌림).
@@ -44,6 +45,7 @@ export function Players3D(props: Props) {
     renderer.domElement.style.cssText = 'display:block;width:100%;height:100%'
     host.appendChild(renderer.domElement)
     const scene = new THREE.Scene()
+    const dropRoomLight = addRoomLight(renderer, scene) // 털·나무에 은은한 반사 (실감 나게)
     scene.add(new THREE.HemisphereLight('#ffffff', '#6b8f5a', 1.1))
     const sun = new THREE.DirectionalLight('#fff4dc', 1.4)
     sun.position.set(30, 25, 10)
@@ -164,6 +166,7 @@ export function Players3D(props: Props) {
       batter.dispose()
       bat.geometry.dispose()
       ;(bat.material as THREE.Material).dispose()
+      dropRoomLight()
       renderer.dispose()
       renderer.domElement.remove()
     }

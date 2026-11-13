@@ -3,6 +3,7 @@ import * as THREE from 'three'
 import type { Look } from '../../../shared/art3d/animalKinds'
 import { type AnimalRig, makeAnimal } from '../../../shared/art3d/animals'
 import type { Distance } from '../constants'
+import { addRoomLight } from '../../../shared/art3d/stage'
 
 // 양궁 위쪽 띠의 실사풍 3D 사로 (사용자 요청 — '실사처럼'). 예전 옆모습 선화(SideView)와 같은 배치:
 // 왼쪽에 내 캐릭터가 활을 들고, 거리가 멀수록 과녁(볏짚 받침)이 오른쪽으로 멀어진다. 단위는 SideView와 같은 화면 단위(가로 100).
@@ -106,6 +107,8 @@ export function Range3D(props: Props) {
     host.appendChild(renderer.domElement)
 
     const scene = new THREE.Scene()
+
+    const dropRoomLight = addRoomLight(renderer, scene) // 털·나무에 은은한 반사 (실감 나게)
     scene.background = new THREE.Color('#bfdcf2')
     scene.fog = new THREE.Fog('#bfdcf2', 90, 220)
     scene.add(new THREE.HemisphereLight('#eef6ff', '#4f7a3a', 1.2))
@@ -274,6 +277,7 @@ export function Range3D(props: Props) {
           m.dispose()
         }
       })
+      dropRoomLight()
       renderer.dispose()
       renderer.domElement.remove()
     }

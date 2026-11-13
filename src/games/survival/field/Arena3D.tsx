@@ -138,7 +138,7 @@ export function Arena3D({ screen, onPointer }: Props) {
     const first = screenRef.current.view
     if (!host || !first) return
     const FULL = first.startHalf
-    const stage = createStage(host, { background: '#2a2a33', fov: 38 })
+    const stage = createStage(host, { background: '#2a2a33', fov: 38, sway: 0 }) // 정확히 눌러야 해서 손카메라 흔들림 없음
     const { scene, camera } = stage
     scene.fog = null
     stage.lamp.position.set(FULL * S * 0.4, FULL * S * 2.6, FULL * S * 0.8)
@@ -251,6 +251,8 @@ export function Arena3D({ screen, onPointer }: Props) {
 
     let raf = 0
     const tmp = new THREE.Vector3()
+    let burstRound: unknown = null
+    const burstDone = new Set<number>()
     function frame() {
       const s = screenRef.current
       const view = s.view
@@ -288,6 +290,16 @@ export function Arena3D({ screen, onPointer }: Props) {
           }
           rig.root.visible = !!pos
           mark.visible = !!pos && dead
+          // 레이저에 맞는 순간 한 번: 빨간 불똥 + 카메라 살짝 당김
+          if (r !== burstRound) {
+            burstRound = r
+            burstDone.clear()
+          }
+          if (dead && pos && view.phase !== 'done' && !burstDone.has(i)) {
+            burstDone.add(i)
+            stage.kick(0.5)
+            stage.burst(at3(pos).add(new THREE.Vector3(0, 0.25, 0)), { color: '#ff5a4a', count: 26, speed: 2.6, size: 0.12 })
+          }
           if (!pos) return
           mark.position.set(pos.x * S, 0.03, pos.y * S)
           rig.root.position.copy(at3(pos))

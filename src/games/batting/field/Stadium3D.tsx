@@ -5,6 +5,7 @@ import { type AnimalRig, makeAnimal } from '../../../shared/art3d/animals'
 import type { Hand } from '../constants'
 import { CAMERA, FOCAL, HORIZON_Y, VIEW_H, VIEW_W } from './view'
 import type { PitcherPose, SwingPose } from './FrontView'
+import { addRoomLight } from '../../../shared/art3d/stage'
 
 // 배팅 실사풍 3D 뒤 배경 (사용자 요청 — '실사처럼'): 잔디·흙 내야·마운드·홈플레이트·파울선·외야 펜스·관중석·하늘,
 // 투수와 타자는 3D 동물. 존·공·궤적·× 표시는 위의 2D 그림(FrontView scene3d) 그대로라 판정·타이밍은 예전과 똑같다.
@@ -188,6 +189,8 @@ export function Stadium3D(props: Props) {
     host.appendChild(renderer.domElement)
 
     const scene = new THREE.Scene()
+
+    const dropRoomLight = addRoomLight(renderer, scene) // 털·나무에 은은한 반사 (실감 나게)
     // 하늘: 위는 짙은 파랑 → 지평선 쪽 옅게 (큰 공 안쪽에 그림)
     const skyTex = (() => {
       const c = document.createElement('canvas')
@@ -346,6 +349,7 @@ export function Stadium3D(props: Props) {
           m.dispose()
         }
       })
+      dropRoomLight()
       renderer.dispose()
       renderer.domElement.remove()
     }

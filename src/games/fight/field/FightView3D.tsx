@@ -208,12 +208,30 @@ export function FightView3D(props: Props) {
     const tmp = new THREE.Vector3()
 
     let raf = 0
+    let fired = false // 이번 공개의 부딪힘 연출(카메라 당김·불꽃)을 했는지
     function frame() {
       const { fighters: shows, reveal, winner } = propsRef.current
       const t = performance.now() / 1000
       const p = reveal ?? 0
       const hits = shows.filter((f) => !f.hidden && f.event && isHurt(f.event))
       const strong = hits.some((f) => f.event !== 'hurt')
+      if (reveal === null) fired = false
+      else if (!fired && fighters.every((f) => f.rig)) {
+        fired = true
+        // 맞은 쪽 얼굴에서 불꽃, 막으면 파란 불똥, 맞부딪히면 흰 불꽃 + 카메라 당김
+        shows.forEach((sh, i) => {
+          if (sh.hidden || !sh.event) return
+          const head = fighters[i].rig.head.getWorldPosition(new THREE.Vector3())
+          if (isHurt(sh.event)) {
+            stage.burst(head.add(new THREE.Vector3(fighters[i].dir * 0.4, 0, 0.3)), { color: sh.event === 'hurt' ? '#ffd23f' : '#ff7a3d', count: sh.event === 'hurt' ? 22 : 40, speed: sh.event === 'hurt' ? 3 : 4.6 })
+          } else if (sh.event === 'block') {
+            stage.burst(new THREE.Vector3(fighters[i].x + fighters[i].dir * 0.3, 1.3, 0.3), { color: '#9fd0ff', count: 18, speed: 2.6, life: 0.5 })
+          }
+        })
+        if (shows[0].event === 'clash') stage.burst(new THREE.Vector3((fighters[0].x + fighters[1].x) / 2, 1.6, 0.3), { color: '#fff7ae', count: 30, speed: 4 })
+        if (hits.length > 0) stage.kick(strong ? 1 : 0.55)
+        else if (shows[0].event === 'clash') stage.kick(0.45)
+      }
       const amp = reveal !== null && hits.length > 0 && p < 0.3 ? (strong ? 0.12 : 0.06) * (1 - p / 0.3) : 0
       camera.position.set(camBase.x + Math.sin(p * 90) * amp, camBase.y + Math.cos(p * 70) * amp * 0.6, camBase.z)
       camera.lookAt(look)

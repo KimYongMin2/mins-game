@@ -208,6 +208,13 @@ export function ArmView3D(props: Props) {
       if (winner !== lastWinner) {
         lastWinner = winner
         slamAt = winner === null ? 0 : t
+        // 쾅: 이긴 쪽 패드에서 먼지·불꽃 + 카메라 당김
+        if (winner !== null) {
+          const at = new THREE.Vector3((winner === 0 ? -1 : 1) * FOREARM * Math.sin(MAX_TILT), TABLE_Y + 0.12, 0.3)
+          stage.kick(0.9)
+          stage.burst(at, { color: '#ffd23f', count: 30, speed: 3.8 })
+          stage.burst(at, { color: '#c9a27a', count: 20, speed: 2, size: 0.22, gravity: 2, life: 0.9 })
+        }
       }
       // 끝나면 이긴 쪽 패드에 쾅 (조금 더 넘어가 닿음)
       const target = winner === null ? pos * MAX_TILT : (winner === 0 ? 1 : -1) * MAX_TILT * 1.12
