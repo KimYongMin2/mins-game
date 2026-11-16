@@ -13,6 +13,8 @@ export type NumbaseballMsg =
   | { t: 'start'; length: Length; guestFirst: boolean }
   /** 내 숫자를 정했음 (숫자는 안 보냄) */
   | { t: 'locked' }
+  /** 우리 게임 서버가 심판일 때: 내 숫자를 서버에만 맡김 (서버가 상대에게 'locked'만 알리고 판정·공개도 서버가) */
+  | { t: 'secret'; digits: number[] }
   /** n번째로 부른 숫자 */
   | { t: 'guess'; n: number; digits: number[] }
   /** 상대가 n번째로 부른 숫자의 판정 */
@@ -28,13 +30,15 @@ export function firstOf(msg: Extract<NumbaseballMsg, { t: 'start' }>, role: 'hos
 const scoreOf = (m: { strike: number; ball: number }): Score => ({ strike: m.strike, ball: m.ball })
 
 /** 상태가 prev → next로 바뀌면서 상대에게 보낼 메시지 */
-export function outbox(prev: MatchState, next: MatchState): NumbaseballMsg[] {
+export function outbox(prev: MatchState, next: MatchState, server = false): NumbaseballMsg[] {
   const out: NumbaseballMsg[] = []
-  if (!prev.locked[0] && next.locked[0]) out.push({ t: 'locked' })
+  if (!prev.locked[0] && next.locked[0] && next.secrets[0]) out.push(server ? { t: 'secret', digits: [...next.secrets[0]] } : { t: 'locked' })
   // 내가 부른 것
   for (let n = prev.guesses[0].length; n < next.guesses[0].length; n++) {
     out.push({ t: 'guess', n, digits: [...next.guesses[0][n].digits] })
   }
+  // 서버 심판이면 판정·공개는 서버가 한다
+  if (server) return out
   // 상대가 부른 것의 판정 (받자마자 내 기기에서 판정됨)
   for (let n = prev.guesses[1].length; n < next.guesses[1].length; n++) {
     const s = next.guesses[1][n].score

@@ -1,4 +1,5 @@
 import { Suspense, lazy, useEffect, useReducer, useRef, useState } from 'react'
+import { REFEREE_FROM } from '../../../shared/online/hubProtocol'
 import { type Look, opponentLook, plainLook } from '../../../shared/art3d/animalKinds'
 import type { Reaction } from '../../../shared/art3d/DuelStrip3D'
 import { canWebGL } from '../../../shared/art3d/webgl'
@@ -187,7 +188,10 @@ export function GameScreen({ mode, difficulty, length, pvp, onFinish, onQuit }: 
   // 친구 대전: 받은 메시지를 경기에 넣고, 상대가 나가면 알린다
   useEffect(() => {
     if (!pvp) return
-    const offMsg = pvp.room.onMessage((msg) => {
+    // 우리 게임 서버가 심판이면 정함·부름·판정·공개는 서버가 보낸 것만 (방장 폰이 지어내지 못하게)
+    const server = !!pvp.room.hasReferee?.('numbaseball')
+    const offMsg = pvp.room.onMessage((msg, from) => {
+      if (server && from !== REFEREE_FROM) return
       const action = actionOf(msg)
       if (action) dispatch(action)
     })
@@ -204,7 +208,7 @@ export function GameScreen({ mode, difficulty, length, pvp, onFinish, onQuit }: 
   const sentRef = useRef(state)
   useEffect(() => {
     if (!pvp) return
-    for (const msg of outbox(sentRef.current, state)) pvp.room.send(msg)
+    for (const msg of outbox(sentRef.current, state, !!pvp.room.hasReferee?.('numbaseball'))) pvp.room.send(msg)
     sentRef.current = state
   }, [pvp, state])
 

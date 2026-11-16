@@ -128,3 +128,44 @@ describe('나머지 서버 심판 (봇과 한참 돌려도 안 멈춤)', () => {
     })
   }
 })
+
+import { createMatch as createNb, matchReducer as nbReducer, type MatchState as NbState } from '../../games/numbaseball/play/matchState'
+import { actionOf as nbAction, outbox as nbOutbox, type NumbaseballMsg } from '../../games/numbaseball/play/pvp'
+import { numbaseballReferee } from './numbaseball'
+
+describe('숫자야구 서버 심판', () => {
+  it('두 폰이 서버를 거쳐 끝까지 같은 결과, 숫자는 끝나고서야 상대에게 감, 거짓 판정은 버림', () => {
+    const inbox: Record<string, NumbaseballMsg[]> = { H: [], G: [] }
+    const f = fakeCtx([{ id: 'H', role: 'host' }, { id: 'G', role: 'guest' }])
+    f.ctx.sendTo = (k, m) => inbox[k].push(m as NumbaseballMsg)
+    const ref = numbaseballReferee({ length: 3, guestFirst: false }, f.ctx)!
+    let h: NbState = createNb({ now: f.now, seed: 1, mode: 'pvp', difficulty: 'normal', length: 3, first: 0 })
+    let g: NbState = createNb({ now: f.now, seed: 2, mode: 'pvp', difficulty: 'normal', length: 3, first: 1 })
+    // 방장이 거짓 판정을 보내 봐도 서버가 버림
+    expect(ref.input('H', { t: 'answer', n: 0, strike: 3, ball: 0 })).toBe(true)
+    let revealedEarly = false
+    for (let i = 0; i < 20000 && (h.phase.kind !== 'done' || g.phase.kind !== 'done'); i++) {
+      f.advance(200)
+      const ph = h, pg = g
+      h = nbReducer(h, { type: 'tick', now: f.now })
+      g = nbReducer(g, { type: 'tick', now: f.now })
+      for (const m of nbOutbox(ph, h, true)) ref.input('H', m)
+      for (const m of nbOutbox(pg, g, true)) ref.input('G', m)
+      for (const [k, msgs] of Object.entries(inbox)) {
+        for (const m of msgs.splice(0)) {
+          if (m.t === 'reveal' && (k === 'H' ? h : g).phase.kind !== 'done' && (k === 'H' ? h : g).phase.kind !== 'result') revealedEarly = true
+          const a = nbAction(m)
+          if (!a) continue
+          if (k === 'H') h = nbReducer(h, a)
+          else g = nbReducer(g, a)
+        }
+      }
+    }
+    expect(h.phase.kind).toBe('done')
+    expect(g.phase.kind).toBe('done')
+    const wh = h.phase.kind === 'done' ? h.phase.winner : null
+    const wg = g.phase.kind === 'done' ? g.phase.winner : null
+    expect(wh === 'draw' ? wg === 'draw' : wg === (wh === 0 ? 1 : 0)).toBe(true)
+    expect(revealedEarly).toBe(false)
+  })
+})

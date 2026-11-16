@@ -127,6 +127,8 @@ export function NumbaseballPage() {
   function startPvp(room: Room<NumbaseballMsg>) {
     goRef.current = false
     const msg = { t: 'start', length: recordRef.current.length, guestFirst: Math.random() < 0.5 } as const
+    // 우리 게임 서버가 있으면 숫자 보관·판정을 서버에 맡긴다 (조작 막기 3단계). 시작 메시지보다 먼저
+    if (room.hasReferee?.('numbaseball')) room.startReferee?.('numbaseball', { length: msg.length, guestFirst: msg.guestFirst })
     room.send(msg)
     setScreen({ kind: 'pvp-game', key: Date.now(), length: msg.length, first: firstOf(msg, 'host') })
   }

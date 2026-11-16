@@ -5536,6 +5536,93 @@ function nunchiReferee(setup, ctx) {
 	});
 }
 //#endregion
+//#region src/games/numbaseball/rules/numbers.ts
+function isValidNumber(digits, length) {
+	return digits.length === length && digits[0] !== 0 && digits.every((d) => Number.isInteger(d) && d >= 0 && d <= 9) && new Set(digits).size === length;
+}
+function score$1(secret, guess) {
+	let strike = 0;
+	let ball = 0;
+	guess.forEach((d, i) => {
+		if (secret[i] === d) strike++;
+		else if (secret.includes(d)) ball++;
+	});
+	return {
+		strike,
+		ball
+	};
+}
+const isSolved = (s, length) => s.strike === length;
+//#endregion
+//#region src/server/referees/numbaseball.ts
+function numbaseballReferee(setup, ctx) {
+	const o = setup ?? {};
+	const length = o.length === 3 || o.length === 4 ? o.length : null;
+	const members = ctx.members();
+	const host = members.find((m) => m.role === "host");
+	const guest = members.find((m) => m.role === "guest");
+	if (!length || !host || !guest || typeof o.guestFirst !== "boolean") return null;
+	const first = o.guestFirst ? guest.id : host.id;
+	const second = o.guestFirst ? host.id : guest.id;
+	const other = (k) => k === host.id ? guest.id : host.id;
+	const secrets = /* @__PURE__ */ new Map();
+	const tries = /* @__PURE__ */ new Map([[host.id, []], [guest.id, []]]);
+	let doneAt = null;
+	const isDigits = (x) => Array.isArray(x) && x.length === length && x.every((d) => Number.isInteger(d) && d >= 0 && d <= 9);
+	return {
+		input(from, msg) {
+			const m = msg ?? {};
+			if (m.t === "answer" || m.t === "reveal" || m.t === "locked") return true;
+			if (m.t !== "secret" && m.t !== "guess") return false;
+			const mine = tries.get(from);
+			if (!mine || doneAt !== null) return true;
+			if (m.t === "secret") {
+				if (secrets.has(from) || !isDigits(m.digits) || !isValidNumber(m.digits, length)) return true;
+				secrets.set(from, m.digits);
+				ctx.sendTo(other(from), { t: "locked" });
+				return true;
+			}
+			const theirs = secrets.get(other(from));
+			if (!secrets.has(from) || !theirs || !isDigits(m.digits) || !isValidNumber(m.digits, length) || m.n !== mine.length) return true;
+			const a = tries.get(first).length;
+			const b = tries.get(second).length;
+			if (!(from === first ? a === b : a === b + 1) || mine.length >= 12) return true;
+			const s = score$1(theirs, m.digits);
+			mine.push({
+				digits: m.digits,
+				solved: isSolved(s, length)
+			});
+			ctx.sendTo(other(from), {
+				t: "guess",
+				n: m.n,
+				digits: m.digits
+			});
+			ctx.sendTo(from, {
+				t: "answer",
+				n: m.n,
+				strike: s.strike,
+				ball: s.ball
+			});
+			const [x, y] = [tries.get(first), tries.get(second)];
+			if (x.length === y.length && (x.some((t) => t.solved) || y.some((t) => t.solved) || x.length >= 12)) {
+				doneAt = ctx.now();
+				ctx.sendTo(host.id, {
+					t: "reveal",
+					digits: [...secrets.get(guest.id)]
+				});
+				ctx.sendTo(guest.id, {
+					t: "reveal",
+					digits: [...secrets.get(host.id)]
+				});
+			}
+			return true;
+		},
+		tick() {},
+		leave() {},
+		finished: () => doneAt !== null && ctx.now() - doneAt > 5e3
+	};
+}
+//#endregion
 //#region src/games/roulette/constants.ts
 /** 시작 전 안내 */
 const INTRO_MS$2 = 1500;
@@ -7571,7 +7658,8 @@ const REFEREES = {
 	survival: survivalReferee,
 	yut: yutReferee,
 	tiles: tilesReferee,
-	artillery: artilleryReferee
+	artillery: artilleryReferee,
+	numbaseball: numbaseballReferee
 };
 //#endregion
 //#region game-server/main.ts
