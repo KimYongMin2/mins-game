@@ -4469,7 +4469,7 @@ function afterBoom$1(s) {
 	};
 	return startTurn$2(s, nextAlive$1(s, s.turn));
 }
-function drop$7(s, player) {
+function drop$8(s, player) {
 	if (!s.tanks[player].alive || s.phase.kind === "done") return s;
 	const next = {
 		...s,
@@ -4490,7 +4490,7 @@ function drop$7(s, player) {
 	if (s.phase.kind === "aim" && s.turn === player) return startTurn$2(next, nextAlive$1(next, player));
 	return next;
 }
-function tick$9(s) {
+function tick$10(s) {
 	const { phase, now } = s;
 	switch (phase.kind) {
 		case "countdown": return now >= phase.until ? startTurn$2(s, s.turn) : s;
@@ -4512,7 +4512,7 @@ function tick$9(s) {
 }
 function engineReducer$7(state, action) {
 	switch (action.type) {
-		case "tick": return tick$9({
+		case "tick": return tick$10({
 			...state,
 			now: action.now
 		});
@@ -4520,7 +4520,7 @@ function engineReducer$7(state, action) {
 		case "fire":
 			if (state.phase.kind !== "aim" || action.player !== state.turn || !state.tanks[action.player].alive) return state;
 			return launch(setAim(state, action.player, action.x, action.angle, action.power));
-		case "drop": return drop$7(state, action.player);
+		case "drop": return drop$8(state, action.player);
 	}
 }
 /** 사람별 등수 (1 = 우승). 끝나기 전이면 남은 사람은 모두 1 */
@@ -5008,7 +5008,7 @@ function pass(state, from, to) {
 		passes: state.passes.map((n, i) => i === from ? n + 1 : n)
 	};
 }
-function drop$6(state, player) {
+function drop$7(state, player) {
 	if (!state.alive[player] || state.phase.kind === "done") return state;
 	let next = eliminate(state, player);
 	const left = aliveIndexes$3(next);
@@ -5033,7 +5033,7 @@ function drop$6(state, player) {
 	}
 	return next;
 }
-function tick$8(state) {
+function tick$9(state) {
 	const { phase, now } = state;
 	switch (phase.kind) {
 		case "countdown": return now >= phase.until ? startPlay(state) : state;
@@ -5046,12 +5046,12 @@ function tick$8(state) {
 }
 function engineReducer$6(state, action) {
 	switch (action.type) {
-		case "tick": return tick$8({
+		case "tick": return tick$9({
 			...state,
 			now: action.now
 		});
 		case "pass": return pass(state, action.from, action.to);
-		case "drop": return drop$6(state, action.player);
+		case "drop": return drop$7(state, action.player);
 	}
 }
 /** 순위: 1등(끝까지 남은 사람)부터. 끝나기 전이면 남은 사람들은 순서 없이 앞에 */
@@ -5158,6 +5158,12 @@ const GUESS_POINTS = [
 ];
 /** 보기로 맞히면 점수 절반 (올림) */
 const CHOICE_RATE = .5;
+/** 제시어 보여주기 */
+const VOTE_WORD_MS = 3e3;
+const VOTE_DRAW_MS = 6e4;
+const VOTE_PICK_MS = 15e3;
+/** 판 결과(누가 그렸는지·표) 보여주기 */
+const VOTE_RESULT_MS = 6e3;
 //#endregion
 //#region src/games/doodle/words.ts
 const WORD_GROUPS = {
@@ -5431,7 +5437,7 @@ function groupOf(word) {
 const normalizeGuess = (s) => s.replace(/\s+/g, "").toLowerCase();
 //#endregion
 //#region src/games/doodle/play/engine.ts
-function shuffle(rng, xs) {
+function shuffle$1(rng, xs) {
 	const a = [...xs];
 	for (let i = a.length - 1; i > 0; i--) {
 		const j = Math.floor(rng.next() * (i + 1));
@@ -5456,7 +5462,7 @@ const activePlayers = (s) => s.players.flatMap((_, i) => s.left[i] ? [] : [i]);
 function createEngine$5(opts) {
 	const rng = createRng(opts.seed);
 	const n = opts.players.length;
-	const base = shuffle(rng, opts.players.map((_, i) => i));
+	const base = shuffle$1(rng, opts.players.map((_, i) => i));
 	const order = n <= 3 ? [...base, ...base] : base;
 	return {
 		now: opts.now,
@@ -5483,7 +5489,7 @@ function nextTurn$2(s) {
 	if (turnNo >= s.order.length) return finish$2(s);
 	const rng = createRng(s.seed);
 	const fresh = WORDS.filter((w) => !s.used.includes(w));
-	const pool = shuffle(rng, fresh.length >= 2 ? fresh : WORDS);
+	const pool = shuffle$1(rng, fresh.length >= 2 ? fresh : WORDS);
 	const a = pool[0];
 	const b = pool.find((w) => groupOf(w) !== groupOf(a)) ?? pool[1];
 	const drawer = s.order[turnNo];
@@ -5502,9 +5508,9 @@ function nextTurn$2(s) {
 /** 보기 4개: 정답 + 같은 갈래에서 3개 (모자라면 아무거나) */
 function choicesFor(rng, word) {
 	const group = groupOf(word);
-	const same = shuffle(rng, (group ? WORD_GROUPS[group] : WORDS).filter((w) => w !== word));
-	const others = shuffle(rng, WORDS.filter((w) => w !== word && !same.includes(w)));
-	return shuffle(rng, [word, ...[...same, ...others].slice(0, 3)]);
+	const same = shuffle$1(rng, (group ? WORD_GROUPS[group] : WORDS).filter((w) => w !== word));
+	const others = shuffle$1(rng, WORDS.filter((w) => w !== word && !same.includes(w)));
+	return shuffle$1(rng, [word, ...[...same, ...others].slice(0, 3)]);
 }
 function startDraw(s, index) {
 	if (s.phase.kind !== "choose") return s;
@@ -5600,7 +5606,7 @@ function pick$2(s, player, index) {
 		}
 	};
 }
-function drop$5(s, player) {
+function drop$6(s, player) {
 	if (s.left[player] || s.phase.kind === "done") return s;
 	let next = addLog({
 		...s,
@@ -5614,7 +5620,7 @@ function drop$5(s, player) {
 	}
 	return next;
 }
-function tick$7(s) {
+function tick$8(s) {
 	const { phase, now } = s;
 	switch (phase.kind) {
 		case "intro": return now >= phase.until ? nextTurn$2(s) : s;
@@ -5633,14 +5639,14 @@ function tick$7(s) {
 }
 function engineReducer$5(s, a) {
 	switch (a.type) {
-		case "tick": return tick$7({
+		case "tick": return tick$8({
 			...s,
 			now: a.now
 		});
 		case "choose": return s.phase.kind === "choose" && s.phase.drawer === a.player ? startDraw(s, a.index) : s;
 		case "guess": return guess(s, a.player, a.text);
 		case "pick": return pick$2(s, a.player, a.index);
-		case "drop": return drop$5(s, a.player);
+		case "drop": return drop$6(s, a.player);
 	}
 }
 /** 순위 (점수 높은 순, 같으면 같은 등수) */
@@ -5755,10 +5761,204 @@ function changeKey(s) {
 	].join("|");
 }
 //#endregion
+//#region src/games/doodle/play/voteEngine.ts
+function shuffle(rng, xs) {
+	const a = [...xs];
+	for (let i = a.length - 1; i > 0; i--) {
+		const j = Math.floor(rng.next() * (i + 1));
+		[a[i], a[j]] = [a[j], a[i]];
+	}
+	return a;
+}
+const activeOf = (s) => s.players.flatMap((_, i) => s.left[i] ? [] : [i]);
+function createVote(opts) {
+	return {
+		now: opts.now,
+		seed: opts.seed,
+		players: opts.players,
+		left: opts.players.map(() => false),
+		scores: opts.players.map(() => 0),
+		round: 0,
+		phase: {
+			kind: "intro",
+			until: opts.now + INTRO_MS$5
+		},
+		used: [],
+		history: [],
+		logSeq: 0
+	};
+}
+function nextRound(s) {
+	if (s.round >= 3 || activeOf(s).length < 2) return {
+		...s,
+		phase: {
+			kind: "done",
+			until: s.now + DONE_MS$7
+		}
+	};
+	const rng = createRng(s.seed);
+	const pool = WORDS.filter((w) => !s.used.includes(w));
+	const word = pool[Math.floor(rng.next() * pool.length)];
+	return {
+		...s,
+		seed: rng.seed(),
+		round: s.round + 1,
+		used: [...s.used, word],
+		phase: {
+			kind: "word",
+			word,
+			until: s.now + VOTE_WORD_MS
+		}
+	};
+}
+function startVote(s) {
+	if (s.phase.kind !== "draw") return s;
+	const rng = createRng(s.seed);
+	const order = shuffle(rng, activeOf(s));
+	return {
+		...s,
+		seed: rng.seed(),
+		phase: {
+			kind: "vote",
+			word: s.phase.word,
+			order,
+			votes: s.players.map(() => null),
+			until: s.now + VOTE_PICK_MS
+		}
+	};
+}
+function finishVote(s) {
+	if (s.phase.kind !== "vote") return s;
+	const { word, order, votes } = s.phase;
+	const got = s.players.map((_, i) => votes.filter((v) => v === i).length);
+	const scores = s.scores.map((v, i) => v + got[i] * 3);
+	return {
+		...s,
+		scores,
+		history: [...s.history, {
+			word,
+			got
+		}].slice(-40),
+		phase: {
+			kind: "result",
+			word,
+			order,
+			votes,
+			until: s.now + VOTE_RESULT_MS
+		}
+	};
+}
+/** 표를 낼 수 있는 사람이 다 냈는지 */
+function allVoted(s) {
+	if (s.phase.kind !== "vote") return false;
+	const { votes, order } = s.phase;
+	return activeOf(s).every((i) => votes[i] !== null || order.every((o) => o === i));
+}
+function vote(s, player, target) {
+	const p = s.phase;
+	if (p.kind !== "vote" || s.left[player] || player === target || !p.order.includes(target) || p.votes[player] !== null) return s;
+	const next = {
+		...s,
+		phase: {
+			...p,
+			votes: p.votes.map((v, i) => i === player ? target : v)
+		}
+	};
+	return allVoted(next) ? finishVote(next) : next;
+}
+function drop$5(s, player) {
+	if (s.left[player] || s.phase.kind === "done") return s;
+	const next = {
+		...s,
+		left: s.left.map((l, i) => l || i === player)
+	};
+	if (activeOf(next).length < 2) return {
+		...next,
+		phase: {
+			kind: "done",
+			until: s.now + DONE_MS$7
+		}
+	};
+	return allVoted(next) ? finishVote(next) : next;
+}
+function tick$7(s) {
+	const { phase, now } = s;
+	if (phase.kind === "done" || now < phase.until) return s;
+	switch (phase.kind) {
+		case "intro": return nextRound(s);
+		case "word": return {
+			...s,
+			phase: {
+				kind: "draw",
+				word: phase.word,
+				until: now + VOTE_DRAW_MS
+			}
+		};
+		case "draw": return startVote(s);
+		case "vote": return finishVote(s);
+		case "result": return nextRound(s);
+	}
+}
+function voteReducer(s, a) {
+	switch (a.type) {
+		case "tick": return tick$7({
+			...s,
+			now: a.now
+		});
+		case "vote": return vote(s, a.player, a.target);
+		case "drop": return drop$5(s, a.player);
+	}
+}
+const voteRanks = (s) => s.scores.map((v) => 1 + s.scores.filter((o) => o > v).length);
+function voteViewFor(s, viewerId) {
+	const me = s.players.findIndex((p) => p.id === viewerId);
+	const p = s.phase;
+	let gallery = null;
+	let myVote = null;
+	if (p.kind === "vote" || p.kind === "result") {
+		const reveal = p.kind === "result";
+		gallery = p.order.map((owner) => ({
+			mine: owner === me,
+			owner: reveal ? owner : null,
+			votes: reveal ? p.votes.filter((v) => v === owner).length : null
+		}));
+		const mv = p.votes[me];
+		myVote = mv === null || mv === void 0 ? null : p.order.indexOf(mv);
+	}
+	return {
+		players: s.players.map(({ id, name }) => ({
+			id,
+			name
+		})),
+		left: s.left,
+		scores: s.scores,
+		round: s.round,
+		rounds: 3,
+		phase: p.kind,
+		leftMs: Math.max(0, p.until - s.now),
+		word: p.kind === "intro" || p.kind === "done" ? null : p.word,
+		gallery,
+		myVote,
+		ranks: voteRanks(s),
+		history: s.history
+	};
+}
+function voteChangeKey(s) {
+	const p = s.phase;
+	return [
+		p.kind,
+		s.round,
+		s.left.join(),
+		p.kind === "vote" ? p.votes.join() : ""
+	].join("|");
+}
+//#endregion
 //#region src/server/referees/doodle.ts
 function doodleReferee(setup, ctx) {
-	const players = readPlayers((setup ?? {}).players, ctx, 2, 8);
+	const o = setup ?? {};
+	const players = readPlayers(o.players, ctx, 2, 8);
 	if (!players || players.some((p) => p.kind === "bot")) return null;
+	if (o.mode === "vote") return players.length >= 3 ? voteReferee(players, ctx) : null;
 	let strokes = [];
 	let inkTurn = -1;
 	/** 그림 묶음을 그대로 기억 (다시 보낼 때 그대로) */
@@ -5814,6 +6014,100 @@ function doodleReferee(setup, ctx) {
 				player,
 				index: m.index
 			} : null;
+		},
+		drop: (s, key) => {
+			const player = s.players.findIndex((p) => p.id === key);
+			return player >= 0 ? {
+				type: "drop",
+				player
+			} : null;
+		},
+		done: (s) => s.phase.kind === "done",
+		nowOf: (s) => s.now
+	});
+}
+/**
+* '다 같이 그리기'(투표) 서버 심판: 그리는 동안 각자 그림은 서버에만 모으고(남에게 안 넘김 — 베끼기 막기),
+* 투표 단계에 섞은 순서로 모두에게 보낸다(누가 그렸는지는 결과 때 공개). 투표는 서버가 붙인 접속 번호로.
+*/
+function voteReferee(players, ctx) {
+	const drawings = /* @__PURE__ */ new Map();
+	let round = 0;
+	let sentGallery = -1;
+	const galleryOf = (s) => s.phase.kind === "vote" || s.phase.kind === "result" ? s.phase.order.map((i) => drawings.get(s.players[i].id)?.ops ?? []) : null;
+	return hostEngineReferee(ctx, {
+		state: createVote({
+			now: ctx.now(),
+			seed: serverSeed(),
+			players
+		}),
+		reduce: (s, a) => {
+			const next = voteReducer(s, a);
+			if (next.round !== round) {
+				round = next.round;
+				drawings.clear();
+			}
+			if (next.phase.kind === "vote" && sentGallery !== next.round) {
+				sentGallery = next.round;
+				ctx.broadcast({
+					t: "gallery",
+					round: next.round,
+					drawings: galleryOf(next)
+				});
+			}
+			return next;
+		},
+		tick: (now) => ({
+			type: "tick",
+			now
+		}),
+		toView: (s) => s,
+		changed: (a, b) => !a || voteChangeKey(a) !== voteChangeKey(b),
+		viewFor: (_v, key, s) => voteViewFor(s, key),
+		wrap: (v) => ({
+			t: "vview",
+			v
+		}),
+		input: (s, from, m) => {
+			const player = s.players.findIndex((p) => p.id === from);
+			if (m.t === "ink") {
+				const ops = readOps(m.ops);
+				if (player < 0 || s.phase.kind !== "draw" || m.turn !== s.round || !ops) return null;
+				const d = drawings.get(from) ?? {
+					strokes: [],
+					ops: []
+				};
+				const strokes = applyOps(d.strokes, ops);
+				if (tooBig(strokes)) return null;
+				const all = [...d.ops, ...ops];
+				const cut = all.map((x) => x.op).lastIndexOf("x");
+				drawings.set(from, {
+					strokes,
+					ops: cut >= 0 ? all.slice(cut) : all
+				});
+				return null;
+			}
+			if (m.t === "inkSync") {
+				if (s.phase.kind === "draw") ctx.sendTo(from, {
+					t: "inkAll",
+					turn: s.round,
+					ops: drawings.get(from)?.ops ?? []
+				});
+				else if (s.phase.kind === "vote" || s.phase.kind === "result") ctx.sendTo(from, {
+					t: "gallery",
+					round: s.round,
+					drawings: galleryOf(s)
+				});
+				return null;
+			}
+			if (m.t !== "vote") return void 0;
+			if (player < 0 || s.phase.kind !== "vote" || !isInt(m.index, 0, 15)) return null;
+			const target = s.phase.order[m.index];
+			return target === void 0 ? null : {
+				type: "vote",
+				player,
+				target
+			};
 		},
 		drop: (s, key) => {
 			const player = s.players.findIndex((p) => p.id === key);

@@ -27,3 +27,15 @@ export const LOG_KEEP = 40
 /** 그림 판 크기 (좌표는 이 안의 정수, 화면에 맞춰 늘림) */
 export const CANVAS_W = 1000
 export const CANVAS_H = 750
+
+// '다 같이 그리기' (투표) 모드 — 사용자 요청 2026-11-16
+export const VOTE_MIN_PLAYERS = 3
+export const VOTE_ROUNDS = 3
+/** 제시어 보여주기 */
+export const VOTE_WORD_MS = 3000
+export const VOTE_DRAW_MS = 60_000
+export const VOTE_PICK_MS = 15_000
+/** 판 결과(누가 그렸는지·표) 보여주기 */
+export const VOTE_RESULT_MS = 6000
+/** 받은 표 1개당 점수 */
+export const VOTE_POINTS = 3

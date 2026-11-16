@@ -1,11 +1,21 @@
 import type { InkOp } from './ink'
 import type { DoodleView } from './view'
+import type { VoteView } from './voteEngine'
 
 // 친구 대전 메시지. 심판은 우리 게임 서버: 사람마다 화면(view)을 보내고, 제시어·정답 판정·점수를 맡는다.
 // 그림(ink)은 그리는 사람 → 서버 → 모두 (서버가 그 판 그림을 기억해서 늦게 온 사람에게 inkAll로 다시 보냄).
+/** 맞히기(한 명이 그리고 맞힘) / 다 같이 그리기(같은 제시어를 각자 그리고 투표) */
+export type DoodleMode = 'guess' | 'vote'
+
 export type DoodleMsg =
-  /** 방장 → 모두: 경기 시작 (화면을 경기로) */
-  | { t: 'start' }
+  /** 방장 → 모두: 경기 시작 (화면을 경기로). mode = 맞히기 / 다 같이 그리기(투표) */
+  | { t: 'start'; mode?: DoodleMode }
+  /** 서버 → 나: 다 같이 그리기 화면 */
+  | { t: 'vview'; v: VoteView }
+  /** 서버 → 모두: 투표할 그림들 (섞은 순서, 누가 그렸는지 없음) */
+  | { t: 'gallery'; round: number; drawings: InkOp[][] }
+  /** 나 → 서버: 그림 번호에 투표 */
+  | { t: 'vote'; index: number }
   /** 서버 → 나: 지금 화면 */
   | { t: 'view'; v: DoodleView }
   /** 그리는 사람 → 모두: 바뀐 그림 (turn = 몇 번째 차례) */

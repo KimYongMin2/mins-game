@@ -278,3 +278,33 @@ describe('그림 맞히기 서버 심판', () => {
     expect(sync.ops).toHaveLength(1)
   })
 })
+
+describe('다 같이 그리기 서버 심판', () => {
+  it('그리는 동안 남의 그림은 안 넘기고, 투표 때 섞어서 모두에게', () => {
+    const f = fakeCtx([{ id: 'H', role: 'host' }, { id: 'G', role: 'guest' }, { id: 'K', role: 'guest' }])
+    const all: { t: string; drawings?: unknown[][] }[] = []
+    f.ctx.broadcast = (m) => all.push(m as never)
+    const to: [string, { t: string; v?: { phase: string; round: number } }][] = []
+    f.ctx.sendTo = (k, m) => to.push([k, m as never])
+    expect(doodleReferee({ mode: 'vote', players: [{ id: 'H' }, { id: 'G' }] }, f.ctx)).toBeNull()
+    const ref = doodleReferee({ mode: 'vote', players: [{ id: 'H' }, { id: 'G' }, { id: 'K' }] }, f.ctx)!
+    let v = to.at(-1)![1].v!
+    for (let i = 0; i < 400 && v.phase !== 'draw'; i++) {
+      f.advance(100)
+      ref.tick(f.now)
+      v = to.filter(([k]) => k === 'H').at(-1)![1].v!
+    }
+    const ink = (id: number) => ({ t: 'ink', turn: v.round, ops: [{ op: 's', id, c: '#1c1748', w: 4, p: [10, 10, 30, 30] }] })
+    expect(ref.input('H', ink(1))).toBe(true)
+    expect(ref.input('G', ink(2))).toBe(true)
+    expect(all.some((m) => m.t === 'gallery')).toBe(false)
+    for (let i = 0; i < 700 && v.phase !== 'vote'; i++) {
+      f.advance(100)
+      ref.tick(f.now)
+      v = to.filter(([k]) => k === 'H').at(-1)![1].v!
+    }
+    const g = all.find((m) => m.t === 'gallery')!
+    expect(g.drawings).toHaveLength(3)
+    expect(g.drawings!.filter((d) => d.length === 1)).toHaveLength(2)
+  })
+})

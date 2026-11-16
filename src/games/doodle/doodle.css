@@ -188,3 +188,40 @@
 .dd-result__me { border-color: var(--brand) !important; font-weight: 800; }
 .dd-result__buttons { display: flex; gap: 8px; }
 .dd-result__buttons .button { flex: 1; min-height: 48px; }
+
+/* 다 같이 그리기 (투표) */
+.dd-bigword { font-size: 2.4rem; font-weight: 800; color: #ffd23f; }
+.dd-hint { margin: 0; color: var(--ink-soft); font-size: 0.85rem; text-align: center; }
+.dd-gallery {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+@media (min-width: 640px) {
+  .dd-gallery { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+.dd-gallery__item {
+  display: flex;
+  flex-direction: column;
+  border: 3px solid #1c1748;
+  border-radius: 2px;
+  background: var(--card);
+  overflow: hidden;
+}
+.dd-gallery__item--picked { border-color: var(--brand); }
+.dd-gallery__item--best { border-color: #f59f0b; box-shadow: 4px 4px 0 #f59f0b; }
+.dd-thumb { display: block; width: 100%; aspect-ratio: 4 / 3; height: auto; background: #fff; }
+.dd-gallery__foot {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 40px;
+  padding: 4px;
+  font-weight: 800;
+  font-size: 0.85rem;
+}
+.dd-gallery__foot .button { width: 100%; }
+.dd-gallery__mine { color: var(--ink-soft); }

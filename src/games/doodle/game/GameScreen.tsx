@@ -4,14 +4,14 @@ import { REFEREE_FROM } from '../../../shared/online/hubProtocol'
 import { decodeLook } from '../../../shared/art3d/animalKinds'
 import { loadLook } from '../../../shared/storage/avatar'
 import { loadNickname } from '../../../shared/storage/nickname'
-import { CANVAS_H, CANVAS_W, CHAT_MAX } from '../constants'
-import { ERASER, type InkOp, PEN_COLORS, PEN_WIDTHS, type Stroke, type StrokeKind, applyOps, drawStroke } from '../play/ink'
+import { CHAT_MAX } from '../constants'
 import type { DoodleMsg } from '../play/pvp'
 import type { DoodleView } from '../play/view'
 import type { GameSummary } from '../records'
 import { playSound } from '../sounds'
+import { type SketchHandle, Sketchpad } from './Sketchpad'
 
-// 경기 화면. 심판은 우리 게임 서버: 사람마다 화면(view)을 받고, 고르기·답·보기를 서버에 보낸다.
+// 맞히기 경기 화면. 심판은 우리 게임 서버: 사람마다 화면(view)을 받고, 고르기·답·보기를 서버에 보낸다.
 // 그림은 그리는 사람이 0.04초마다 묶어 보내고(서버를 거쳐 모두에게), 받는 쪽은 바뀐 선만 바로 그린다.
 
 type Props = {
@@ -22,27 +22,35 @@ type Props = {
   onQuit: () => void
 }
 
-/** 그림 묶어 보내는 간격 */
-const SEND_MS = 40
-
-/** 그리기 도구 (사용자 요청 — 그림판처럼): 펜 · 직선 · 네모 · 동그라미 · 채우기 · 지우개(흰 펜) */
-type Tool = 'pen' | 'line' | 'rect' | 'ellipse' | 'fill' | 'eraser'
-const TOOLS: { id: Tool; label: string }[] = [
-  { id: 'pen', label: '펜' },
-  { id: 'line', label: '직선' },
-  { id: 'rect', label: '네모' },
-  { id: 'ellipse', label: '동그라미' },
-  { id: 'fill', label: '채우기' },
-  { id: 'eraser', label: '지우개' },
-]
-const SHAPE_KIND: Partial<Record<Tool, StrokeKind>> = { line: 'l', rect: 'r', ellipse: 'e' }
-
-function summaryOf(v: DoodleView, myId: string): GameSummary {
+function summaryOf(v: { players: { id: string; name: string }[]; scores: number[]; ranks: number[] }, myId: string): GameSummary {
   const me = v.players.findIndex((p) => p.id === myId)
-  const ranking = v.players
-    .map((p, i) => ({ name: p.name, score: v.scores[i], rank: v.ranks[i], me: i === me }))
-    .sort((a, b) => a.rank - b.rank)
+  const ranking = v.players.map((p, i) => ({ name: p.name, score: v.scores[i], rank: v.ranks[i], me: i === me })).sort((a, b) => a.rank - b.rank)
   return { rank: v.ranks[me] ?? v.players.length, score: v.scores[me] ?? 0, ranking }
+}
+export { summaryOf }
+
+/** 방장: 서버에 심판을 맡김 (씨앗값·제시어는 서버가) */
+export function startDoodle(room: Room<DoodleMsg>, members: Member[], mode: 'guess' | 'vote') {
+  room.startReferee?.('doodle', {
+    mode,
+    players: [
+      { id: room.myId, name: loadNickname() ?? '나', avatar: loadLook() ?? undefined },
+      ...members.map((m) => ({ id: m.id, name: m.nickname, avatar: decodeLook(m.avatar) })),
+    ],
+  })
+}
+
+export function ServerNotReady({ onQuit }: { onQuit: () => void }) {
+  return (
+    <section className="dd-game">
+      <p className="dd-notice" role="alert">
+        게임 서버를 준비하는 중이에요. 몇 분 뒤에 다시 시작해 주세요.
+      </p>
+      <button type="button" className="button" onClick={onQuit}>
+        나가기
+      </button>
+    </section>
+  )
 }
 
 export function GameScreen({ room, members, onFinish, onQuit }: Props) {
@@ -50,69 +58,26 @@ export function GameScreen({ room, members, onFinish, onQuit }: Props) {
   const [view, setView] = useState<DoodleView | null>(null)
   const [until, setUntil] = useState(0)
   const [now, setNow] = useState(() => performance.now())
-  const [color, setColor] = useState<string>(PEN_COLORS[0])
-  const [width, setWidth] = useState<number>(PEN_WIDTHS[1])
-  const [tool, setTool] = useState<Tool>('pen')
   const [text, setText] = useState('')
-  /** 도형을 끄는 동안 미리 보기 (그리는 사람 화면에만) */
-  const previewRef = useRef<HTMLCanvasElement>(null)
-  const shapeRef = useRef<{ kind: StrokeKind; from: [number, number]; to: [number, number] } | null>(null)
   const myId = room.myId
-
-  const canvasRef = useRef<HTMLCanvasElement>(null)
-  const strokesRef = useRef<Stroke[]>([])
+  const padRef = useRef<SketchHandle>(null)
   const turnRef = useRef(-1)
   const viewRef = useRef<DoodleView | null>(null)
-  const pendingRef = useRef<InkOp[]>([])
-  const penRef = useRef<{ id: number; last: [number, number] } | null>(null)
 
-  const redraw = () => {
-    const ctx = canvasRef.current?.getContext('2d')
-    if (!ctx) return
-    ctx.fillStyle = '#ffffff'
-    ctx.fillRect(0, 0, CANVAS_W, CANVAS_H)
-    for (const s of strokesRef.current) drawStroke(ctx, s)
-  }
-
-  /** 바뀐 그림 넣기: 선 시작·이어 그리기는 그 부분만 (한 묶음에 여러 조각이 와도 하나씩), 지우기는 다시 그림 */
-  const apply = (ops: readonly InkOp[]) => {
-    const ctx = canvasRef.current?.getContext('2d')
-    for (const o of ops) {
-      strokesRef.current = applyOps(strokesRef.current, [o])
-      if (!ctx) continue
-      if (o.op === 'u' || o.op === 'x') {
-        redraw()
-        continue
-      }
-      const s = strokesRef.current.find((x) => x.id === o.id)
-      if (!s) continue
-      if (o.op === 's') drawStroke(ctx, s)
-      else drawStroke(ctx, s, s.p.length - o.p.length)
-    }
-  }
-
-  // 방장: 서버에 심판을 맡김 (씨앗값·제시어는 서버가)
   useEffect(() => {
-    if (!serverOk || room.role !== 'host') return
-    room.startReferee?.('doodle', {
-      players: [
-        { id: room.myId, name: loadNickname() ?? '나', avatar: loadLook() ?? undefined },
-        ...members.map((m) => ({ id: m.id, name: m.nickname, avatar: decodeLook(m.avatar) })),
-      ],
-    })
+    if (serverOk && room.role === 'host') startDoodle(room, members, 'guess')
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // 메시지: 화면·그림 전부는 서버가 보낸 것만, 그림 조각은 지금 그리는 사람 것만
   useEffect(() => {
     let synced = false
-    const off = room.onMessage((msg, from) => {
+    return room.onMessage((msg, from) => {
       if (msg.t === 'view' && from === REFEREE_FROM) {
         const v = msg.v
         if (v.turnNo !== turnRef.current) {
           turnRef.current = v.turnNo
-          strokesRef.current = []
-          redraw()
+          padRef.current?.load([])
         }
         // 처음 받은 화면이면 지금까지 그림을 달라고 (중간에 들어왔거나 다시 붙었을 때)
         if (!synced) {
@@ -126,17 +91,13 @@ export function GameScreen({ room, members, onFinish, onQuit }: Props) {
         setView(v)
         setUntil(performance.now() + v.leftMs)
       } else if (msg.t === 'inkAll' && from === REFEREE_FROM && msg.turn === turnRef.current) {
-        strokesRef.current = []
-        apply(msg.ops)
-        if (!msg.ops.length) redraw()
+        padRef.current?.load(msg.ops)
       } else if (msg.t === 'ink') {
         const v = viewRef.current
         if (!v || v.drawer === null || v.players[v.drawer]?.id !== from || msg.turn !== v.turnNo) return
-        apply(msg.ops)
+        padRef.current?.apply(msg.ops)
       }
     })
-    return off
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [room])
 
   // 남은 시간 표시용 시계
@@ -144,19 +105,6 @@ export function GameScreen({ room, members, onFinish, onQuit }: Props) {
     const id = setInterval(() => setNow(performance.now()), 200)
     return () => clearInterval(id)
   }, [])
-
-  // 그리는 사람: 모아 둔 그림을 0.04초마다 보냄
-  useEffect(() => {
-    const id = setInterval(() => {
-      const ops = pendingRef.current
-      if (!ops.length || !viewRef.current) return
-      pendingRef.current = []
-      room.send({ t: 'ink', turn: viewRef.current.turnNo, ops })
-    }, SEND_MS)
-    return () => clearInterval(id)
-  }, [room])
-
-  useEffect(redraw, [])
 
   // 끝나면 결과로
   const finished = useRef(false)
@@ -166,73 +114,11 @@ export function GameScreen({ room, members, onFinish, onQuit }: Props) {
     onFinish(summaryOf(view, myId))
   }, [view, now, until, onFinish, myId])
 
+  if (!serverOk) return <ServerNotReady onQuit={onQuit} />
+
   const me = view ? view.players.findIndex((p) => p.id === myId) : -1
   const drawing = !!view && view.phase === 'draw' && view.drawer === me
   const left = Math.ceil(Math.max(0, until - now) / 1000)
-
-  const queue = (ops: InkOp[]) => {
-    apply(ops)
-    pendingRef.current.push(...ops)
-  }
-
-  function pointOf(e: React.PointerEvent<HTMLCanvasElement>): [number, number] {
-    const r = e.currentTarget.getBoundingClientRect()
-    const x = Math.round(((e.clientX - r.left) / r.width) * CANVAS_W)
-    const y = Math.round(((e.clientY - r.top) / r.height) * CANVAS_H)
-    return [Math.min(CANVAS_W, Math.max(0, x)), Math.min(CANVAS_H, Math.max(0, y))]
-  }
-
-  const newId = () => (Date.now() % 1e8) * 10 + Math.floor(Math.random() * 10)
-
-  /** 도형 미리 보기 다시 그리기 (위에 겹친 투명 판) */
-  function showPreview() {
-    const ctx = previewRef.current?.getContext('2d')
-    if (!ctx) return
-    ctx.clearRect(0, 0, CANVAS_W, CANVAS_H)
-    const sh = shapeRef.current
-    if (sh) drawStroke(ctx, { id: 0, c: color, w: width, k: sh.kind, p: [...sh.from, ...sh.to] })
-  }
-
-  function down(e: React.PointerEvent<HTMLCanvasElement>) {
-    if (!drawing) return
-    e.currentTarget.setPointerCapture(e.pointerId)
-    const p = pointOf(e)
-    if (tool === 'fill') return queue([{ op: 's', id: newId(), c: color, w: width, p, k: 'f' }])
-    const kind = SHAPE_KIND[tool]
-    if (kind) {
-      shapeRef.current = { kind, from: p, to: p }
-      return showPreview()
-    }
-    const id = newId()
-    penRef.current = { id, last: p }
-    queue([{ op: 's', id, c: tool === 'eraser' ? ERASER : color, w: tool === 'eraser' ? Math.max(width, 16) : width, p }])
-  }
-
-  function move(e: React.PointerEvent<HTMLCanvasElement>) {
-    if (!drawing) return
-    if (shapeRef.current) {
-      shapeRef.current.to = pointOf(e)
-      return showPreview()
-    }
-    const pen = penRef.current
-    if (!pen) return
-    const p = pointOf(e)
-    // 너무 가까운 점은 건너뜀 (보낼 양 줄이기)
-    if (Math.hypot(p[0] - pen.last[0], p[1] - pen.last[1]) < 3) return
-    pen.last = p
-    queue([{ op: 'a', id: pen.id, p }])
-  }
-
-  const up = () => {
-    penRef.current = null
-    const sh = shapeRef.current
-    shapeRef.current = null
-    if (!sh) return
-    showPreview()
-    // 거의 안 끈 도형은 버림
-    if (Math.hypot(sh.to[0] - sh.from[0], sh.to[1] - sh.from[1]) < 4) return
-    queue([{ op: 's', id: newId(), c: color, w: width, p: [...sh.from, ...sh.to], k: sh.kind }])
-  }
 
   function submit(e: React.FormEvent) {
     e.preventDefault()
@@ -240,19 +126,6 @@ export function GameScreen({ room, members, onFinish, onQuit }: Props) {
     if (!t || !view?.canGuess) return
     room.send({ t: 'guess', text: t })
     setText('')
-  }
-
-  if (!serverOk) {
-    return (
-      <section className="dd-game">
-        <p className="dd-notice" role="alert">
-          게임 서버를 준비하는 중이에요. 몇 분 뒤에 다시 시작해 주세요.
-        </p>
-        <button type="button" className="button" onClick={onQuit}>
-          나가기
-        </button>
-      </section>
-    )
   }
 
   const nameOf = (i: number | null) => (i === null ? '' : i === me ? '나' : (view?.players[i]?.name ?? ''))
@@ -287,19 +160,7 @@ export function GameScreen({ room, members, onFinish, onQuit }: Props) {
         ))}
       </ul>
 
-      <div className="dd-board">
-        <canvas
-          ref={canvasRef}
-          className={`dd-canvas${drawing ? ' dd-canvas--drawing' : ''}`}
-          width={CANVAS_W}
-          height={CANVAS_H}
-          onPointerDown={down}
-          onPointerMove={move}
-          onPointerUp={up}
-          onPointerCancel={up}
-          aria-label="그림판"
-        />
-        <canvas ref={previewRef} className="dd-canvas dd-canvas--preview" width={CANVAS_W} height={CANVAS_H} aria-hidden />
+      <Sketchpad padRef={padRef} drawing={drawing} onSend={(ops) => viewRef.current && room.send({ t: 'ink', turn: viewRef.current.turnNo, ops })}>
         {view?.phase === 'choose' && view.options && (
           <div className="dd-choose">
             <p>무엇을 그릴까요?</p>
@@ -310,48 +171,7 @@ export function GameScreen({ room, members, onFinish, onQuit }: Props) {
             ))}
           </div>
         )}
-      </div>
-
-      {drawing && (
-        <div className="dd-tools" role="group" aria-label="그리기 도구">
-          <div className="dd-tools__kinds" role="radiogroup" aria-label="도구">
-            {TOOLS.map((t) => (
-              <button key={t.id} type="button" role="radio" aria-checked={tool === t.id} className={`dd-tool${tool === t.id ? ' dd-tool--on' : ''}`} onClick={() => setTool(t.id)}>
-                {t.label}
-              </button>
-            ))}
-          </div>
-          <div className="dd-tools__colors">
-            {PEN_COLORS.map((c) => (
-              <button
-                key={c}
-                type="button"
-                className={`dd-swatch${color === c && tool !== 'eraser' ? ' dd-swatch--on' : ''}`}
-                style={{ background: c }}
-                aria-label={`색 ${c}`}
-                aria-pressed={color === c}
-                onClick={() => {
-                  setColor(c)
-                  if (tool === 'eraser') setTool('pen')
-                }}
-              />
-            ))}
-          </div>
-          <div className="dd-tools__row">
-            {PEN_WIDTHS.map((w) => (
-              <button key={w} type="button" className={`dd-width${width === w ? ' dd-width--on' : ''}`} aria-label={`굵기 ${w}`} aria-pressed={width === w} onClick={() => setWidth(w)}>
-                <span style={{ width: Math.min(22, w), height: Math.min(22, w) }} />
-              </button>
-            ))}
-            <button type="button" className="button button--small" onClick={() => queue([{ op: 'u' }])}>
-              되돌리기
-            </button>
-            <button type="button" className="button button--small" onClick={() => queue([{ op: 'x' }])}>
-              다 지우기
-            </button>
-          </div>
-        </div>
-      )}
+      </Sketchpad>
 
       {view?.choices && !view.choiceTried && (
         <div className="dd-choices" role="group" aria-label="보기">
@@ -390,7 +210,6 @@ export function GameScreen({ room, members, onFinish, onQuit }: Props) {
           </form>
         )}
       </div>
-
     </section>
   )
 }

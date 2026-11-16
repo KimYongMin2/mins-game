@@ -1,6 +1,7 @@
 import { createEngine, engineReducer, type EngineAction, type EngineState } from '../../games/doodle/play/engine'
 import { type InkOp, applyOps, readOps, tooBig, type Stroke } from '../../games/doodle/play/ink'
 import { changeKey, viewFor } from '../../games/doodle/play/view'
+import { createVote, voteChangeKey, voteReducer, voteViewFor, type VoteAction, type VoteState } from '../../games/doodle/play/voteEngine'
 import type { Referee, RefereeContext } from '../hub'
 import { readPlayers, serverSeed } from './common'
 import { hostEngineReferee } from './hostEngine'
@@ -14,6 +15,7 @@ export function doodleReferee(setup: unknown, ctx: RefereeContext): Referee | nu
   const players = readPlayers(o.players, ctx, 2, 8)
   // 봇 없는 게임
   if (!players || players.some((p) => p.kind === 'bot')) return null
+  if (o.mode === 'vote') return players.length >= 3 ? voteReferee(players, ctx) : null
   let strokes: Stroke[] = []
   let inkTurn = -1
   /** 그림 묶음을 그대로 기억 (다시 보낼 때 그대로) */
@@ -51,6 +53,69 @@ export function doodleReferee(setup: unknown, ctx: RefereeContext): Referee | nu
       if (player < 0) return null
       if (m.t === 'guess') return typeof m.text === 'string' && m.text.length <= 100 ? { type: 'guess', player, text: m.text } : null
       return isInt(m.index, 0, 3) ? { type: m.t, player, index: m.index } : null
+    },
+    drop: (s, key) => {
+      const player = s.players.findIndex((p) => p.id === key)
+      return player >= 0 ? { type: 'drop', player } : null
+    },
+    done: (s) => s.phase.kind === 'done',
+    nowOf: (s) => s.now,
+  })
+}
+
+
+/**
+ * '다 같이 그리기'(투표) 서버 심판: 그리는 동안 각자 그림은 서버에만 모으고(남에게 안 넘김 — 베끼기 막기),
+ * 투표 단계에 섞은 순서로 모두에게 보낸다(누가 그렸는지는 결과 때 공개). 투표는 서버가 붙인 접속 번호로.
+ */
+function voteReferee(players: { id: string; name: string; kind: 'remote' | 'bot' }[], ctx: RefereeContext): Referee {
+  const drawings = new Map<string, { strokes: Stroke[]; ops: InkOp[] }>()
+  let round = 0
+  let sentGallery = -1
+  const galleryOf = (s: VoteState) => (s.phase.kind === 'vote' || s.phase.kind === 'result' ? s.phase.order.map((i) => drawings.get(s.players[i].id)?.ops ?? []) : null)
+  return hostEngineReferee<VoteState, VoteState, VoteAction>(ctx, {
+    state: createVote({ now: ctx.now(), seed: serverSeed(), players }),
+    reduce: (s, a) => {
+      const next = voteReducer(s, a)
+      // 새 판이면 그림 비움, 투표가 시작되면 그림을 한 번 모두에게
+      if (next.round !== round) {
+        round = next.round
+        drawings.clear()
+      }
+      if (next.phase.kind === 'vote' && sentGallery !== next.round) {
+        sentGallery = next.round
+        ctx.broadcast({ t: 'gallery', round: next.round, drawings: galleryOf(next) })
+      }
+      return next
+    },
+    tick: (now) => ({ type: 'tick', now }),
+    toView: (s) => s,
+    changed: (a, b) => !a || voteChangeKey(a) !== voteChangeKey(b),
+    viewFor: (_v, key, s) => voteViewFor(s, key) as unknown as VoteState,
+    wrap: (v) => ({ t: 'vview', v }),
+    input: (s, from, m) => {
+      const player = s.players.findIndex((p) => p.id === from)
+      if (m.t === 'ink') {
+        const ops = readOps(m.ops)
+        if (player < 0 || s.phase.kind !== 'draw' || m.turn !== s.round || !ops) return null
+        const d = drawings.get(from) ?? { strokes: [], ops: [] }
+        const strokes = applyOps(d.strokes, ops)
+        if (tooBig(strokes)) return null
+        const all = [...d.ops, ...ops]
+        const cut = all.map((x) => x.op).lastIndexOf('x')
+        drawings.set(from, { strokes, ops: cut >= 0 ? all.slice(cut) : all })
+        return null // 남에게 안 넘김
+      }
+      if (m.t === 'inkSync') {
+        // 그리는 중이면 내 그림만 돌려주고, 투표·결과면 모든 그림
+        if (s.phase.kind === 'draw') ctx.sendTo(from, { t: 'inkAll', turn: s.round, ops: drawings.get(from)?.ops ?? [] })
+        else if (s.phase.kind === 'vote' || s.phase.kind === 'result') ctx.sendTo(from, { t: 'gallery', round: s.round, drawings: galleryOf(s) })
+        return null
+      }
+      if (m.t !== 'vote') return undefined
+      if (player < 0 || s.phase.kind !== 'vote' || !isInt(m.index, 0, 15)) return null
+      const target = s.phase.order[m.index]
+      return target === undefined ? null : { type: 'vote', player, target }
     },
     drop: (s, key) => {
       const player = s.players.findIndex((p) => p.id === key)
