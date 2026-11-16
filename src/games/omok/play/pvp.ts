@@ -9,7 +9,7 @@ export type OmokMsg =
   | { t: 'ready' }
   /** 방장 → 친구: 새 경기. 친구가 카드를 고르는지, 흑 카드가 몇 번째인지 */
   | { t: 'start'; guestPicks: boolean; blackCard: Card }
-  | { t: 'pick'; card: Card }
+  | { t: 'pick'; card: Card; /** 서버 심판이 보낼 때만: 흑 카드 */ blackCard?: Card }
   | { t: 'move'; n: number; pos: number }
 
 /** 경기 시작 메시지에서 카드 고를 쪽 (나 = 0) */

@@ -4,6 +4,7 @@ import { bombReferee } from './bomb'
 import { fightReferee } from './fight'
 import { memoryReferee } from './memory'
 import { nunchiReferee } from './nunchi'
+import { omokReferee } from './omok'
 import { numbaseballReferee } from './numbaseball'
 import { rouletteReferee } from './roulette'
 import { survivalReferee } from './survival'
@@ -22,4 +23,5 @@ export const REFEREES: Record<string, RefereeFactory> = {
   numbaseball: numbaseballReferee,
   memory: memoryReferee,
   fight: fightReferee,
+  omok: omokReferee,
 }

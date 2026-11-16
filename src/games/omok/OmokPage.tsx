@@ -111,6 +111,8 @@ export function OmokPage() {
   function startPvp(room: Room<OmokMsg>) {
     goRef.current = false
     const msg = { t: 'start', guestPicks: Math.random() < 0.5, blackCard: Math.random() < 0.5 ? 0 : 1 } as const
+    // 우리 게임 서버가 있으면 흑 카드는 서버만 알다가 고를 때 알려 준다 (조작 막기 3단계). 시작 메시지보다 먼저
+    if (room.hasReferee?.('omok')) room.startReferee?.('omok', { guestPicks: msg.guestPicks })
     room.send(msg)
     setScreen({ kind: 'pvp-game', key: Date.now(), picker: pickerOf(msg, 'host'), blackCard: msg.blackCard })
   }

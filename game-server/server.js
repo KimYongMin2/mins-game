@@ -5518,7 +5518,7 @@ function chooseBotCard(rng, view) {
 //#endregion
 //#region src/games/memory/constants.ts
 /** 한 장 고르는 시간. 넘기면 무작위로 열린다 */
-const PICK_MS = 1e4;
+const PICK_MS$1 = 1e4;
 /** 첫 차례 전 '시작!' 표시 */
 const INTRO_MS$3 = 1500;
 /** 틀린 두 장을 보여주는 시간 (그다음 덮고 차례가 넘어간다) */
@@ -5600,7 +5600,7 @@ function picking(state) {
 		...state,
 		phase: {
 			kind: "picking",
-			until: state.now + PICK_MS,
+			until: state.now + PICK_MS$1,
 			botAt: state.now + 700
 		}
 	};
@@ -6216,6 +6216,44 @@ function nunchiReferee(setup, ctx) {
 		done: (s) => s.phase.kind === "done",
 		nowOf: (s) => s.now
 	});
+}
+//#endregion
+//#region src/games/omok/constants.ts
+/** 흑·백 카드 고르기. 넘기면 무작위 */
+const PICK_MS = 1e4;
+//#endregion
+//#region src/server/referees/omok.ts
+function omokReferee(setup, ctx) {
+	const o = setup ?? {};
+	const members = ctx.members();
+	const host = members.find((m) => m.role === "host");
+	const guest = members.find((m) => m.role === "guest");
+	if (!host || !guest || typeof o.guestPicks !== "boolean") return null;
+	const picker = o.guestPicks ? guest.id : host.id;
+	const blackCard = crypto.getRandomValues(/* @__PURE__ */ new Uint8Array(1))[0] % 2;
+	const deadline = ctx.now() + PICK_MS + 1e3;
+	let pickedAt = null;
+	const reveal = (card) => {
+		pickedAt = ctx.now();
+		ctx.broadcast({
+			t: "pick",
+			card,
+			blackCard
+		});
+	};
+	return {
+		input(from, msg) {
+			const m = msg ?? {};
+			if (m.t !== "pick") return false;
+			if (pickedAt === null && from === picker && (m.card === 0 || m.card === 1)) reveal(m.card);
+			return true;
+		},
+		tick(now) {
+			if (pickedAt === null && now >= deadline) reveal(crypto.getRandomValues(/* @__PURE__ */ new Uint8Array(1))[0] % 2);
+		},
+		leave() {},
+		finished: () => pickedAt !== null && ctx.now() - pickedAt > 3e3
+	};
 }
 //#endregion
 //#region src/games/numbaseball/rules/numbers.ts
@@ -8343,7 +8381,8 @@ const REFEREES = {
 	artillery: artilleryReferee,
 	numbaseball: numbaseballReferee,
 	memory: memoryReferee,
-	fight: fightReferee
+	fight: fightReferee,
+	omok: omokReferee
 };
 //#endregion
 //#region game-server/main.ts

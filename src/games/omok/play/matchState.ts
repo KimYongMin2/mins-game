@@ -52,12 +52,16 @@ export type MatchState = {
   phase: Phase
   sounds: { id: number; name: SoundName }[]
   soundSeq: number
+  /** 우리 게임 서버가 심판: 흑 카드를 모르고(고르면 서버가 알려 줌), 카드 고르기·시간 초과는 서버가 */
+  hidden: boolean
 }
 
 export type MatchAction =
   | { type: 'tick'; now: number }
   /** 내가 카드를 고름 */
   | { type: 'pick'; card: Card }
+  /** 서버 심판: 고른 카드와 흑 카드 (누가 골랐든) */
+  | { type: 'serverPick'; card: Card; blackCard: Card }
   /** 자리 고르기(미리 보기). null이면 풀기 */
   | { type: 'select'; pos: number | null }
   /** 착수 */
@@ -81,6 +85,8 @@ export function createMatch(opts: {
   /** 친구 대전: 방장이 정해서 보낸 카드 고를 쪽(나 = 0)과 흑 카드. 봇전은 내가 고르고 흑 카드는 seed로 */
   picker?: Side
   blackCard?: Card
+  /** 서버 심판: 흑 카드를 모른 채 시작 */
+  hidden?: boolean
 }): MatchState {
   const rng = createRng(opts.seed)
   const blackCard: Card = opts.blackCard ?? (rng.next() < 0.5 ? 0 : 1)
@@ -100,6 +106,7 @@ export function createMatch(opts: {
     phase: { kind: 'pick', until: opts.now + PICK_MS },
     sounds: [],
     soundSeq: 0,
+    hidden: !!opts.hidden,
   }
 }
 
@@ -145,7 +152,7 @@ function tick(state: MatchState): MatchState {
   switch (phase.kind) {
     case 'pick': {
       // 봇전은 봇이 고를 일이 없다. 친구 대전에서 친구가 고를 차례면 친구 기기가 처리
-      if (now < phase.until || state.picker !== 0) return state
+      if (now < phase.until || state.picker !== 0 || state.hidden) return state
       const rng = createRng(state.seed)
       return pick({ ...state, seed: rng.seed() }, rng.next() < 0.5 ? 0 : 1)
     }
@@ -174,7 +181,9 @@ export function matchReducer(state: MatchState, action: MatchAction): MatchState
     case 'tick':
       return tick({ ...state, now: action.now })
     case 'pick':
-      return state.picker === 0 ? pick(state, action.card) : state
+      return state.picker === 0 && !state.hidden ? pick(state, action.card) : state
+    case 'serverPick':
+      return state.hidden ? pick({ ...state, blackCard: action.blackCard }, action.card) : state
     case 'select': {
       if (state.phase.kind === 'done' || state.black === null) return state
       if (action.pos !== null && !canPlace(state.board, action.pos, stoneOf(state, 0))) return state
@@ -183,7 +192,7 @@ export function matchReducer(state: MatchState, action: MatchAction): MatchState
     case 'place':
       return move(state, 0, action.pos)
     case 'remotePick':
-      return state.mode === 'pvp' && state.picker === 1 ? pick(state, action.card) : state
+      return state.mode === 'pvp' && state.picker === 1 && !state.hidden ? pick(state, action.card) : state
     case 'remoteMove': {
       if (state.mode !== 'pvp' || action.n !== state.moves.length) return state
       // 카드 공개가 아직 안 끝났으면(통신 지연) 바로 끝내고 받는다

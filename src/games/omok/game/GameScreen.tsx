@@ -1,4 +1,5 @@
 import { Suspense, lazy, useEffect, useReducer, useRef, useState } from 'react'
+import { REFEREE_FROM } from '../../../shared/online/hubProtocol'
 import { type Look, opponentLook, plainLook } from '../../../shared/art3d/animalKinds'
 import type { Reaction } from '../../../shared/art3d/DuelStrip3D'
 import { canWebGL } from '../../../shared/art3d/webgl'
@@ -115,8 +116,10 @@ function Cards({ state, foe, onPick }: { state: MatchState; foe: string; onPick:
 }
 
 export function GameScreen({ mode, difficulty, pvp, onFinish, onQuit }: Props) {
+  // 우리 게임 서버가 심판이면 흑 카드를 모르고, 카드는 서버가 고른 순간 알려 준다 (조작 막기 3단계)
+  const [hidden] = useState(() => !!pvp?.room.hasReferee?.('omok'))
   const [state, dispatch] = useReducer(matchReducer, undefined, () =>
-    createMatch({ now: performance.now(), seed: randomSeed(), mode, difficulty, picker: pvp?.picker, blackCard: pvp?.blackCard }),
+    createMatch({ now: performance.now(), seed: randomSeed(), mode, difficulty, picker: pvp?.picker, blackCard: pvp?.blackCard, hidden }),
   )
   const [peerGone, setPeerGone] = useState(false)
   const [use3D] = useState(canWebGL)
@@ -130,7 +133,12 @@ export function GameScreen({ mode, difficulty, pvp, onFinish, onQuit }: Props) {
   // 친구 대전: 받은 메시지를 경기에 넣고, 상대가 나가면 알린다
   useEffect(() => {
     if (!pvp) return
-    const offMsg = pvp.room.onMessage((msg) => {
+    const offMsg = pvp.room.onMessage((msg, from) => {
+      if (hidden && msg.t === 'pick') {
+        // 카드는 서버가 보낸 것만 (흑 카드와 같이)
+        if (from === REFEREE_FROM && msg.blackCard !== undefined) dispatch({ type: 'serverPick', card: msg.card, blackCard: msg.blackCard })
+        return
+      }
       const action = actionOf(msg)
       if (action) dispatch(action)
     })
@@ -141,7 +149,7 @@ export function GameScreen({ mode, difficulty, pvp, onFinish, onQuit }: Props) {
       offMsg()
       offPeer()
     }
-  }, [pvp])
+  }, [pvp, hidden])
 
   // 친구 대전: 고른 카드·둔 자리를 보낸다 (시간 초과로 정해진 것도)
   const sentRef = useRef(state)
@@ -302,7 +310,7 @@ export function GameScreen({ mode, difficulty, pvp, onFinish, onQuit }: Props) {
           )}
         </>
       ) : (
-        <Cards state={state} foe={foe} onPick={(card) => dispatch({ type: 'pick', card })} />
+        <Cards state={state} foe={foe} onPick={(card) => (hidden && pvp ? state.picker === 0 && state.phase.kind === 'pick' && pvp.room.send({ t: 'pick', card }) : dispatch({ type: 'pick', card }))} />
       )}
 
       {peerGone && !done && (
