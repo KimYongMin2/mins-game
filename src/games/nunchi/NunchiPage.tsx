@@ -129,7 +129,7 @@ export function NunchiPage() {
           minPlayers={MIN_PLAYERS}
           teams
           // 되도록 기기끼리 직접 (WebRTC, 방장 ↔ 친구 각자). 동시 판정이 방장 기기에 도착한 시각 기준이라, 늦게 가면 불공평해서
-          onConnected={(r) => setRoom(r.startReferee ? r : withDirectLink(r))}
+          onConnected={(r) => setRoom(r.hasReferee?.('nunchi') ? r : withDirectLink(r))}
           onStart={(with_, bots, teams) => room && startPvp(room, with_, bots, teams)}
           onBack={() => {
             room?.leave()

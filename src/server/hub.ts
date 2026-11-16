@@ -166,7 +166,7 @@ export class Hub {
         return s.conn.close(4001)
       }
       s.uid = uid
-      return s.push({ t: 'hello-ok' })
+      return s.push({ t: 'hello-ok', referees: Object.keys(this.opts.referees ?? {}) })
     }
     if (!s.uid) return // 로그인 확인 전엔 아무것도 안 받음
     switch (m.t) {

@@ -1,5 +1,4 @@
 import { Suspense, lazy, useEffect, useReducer, useRef, useState } from 'react'
-import { REFEREE_FROM } from '../../../shared/online/hubProtocol'
 import type { Member, Room } from '../../../shared/online/room'
 import { LinkBadge } from '../../../shared/ui/LinkBadge'
 import { randomSeed } from '../../../shared/random'
@@ -170,7 +169,7 @@ function Banner({ screen }: { screen: ScreenState }) {
 
 export function GameScreen(props: Props) {
   // 우리 게임 서버가 심판이면 방장도 친구처럼 화면만 받는다 (누른 순서·가위바위보 손은 서버가 정함 — 조작 막기 3단계)
-  const [serverRef] = useState(() => props.mode === 'host' && !!props.room.startReferee)
+  const [serverRef] = useState(() => props.mode === 'host' && !!props.room.hasReferee?.('nunchi'))
   const isGuest = props.mode === 'guest' || serverRef
   // 3D 탁자 (WebGL이 안 되는 기기는 예전 2D 그림)
   const [use3D] = useState(canWebGL)
@@ -201,7 +200,7 @@ export function GameScreen(props: Props) {
     const indexOf = (id: string) => engineRef.current.players.findIndex((p) => p.id === id && p.kind === 'remote')
     const offMsg = room.onMessage((msg, from) => {
       // 화면은 심판(서버, 아니면 방장)이 보낸 것만
-      if ((room.role === 'guest' || serverRef) && msg.t === 'view' && (from === undefined || from === REFEREE_FROM)) guestDispatch({ type: 'view', view: msg.v })
+      if ((room.role === 'guest' || serverRef) && msg.t === 'view' && room.fromJudge?.(from) !== false) guestDispatch({ type: 'view', view: msg.v })
       if (room.role !== 'host' || serverRef) return
       if (msg.t === 'press' && indexOf(msg.from) >= 0) hostDispatch({ type: 'press', player: indexOf(msg.from) })
       if (msg.t === 'pick' && indexOf(msg.from) >= 0) hostDispatch({ type: 'pick', player: indexOf(msg.from), hand: msg.hand })

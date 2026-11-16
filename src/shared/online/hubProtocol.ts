@@ -50,7 +50,8 @@ export type ClientMsg =
 
 /** 서버 → 브라우저 */
 export type ServerMsg =
-  | { t: 'hello-ok' }
+  /** referees = 이 서버가 심판을 맡을 수 있는 게임 (모르는 게임은 예전처럼 방장 폰이 심판 — 사이트가 서버보다 먼저 바뀌어도 안 멈추게) */
+  | { t: 'hello-ok'; referees?: string[] }
   | { t: 'error'; reason: string }
   | { t: 'joined'; ref: number; room: string; key: string; resume: string }
   | { t: 'join-error'; ref: number; reason: JoinError }

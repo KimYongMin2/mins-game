@@ -2,7 +2,7 @@ import type { RealtimeChannel, SupabaseClient } from '@supabase/supabase-js'
 import { type Advert, advertiseRoom, cleanId, cleanName, isInt } from './roomList'
 import { getRealtimeClient } from './supabase'
 import { GAME_SERVER_URL, hub } from './hubClient'
-import type { HubMember } from './hubProtocol'
+import { type HubMember, REFEREE_FROM } from './hubProtocol'
 
 // 친구 대전(PvP)용 방. Supabase Realtime 채널 하나 = 방 하나.
 // 방장이 4자리 코드로 방을 만들고, 친구들이 그 코드로 들어온다. 서로 메시지를 주고받는다.
@@ -134,6 +134,10 @@ export interface Room<M> {
    * 우리 게임 서버로 연 방에만 있다 (없으면 예전처럼 방장 폰이 심판)
    */
   startReferee?(game: string, setup: unknown): void
+  /** 우리 게임 서버가 이 게임 심판을 맡을 수 있는지 (없거나 false면 예전처럼 방장 폰이 심판) */
+  hasReferee?(game: string): boolean
+  /** 심판이 보낸 메시지인지: 서버 심판, 아니면 방장 (우리 서버면 서버가 붙인 보낸 사람으로 — 친구가 가짜 화면을 보내도 걸러짐) */
+  fromJudge?(from?: string): boolean
   leave(): void
 }
 
@@ -292,6 +296,8 @@ async function openHub<M>(gameId: string, code: string, meta: Meta, { capacity =
     },
     sendMove: (move) => meta.role === 'host' && conn.move(move),
     startReferee: (game, setup) => meta.role === 'host' && conn.referee(game, setup),
+    hasReferee: (game) => hub().referees.includes(game),
+    fromJudge: (from) => from === REFEREE_FROM || (!!from && all.some((m) => m.id === from && m.role === 'host')),
     onMove(fn) {
       moveFns.add(fn)
       return () => moveFns.delete(fn)

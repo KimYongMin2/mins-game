@@ -1,6 +1,5 @@
 import { Suspense, lazy, useEffect, useReducer, useRef, useState } from 'react'
 import type { Member, Room } from '../../../shared/online/room'
-import { REFEREE_FROM } from '../../../shared/online/hubProtocol'
 import { randomSeed } from '../../../shared/random'
 import { TEAM_NAMES, type Team, type TeamPick, planTeams, teamOutcome } from '../../../shared/team/teams'
 import { assignLooks, decodeLook } from '../../../shared/art3d/animalKinds'
@@ -112,7 +111,7 @@ function statusOf(screen: ScreenState): { text: string; tone?: 'bad' | 'win' | '
 
 export function GameScreen(props: Props) {
   // 우리 게임 서버가 심판이면 방장도 친구처럼 화면만 받는다 (총알 칸은 서버만 앎 — 조작 막기 3단계)
-  const [serverRef] = useState(() => props.mode === 'host' && !!props.room.startReferee)
+  const [serverRef] = useState(() => props.mode === 'host' && !!props.room.hasReferee?.('roulette'))
   const isGuest = props.mode === 'guest' || serverRef
   // 3D 탁자 (WebGL이 안 되는 기기는 예전 2D 그림)
   const [use3D] = useState(canWebGL)
@@ -143,7 +142,7 @@ export function GameScreen(props: Props) {
     const indexOf = (id: string) => engineRef.current.players.findIndex((p) => p.id === id && p.kind === 'remote')
     const offMsg = room.onMessage((msg, from) => {
       // 화면은 심판(서버, 아니면 방장)이 보낸 것만 — 우리 서버면 친구가 가짜 화면을 보내도 from이 달라 무시
-      if ((room.role === 'guest' || serverRef) && msg.t === 'view' && (from === undefined || from === REFEREE_FROM)) guestDispatch({ type: 'view', view: msg.v })
+      if ((room.role === 'guest' || serverRef) && msg.t === 'view' && room.fromJudge?.(from) !== false) guestDispatch({ type: 'view', view: msg.v })
       if (room.role !== 'host' || serverRef) return
       if (msg.t === 'aim' && indexOf(msg.from) >= 0) hostDispatch({ type: 'aim', player: indexOf(msg.from), target: msg.target })
       if (msg.t === 'pull' && indexOf(msg.from) >= 0) hostDispatch({ type: 'pull', player: indexOf(msg.from), target: msg.target })

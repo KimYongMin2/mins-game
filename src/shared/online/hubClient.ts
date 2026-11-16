@@ -24,6 +24,8 @@ class HubClient {
   private lists = new Map<string, Set<(rooms: Record<string, unknown>[]) => void>>()
   private adverts = new Map<string, Record<string, unknown>>()
   private retry = 0
+  /** 서버가 심판을 맡을 수 있는 게임 */
+  referees: string[] = []
   private timer: ReturnType<typeof setTimeout> | null = null
 
   constructor() {
@@ -69,6 +71,7 @@ class HubClient {
         }
         if (m.t === 'hello-ok') {
           opened = true
+          this.referees = Array.isArray(m.referees) ? m.referees : []
           this.retry = 0
           resolve()
           void this.restore()

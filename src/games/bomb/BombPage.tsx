@@ -129,7 +129,7 @@ export function BombPage() {
           minPlayers={MIN_PLAYERS}
           teams
           // 되도록 기기끼리 직접 (WebRTC, 방장 ↔ 친구 각자). 던진 폭탄이 방장에게 늦게 가면 내 손에서 터질 수 있어서
-          onConnected={(r) => setRoom(r.startReferee ? r : withDirectLink(r))}
+          onConnected={(r) => setRoom(r.hasReferee?.('bomb') ? r : withDirectLink(r))}
           onStart={(with_, bots, teams) => room && startPvp(room, with_, bots, teams)}
           onBack={() => {
             room?.leave()
