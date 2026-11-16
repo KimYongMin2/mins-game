@@ -11,6 +11,7 @@ import { playerRange } from './pages/PlayerDots'
 const ArcheryPage = lazy(() => import('./games/archery/ArcheryPage').then((m) => ({ default: m.ArcheryPage })))
 const ArmwrestlePage = lazy(() => import('./games/armwrestle/ArmwrestlePage').then((m) => ({ default: m.ArmwrestlePage })))
 const BattingPage = lazy(() => import('./games/batting/BattingPage').then((m) => ({ default: m.BattingPage })))
+const DoodlePage = lazy(() => import('./games/doodle/DoodlePage').then((m) => ({ default: m.DoodlePage })))
 const BombPage = lazy(() => import('./games/bomb/BombPage').then((m) => ({ default: m.BombPage })))
 const FightPage = lazy(() => import('./games/fight/FightPage').then((m) => ({ default: m.FightPage })))
 const MemoryPage = lazy(() => import('./games/memory/MemoryPage').then((m) => ({ default: m.MemoryPage })))
@@ -81,6 +82,10 @@ function App() {
         <Route
           path="/games/bomb"
           element={nickname ? <BombPage /> : <ToNickname />}
+        />
+        <Route
+          path="/games/doodle"
+          element={nickname ? <DoodlePage /> : <ToNickname />}
         />
         <Route
           path="/games/nunchi"

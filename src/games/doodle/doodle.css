@@ -1,0 +1,169 @@
+/* 그림 맞히기 — 오락실 테마 토큰(--card·--ink·--hair·--brand…)을 쓰고, 그림판만 흰 종이 */
+
+.dd-start,
+.dd-result {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-width: 460px;
+  margin: 8px auto 0;
+}
+.dd-start__lead { margin: 0; font-weight: 700; font-size: 1.05rem; }
+.dd-start__rules { margin: 0; padding-left: 18px; color: var(--ink-soft); line-height: 1.6; font-size: 0.92rem; }
+.dd-start__career,
+.dd-result__career,
+.dd-result__note { margin: 0; color: var(--ink-soft); font-size: 0.875rem; }
+.dd-start__go { min-height: 52px; font-size: 1.05rem; }
+
+.dd-game {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-width: 760px;
+  margin: 0 auto;
+  width: 100%;
+}
+.dd-notice { padding: 16px; border: 2px solid var(--brand); border-radius: 2px; font-weight: 700; }
+
+.dd-top {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.85rem;
+  color: var(--ink-soft);
+}
+.dd-top__word {
+  text-align: center;
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: var(--ink);
+  letter-spacing: 0.04em;
+}
+.dd-top__word--reveal { color: var(--brand); }
+.dd-top__time { font-weight: 800; font-variant-numeric: tabular-nums; min-width: 3ch; text-align: right; color: var(--ink); }
+.dd-top__time--low { color: #e8473f; }
+
+.dd-players {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.dd-players li {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  padding: 3px 8px;
+  border: 1px solid var(--hair);
+  border-radius: 2px;
+  background: var(--card);
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+.dd-players b { font-variant-numeric: tabular-nums; }
+.dd-players__drawer { border-color: var(--brand) !important; }
+.dd-players__got { background: color-mix(in srgb, #22a861 18%, var(--card)) !important; }
+.dd-players__left { opacity: 0.45; text-decoration: line-through; }
+.dd-players__me { outline: 2px solid color-mix(in srgb, var(--brand) 60%, transparent); }
+
+.dd-board { position: relative; }
+.dd-canvas {
+  display: block;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  /* 폰 세로 화면에서 채팅이 안 밀리게 높이도 제한 */
+  max-height: 52dvh;
+  object-fit: contain;
+  background: #fff;
+  border: 3px solid #1c1748;
+  border-radius: 2px;
+  touch-action: none;
+}
+.dd-canvas--drawing { cursor: crosshair; border-color: var(--brand); }
+
+.dd-choose {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  background: rgba(28, 23, 72, 0.78);
+  color: #fff;
+}
+.dd-choose p { margin: 0; font-weight: 800; font-size: 1.1rem; }
+.dd-choose .button { min-width: 180px; min-height: 48px; font-size: 1.1rem; }
+
+.dd-tools { display: flex; flex-direction: column; gap: 6px; }
+.dd-tools__colors,
+.dd-tools__row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.dd-swatch {
+  width: 32px;
+  height: 32px;
+  border: 2px solid var(--hair-strong, rgba(0, 0, 0, 0.2));
+  border-radius: 2px;
+  padding: 0;
+  cursor: pointer;
+}
+.dd-swatch--eraser { width: auto; padding: 0 8px; background: #fff; color: #1c1748; font-weight: 700; font-size: 0.8rem; }
+.dd-swatch--on { outline: 3px solid var(--brand); outline-offset: 1px; }
+.dd-width {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 32px;
+  border: 2px solid var(--hair);
+  border-radius: 2px;
+  background: var(--card);
+  cursor: pointer;
+}
+.dd-width span { display: block; border-radius: 50%; background: var(--ink); }
+.dd-width--on { border-color: var(--brand); }
+
+.dd-choices { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.dd-choices p { grid-column: 1 / -1; margin: 0; font-size: 0.8rem; font-weight: 700; color: var(--ink-soft); }
+.dd-choices .button { min-height: 44px; font-weight: 800; }
+
+.dd-chat { display: flex; flex-direction: column; gap: 6px; }
+.dd-chat__log {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: 2px;
+  height: 120px;
+  margin: 0;
+  padding: 6px 8px;
+  overflow: hidden;
+  list-style: none;
+  border: 1px solid var(--hair);
+  border-radius: 2px;
+  background: var(--card);
+  font-size: 0.85rem;
+}
+.dd-chat__correct { color: #22a861; font-weight: 800; }
+.dd-chat__system { color: var(--ink-soft); font-size: 0.8rem; }
+.dd-chat__form { display: grid; grid-template-columns: 1fr auto; gap: 6px; }
+
+.dd-result__headline {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 20px 16px;
+  border: 1px solid var(--hair);
+  border-radius: 2px;
+  text-align: center;
+}
+.dd-result__headline strong { font-size: 3rem; font-weight: 800; line-height: 1.1; }
+.dd-result__headline span { color: var(--ink-soft); font-size: 0.875rem; }
+.dd-result__headline--win { border: 2px solid var(--brand); }
+.dd-result__ranking { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 4px; }
+.dd-result__ranking li { display: flex; gap: 8px; padding: 8px 10px; border: 1px solid var(--hair); border-radius: 2px; background: var(--card); }
+.dd-result__ranking b { margin-left: auto; font-variant-numeric: tabular-nums; }
+.dd-result__me { border-color: var(--brand) !important; font-weight: 800; }
+.dd-result__buttons { display: flex; gap: 8px; }
+.dd-result__buttons .button { flex: 1; min-height: 48px; }

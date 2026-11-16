@@ -248,3 +248,33 @@ describe('격투 서버 심판', () => {
     expect([h.fighters[0].life, h.fighters[1].life]).toEqual([g.fighters[1].life, g.fighters[0].life])
   })
 })
+
+import { doodleReferee } from './doodle'
+
+describe('그림 맞히기 서버 심판', () => {
+  it('그리는 사람 그림만 넘기고 기억해서 다시 보내 줌, 제시어는 그리는 사람에게만', () => {
+    const f = fakeCtx([{ id: 'H', role: 'host' }, { id: 'G', role: 'guest' }])
+    const to: [string, { t: string; v?: { word: string | null; drawer: number | null; phase: string; turnNo: number; players: { id: string }[] }; ops?: unknown[] }][] = []
+    f.ctx.sendTo = (k, m) => to.push([k, m as never])
+    const ref = doodleReferee({ players: [{ id: 'H' }, { id: 'G' }] }, f.ctx)!
+    expect(doodleReferee({ players: [{ id: 'H' }, { id: 'bot0' }] }, f.ctx)).toBeNull()
+    let v = to.at(-1)![1].v!
+    for (let i = 0; i < 400 && v.phase !== 'draw'; i++) {
+      f.advance(100)
+      ref.tick(f.now)
+      v = to.filter(([k]) => k === 'H').at(-1)![1].v!
+    }
+    const drawerId = v.players[v.drawer!].id
+    const otherId = drawerId === 'H' ? 'G' : 'H'
+    const mine = to.filter(([k]) => k === drawerId).at(-1)![1].v!
+    const theirs = to.filter(([k]) => k === otherId).at(-1)![1].v!
+    expect(mine.word).toBeTruthy()
+    expect(theirs.word).toBeNull()
+    const ink = { t: 'ink', turn: v.turnNo, ops: [{ op: 's', id: 1, c: '#1c1748', w: 4, p: [10, 10, 20, 20] }] }
+    expect(ref.input(otherId, ink)).toBe(true) // 맞히는 사람 낙서는 막힘
+    expect(ref.input(drawerId, ink)).toBe(false) // 그리는 사람 것은 그대로 전달
+    ref.input(otherId, { t: 'inkSync' })
+    const sync = to.filter(([k, m]) => k === otherId && m.t === 'inkAll').at(-1)![1]
+    expect(sync.ops).toHaveLength(1)
+  })
+})

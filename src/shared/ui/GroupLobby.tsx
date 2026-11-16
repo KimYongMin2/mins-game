@@ -34,6 +34,8 @@ type Props<M> = {
   onBack: () => void
   /** 방 안에서 방장이 바꾸는 모드 (예: 윷놀이 말 개수) — 친구 화면엔 고른 것이 보이고, 바뀌면 친구 준비가 풀림 */
   mode?: ModeSpec
+  /** 봇을 못 넣는 게임 (그림 맞히기) — '빈자리에 봇' 줄을 안 보임 */
+  noBots?: boolean
 }
 
 type View =
@@ -54,7 +56,7 @@ const myAvatar = () => {
   return l ? encodeLook(l) : undefined
 }
 
-export function GroupLobby<M>({ gameId, nickname, capacity, minPlayers, teams: canTeam = false, friendlyFire: canFriendlyFire = false, onConnected, onStart, onBack, mode }: Props<M>) {
+export function GroupLobby<M>({ gameId, nickname, capacity, minPlayers, teams: canTeam = false, friendlyFire: canFriendlyFire = false, onConnected, onStart, onBack, mode, noBots = false }: Props<M>) {
   const [view, setView] = useState<View>({ kind: 'menu' })
   const [room, setRoom] = useState<Room<M> | null>(null)
   const [members, setMembers] = useState<Member[]>([])
@@ -213,7 +215,7 @@ export function GroupLobby<M>({ gameId, nickname, capacity, minPlayers, teams: c
                 </button>
               </div>
             )}
-            <div className="group-lobby__bots" role="group" aria-label="봇 수">
+            {!noBots && <div className="group-lobby__bots" role="group" aria-label="봇 수">
               <span>빈자리에 봇</span>
               <button type="button" className="button button--small" disabled={bots <= 0} onClick={() => setBotsWanted(bots - 1)} aria-label="봇 빼기">
                 −
@@ -228,7 +230,7 @@ export function GroupLobby<M>({ gameId, nickname, capacity, minPlayers, teams: c
               >
                 +
               </button>
-            </div>
+            </div>}
             <button type="button" className="button button--primary pvp-lobby__big" disabled={count < minPlayers || !ready || !allReady} onClick={() => {
                 room.setPlaying(true)
                 onStart(members, bots, teamOf ? Object.fromEntries(ids.map((id, k) => [id, teamOf[k]])) : null, !!teamOf && canFriendlyFire && friendlyFire)

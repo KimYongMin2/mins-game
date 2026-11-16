@@ -3995,7 +3995,7 @@ const BARREL = 7.5;
 const COUNTDOWN_MS$3 = 1500;
 const TURN_MS$2 = 2e4;
 const BOOM_MS$1 = 1600;
-const DONE_MS$8 = 2500;
+const DONE_MS$9 = 2500;
 /** 봇이 생각하는 시간 */
 const BOT_THINK_MS$1 = [1200, 2400];
 //#endregion
@@ -4316,7 +4316,7 @@ function startSpots(rng, n) {
 	}
 	return spots;
 }
-function createEngine$6(opts) {
+function createEngine$7(opts) {
 	const rng = createRng(opts.seed);
 	const { land, terrain } = makeLand(rng);
 	const tanks = startSpots(rng, opts.players.length).map((x) => ({
@@ -4464,12 +4464,12 @@ function afterBoom$1(s) {
 		...s,
 		phase: {
 			kind: "done",
-			until: s.now + DONE_MS$8
+			until: s.now + DONE_MS$9
 		}
 	};
 	return startTurn$2(s, nextAlive$1(s, s.turn));
 }
-function drop$6(s, player) {
+function drop$7(s, player) {
 	if (!s.tanks[player].alive || s.phase.kind === "done") return s;
 	const next = {
 		...s,
@@ -4484,13 +4484,13 @@ function drop$6(s, player) {
 		...next,
 		phase: {
 			kind: "done",
-			until: s.now + DONE_MS$8
+			until: s.now + DONE_MS$9
 		}
 	};
 	if (s.phase.kind === "aim" && s.turn === player) return startTurn$2(next, nextAlive$1(next, player));
 	return next;
 }
-function tick$8(s) {
+function tick$9(s) {
 	const { phase, now } = s;
 	switch (phase.kind) {
 		case "countdown": return now >= phase.until ? startTurn$2(s, s.turn) : s;
@@ -4510,9 +4510,9 @@ function tick$8(s) {
 		case "done": return s;
 	}
 }
-function engineReducer$6(state, action) {
+function engineReducer$7(state, action) {
 	switch (action.type) {
-		case "tick": return tick$8({
+		case "tick": return tick$9({
 			...state,
 			now: action.now
 		});
@@ -4520,11 +4520,11 @@ function engineReducer$6(state, action) {
 		case "fire":
 			if (state.phase.kind !== "aim" || action.player !== state.turn || !state.tanks[action.player].alive) return state;
 			return launch(setAim(state, action.player, action.x, action.angle, action.power));
-		case "drop": return drop$6(state, action.player);
+		case "drop": return drop$7(state, action.player);
 	}
 }
 /** 사람별 등수 (1 = 우승). 끝나기 전이면 남은 사람은 모두 1 */
-function ranksOf$3(s) {
+function ranksOf$4(s) {
 	const ranks = s.players.map(() => 1);
 	let next = aliveIndexes$4(s).length + 1;
 	for (const group of [...s.out].reverse()) {
@@ -4563,7 +4563,7 @@ function toView$6(s) {
 		shot: phase.kind === "flight" ? phase.shot : null,
 		boom: phase.kind === "boom" ? phase.boom : null,
 		kills: s.kills,
-		ranks: ranksOf$3(s)
+		ranks: ranksOf$4(s)
 	};
 }
 /** 친구에게 바로 알려야 할 만큼 바뀌었는지 (차례인 사람이 움직이거나 겨누는 것도) */
@@ -4643,7 +4643,7 @@ const clampNumber = (n) => {
 	const x = Math.floor(Number(n));
 	return Number.isFinite(x) ? Math.min(99, Math.max(0, x)) : 7;
 };
-const pick$2 = (list, x, fallback) => typeof x === "string" && list.includes(x) ? x : fallback;
+const pick$3 = (list, x, fallback) => typeof x === "string" && list.includes(x) ? x : fallback;
 /** 방으로 보낼 짧은 글자: '동물.모자.안경.목.털.옷.색.번호' */
 const encodeLook = (l) => [
 	l.animal,
@@ -4663,12 +4663,12 @@ function decodeLook(x) {
 	if (!animal) return void 0;
 	return {
 		animal,
-		hat: pick$2(HATS, hat, "none"),
-		glasses: pick$2(GLASSES, glasses, "none"),
-		neck: pick$2(NECKS, neck, "none"),
-		fur: pick$2(FURS, fur, "base"),
-		outfit: pick$2(OUTFITS, outfit, "shirt"),
-		tint: pick$2(TINTS, tint, "red"),
+		hat: pick$3(HATS, hat, "none"),
+		glasses: pick$3(GLASSES, glasses, "none"),
+		neck: pick$3(NECKS, neck, "none"),
+		fur: pick$3(FURS, fur, "base"),
+		outfit: pick$3(OUTFITS, outfit, "shirt"),
+		tint: pick$3(TINTS, tint, "red"),
 		number: number === void 0 ? 7 : clampNumber(number)
 	};
 }
@@ -4797,7 +4797,7 @@ function artilleryReferee(setup, ctx) {
 	const teams = readTeams(o.teams, players.length);
 	if (teams === void 0) return null;
 	return hostEngineReferee(ctx, {
-		state: createEngine$6({
+		state: createEngine$7({
 			now: ctx.now(),
 			seed: serverSeed(),
 			players,
@@ -4805,7 +4805,7 @@ function artilleryReferee(setup, ctx) {
 			friendlyFire: o.friendlyFire === true,
 			level: "normal"
 		}),
-		reduce: engineReducer$6,
+		reduce: engineReducer$7,
 		tick: (now) => ({
 			type: "tick",
 			now
@@ -4844,13 +4844,13 @@ const COUNTDOWN_MS$2 = 2400;
 /** 펑! 보여주기 */
 const BOOM_MS = 2200;
 /** 경기가 끝난 뒤 결과 화면으로 넘어가기까지 */
-const DONE_MS$7 = 2500;
+const DONE_MS$8 = 2500;
 /** 봇이 폭탄을 받고 넘기기까지 */
 const BOT_HOLD_MS = [350, 1500];
 //#endregion
 //#region src/games/bomb/play/engine.ts
 const within$4 = (rng, [min, max]) => min + rng.next() * (max - min);
-function createEngine$5(opts) {
+function createEngine$6(opts) {
 	return countdown$1({
 		now: opts.now,
 		seed: opts.seed,
@@ -4933,7 +4933,7 @@ function afterBoom(state) {
 		...state,
 		phase: {
 			kind: "done",
-			until: state.now + DONE_MS$7
+			until: state.now + DONE_MS$8
 		}
 	};
 	return countdown$1({
@@ -5008,7 +5008,7 @@ function pass(state, from, to) {
 		passes: state.passes.map((n, i) => i === from ? n + 1 : n)
 	};
 }
-function drop$5(state, player) {
+function drop$6(state, player) {
 	if (!state.alive[player] || state.phase.kind === "done") return state;
 	let next = eliminate(state, player);
 	const left = aliveIndexes$3(next);
@@ -5017,7 +5017,7 @@ function drop$5(state, player) {
 		flight: null,
 		phase: {
 			kind: "done",
-			until: state.now + DONE_MS$7
+			until: state.now + DONE_MS$8
 		}
 	};
 	if (next.holder === player || next.flight?.to === player || next.flight?.from === player) {
@@ -5033,7 +5033,7 @@ function drop$5(state, player) {
 	}
 	return next;
 }
-function tick$7(state) {
+function tick$8(state) {
 	const { phase, now } = state;
 	switch (phase.kind) {
 		case "countdown": return now >= phase.until ? startPlay(state) : state;
@@ -5044,14 +5044,14 @@ function tick$7(state) {
 		case "done": return state;
 	}
 }
-function engineReducer$5(state, action) {
+function engineReducer$6(state, action) {
 	switch (action.type) {
-		case "tick": return tick$7({
+		case "tick": return tick$8({
 			...state,
 			now: action.now
 		});
 		case "pass": return pass(state, action.from, action.to);
-		case "drop": return drop$5(state, action.player);
+		case "drop": return drop$6(state, action.player);
 	}
 }
 /** 순위: 1등(끝까지 남은 사람)부터. 끝나기 전이면 남은 사람들은 순서 없이 앞에 */
@@ -5101,13 +5101,13 @@ function bombReferee(setup, ctx) {
 	const teams = readTeams(o.teams, players.length);
 	if (teams === void 0) return null;
 	return hostEngineReferee(ctx, {
-		state: createEngine$5({
+		state: createEngine$6({
 			now: ctx.now(),
 			seed: serverSeed(),
 			players,
 			teams
 		}),
-		reduce: engineReducer$5,
+		reduce: engineReducer$6,
 		tick: (now) => ({
 			type: "tick",
 			now
@@ -5126,6 +5126,682 @@ function bombReferee(setup, ctx) {
 		},
 		drop: (s, key) => {
 			const player = humanIndex(s.players, key);
+			return player >= 0 ? {
+				type: "drop",
+				player
+			} : null;
+		},
+		done: (s) => s.phase.kind === "done",
+		nowOf: (s) => s.now
+	});
+}
+//#endregion
+//#region src/games/doodle/constants.ts
+/** 시작 안내 */
+const INTRO_MS$5 = 2e3;
+/** 그릴 사람이 제시어 2개 중 고르는 시간 (넘으면 무작위) */
+const CHOOSE_MS$1 = 6e3;
+/** 그리는 시간 */
+const DRAW_MS = 6e4;
+/** 정답 보여주기 */
+const REVEAL_MS$1 = 4e3;
+const DONE_MS$7 = 2500;
+/** 맞힌 순서대로 점수 (그 뒤는 1점) */
+const GUESS_POINTS = [
+	10,
+	8,
+	6,
+	5,
+	4,
+	3,
+	2
+];
+/** 보기로 맞히면 점수 절반 (올림) */
+const CHOICE_RATE = .5;
+//#endregion
+//#region src/games/doodle/words.ts
+const WORD_GROUPS = {
+	동물: [
+		"기린",
+		"코끼리",
+		"고양이",
+		"강아지",
+		"토끼",
+		"거북이",
+		"사자",
+		"호랑이",
+		"펭귄",
+		"돼지",
+		"원숭이",
+		"뱀",
+		"개구리",
+		"오리",
+		"닭",
+		"말",
+		"소",
+		"양",
+		"곰",
+		"판다",
+		"여우",
+		"늑대",
+		"다람쥐",
+		"고슴도치",
+		"하마",
+		"악어",
+		"얼룩말",
+		"낙타",
+		"캥거루",
+		"부엉이",
+		"독수리",
+		"앵무새",
+		"참새",
+		"박쥐",
+		"쥐",
+		"사슴",
+		"물개",
+		"고래",
+		"상어",
+		"문어",
+		"오징어",
+		"게",
+		"새우",
+		"달팽이",
+		"나비",
+		"벌",
+		"개미",
+		"거미",
+		"무당벌레",
+		"잠자리"
+	],
+	음식: [
+		"사과",
+		"바나나",
+		"포도",
+		"수박",
+		"딸기",
+		"복숭아",
+		"귤",
+		"파인애플",
+		"체리",
+		"레몬",
+		"당근",
+		"옥수수",
+		"감자",
+		"고구마",
+		"브로콜리",
+		"버섯",
+		"김밥",
+		"라면",
+		"떡볶이",
+		"피자",
+		"햄버거",
+		"치킨",
+		"아이스크림",
+		"케이크",
+		"도넛",
+		"빵",
+		"우유",
+		"계란",
+		"치즈",
+		"사탕",
+		"초콜릿",
+		"쿠키",
+		"핫도그",
+		"만두",
+		"주먹밥",
+		"팝콘",
+		"솜사탕",
+		"붕어빵",
+		"호떡"
+	],
+	물건: [
+		"우산",
+		"안경",
+		"모자",
+		"신발",
+		"양말",
+		"가방",
+		"시계",
+		"연필",
+		"지우개",
+		"가위",
+		"자",
+		"책",
+		"공책",
+		"컵",
+		"숟가락",
+		"젓가락",
+		"포크",
+		"칼",
+		"냄비",
+		"프라이팬",
+		"의자",
+		"책상",
+		"침대",
+		"소파",
+		"텔레비전",
+		"냉장고",
+		"선풍기",
+		"전화기",
+		"컴퓨터",
+		"카메라",
+		"열쇠",
+		"자물쇠",
+		"전구",
+		"촛불",
+		"거울",
+		"빗",
+		"칫솔",
+		"수건",
+		"휴지",
+		"풍선",
+		"선물",
+		"편지",
+		"왕관",
+		"반지",
+		"목걸이",
+		"망치",
+		"사다리",
+		"바구니",
+		"빗자루",
+		"주전자"
+	],
+	탈것: [
+		"자동차",
+		"버스",
+		"기차",
+		"비행기",
+		"배",
+		"자전거",
+		"오토바이",
+		"헬리콥터",
+		"로켓",
+		"트럭",
+		"소방차",
+		"구급차",
+		"경찰차",
+		"택시",
+		"잠수함",
+		"열기구",
+		"스케이트보드",
+		"유모차",
+		"지하철",
+		"트랙터"
+	],
+	자연: [
+		"해",
+		"달",
+		"별",
+		"구름",
+		"비",
+		"눈사람",
+		"무지개",
+		"번개",
+		"산",
+		"바다",
+		"강",
+		"섬",
+		"나무",
+		"꽃",
+		"해바라기",
+		"장미",
+		"선인장",
+		"나뭇잎",
+		"불",
+		"화산",
+		"폭포",
+		"파도",
+		"돌",
+		"모래성",
+		"토네이도"
+	],
+	장소: [
+		"집",
+		"학교",
+		"병원",
+		"성",
+		"교회",
+		"등대",
+		"다리",
+		"놀이터",
+		"수영장",
+		"공원",
+		"동물원",
+		"캠핑",
+		"텐트",
+		"피라미드",
+		"탑",
+		"감옥",
+		"빌딩",
+		"시장",
+		"도서관",
+		"우체국"
+	],
+	운동: [
+		"축구공",
+		"야구공",
+		"농구공",
+		"배드민턴",
+		"볼링",
+		"스키",
+		"수영",
+		"태권도",
+		"줄넘기",
+		"양궁",
+		"골프",
+		"탁구",
+		"씨름",
+		"스케이트",
+		"등산",
+		"낚시",
+		"달리기",
+		"권투",
+		"요가",
+		"서핑"
+	],
+	사람: [
+		"의사",
+		"경찰",
+		"소방관",
+		"요리사",
+		"선생님",
+		"가수",
+		"해적",
+		"마법사",
+		"공주",
+		"왕",
+		"로봇",
+		"외계인",
+		"유령",
+		"천사",
+		"닌자",
+		"산타",
+		"광대",
+		"우주인",
+		"농부",
+		"화가"
+	]
+};
+const WORDS = Object.values(WORD_GROUPS).flat();
+function groupOf(word) {
+	for (const [g, ws] of Object.entries(WORD_GROUPS)) if (ws.includes(word)) return g;
+	return null;
+}
+/** 정답 비교: 띄어쓰기·대소문자 무시 */
+const normalizeGuess = (s) => s.replace(/\s+/g, "").toLowerCase();
+//#endregion
+//#region src/games/doodle/play/engine.ts
+function shuffle(rng, xs) {
+	const a = [...xs];
+	for (let i = a.length - 1; i > 0; i--) {
+		const j = Math.floor(rng.next() * (i + 1));
+		[a[i], a[j]] = [a[j], a[i]];
+	}
+	return a;
+}
+function addLog(s, kind, player, text) {
+	const seq = s.logSeq + 1;
+	return {
+		...s,
+		logSeq: seq,
+		log: [...s.log, {
+			seq,
+			kind,
+			player,
+			text
+		}].slice(-40)
+	};
+}
+const activePlayers = (s) => s.players.flatMap((_, i) => s.left[i] ? [] : [i]);
+function createEngine$5(opts) {
+	const rng = createRng(opts.seed);
+	const n = opts.players.length;
+	const base = shuffle(rng, opts.players.map((_, i) => i));
+	const order = n <= 3 ? [...base, ...base] : base;
+	return {
+		now: opts.now,
+		seed: rng.seed(),
+		players: opts.players,
+		left: opts.players.map(() => false),
+		scores: opts.players.map(() => 0),
+		order,
+		turnNo: -1,
+		phase: {
+			kind: "intro",
+			until: opts.now + INTRO_MS$5
+		},
+		log: [],
+		logSeq: 0,
+		used: []
+	};
+}
+/** 다음 차례로 (나간 사람 차례는 건너뜀). 더 없거나 남은 사람이 둘보다 적으면 끝 */
+function nextTurn$2(s) {
+	if (activePlayers(s).length < 2) return finish$2(s);
+	let turnNo = s.turnNo + 1;
+	while (turnNo < s.order.length && s.left[s.order[turnNo]]) turnNo++;
+	if (turnNo >= s.order.length) return finish$2(s);
+	const rng = createRng(s.seed);
+	const fresh = WORDS.filter((w) => !s.used.includes(w));
+	const pool = shuffle(rng, fresh.length >= 2 ? fresh : WORDS);
+	const a = pool[0];
+	const b = pool.find((w) => groupOf(w) !== groupOf(a)) ?? pool[1];
+	const drawer = s.order[turnNo];
+	return {
+		...s,
+		seed: rng.seed(),
+		turnNo,
+		phase: {
+			kind: "choose",
+			drawer,
+			options: [a, b],
+			until: s.now + CHOOSE_MS$1
+		}
+	};
+}
+/** 보기 4개: 정답 + 같은 갈래에서 3개 (모자라면 아무거나) */
+function choicesFor(rng, word) {
+	const group = groupOf(word);
+	const same = shuffle(rng, (group ? WORD_GROUPS[group] : WORDS).filter((w) => w !== word));
+	const others = shuffle(rng, WORDS.filter((w) => w !== word && !same.includes(w)));
+	return shuffle(rng, [word, ...[...same, ...others].slice(0, 3)]);
+}
+function startDraw(s, index) {
+	if (s.phase.kind !== "choose") return s;
+	const { drawer, options } = s.phase;
+	const word = options[index === 1 ? 1 : 0];
+	const rng = createRng(s.seed);
+	const choices = choicesFor(rng, word);
+	return addLog({
+		...s,
+		seed: rng.seed(),
+		used: [...s.used, word],
+		phase: {
+			kind: "draw",
+			drawer,
+			word,
+			start: s.now,
+			until: s.now + DRAW_MS,
+			choices,
+			guessed: [],
+			choiceTried: []
+		}
+	}, "system", drawer, `${s.players[drawer].name}님이 그려요`);
+}
+function reveal$2(s) {
+	if (s.phase.kind !== "draw") return s;
+	const { drawer, word, guessed } = s.phase;
+	return addLog({
+		...s,
+		phase: {
+			kind: "reveal",
+			drawer,
+			word,
+			until: s.now + REVEAL_MS$1,
+			guessed
+		}
+	}, "system", null, `정답은 '${word}'`);
+}
+function finish$2(s) {
+	return {
+		...s,
+		phase: {
+			kind: "done",
+			until: s.now + DONE_MS$7
+		}
+	};
+}
+/** 보기가 보이는지 (마지막 20초) */
+const choicesOpen = (s) => s.phase.kind === "draw" && s.now >= s.phase.start + 4e4;
+/** 맞힘: 순서대로 점수, 보기로 맞히면 절반. 그린 사람은 1명당 점수. 모두 맞히면 바로 정답 보여주기 */
+function correct(s, player, viaChoice) {
+	const phase = s.phase;
+	if (phase.kind !== "draw") return s;
+	const base = GUESS_POINTS[phase.guessed.length] ?? 1;
+	const points = viaChoice ? Math.ceil(base * CHOICE_RATE) : base;
+	const guessed = [...phase.guessed, {
+		player,
+		points,
+		viaChoice
+	}];
+	const scores = s.scores.map((v, i) => i === player ? v + points : i === phase.drawer ? v + 3 : v);
+	let next = addLog({
+		...s,
+		scores,
+		phase: {
+			...phase,
+			guessed
+		}
+	}, "correct", player, `${s.players[player].name}님 정답!${viaChoice ? " (보기)" : ""}`);
+	if (activePlayers(next).filter((i) => i !== phase.drawer && !guessed.some((g) => g.player === i)).length === 0) next = reveal$2(next);
+	return next;
+}
+/** 맞힐 수 있는 사람인지 (그리는 중, 그린 사람 아님, 아직 못 맞힘, 안 나감) */
+function canGuess(s, player) {
+	return s.phase.kind === "draw" && player !== s.phase.drawer && !s.left[player] && !s.phase.guessed.some((g) => g.player === player);
+}
+function guess(s, player, text) {
+	if (!canGuess(s, player) || s.phase.kind !== "draw") return s;
+	const clean = [...text.replace(/[\u0000-\u001f\u007f]/g, "").trim()].slice(0, 30).join("");
+	if (!clean) return s;
+	if (normalizeGuess(clean) === normalizeGuess(s.phase.word)) return correct(s, player, false);
+	return addLog(s, "chat", player, clean);
+}
+function pick$2(s, player, index) {
+	if (!canGuess(s, player) || s.phase.kind !== "draw" || !choicesOpen(s) || s.phase.choiceTried.includes(player)) return s;
+	const chosen = s.phase.choices[index];
+	if (chosen === void 0) return s;
+	if (chosen === s.phase.word) return correct(s, player, true);
+	return {
+		...s,
+		phase: {
+			...s.phase,
+			choiceTried: [...s.phase.choiceTried, player]
+		}
+	};
+}
+function drop$5(s, player) {
+	if (s.left[player] || s.phase.kind === "done") return s;
+	let next = addLog({
+		...s,
+		left: s.left.map((l, i) => l || i === player)
+	}, "system", null, `${s.players[player].name}님이 나갔어요`);
+	if (activePlayers(next).length < 2) return finish$2(next);
+	const p = next.phase;
+	if ((p.kind === "choose" || p.kind === "draw") && p.drawer === player) return p.kind === "draw" ? reveal$2(next) : nextTurn$2(next);
+	if (p.kind === "draw") {
+		if (activePlayers(next).filter((i) => i !== p.drawer && !p.guessed.some((g) => g.player === i)).length === 0) next = reveal$2(next);
+	}
+	return next;
+}
+function tick$7(s) {
+	const { phase, now } = s;
+	switch (phase.kind) {
+		case "intro": return now >= phase.until ? nextTurn$2(s) : s;
+		case "choose": {
+			if (now < phase.until) return s;
+			const rng = createRng(s.seed);
+			return startDraw({
+				...s,
+				seed: rng.seed()
+			}, rng.next() < .5 ? 0 : 1);
+		}
+		case "draw": return now >= phase.until ? reveal$2(s) : s;
+		case "reveal": return now >= phase.until ? nextTurn$2(s) : s;
+		case "done": return s;
+	}
+}
+function engineReducer$5(s, a) {
+	switch (a.type) {
+		case "tick": return tick$7({
+			...s,
+			now: a.now
+		});
+		case "choose": return s.phase.kind === "choose" && s.phase.drawer === a.player ? startDraw(s, a.index) : s;
+		case "guess": return guess(s, a.player, a.text);
+		case "pick": return pick$2(s, a.player, a.index);
+		case "drop": return drop$5(s, a.player);
+	}
+}
+/** 순위 (점수 높은 순, 같으면 같은 등수) */
+function ranksOf$3(s) {
+	return s.scores.map((v) => 1 + s.scores.filter((o) => o > v).length);
+}
+//#endregion
+//#region src/games/doodle/play/ink.ts
+/** 한 판에 쌓는 점 수 제한 (너무 크면 받는 폰이 느려짐) */
+const MAX_POINTS = 4e4;
+function applyOps(strokes, ops) {
+	let out = strokes;
+	for (const o of ops) if (o.op === "x") out = [];
+	else if (o.op === "u") out = out.slice(0, -1);
+	else if (o.op === "s") out = [...out, {
+		id: o.id,
+		c: o.c,
+		w: o.w,
+		p: o.p
+	}];
+	else if (o.op === "a") {
+		const i = out.findIndex((s) => s.id === o.id);
+		if (i >= 0) out = out.map((s, k) => k === i ? {
+			...s,
+			p: [...s.p, ...o.p]
+		} : s);
+	}
+	return out;
+}
+const pointCount = (strokes) => strokes.reduce((n, s) => n + s.p.length / 2, 0);
+/** 받은 묶음 검사 (그리는 사람이 보낸 것만 쓰지만 모양도 확인). 이상하면 null */
+function readOps(x) {
+	if (!Array.isArray(x) || x.length > 200) return null;
+	const pts = (p) => Array.isArray(p) && p.length <= 400 && p.length % 2 === 0 && p.every((v, i) => Number.isInteger(v) && v >= 0 && v <= (i % 2 ? 750 : 1e3));
+	const out = [];
+	for (const o of x) {
+		if (!o || typeof o !== "object") return null;
+		if (o.op === "x" || o.op === "u") out.push({ op: o.op });
+		else if (o.op === "s" && Number.isInteger(o.id) && typeof o.c === "string" && /^#[0-9a-f]{6}$/.test(o.c) && typeof o.w === "number" && o.w > 0 && o.w <= 40 && pts(o.p)) out.push({
+			op: "s",
+			id: o.id,
+			c: o.c,
+			w: o.w,
+			p: o.p
+		});
+		else if (o.op === "a" && Number.isInteger(o.id) && pts(o.p)) out.push({
+			op: "a",
+			id: o.id,
+			p: o.p
+		});
+		else return null;
+	}
+	return out;
+}
+const tooBig = (strokes) => pointCount(strokes) > MAX_POINTS;
+//#endregion
+//#region src/games/doodle/play/view.ts
+function viewFor(s, viewerId) {
+	const me = s.players.findIndex((p) => p.id === viewerId);
+	const p = s.phase;
+	const drawer = p.kind === "choose" || p.kind === "draw" || p.kind === "reveal" ? p.drawer : null;
+	const word = p.kind === "reveal" ? p.word : p.kind === "draw" && drawer === me ? p.word : null;
+	const showChoices = p.kind === "draw" && choicesOpen(s) && canGuess(s, me);
+	return {
+		players: s.players.map(({ id, name, avatar }) => ({
+			id,
+			name,
+			avatar
+		})),
+		left: s.left,
+		scores: s.scores,
+		phase: p.kind,
+		leftMs: "until" in p ? Math.max(0, p.until - s.now) : 0,
+		turnNo: Math.max(0, s.turnNo),
+		turns: s.order.length,
+		drawer,
+		word,
+		wordLength: p.kind === "draw" ? [...p.word].length : null,
+		options: p.kind === "choose" && drawer === me ? p.options : null,
+		choices: showChoices ? p.choices : null,
+		choiceTried: p.kind === "draw" && p.choiceTried.includes(me),
+		canGuess: canGuess(s, me),
+		guessed: p.kind === "draw" || p.kind === "reveal" ? p.guessed : [],
+		log: s.log.slice(-20),
+		ranks: ranksOf$3(s)
+	};
+}
+/** 바로 보내야 할 만큼 바뀌었는지 (그 밖엔 1초마다) */
+function changeKey(s) {
+	const p = s.phase;
+	return [
+		p.kind,
+		s.turnNo,
+		s.logSeq,
+		s.left.join(),
+		p.kind === "draw" ? `${p.guessed.length}.${p.choiceTried.length}.${choicesOpen(s)}` : ""
+	].join("|");
+}
+//#endregion
+//#region src/server/referees/doodle.ts
+function doodleReferee(setup, ctx) {
+	const players = readPlayers((setup ?? {}).players, ctx, 2, 8);
+	if (!players || players.some((p) => p.kind === "bot")) return null;
+	let strokes = [];
+	let inkTurn = -1;
+	/** 그림 묶음을 그대로 기억 (다시 보낼 때 그대로) */
+	let history = [];
+	const drawerKey = (s) => s.phase.kind === "draw" ? s.players[s.phase.drawer].id : null;
+	return hostEngineReferee(ctx, {
+		state: createEngine$5({
+			now: ctx.now(),
+			seed: serverSeed(),
+			players
+		}),
+		reduce: engineReducer$5,
+		tick: (now) => ({
+			type: "tick",
+			now
+		}),
+		toView: (s) => s,
+		changed: (a, b) => !a || changeKey(a) !== changeKey(b),
+		viewFor: (_v, key, s) => viewFor(s, key),
+		input: (s, from, m) => {
+			if (inkTurn !== s.turnNo) {
+				inkTurn = s.turnNo;
+				strokes = [];
+				history = [];
+			}
+			if (m.t === "ink") {
+				const ops = readOps(m.ops);
+				if (from !== drawerKey(s) || m.turn !== s.turnNo || !ops) return null;
+				const next = applyOps(strokes, ops);
+				if (tooBig(next)) return null;
+				strokes = next;
+				history = ops.some((x) => x.op === "x") ? ops.slice(ops.map((x) => x.op).lastIndexOf("x")) : [...history, ...ops];
+				return;
+			}
+			if (m.t === "inkSync") {
+				ctx.sendTo(from, {
+					t: "inkAll",
+					turn: s.turnNo,
+					ops: history
+				});
+				return null;
+			}
+			if (m.t !== "choose" && m.t !== "guess" && m.t !== "pick") return void 0;
+			const player = s.players.findIndex((p) => p.id === from);
+			if (player < 0) return null;
+			if (m.t === "guess") return typeof m.text === "string" && m.text.length <= 100 ? {
+				type: "guess",
+				player,
+				text: m.text
+			} : null;
+			return isInt(m.index, 0, 3) ? {
+				type: m.t,
+				player,
+				index: m.index
+			} : null;
+		},
+		drop: (s, key) => {
+			const player = s.players.findIndex((p) => p.id === key);
 			return player >= 0 ? {
 				type: "drop",
 				player
@@ -8382,7 +9058,8 @@ const REFEREES = {
 	numbaseball: numbaseballReferee,
 	memory: memoryReferee,
 	fight: fightReferee,
-	omok: omokReferee
+	omok: omokReferee,
+	doodle: doodleReferee
 };
 //#endregion
 //#region game-server/main.ts
