@@ -364,3 +364,5 @@ grant execute on function public.fight_leaderboard(text) to anon, authenticated;
 -- ============================================================
 drop policy if exists "본인 기록 추가" on public.fight_games;
 revoke insert on public.fight_games from authenticated;
+drop policy if exists "본인 기록 추가" on public.archery_games;
+revoke insert on public.archery_games from authenticated;

@@ -1,36 +1,20 @@
 import { getSupabase } from '../../../shared/online/supabase'
-import { createUploadQueue, newRecordId, type UploadStatus } from '../../../shared/online/uploadQueue'
+import type { UploadStatus } from '../../../shared/online/uploadQueue'
+import { type Ticket, createVerifiedQueue } from '../../../shared/online/verified'
 import type { RoundSummary } from '../play/roundState'
 import type { ArcheryLeaderRow } from './leaderboard'
 
 // 경기 결과를 서버(Supabase)에 올리고 랭킹 합계를 받아온다.
 // 올리기·재전송은 shared/online/uploadQueue가 맡는다.
 
-/** archery_games 한 줄 (player_id·created_at은 서버가 채운다) */
-export type ArcheryGameRow = {
-  id: string
-  nickname: string
-  points: number
-  x_count: number
-  ten_count: number
-}
-
-export function toGameRow(summary: RoundSummary, nickname: string, id: string): ArcheryGameRow {
-  return {
-    id,
-    nickname: nickname.trim().slice(0, 10) || '익명',
-    points: summary.points,
-    x_count: summary.xCount,
-    ten_count: summary.tenCount,
-  }
-}
-
-const queue = createUploadQueue<ArcheryGameRow>('archery_games', 'archery:pending-games')
+// 올리기: 서버가 입장권 시드와 화살마다 누른·놓은 시각·조준점으로 다시 쏴서 점수를 직접 매겨 넣는다 (src/server/games/archery.ts).
+const queue = createVerifiedQueue('archery:verified-games')
 
 export const flushPendingGames = queue.flush
 
-export function submitGame(summary: RoundSummary, nickname: string): Promise<Exclude<UploadStatus, 'saving'>> {
-  return queue.submit(toGameRow(summary, nickname, newRecordId()))
+export function submitGame(summary: RoundSummary, ticket: Ticket, nickname: string): Promise<Exclude<UploadStatus, 'saving'>> {
+  const shots = summary.shots.map((s) => ({ pressAt: s.pressAt, releaseAt: s.releaseAt, aim: s.aim }))
+  return queue.submit({ game: 'archery', ticket, nickname: nickname.trim().slice(0, 10) || '익명', data: { t0: summary.t0, shots } })
 }
 
 type RpcRow = {

@@ -25,6 +25,10 @@ export type Shot = {
   score: ArrowScore
   /** 놓을 때 당긴 정도 */
   progress: number
+  /** 누른 시각·놓은 시각(자동 발사 포함)·놓을 때 조준점 — 랭킹 올릴 때 서버가 이걸로 다시 쏴 본다. 시간 초과면 null */
+  pressAt: number | null
+  releaseAt: number | null
+  aim: Point
 }
 
 export type Phase =
@@ -42,6 +46,8 @@ export type Phase =
 
 export type RoundState = {
   now: number
+  /** 경기를 만든 시각 (서버가 다시 돌릴 때 같은 시각에서 시작) */
+  t0: number
   seed: number
   /** 지금 쏠 화살 번호 (0부터) */
   arrowIndex: number
@@ -101,6 +107,7 @@ function prepareArrow(state: RoundState, index: number, now: number): RoundState
 export function createRound(now: number, seed: number): RoundState {
   const base: RoundState = {
     now,
+    t0: now,
     seed,
     arrowIndex: 0,
     wind: { direction: 0, tier: 'light', speed: 0 },
@@ -135,7 +142,7 @@ function fire(state: RoundState, at: number): RoundState {
   const progress = drawProgress(holdMs)
   const sway = swayOffset(at, holdMs, distance, state.swayPhase)
   const impact = computeImpact({ aim: state.aim, sway, wind: state.wind, distance, progress })
-  const shot: Shot = { index: state.arrowIndex, distance, wind: state.wind, impact, score: scoreImpact(impact), progress }
+  const shot: Shot = { index: state.arrowIndex, distance, wind: state.wind, impact, score: scoreImpact(impact), progress, pressAt: state.phase.startedAt, releaseAt: at, aim: state.aim }
   return withSounds(
     { ...state, phase: { kind: 'flying', shot, startAt: at, until: at + flightMs(distance) } },
     'release',
@@ -158,6 +165,9 @@ function timeOut(state: RoundState): RoundState {
     impact: null,
     score: MISS,
     progress: 0,
+    pressAt: null,
+    releaseAt: null,
+    aim: CENTER,
   }
   return withSounds(
     { ...state, shots: [...state.shots, shot], phase: { kind: 'scored', shot, until: state.now + SCORED_MS } },
@@ -225,6 +235,7 @@ export function roundReducer(state: RoundState, action: RoundAction): RoundState
 }
 
 export type RoundSummary = {
+  t0: number
   shots: Shot[]
   points: number
   xCount: number
@@ -232,5 +243,5 @@ export type RoundSummary = {
 }
 
 export function summarizeRound(state: RoundState): RoundSummary {
-  return { shots: state.shots, ...totalOf(state.shots.map((s) => s.score)) }
+  return { t0: state.t0, shots: state.shots, ...totalOf(state.shots.map((s) => s.score)) }
 }

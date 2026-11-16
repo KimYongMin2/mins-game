@@ -28,6 +28,8 @@ import { type ArrowScore, formatArrow, formatPoints, totalOf } from '../rules/sc
 import { playSound } from '../sounds'
 
 type Props = {
+  /** 서버 입장권의 시드 (랭킹 확인용). 없으면 아무 시드 */
+  seed?: number
   onFinish: (summary: RoundSummary) => void
 }
 
@@ -127,8 +129,8 @@ function ScoreSheet({ state }: { state: RoundState }) {
   )
 }
 
-export function GameScreen({ onFinish }: Props) {
-  const [state, dispatch] = useReducer(roundReducer, undefined, () => createRound(performance.now(), randomSeed()))
+export function GameScreen({ seed, onFinish }: Props) {
+  const [state, dispatch] = useReducer(roundReducer, undefined, () => createRound(performance.now(), seed ?? randomSeed()))
   const distance = currentDistance(state)
   const done = state.phase.kind === 'done'
   const wrapRef = useRef<HTMLDivElement>(null)

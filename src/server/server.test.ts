@@ -61,3 +61,43 @@ describe('판 입장권', () => {
     expect(await checkTicket('secret', t, 'fight', 'u1', t.exp + 1)).toBeNull()
   })
 })
+
+import { createRound, roundReducer, summarizeRound } from '../games/archery/play/roundState'
+import { replayArchery } from './games/archery'
+
+/** 화면처럼 16.7ms 프레임마다, 사람처럼 아무 때나 누르고 끌고 놓기 (가끔 시간 초과·자동 발사) */
+function playArchery(seed: number, pickSeed: number) {
+  const rng = createRng(pickSeed)
+  const t0 = 1234.5 + pickSeed
+  let s = createRound(t0, seed)
+  let t = t0
+  while (s.phase.kind !== 'done') {
+    t += 16.7
+    const r = rng.next()
+    if (s.phase.kind === 'ready' && r < 0.01) s = roundReducer(s, { type: 'press', at: t - rng.next() * 10 })
+    else if (s.phase.kind === 'drawing') {
+      if (r < 0.3) s = roundReducer(s, { type: 'aimBy', dx: (rng.next() - 0.5) * 0.05, dy: (rng.next() - 0.5) * 0.05 })
+      else if (r < 0.32) s = roundReducer(s, { type: 'release', at: t - rng.next() * 10 })
+    }
+    s = roundReducer(s, { type: 'tick', now: t })
+  }
+  return summarizeRound(s)
+}
+
+describe('양궁 다시 쏘기', () => {
+  it('화면에서 쏜 점수와 똑같다', () => {
+    for (let i = 0; i < 25; i++) {
+      const sum = playArchery(500 + i, i)
+      const r = replayArchery(500 + i, sum.t0, sum.shots)
+      expect(r).toEqual({ points: sum.points, xCount: sum.xCount, tenCount: sum.tenCount })
+    }
+  })
+
+  it('지어낸 기록은 거절하거나 다른 점수', () => {
+    const sum = playArchery(7, 3)
+    expect(replayArchery(7, sum.t0, sum.shots.slice(0, 5))).toBeNull()
+    expect(replayArchery(7, sum.t0, sum.shots.map((x) => ({ ...x, releaseAt: x.pressAt === null ? null : x.pressAt + 60_000 })))).toBeNull()
+    const other = replayArchery(8, sum.t0, sum.shots)
+    expect(other?.points).not.toBe(sum.points)
+  })
+})

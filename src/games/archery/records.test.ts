@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { RoundSummary } from './play/roundState'
 import { EMPTY_RECORD, addGame, averageOf } from './records'
 
-const game = (points: number, xCount = 0, tenCount = xCount): RoundSummary => ({ shots: [], points, xCount, tenCount })
+const game = (points: number, xCount = 0, tenCount = xCount): RoundSummary => ({ t0: 0, shots: [], points, xCount, tenCount })
 
 describe('addGame', () => {
   it('첫 경기는 무조건 최고 기록', () => {
