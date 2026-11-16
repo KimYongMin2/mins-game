@@ -27,7 +27,17 @@ async function signedIn(req: Request): Promise<string | null> {
   }
 }
 
+/**
+ * 우리 사이트에서 온 요청만 (사용자 요청 — 남이 프로그램으로 입장권을 잔뜩 받아 트래픽을 일으키지 못하게).
+ * Origin은 브라우저가 붙이고 페이지가 못 바꾼다. 프로그램은 속일 수 있지만 대충 긁어 쓰는 건 막고, 진짜 상한은 서버 설정(limit)이 맡는다
+ */
+function fromOurSite(req: Request): boolean {
+  const origin = req.headers.get('origin') ?? ''
+  return /^https:\/\/mins-game[a-z0-9-]*\.vercel\.app$/.test(origin) || /^http:\/\/localhost:\d+$/.test(origin)
+}
+
 export async function POST(req: Request): Promise<Response> {
+  if (!fromOurSite(req)) return json(403, { error: 'forbidden' })
   const key = process.env.LIVEKIT_API_KEY
   const secret = process.env.LIVEKIT_API_SECRET
   if (!key || !secret) return json(500, { error: 'not-configured' })
