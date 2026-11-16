@@ -1,5 +1,6 @@
 import type { RealtimeChannel } from '@supabase/supabase-js'
 import { getRealtimeClient } from './supabase'
+import { GAME_SERVER_URL, hub } from './hubClient'
 
 // 열린 방 목록: DB 없이 Supabase Realtime presence로. 방장이 목록 채널에 자기 방을 올려 두고(advertise),
 // 목록 화면은 그 채널을 지켜본다(watch). 방장이 나가면(연결이 끊기면) 목록에서 저절로 사라진다 (1~3초).
@@ -65,6 +66,14 @@ export type Advert<T> = {
 
 /** 내 방을 목록에 올린다. 접속이 늦어도 바로 돌려주고, 붙으면 올라간다 */
 export function advertiseRoom<T extends object>(listId: string, info: T): Advert<T> {
+  // 우리 게임 서버: 그 방의 방장만 올릴 수 있고(서버가 검사), 방장이 나가면 서버가 내린다
+  if (GAME_SERVER_URL) {
+    hub().advertise(listId, info as Record<string, unknown>)
+    return {
+      update: (next) => hub().advertise(listId, next as Record<string, unknown>),
+      stop: () => hub().advertise(listId, null),
+    }
+  }
   let latest = info
   let stopped = false
   let channel: RealtimeChannel | null = null
@@ -101,6 +110,7 @@ type Watch = { listeners: Set<{ onRooms: (rooms: object[]) => void; onError: () 
 const watches = new Map<string, Watch>()
 
 export function watchRooms<T extends object>(listId: string, onRooms: (rooms: T[]) => void, onError: () => void): () => void {
+  if (GAME_SERVER_URL) return hub().watch(listId, (rooms) => onRooms(rooms as T[]), onError)
   const listener = { onRooms: onRooms as (rooms: object[]) => void, onError }
   let w = watches.get(listId)
   if (!w) {

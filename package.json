@@ -9,7 +9,8 @@
     "lint": "oxlint",
     "preview": "vite preview",
     "test": "vitest run",
-    "build:api": "rolldown server-entry/ticket.ts -o api/ticket.js -p node -f esm && rolldown server-entry/submit.ts -o api/submit.js -p node -f esm"
+    "build:api": "rolldown server-entry/ticket.ts -o api/ticket.js -p node -f esm && rolldown server-entry/submit.ts -o api/submit.js -p node -f esm",
+    "build:game": "rolldown game-server/main.ts -o game-server/server.js -p node -f esm --external bufferutil --external utf-8-validate"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.118.0",
@@ -25,10 +26,12 @@
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.7",
     "@types/three": "^0.170.0",
+    "@types/ws": "^8.18.1",
     "@vitejs/plugin-react": "^6.1.1",
     "oxlint": "^1.81.0",
     "typescript": "~6.0.2",
     "vite": "^8.3.0",
-    "vitest": "^5.0.5"
+    "vitest": "^5.0.5",
+    "ws": "^8.18.3"
   }
 }

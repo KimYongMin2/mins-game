@@ -1,6 +1,8 @@
 import type { RealtimeChannel, SupabaseClient } from '@supabase/supabase-js'
 import { type Advert, advertiseRoom, cleanId, cleanName, isInt } from './roomList'
 import { getRealtimeClient } from './supabase'
+import { GAME_SERVER_URL, hub } from './hubClient'
+import type { HubMember } from './hubProtocol'
 
 // 친구 대전(PvP)용 방. Supabase Realtime 채널 하나 = 방 하나.
 // 방장이 4자리 코드로 방을 만들고, 친구들이 그 코드로 들어온다. 서로 메시지를 주고받는다.
@@ -111,8 +113,8 @@ export interface Room<M> {
   /** 내 접속 번호 (Member.id와 같은 종류) */
   myId: string
   send(msg: M): void
-  /** 받은 메시지. 해제 함수를 돌려준다 */
-  onMessage(fn: (msg: M) => void): () => void
+  /** 받은 메시지. from = 보낸 사람 접속 번호 (우리 게임 서버면 서버가 붙인 것이라 믿을 수 있음). 해제 함수를 돌려준다 */
+  onMessage(fn: (msg: M, from?: string) => void): () => void
   /** 1:1 게임용: 상대가 들어오면 Peer, 나가면 null. 등록 직후(바로 다음 틈에) 지금 상태도 한 번 알려준다 */
   onPeer(fn: (peer: Peer | null) => void): () => void
   /** 여럿이 하는 게임용: 나 말고 방에 있는 사람들 (들어온 순서). 바뀔 때마다, 등록 직후에도 한 번 */
@@ -172,7 +174,139 @@ export type RoomOptions = {
   client?: SupabaseClient
 }
 
-async function open<M>(gameId: string, code: string, meta: Meta, { capacity = 2, client, listing }: RoomOptions): Promise<Room<M>> {
+async function open<M>(gameId: string, code: string, meta: Meta, opts: RoomOptions): Promise<Room<M>> {
+  // 우리 게임 서버가 있으면 그쪽으로 (테스트처럼 Supabase 연결을 직접 넘기면 예전 방식)
+  if (GAME_SERVER_URL && !opts.client) return openHub<M>(gameId, code, meta, opts)
+  return openRealtime<M>(gameId, code, meta, opts)
+}
+
+/** 게임 이동 메시지 검사 (방장이 보낸 것만 쓰는 건 부르는 쪽이 확인) */
+function readMove(p: { path?: unknown; id?: unknown; name?: unknown; pin?: unknown }): RoomMove | null {
+  if (typeof p.path !== 'string' || !/^\/games\/[a-z]+$/.test(p.path) || typeof p.id !== 'string' || !/^[A-Z0-9]{4,12}$/.test(p.id)) return null
+  // eslint-disable-next-line no-control-regex -- 보이지 않는 제어 문자 지우기
+  const name = typeof p.name === 'string' ? p.name.replace(/[\u0000-\u001f]/g, '').slice(0, 20) : ''
+  const pin = typeof p.pin === 'string' && /^\d{4}$/.test(p.pin) ? p.pin : null
+  return { path: p.path, id: p.id, name, pin }
+}
+
+/**
+ * 우리 게임 서버(민스서버)로 여는 방 (2026-11-16 조작 막기 2단계). 접속 번호·보낸 사람·비공개 코드·방장 여부를 서버가 정하고 검사한다.
+ * 겉모양(Room)은 예전과 같아서 게임 코드는 그대로.
+ */
+async function openHub<M>(gameId: string, code: string, meta: Meta, { capacity = 2, listing }: RoomOptions): Promise<Room<M>> {
+  const messageFns = new Set<(msg: M, from?: string) => void>()
+  const peerFns = new Set<(peer: Peer | null) => void>()
+  const memberFns = new Set<(members: Member[]) => void>()
+  const moveFns = new Set<(move: RoomMove) => void>()
+  let peer: Peer | null = null
+  let members: Member[] = []
+  let myKey = ''
+  let all: HubMember[] = []
+  let advert: Advert<ListedRoom> | null = null
+  let listed: ListedRoom | null = null
+
+  function publish() {
+    const others = all.filter((m) => m.id !== myKey).sort((a, b) => (a.role === 'host' ? 0 : 1) - (b.role === 'host' ? 0 : 1) || a.joinedAt - b.joinedAt)
+    const nextMembers: Member[] = others.map((o) => ({ id: o.id, nickname: o.nickname, role: o.role, ...(o.avatar ? { avatar: o.avatar } : {}), ...(o.ready ? { ready: true } : {}), ...(o.role === 'host' && o.info ? { info: o.info } : {}) }))
+    const first = nextMembers[0]
+    const next: Peer | null = first ? { nickname: first.nickname, ...(first.avatar ? { avatar: first.avatar } : {}), ...(first.ready ? { ready: true } : {}), ...(first.info ? { info: first.info } : {}) } : null
+    if (JSON.stringify(next) !== JSON.stringify(peer)) {
+      peer = next
+      for (const fn of peerFns) fn(peer)
+    }
+    if (JSON.stringify(nextMembers) !== JSON.stringify(members)) {
+      members = nextMembers
+      for (const fn of memberFns) fn(members)
+    }
+    if (advert && listed) {
+      const count = Math.min(capacity, members.length + 1)
+      if (count !== listed.count) advert.update((listed = { ...listed, count }))
+    }
+  }
+
+  let conn: Awaited<ReturnType<ReturnType<typeof hub>['join']>>
+  try {
+    conn = await hub().join(
+      { game: gameId, code, role: meta.role, nickname: meta.nickname, avatar: meta.avatar, capacity },
+      {
+        onMembers: (ms) => {
+          all = ms
+          publish()
+        },
+        onMessage: (from, msg) => {
+          for (const fn of messageFns) fn(msg as M, from)
+        },
+        onMove: (_from, move) => {
+          const mv = move && typeof move === 'object' ? readMove(move as Record<string, unknown>) : null
+          if (mv) for (const fn of moveFns) fn(mv)
+        },
+      },
+    )
+  } catch (e) {
+    throw new RoomError(e === 'not-found' || e === 'full' ? e : 'offline')
+  }
+  myKey = conn.key()
+  publish()
+
+  if (meta.role === 'host' && listing) {
+    listed = { ...listing, count: Math.min(capacity, members.length + 1), capacity, playing: false, at: meta.joinedAt }
+    advert = advertiseRoom(gameListId(gameId), listed)
+  }
+
+  return {
+    code,
+    ...(listing ? { name: listing.name } : {}),
+    role: meta.role,
+    get myId() {
+      return conn.key()
+    },
+    send: (msg) => conn.send(msg),
+    onMessage(fn) {
+      messageFns.add(fn)
+      return () => messageFns.delete(fn)
+    },
+    onPeer(fn) {
+      peerFns.add(fn)
+      queueMicrotask(() => peerFns.has(fn) && fn(peer))
+      return () => peerFns.delete(fn)
+    },
+    onMembers(fn) {
+      memberFns.add(fn)
+      queueMicrotask(() => memberFns.has(fn) && fn(members))
+      return () => memberFns.delete(fn)
+    },
+    setReady(ready) {
+      if (meta.role !== 'guest' || !!meta.ready === ready) return
+      meta.ready = ready
+      conn.ready(ready)
+    },
+    setInfo(info) {
+      if (meta.role !== 'host' || meta.info === info) return
+      meta.info = info
+      conn.info(info)
+    },
+    sendMove: (move) => meta.role === 'host' && conn.move(move),
+    onMove(fn) {
+      moveFns.add(fn)
+      return () => moveFns.delete(fn)
+    },
+    setPlaying(playing) {
+      if (!advert || !listed || listed.playing === playing) return
+      advert.update((listed = { ...listed, playing }))
+    },
+    leave() {
+      advert?.stop()
+      advert = null
+      messageFns.clear()
+      peerFns.clear()
+      memberFns.clear()
+      moveFns.clear()
+      conn.leave()
+    },
+  }
+}
+
+async function openRealtime<M>(gameId: string, code: string, meta: Meta, { capacity = 2, client, listing }: RoomOptions): Promise<Room<M>> {
   const supabase =
     client ??
     (await getRealtimeClient().catch(() => {
@@ -188,7 +322,7 @@ async function open<M>(gameId: string, code: string, meta: Meta, { capacity = 2,
     config: { broadcast: { self: false }, presence: { key: myKey } },
   })
 
-  const messageFns = new Set<(msg: M) => void>()
+  const messageFns = new Set<(msg: M, from?: string) => void>()
   const peerFns = new Set<(peer: Peer | null) => void>()
   const memberFns = new Set<(members: Member[]) => void>()
   let peer: Peer | null = null
