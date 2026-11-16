@@ -3958,6 +3958,17 @@ function chance(rng, p) {
 function pickOne(rng, values) {
 	return values[Math.floor(rng.next() * values.length)];
 }
+/** 가중치에 따라 하나를 고른다. */
+function pickWeighted(rng, weights) {
+	const entries = Object.entries(weights);
+	const total = entries.reduce((sum, [, w]) => sum + w, 0);
+	let r = rng.next() * total;
+	for (const [value, w] of entries) {
+		r -= w;
+		if (r < 0) return value;
+	}
+	return entries[entries.length - 1][0];
+}
 //#endregion
 //#region src/shared/team/teams.ts
 /** 살아 있는 사람이 모두 한 팀이면 그 팀, 아니면 null (아무도 없으면 null) */
@@ -3973,264 +3984,592 @@ function lastTeam(alive, teams) {
 /** 같은 팀인지 (팀전이 아니면 늘 false) */
 const sameTeam = (teams, a, b) => !!teams && a !== b && teams[a] === teams[b];
 //#endregion
-//#region src/games/roulette/constants.ts
-/** 시작 전 안내 */
-const INTRO_MS = 1500;
-/** 한 차례 시간. 넘기면 골라 둔 사람(없으면 아무나)을 쏜다 */
-const TURN_MS = 15e3;
-/** 방아쇠: 철컥 뒤 SUSPENSE_MS에 '틱' 또는 '탕' */
-const SUSPENSE_MS = 1100;
-const BANG_SHOW_MS = 2400;
-/** 경기가 끝난 뒤 결과 화면으로 넘어가기까지 */
-const DONE_MS = 2500;
-/** 봇: 누구를 쏠지 고르기까지, 고른 뒤 당기기까지 */
-const BOT_AIM_MS = [700, 1600];
-const BOT_PULL_MS = [500, 1100];
+//#region src/games/artillery/constants.ts
+/** 물리: 고정 스텝, 중력, 힘 100일 때 포탄 속도, 바람(옆으로 미는 가속도) 최대 */
+const STEP = 1 / 60;
+const BARREL = 7.5;
+/** 시간 (ms): 시작 안내, 한 차례, 터진 뒤 보여주기, 끝 */
+const COUNTDOWN_MS$3 = 1500;
+const TURN_MS$2 = 2e4;
+const BOOM_MS$1 = 1600;
+const DONE_MS$6 = 2500;
+/** 봇이 생각하는 시간 */
+const BOT_THINK_MS$1 = [1200, 2400];
 //#endregion
-//#region src/games/roulette/bot/rouletteBot.ts
-function chooseTarget(rng, me, alive, pulls) {
-	const others = alive.filter((i) => i !== me);
-	if (others.length === 0) return me;
-	const risk = 1 / (6 - pulls);
-	return chance(rng, risk <= 1 / 6 ? .45 : risk <= 1 / 5 ? .2 : risk < 1 ? .05 : 0) ? me : pickOne(rng, others);
-}
-//#endregion
-//#region src/games/roulette/play/engine.ts
-const aliveIndexes = (s) => s.alive.flatMap((a, i) => a ? [i] : []);
-const within = (rng, [min, max]) => min + rng.next() * (max - min);
-/** 자리 순서로 from 다음 살아 있는 사람 */
-function nextAlive(alive, from) {
-	for (let k = 1; k <= alive.length; k++) {
-		const i = (from + k) % alive.length;
-		if (alive[i]) return i;
-	}
-	return from;
-}
-/** player가 target을 쏠 수 있는지 (살아 있고, 같은 팀 공격을 껐으면 같은 팀이 아님 — 나는 늘 됨) */
-function canTarget(s, player, target) {
-	return !!s.alive[target] && (s.friendlyFire || !sameTeam(s.teams, player, target));
-}
-/** 봇이 고르는 사람들: 같은 팀 공격이 켜져 있어도 같은 팀은 빼고 (나는 됨) */
-const botTargetsOf = (s, player) => aliveIndexes(s).filter((i) => !sameTeam(s.teams, player, i));
-/** 끝났는지: 한 명 남음, 팀전이면 한 팀만 남음 */
-function isOver(s) {
-	return aliveIndexes(s).length <= 1 || !!s.teams && lastTeam(s.alive, s.teams) !== null;
-}
-/** 이긴 팀 (팀전이고 끝났을 때) */
-function winnerTeam(s) {
-	return s.teams ? lastTeam(s.alive, s.teams) : null;
-}
-function reload(s) {
-	const rng = createRng(s.seed);
-	const chamber = 1 + Math.floor(rng.next() * 6);
+//#region src/games/artillery/rules/physics.ts
+/**
+* 지형 모양 (판마다 무작위, 사용자 요청 — 처음엔 늘 물결 언덕이라 비슷해 보였음):
+* 언덕(물결) · 큰 산(가운데 높은 봉우리) · 골짜기(양끝 높고 가운데 낮음) · 쌍봉 · 고원(평평한 대지 몇 개) · 울퉁불퉁
+*/
+const TERRAIN_SHAPES = [
+	"hills",
+	"mountain",
+	"valley",
+	"twin",
+	"mesa",
+	"rough"
+];
+/** 땅 색·하늘 (판마다 무작위): 풀밭 · 사막 · 눈밭 · 노을 · 밤 */
+const LAND_THEMES = [
+	"grass",
+	"desert",
+	"snow",
+	"sunset",
+	"night"
+];
+const pickOf = (rng, list) => list[Math.floor(rng.next() * list.length) % list.length];
+const smooth = (e0, e1, x) => {
+	const t = Math.min(1, Math.max(0, (x - e0) / (e1 - e0)));
+	return t * t * (3 - 2 * t);
+};
+/** 판 하나의 땅: 모양·색을 고르고 지형을 만든다 */
+function makeLand(rng) {
+	const shape = pickOf(rng, TERRAIN_SHAPES);
 	return {
-		...s,
-		seed: rng.seed(),
-		chamber,
-		pulls: 0
+		land: {
+			shape,
+			theme: pickOf(rng, LAND_THEMES)
+		},
+		terrain: makeTerrain(rng, shape)
 	};
 }
-function createEngine(opts) {
+/** 지형: 모양마다 큰 틀을 잡고, 크기가 다른 물결을 겹쳐 자연스럽게 */
+function makeTerrain(rng, shape = "hills") {
+	const wave = (amp, len) => ({
+		amp,
+		len,
+		phase: rng.next() * Math.PI * 2
+	});
+	const waves = [
+		wave(shape === "hills" ? 16 + rng.next() * 10 : shape === "rough" ? 10 + rng.next() * 6 : 4 + rng.next() * 4, 120 + rng.next() * 80),
+		wave(shape === "rough" ? 10 + rng.next() * 5 : shape === "mesa" ? 1.5 : 5 + rng.next() * 5, 45 + rng.next() * 25),
+		wave(shape === "rough" ? 4 + rng.next() * 3 : 2 + rng.next() * 3, 14 + rng.next() * 8)
+	];
+	const W = 200;
+	let frame;
+	switch (shape) {
+		case "mountain": {
+			const c = W / 2 + (rng.next() - .5) * 40;
+			const height = 34 + rng.next() * 12;
+			const width = 22 + rng.next() * 14;
+			const base = 26 + rng.next() * 8;
+			frame = (x) => base + height * Math.exp(-(((x - c) / width) ** 2));
+			break;
+		}
+		case "valley": {
+			const edge = 62 + rng.next() * 12;
+			const low = 22 + rng.next() * 8;
+			frame = (x) => low + (edge - low) * (Math.abs(x / W - .5) * 2) ** 1.6;
+			break;
+		}
+		case "twin": {
+			const base = 26 + rng.next() * 6;
+			const peaks = [W * (.3 + (rng.next() - .5) * .08), W * (.7 + (rng.next() - .5) * .08)];
+			const hs = [26 + rng.next() * 14, 26 + rng.next() * 14];
+			const width = 16 + rng.next() * 8;
+			frame = (x) => base + peaks.reduce((sum, c, i) => sum + hs[i] * Math.exp(-(((x - c) / width) ** 2)), 0);
+			break;
+		}
+		case "mesa": {
+			const n = 3 + Math.floor(rng.next() * 2);
+			const levels = Array.from({ length: n }, () => 26 + rng.next() * 40);
+			const seg = W / n;
+			frame = (x) => {
+				const i = Math.min(n - 1, Math.floor(x / seg));
+				const local = x - i * seg;
+				let h = levels[i];
+				if (i > 0) h += (levels[i - 1] - levels[i]) * (1 - smooth(0, 9, local));
+				return h;
+			};
+			break;
+		}
+		default: {
+			const base = 38 + rng.next() * 14;
+			frame = () => base;
+		}
+	}
+	return Array.from({ length: 201 }, (_, x) => {
+		const h = waves.reduce((sum, w) => sum + w.amp * Math.sin(x / w.len * Math.PI * 2 + w.phase), frame(x));
+		return Math.round(Math.min(82, Math.max(18, h)) * 10) / 10;
+	});
+}
+/** x 자리 땅 높이 (사이는 이어서). 맵 밖이면 가장자리 높이 */
+function heightAt(t, x) {
+	const cx = Math.min(200, Math.max(0, x));
+	const i = Math.min(199, Math.floor(cx));
+	const f = cx - i;
+	return t[i] * (1 - f) + t[i + 1] * f;
+}
+/** 대포가 땅 기울기를 따라 기운 각도 (라디안, + = 오른쪽이 높음). 바퀴 띠 양끝의 땅 높이로 잰다 */
+const TILT_SPAN = 5;
+const TILT_MAX = 40 * Math.PI / 180;
+function tankTilt(t, x) {
+	const a = Math.atan2(heightAt(t, x + TILT_SPAN) - heightAt(t, x - TILT_SPAN), 10);
+	return Math.max(-TILT_MAX, Math.min(TILT_MAX, a));
+}
+/** 대포가 땅에 얹힌 모습: 기울기와, 바퀴 띠 밑면이 x 자리에서 있는 높이.
+*  바퀴 띠(기운 직선)가 그 아래 땅 어디에도 파묻히지 않게 가장 높이 닿는 곳에 얹는다
+*  (언덕 꼭대기에선 꼭대기에 올라타고, 골짜기에선 양쪽 가장자리에 걸침) */
+function tankPose(t, x) {
+	const tilt = tankTilt(t, x);
+	const k = Math.tan(tilt);
+	let y = heightAt(t, x);
+	for (let dx = -5; dx <= TILT_SPAN; dx += .5) y = Math.max(y, heightAt(t, x + dx) - dx * k);
+	return {
+		y,
+		tilt
+	};
+}
+/** 대포 몸(포탑) 가운데: 땅에 얹힌 곳에서 기운 방향으로 TANK_CY 위 */
+const tankCenter = (t, x) => {
+	const { y, tilt } = tankPose(t, x);
+	return {
+		x: x - Math.sin(tilt) * 3,
+		y: y + Math.cos(tilt) * 3
+	};
+};
+/** 땅을 둥글게 판다 (원 아래쪽까지 깎임) */
+function carve(t, c, r = 7) {
+	const out = t.slice();
+	for (let i = Math.max(0, Math.ceil(c.x - r)); i <= Math.min(200, Math.floor(c.x + r)); i++) {
+		const bottom = c.y - Math.sqrt(Math.max(0, r * r - (i - c.x) ** 2));
+		if (out[i] > bottom) out[i] = Math.max(0, Math.round(bottom * 10) / 10);
+	}
+	return out;
+}
+/** 포구: 대포 가운데에서 포신 길이만큼 각도 쪽으로 */
+function muzzle(t, x, angleDeg) {
+	const c = tankCenter(t, x);
+	const a = angleDeg * Math.PI / 180;
+	return {
+		x: c.x + Math.cos(a) * BARREL,
+		y: c.y + Math.sin(a) * BARREL
+	};
+}
+/** 포탄 궤적: 각도(0 = 오른쪽, 90 = 위, 180 = 왼쪽), 힘(0~100), 바람(+ = 오른쪽으로 미는 가속도) */
+function simulateShot(t, tanks, shooter, angleDeg, power, wind, maxSteps = Math.round(12 / STEP)) {
+	const a = angleDeg * Math.PI / 180;
+	const speed = power / 100 * 80;
+	let { x, y } = muzzle(t, tanks[shooter].x, angleDeg);
+	let vx = Math.cos(a) * speed;
+	let vy = Math.sin(a) * speed;
+	const path = [{
+		x,
+		y
+	}];
+	const centers = tanks.map((k) => k.alive ? tankCenter(t, k.x) : null);
+	for (let step = 1; step <= maxSteps; step++) {
+		vx += wind * STEP;
+		vy -= 30 * STEP;
+		x += vx * STEP;
+		y += vy * STEP;
+		for (let i = 0; i < centers.length; i++) {
+			const c = centers[i];
+			if (!c || i === shooter && step < 12) continue;
+			if (Math.hypot(x - c.x, y - c.y) <= 4.5) {
+				path.push({
+					x,
+					y
+				});
+				return {
+					path,
+					steps: step,
+					impact: {
+						x,
+						y
+					},
+					direct: i
+				};
+			}
+		}
+		if (x >= 0 && x <= 200 && y <= heightAt(t, x)) {
+			const impact = {
+				x,
+				y: heightAt(t, x)
+			};
+			path.push(impact);
+			return {
+				path,
+				steps: step,
+				impact,
+				direct: null
+			};
+		}
+		if (x < -40 || x > 240 || y < -40) {
+			path.push({
+				x,
+				y
+			});
+			return {
+				path,
+				steps: step,
+				impact: null,
+				direct: null
+			};
+		}
+		if (step % 2 === 0) path.push({
+			x,
+			y
+		});
+	}
+	return {
+		path,
+		steps: maxSteps,
+		impact: null,
+		direct: null
+	};
+}
+/** 폭발 피해: 가운데에서 멀수록 줄어든다 (DAMAGE_R 밖은 0) */
+function blastDamage(impact, center) {
+	const d = Math.hypot(impact.x - center.x, impact.y - center.y);
+	return d >= 11 ? 0 : Math.round(45 * (1 - d / 11));
+}
+/** 터짐: 피해를 주고 땅을 판 뒤, 발밑이 꺼진 대포는 떨어진다 */
+function explode$1(t, tanks, impact) {
+	const damage = tanks.map((k) => k.alive ? blastDamage(impact, tankCenter(t, k.x)) : 0);
+	const terrain = carve(t, impact);
+	const fell = [];
+	tanks.forEach((k, i) => {
+		if (!k.alive) return;
+		const before = heightAt(t, k.x);
+		const after = heightAt(terrain, k.x);
+		if (after <= 1) fell.push(i);
+		const drop = before - after;
+		if (drop > 5) damage[i] += Math.round((drop - 5) * 2);
+	});
+	return {
+		terrain,
+		damage,
+		fell
+	};
+}
+//#endregion
+//#region src/games/artillery/bot/artilleryBot.ts
+/** 손 떨림: 각도(도), 힘 */
+const JITTER = {
+	normal: {
+		angle: 5,
+		power: 7
+	},
+	hard: {
+		angle: 1.2,
+		power: 1.8
+	}
+};
+function chooseBotAim(rng, terrain, tanks, me, wind, level, teams = null) {
+	const myPos = tankCenter(terrain, tanks[me].x);
+	const enemies = tanks.map((t, i) => ({
+		t,
+		i
+	})).filter(({ t, i }) => t.alive && i !== me && !sameTeam(teams, me, i));
+	if (enemies.length === 0) return {
+		angle: 90,
+		power: 30
+	};
+	enemies.sort((a, b) => Math.abs(a.t.x - tanks[me].x) - Math.abs(b.t.x - tanks[me].x));
+	const target = level === "hard" ? [...enemies.slice(0, 2)].sort((a, b) => a.t.hp - b.t.hp)[0] : enemies[0];
+	const goal = tankCenter(terrain, target.t.x);
+	const right = goal.x >= myPos.x;
+	let best = {
+		angle: right ? 45 : 135,
+		power: 60,
+		miss: Infinity
+	};
+	for (let a = 15; a <= 80; a += 2.5) {
+		const angle = right ? a : 180 - a;
+		for (let power = 15; power <= 100; power += 2) {
+			const s = simulateShot(terrain, tanks, me, angle, power, wind);
+			if (!s.impact) continue;
+			if (Math.hypot(s.impact.x - myPos.x, s.impact.y - myPos.y) < 11) continue;
+			const miss = Math.hypot(s.impact.x - goal.x, s.impact.y - goal.y);
+			if (miss < best.miss) best = {
+				angle,
+				power,
+				miss
+			};
+		}
+	}
+	const j = JITTER[level];
+	const angle = Math.min(180, Math.max(0, best.angle + (rng.next() * 2 - 1) * j.angle));
+	const power = Math.min(100, Math.max(5, best.power + (rng.next() * 2 - 1) * j.power));
+	return {
+		angle: Math.round(angle * 10) / 10,
+		power: Math.round(power * 10) / 10
+	};
+}
+//#endregion
+//#region src/games/artillery/play/engine.ts
+const aliveIndexes$4 = (s) => s.tanks.flatMap((t, i) => t.alive ? [i] : []);
+const within$5 = (rng, [min, max]) => min + rng.next() * (max - min);
+const clamp = (v, min, max) => Math.min(max, Math.max(min, v));
+const round1 = (v) => Math.round(v * 10) / 10;
+/** 대포 자리: 맵을 사람 수만큼 나눠 칸마다 한 명 (조금씩 흔들고, 누가 어디일지는 섞는다) */
+function startSpots(rng, n) {
+	const seg = 170 / n;
+	const spots = Array.from({ length: n }, (_, i) => round1(15 + seg * (i + .5) + (rng.next() - .5) * seg * .4));
+	for (let i = spots.length - 1; i > 0; i--) {
+		const j = Math.floor(rng.next() * (i + 1));
+		[spots[i], spots[j]] = [spots[j], spots[i]];
+	}
+	return spots;
+}
+function createEngine$6(opts) {
 	const rng = createRng(opts.seed);
+	const { land, terrain } = makeLand(rng);
+	const tanks = startSpots(rng, opts.players.length).map((x) => ({
+		x,
+		hp: 100,
+		alive: true,
+		angle: x < 100 ? 45 : 135,
+		power: 60
+	}));
 	const turn = Math.floor(rng.next() * opts.players.length);
-	return reload({
+	return {
 		now: opts.now,
 		seed: rng.seed(),
+		level: opts.level ?? "normal",
 		players: opts.players,
 		teams: opts.teams ?? null,
 		friendlyFire: !!opts.friendlyFire,
-		alive: opts.players.map(() => true),
+		tanks,
+		terrain,
+		land,
+		turn,
+		turnNo: 0,
+		wind: 0,
 		out: [],
 		kills: opts.players.map(() => 0),
-		turn,
-		aimAt: null,
-		chamber: 1,
-		pulls: 0,
-		bot: null,
+		botAt: null,
 		phase: {
-			kind: "intro",
-			until: opts.now + INTRO_MS
+			kind: "countdown",
+			until: opts.now + COUNTDOWN_MS$3
 		}
-	});
+	};
 }
-/** turn 사람 차례 시작 (봇이면 언제 고르고 당길지 정해 둔다) */
-function startTurn(s, turn) {
-	let next = {
+/** 끝났는지: 한 명 남음, 팀전이면 한 팀만 남음 */
+function isOver$4(s) {
+	return aliveIndexes$4(s).length <= 1 || !!s.teams && lastTeam(s.tanks.map((t) => t.alive), s.teams) !== null;
+}
+/** 이긴 팀 (팀전이고 끝났을 때) */
+function winnerTeam$5(s) {
+	return s.teams ? lastTeam(s.tanks.map((t) => t.alive), s.teams) : null;
+}
+/** 차례 시작: 바람을 새로 정하고, 봇이면 쏠 시각을 정한다 */
+function startTurn$2(s, turn) {
+	const rng = createRng(s.seed);
+	const wind = round1((rng.next() * 2 - 1) * 8);
+	const botAt = s.players[turn].kind === "bot" ? s.now + within$5(rng, BOT_THINK_MS$1) : null;
+	return {
 		...s,
+		seed: rng.seed(),
 		turn,
-		aimAt: null,
-		bot: null,
+		turnNo: s.turnNo + 1,
+		wind,
+		botAt,
 		phase: {
 			kind: "aim",
-			until: s.now + TURN_MS
+			until: s.now + TURN_MS$2,
+			startX: s.tanks[turn].x
 		}
 	};
-	if (s.players[turn].kind === "bot") {
-		const rng = createRng(s.seed);
-		const target = chooseTarget(rng, turn, botTargetsOf(s, turn), s.pulls);
-		const aimAt = s.now + within(rng, BOT_AIM_MS);
-		next = {
-			...next,
-			seed: rng.seed(),
-			bot: {
-				aimAt,
-				pullAt: aimAt + within(rng, BOT_PULL_MS),
-				target
+}
+function nextAlive$1(s, from) {
+	for (let k = 1; k <= s.players.length; k++) {
+		const i = (from + k) % s.players.length;
+		if (s.tanks[i].alive) return i;
+	}
+	return from;
+}
+/** 조준 값 정리: 움직일 수 있는 범위·각도·힘 안으로 */
+function setAim(s, player, x, angle, power) {
+	if (s.phase.kind !== "aim" || player !== s.turn || !s.tanks[player].alive) return s;
+	const { startX } = s.phase;
+	const tank = {
+		...s.tanks[player],
+		x: round1(clamp(x, Math.max(3, startX - 14), Math.min(197, startX + 14))),
+		angle: round1(clamp(angle, 0, 180)),
+		power: round1(clamp(power, 5, 100))
+	};
+	return {
+		...s,
+		tanks: s.tanks.map((t, i) => i === player ? tank : t)
+	};
+}
+/** 발사: 궤적을 미리 다 계산해 두고, 날아가는 시간만큼 보여준다 */
+function launch(s) {
+	const t = s.tanks[s.turn];
+	const shot = simulateShot(s.terrain, s.tanks, s.turn, t.angle, t.power, s.wind);
+	const ms = Math.max(300, shot.steps * STEP * 1e3);
+	return {
+		...s,
+		botAt: null,
+		phase: {
+			kind: "flight",
+			until: s.now + ms,
+			shot
+		}
+	};
+}
+/** 터짐: 피해·땅 파임·떨어짐을 반영하고 탈락자를 정한다 */
+function land$1(s, shot) {
+	if (!shot.impact) return {
+		...s,
+		phase: {
+			kind: "boom",
+			until: s.now + BOOM_MS$1,
+			boom: {
+				at: null,
+				damage: s.tanks.map(() => 0),
+				dead: [],
+				fell: []
 			}
+		}
+	};
+	const blast = explode$1(s.terrain, s.tanks, shot.impact);
+	if (s.teams && !s.friendlyFire) blast.damage = blast.damage.map((d, i) => sameTeam(s.teams, s.turn, i) ? 0 : d);
+	const tanks = s.tanks.map((t, i) => {
+		if (!t.alive) return t;
+		const hp = Math.max(0, t.hp - blast.damage[i]);
+		return {
+			...t,
+			hp: blast.fell.includes(i) ? 0 : hp,
+			alive: hp > 0 && !blast.fell.includes(i)
 		};
-	}
-	return next;
-}
-function aim(s, player, target) {
-	if (s.phase.kind !== "aim" || player !== s.turn || !canTarget(s, player, target)) return s;
+	});
+	const dead = tanks.flatMap((t, i) => s.tanks[i].alive && !t.alive ? [i] : []);
+	const kills = s.kills.map((k, i) => i === s.turn ? k + dead.filter((d) => d !== s.turn).length : k);
 	return {
 		...s,
-		aimAt: target
-	};
-}
-function pull(s, player, target = s.aimAt) {
-	if (s.phase.kind !== "aim" || player !== s.turn || target === null || !canTarget(s, player, target)) return s;
-	const pulls = s.pulls + 1;
-	const bang = pulls >= s.chamber;
-	const fire = {
-		shooter: player,
-		target,
-		bang
-	};
-	return {
-		...s,
-		aimAt: target,
-		pulls,
-		bot: null,
+		terrain: blast.terrain,
+		tanks,
+		kills,
+		out: dead.length ? [...s.out, dead] : s.out,
 		phase: {
-			kind: "fire",
-			fire,
-			until: s.now + SUSPENSE_MS + (bang ? BANG_SHOW_MS : 900)
+			kind: "boom",
+			until: s.now + BOOM_MS$1,
+			boom: {
+				at: shot.impact,
+				damage: blast.damage,
+				dead,
+				fell: blast.fell
+			}
 		}
 	};
 }
-function afterFire(s) {
-	if (s.phase.kind !== "fire") return s;
-	const { shooter, target, bang } = s.phase.fire;
-	if (!bang) return startTurn(s, s.alive[target] ? target : nextAlive(s.alive, target));
-	const next = {
+function afterBoom$1(s) {
+	if (isOver$4(s)) return {
 		...s,
-		alive: s.alive.map((a, i) => a && i !== target),
-		out: [...s.out, target],
-		kills: s.kills.map((k, i) => i === shooter && shooter !== target ? k + 1 : k)
-	};
-	if (isOver(next)) return {
-		...next,
-		aimAt: null,
 		phase: {
 			kind: "done",
-			until: s.now + DONE_MS
+			until: s.now + DONE_MS$6
 		}
 	};
-	const turn = next.alive[shooter] ? shooter : nextAlive(next.alive, shooter);
-	return startTurn(reload(next), turn);
+	return startTurn$2(s, nextAlive$1(s, s.turn));
 }
-function timeout(s) {
-	const rng = createRng(s.seed);
-	const alive = aliveIndexes(s).filter((i) => canTarget(s, s.turn, i));
-	const target = s.aimAt ?? alive[Math.floor(rng.next() * alive.length)];
-	return pull({
-		...s,
-		seed: rng.seed()
-	}, s.turn, target);
-}
-function bots(s) {
-	const b = s.bot;
-	if (!b) return s;
-	let next = s;
-	if (s.now >= b.aimAt && s.aimAt !== b.target) next = aim(next, s.turn, b.target);
-	if (s.now >= b.pullAt) next = pull(next, s.turn, b.target);
-	return next;
-}
-function drop(s, player) {
-	if (!s.alive[player] || s.phase.kind === "done") return s;
+function drop$6(s, player) {
+	if (!s.tanks[player].alive || s.phase.kind === "done") return s;
 	const next = {
 		...s,
-		alive: s.alive.map((a, i) => a && i !== player),
-		out: [...s.out, player]
+		tanks: s.tanks.map((t, i) => i === player ? {
+			...t,
+			hp: 0,
+			alive: false
+		} : t),
+		out: [...s.out, [player]]
 	};
-	if (isOver(next)) return {
+	if (isOver$4(next)) return {
 		...next,
-		aimAt: null,
 		phase: {
 			kind: "done",
-			until: s.now + DONE_MS
+			until: s.now + DONE_MS$6
 		}
 	};
-	if (s.phase.kind === "aim") {
-		if (s.turn === player) return startTurn(next, nextAlive(next.alive, player));
-		if (s.aimAt === player) return {
-			...next,
-			aimAt: null
-		};
-	}
+	if (s.phase.kind === "aim" && s.turn === player) return startTurn$2(next, nextAlive$1(next, player));
 	return next;
 }
-function tick(s) {
+function tick$6(s) {
 	const { phase, now } = s;
 	switch (phase.kind) {
-		case "intro": return now >= phase.until ? startTurn(s, s.turn) : s;
-		case "aim": {
-			const b = bots(s);
-			if (b.phase.kind !== "aim") return b;
-			return now >= phase.until ? timeout(b) : b;
-		}
-		case "fire": return now >= phase.until ? afterFire(s) : s;
+		case "countdown": return now >= phase.until ? startTurn$2(s, s.turn) : s;
+		case "aim":
+			if (s.botAt !== null && now >= s.botAt) {
+				const rng = createRng(s.seed);
+				const aim = chooseBotAim(rng, s.terrain, s.tanks, s.turn, s.wind, s.level, s.teams);
+				const t = s.tanks[s.turn];
+				return launch(setAim({
+					...s,
+					seed: rng.seed()
+				}, s.turn, t.x, aim.angle, aim.power));
+			}
+			return now >= phase.until ? launch(s) : s;
+		case "flight": return now >= phase.until ? land$1(s, phase.shot) : s;
+		case "boom": return now >= phase.until ? afterBoom$1(s) : s;
 		case "done": return s;
 	}
 }
-function engineReducer(state, action) {
+function engineReducer$6(state, action) {
 	switch (action.type) {
-		case "tick": return tick({
+		case "tick": return tick$6({
 			...state,
 			now: action.now
 		});
-		case "aim": return aim(state, action.player, action.target);
-		case "pull": return pull(state, action.player, action.target ?? state.aimAt);
-		case "drop": return drop(state, action.player);
+		case "aim": return setAim(state, action.player, action.x, action.angle, action.power);
+		case "fire":
+			if (state.phase.kind !== "aim" || action.player !== state.turn || !state.tanks[action.player].alive) return state;
+			return launch(setAim(state, action.player, action.x, action.angle, action.power));
+		case "drop": return drop$6(state, action.player);
 	}
 }
-/** 사람별 등수 (1 = 우승). 늦게 탈락할수록 앞. 끝나기 전이면 남은 사람은 모두 1 */
-function ranksOf(s) {
+/** 사람별 등수 (1 = 우승). 끝나기 전이면 남은 사람은 모두 1 */
+function ranksOf$3(s) {
 	const ranks = s.players.map(() => 1);
-	const left = aliveIndexes(s).length;
-	[...s.out].reverse().forEach((i, k) => ranks[i] = left + 1 + k);
+	let next = aliveIndexes$4(s).length + 1;
+	for (const group of [...s.out].reverse()) {
+		for (const i of group) ranks[i] = next;
+		next += group.length;
+	}
 	return ranks;
 }
 //#endregion
-//#region src/games/roulette/play/view.ts
-/** 심판 상태 → 화면 */
-function toView(s) {
+//#region src/games/artillery/play/view.ts
+function toView$6(s) {
 	const { phase, now } = s;
 	return {
 		players: s.players.map(({ id, name, avatar }) => ({
 			id,
 			name,
-			avatar
+			...avatar ? { avatar } : {}
 		})),
 		teams: s.teams,
-		friendlyFire: s.friendlyFire,
-		winTeam: s.phase.kind === "done" ? winnerTeam(s) : null,
-		alive: s.alive,
-		kills: s.kills,
+		winTeam: s.phase.kind === "done" ? winnerTeam$5(s) : null,
+		tanks: s.tanks.map(({ x, hp, alive, angle, power }) => ({
+			x,
+			hp,
+			alive,
+			angle,
+			power
+		})),
+		terrain: s.terrain,
+		land: s.land,
 		turn: s.turn,
-		aimAt: s.aimAt,
-		pulls: s.pulls,
+		turnNo: s.turnNo,
+		wind: s.wind,
 		phase: phase.kind,
 		leftMs: Math.max(0, phase.until - now),
-		fire: phase.kind === "fire" ? phase.fire : null,
-		ranks: ranksOf(s)
+		startX: phase.kind === "aim" ? phase.startX : null,
+		shot: phase.kind === "flight" ? phase.shot : null,
+		boom: phase.kind === "boom" ? phase.boom : null,
+		kills: s.kills,
+		ranks: ranksOf$3(s)
 	};
 }
-/** 친구에게 바로 알려야 할 만큼 바뀌었는지 (그 밖엔 1초마다 보냄) */
-function viewChanged(a, b) {
+/** 친구에게 바로 알려야 할 만큼 바뀌었는지 (차례인 사람이 움직이거나 겨누는 것도) */
+function viewChanged$6(a, b) {
 	if (!a) return true;
-	return a.phase !== b.phase || a.turn !== b.turn || a.aimAt !== b.aimAt || a.pulls !== b.pulls || a.alive.some((x, i) => x !== b.alive[i]);
+	if (a.phase !== b.phase || a.turnNo !== b.turnNo) return true;
+	const ta = a.tanks[b.turn];
+	const tb = b.tanks[b.turn];
+	return ta.x !== tb.x || ta.angle !== tb.angle || ta.power !== tb.power;
 }
 //#endregion
 //#region src/shared/art3d/animalKinds.ts
@@ -4301,7 +4640,7 @@ const clampNumber = (n) => {
 	const x = Math.floor(Number(n));
 	return Number.isFinite(x) ? Math.min(99, Math.max(0, x)) : 7;
 };
-const pick = (list, x, fallback) => typeof x === "string" && list.includes(x) ? x : fallback;
+const pick$1 = (list, x, fallback) => typeof x === "string" && list.includes(x) ? x : fallback;
 /** 방으로 보낼 짧은 글자: '동물.모자.안경.목.털.옷.색.번호' */
 const encodeLook = (l) => [
 	l.animal,
@@ -4321,12 +4660,12 @@ function decodeLook(x) {
 	if (!animal) return void 0;
 	return {
 		animal,
-		hat: pick(HATS, hat, "none"),
-		glasses: pick(GLASSES, glasses, "none"),
-		neck: pick(NECKS, neck, "none"),
-		fur: pick(FURS, fur, "base"),
-		outfit: pick(OUTFITS, outfit, "shirt"),
-		tint: pick(TINTS, tint, "red"),
+		hat: pick$1(HATS, hat, "none"),
+		glasses: pick$1(GLASSES, glasses, "none"),
+		neck: pick$1(NECKS, neck, "none"),
+		fur: pick$1(FURS, fur, "base"),
+		outfit: pick$1(OUTFITS, outfit, "shirt"),
+		tint: pick$1(TINTS, tint, "red"),
 		number: number === void 0 ? 7 : clampNumber(number)
 	};
 }
@@ -4377,50 +4716,1110 @@ function readTeams(x, n) {
 }
 const serverSeed = () => crypto.getRandomValues(/* @__PURE__ */ new Uint32Array(1))[0];
 //#endregion
-//#region src/server/referees/roulette.ts
+//#region src/server/referees/hostEngine.ts
 const HEARTBEAT_MS = 1e3;
 /** 끝나고 이만큼 더 화면을 보낸 뒤 심판을 내린다 */
 const LINGER_MS = 3e3;
-function rouletteReferee(setup, ctx) {
-	const o = setup ?? {};
-	const players = readPlayers(o.players, ctx, 2, 8);
-	if (!players) return null;
-	const teams = readTeams(o.teams, players.length);
-	if (teams === void 0) return null;
-	let s = createEngine({
-		now: ctx.now(),
-		seed: serverSeed(),
-		players,
-		teams,
-		friendlyFire: o.friendlyFire === true
-	});
+function hostEngineReferee(ctx, spec) {
+	let s = spec.state;
 	let sent = {
 		view: null,
 		at: 0
 	};
 	let doneAt = null;
-	const indexOf = (id) => s.players.findIndex((p) => p.id === id && p.kind === "remote");
+	const wrap = spec.wrap ?? ((v) => ({
+		t: "view",
+		v
+	}));
 	const flush = (force = false) => {
-		const view = toView(s);
-		if (force || viewChanged(sent.view, view) || s.now - sent.at >= HEARTBEAT_MS) {
-			ctx.broadcast({
-				t: "view",
-				v: view
-			});
+		const view = spec.toView(s);
+		const now = spec.nowOf(s);
+		if (force || spec.changed(sent.view, view) || now - sent.at >= HEARTBEAT_MS) {
+			const viewFor = spec.viewFor;
+			if (viewFor) for (const m of ctx.members()) ctx.sendTo(m.id, wrap(viewFor(view, m.id, s)));
+			else ctx.broadcast(wrap(view));
 			sent = {
 				view,
-				at: s.now
+				at: now
 			};
 		}
 	};
 	flush(true);
 	return {
 		input(from, msg) {
-			const m = msg;
-			if (m?.t !== "aim" && m?.t !== "pull") return false;
-			const player = indexOf(from);
-			if (player < 0 || typeof m.target !== "number" || !Number.isInteger(m.target)) return true;
-			s = engineReducer(s, m.t === "aim" ? {
+			if (!msg || typeof msg !== "object") return false;
+			try {
+				const a = spec.input(s, from, msg);
+				if (a === void 0) return false;
+				if (a !== null) {
+					s = spec.reduce(spec.reduce(s, spec.tick(ctx.now())), a);
+					flush();
+				}
+			} catch (e) {
+				console.warn("[referee] 입력 무시", e);
+			}
+			return true;
+		},
+		tick(now) {
+			s = spec.reduce(s, spec.tick(now));
+			if (doneAt === null && spec.done(s)) doneAt = now;
+			flush();
+		},
+		leave(key) {
+			const a = spec.drop(s, key);
+			if (a) {
+				s = spec.reduce(s, a);
+				flush();
+			}
+		},
+		finished: () => doneAt !== null && spec.nowOf(s) - doneAt > LINGER_MS
+	};
+}
+/** 사람 번호 (서버가 정한 접속 번호로, 사람 자리만) */
+const humanIndex = (players, key) => players.findIndex((p) => p.id === key && p.kind === "remote");
+const isInt$1 = (x) => typeof x === "number" && Number.isInteger(x);
+//#endregion
+//#region src/server/referees/validate.ts
+const isNum = (x) => typeof x === "number" && Number.isFinite(x);
+const isInt = (x, min = -1e9, max = 1e9) => typeof x === "number" && Number.isInteger(x) && x >= min && x <= max;
+const isVec = (x) => !!x && typeof x === "object" && isNum(x.x) && isNum(x.y);
+/** 숫자 잇기 바닥: 줄 최대 60개, 줄마다 최대 13장, 타일 번호 0~105 */
+const isTable = (x) => Array.isArray(x) && x.length <= 60 && x.every((row) => Array.isArray(row) && row.length <= 13 && row.every((t) => isInt(t, 0, 105)));
+//#endregion
+//#region src/server/referees/artillery.ts
+function artilleryReferee(setup, ctx) {
+	const o = setup ?? {};
+	const players = readPlayers(o.players, ctx, 2, 4);
+	if (!players) return null;
+	const teams = readTeams(o.teams, players.length);
+	if (teams === void 0) return null;
+	return hostEngineReferee(ctx, {
+		state: createEngine$6({
+			now: ctx.now(),
+			seed: serverSeed(),
+			players,
+			teams,
+			friendlyFire: o.friendlyFire === true,
+			level: "normal"
+		}),
+		reduce: engineReducer$6,
+		tick: (now) => ({
+			type: "tick",
+			now
+		}),
+		toView: toView$6,
+		changed: viewChanged$6,
+		input: (s, from, m) => {
+			if (m.t !== "aim" && m.t !== "fire") return void 0;
+			const player = humanIndex(s.players, from);
+			if (player < 0 || m.turnNo !== s.turnNo || !isNum(m.x) || !isNum(m.angle) || !isNum(m.power)) return null;
+			return {
+				type: m.t,
+				player,
+				x: m.x,
+				angle: m.angle,
+				power: m.power
+			};
+		},
+		drop: (s, key) => {
+			const player = humanIndex(s.players, key);
+			return player >= 0 ? {
+				type: "drop",
+				player
+			} : null;
+		},
+		done: (s) => s.phase.kind === "done",
+		nowOf: (s) => s.now
+	});
+}
+//#endregion
+//#region src/games/bomb/constants.ts
+/** 폭탄이 터지기까지 (판마다 이 사이에서 무작위, 아무도 모름. 처음 7~16초는 늘 비슷하게 느껴져 넓힘) */
+const FUSE_MS = [5e3, 2e4];
+/** 판 시작 전 3·2·1 */
+const COUNTDOWN_MS$2 = 2400;
+/** 펑! 보여주기 */
+const BOOM_MS = 2200;
+/** 경기가 끝난 뒤 결과 화면으로 넘어가기까지 */
+const DONE_MS$5 = 2500;
+/** 봇이 폭탄을 받고 넘기기까지 */
+const BOT_HOLD_MS = [350, 1500];
+//#endregion
+//#region src/games/bomb/play/engine.ts
+const within$4 = (rng, [min, max]) => min + rng.next() * (max - min);
+function createEngine$5(opts) {
+	return countdown$1({
+		now: opts.now,
+		seed: opts.seed,
+		players: opts.players,
+		teams: opts.teams ?? null,
+		alive: opts.players.map(() => true),
+		out: [],
+		round: 1,
+		holder: 0,
+		heldSince: 0,
+		flight: null,
+		phase: {
+			kind: "countdown",
+			until: 0
+		},
+		botAt: null,
+		passes: opts.players.map(() => 0)
+	});
+}
+function countdown$1(state) {
+	return {
+		...state,
+		flight: null,
+		botAt: null,
+		phase: {
+			kind: "countdown",
+			until: state.now + COUNTDOWN_MS$2
+		}
+	};
+}
+const aliveIndexes$3 = (state) => state.alive.flatMap((a, i) => a ? [i] : []);
+function startPlay(state) {
+	const rng = createRng(state.seed);
+	const holder = pickOne(rng, aliveIndexes$3(state));
+	const explodeAt = state.now + within$4(rng, FUSE_MS);
+	return {
+		...state,
+		seed: rng.seed(),
+		holder,
+		heldSince: state.now,
+		phase: {
+			kind: "play",
+			start: state.now,
+			explodeAt
+		}
+	};
+}
+/** 그 사람을 탈락시킨다. 한 명만 남으면 끝 */
+function eliminate(state, victim) {
+	return {
+		...state,
+		alive: state.alive.map((a, i) => a && i !== victim),
+		out: [...state.out, victim]
+	};
+}
+function explode(state) {
+	const victim = state.flight ? state.flight.to : state.holder;
+	return {
+		...eliminate(state, victim),
+		flight: null,
+		botAt: null,
+		phase: {
+			kind: "boom",
+			victim,
+			until: state.now + BOOM_MS
+		}
+	};
+}
+/** 끝났는지: 한 명 남음, 팀전이면 한 팀만 남음 */
+function isOver$3(state) {
+	if (aliveIndexes$3(state).length <= 1) return true;
+	return !!state.teams && lastTeam(state.alive, state.teams) !== null;
+}
+/** 이긴 팀 (팀전이고 끝났을 때) */
+function winnerTeam$4(state) {
+	return state.teams ? lastTeam(state.alive, state.teams) : null;
+}
+function afterBoom(state) {
+	if (isOver$3(state)) return {
+		...state,
+		phase: {
+			kind: "done",
+			until: state.now + DONE_MS$5
+		}
+	};
+	return countdown$1({
+		...state,
+		round: state.round + 1
+	});
+}
+function land(state) {
+	const { flight } = state;
+	if (!flight || state.now < flight.landAt) return state;
+	return {
+		...state,
+		holder: flight.to,
+		heldSince: state.now,
+		flight: null
+	};
+}
+function botTurn(state) {
+	const { holder } = state;
+	if (state.phase.kind !== "play" || state.flight || state.players[holder].kind !== "bot") return state;
+	const rng = createRng(state.seed);
+	if (state.botAt === null) return {
+		...state,
+		seed: rng.seed(),
+		botAt: state.now + within$4(rng, BOT_HOLD_MS)
+	};
+	if (state.now < state.botAt) return state;
+	const side = neighborsOf(state.alive, holder) ?? [];
+	const foes = side.filter((j) => !sameTeam(state.teams, holder, j));
+	const to = pickOne(rng, foes.length ? foes : side);
+	return pass({
+		...state,
+		seed: rng.seed()
+	}, holder, to);
+}
+/**
+* i 바로 옆에 앉은 살아 있는 사람: [왼쪽, 오른쪽]. 자리 번호가 커지는 쪽이 왼쪽
+* (화면에서 나를 맨 아래에 두고 시계 방향으로 앉히므로 다음 번호가 내 왼쪽에 보인다). 둘만 남으면 같은 사람
+*/
+function neighborsOf(alive, i) {
+	const n = alive.length;
+	const step = (dir) => {
+		for (let k = 1; k < n; k++) {
+			const j = (i + dir * k + n) % n;
+			if (alive[j]) return j;
+		}
+		return -1;
+	};
+	const left = step(1);
+	return left < 0 ? null : [left, step(-1)];
+}
+/** 받은 폭탄을 다시 던질 수 있게 되기까지 남은 시간 */
+function holdLeft(state) {
+	return Math.max(0, state.heldSince + 200 - state.now);
+}
+/** 지금 from이 to에게 던질 수 있는지 (받고 MIN_HOLD_MS가 지난 뒤, 바로 옆 사람에게만) */
+function canPass(state, from, to) {
+	if (state.phase.kind !== "play" || state.flight !== null || state.holder !== from || from === to) return false;
+	if (holdLeft(state) > 0) return false;
+	return neighborsOf(state.alive, from)?.includes(to) ?? false;
+}
+function pass(state, from, to) {
+	if (!canPass(state, from, to)) return state;
+	return {
+		...state,
+		flight: {
+			from,
+			to,
+			landAt: state.now + 300
+		},
+		botAt: null,
+		passes: state.passes.map((n, i) => i === from ? n + 1 : n)
+	};
+}
+function drop$5(state, player) {
+	if (!state.alive[player] || state.phase.kind === "done") return state;
+	let next = eliminate(state, player);
+	const left = aliveIndexes$3(next);
+	if (isOver$3(next)) return {
+		...next,
+		flight: null,
+		phase: {
+			kind: "done",
+			until: state.now + DONE_MS$5
+		}
+	};
+	if (next.holder === player || next.flight?.to === player || next.flight?.from === player) {
+		const rng = createRng(next.seed);
+		next = {
+			...next,
+			seed: rng.seed(),
+			holder: pickOne(rng, left),
+			heldSince: state.now,
+			flight: null,
+			botAt: null
+		};
+	}
+	return next;
+}
+function tick$5(state) {
+	const { phase, now } = state;
+	switch (phase.kind) {
+		case "countdown": return now >= phase.until ? startPlay(state) : state;
+		case "play":
+			if (now >= phase.explodeAt) return explode(state);
+			return botTurn(land(state));
+		case "boom": return now >= phase.until ? afterBoom(state) : state;
+		case "done": return state;
+	}
+}
+function engineReducer$5(state, action) {
+	switch (action.type) {
+		case "tick": return tick$5({
+			...state,
+			now: action.now
+		});
+		case "pass": return pass(state, action.from, action.to);
+		case "drop": return drop$5(state, action.player);
+	}
+}
+/** 순위: 1등(끝까지 남은 사람)부터. 끝나기 전이면 남은 사람들은 순서 없이 앞에 */
+function rankingOf$1(state) {
+	return [...aliveIndexes$3(state), ...[...state.out].reverse()];
+}
+//#endregion
+//#region src/games/bomb/play/view.ts
+/** 심판 상태 → 화면 (터지는 시각은 넣지 않는다) */
+function toView$5(s) {
+	const { phase, now } = s;
+	return {
+		players: s.players.map(({ id, name, avatar }) => ({
+			id,
+			name,
+			avatar
+		})),
+		teams: s.teams,
+		winner: phase.kind === "done" ? winnerTeam$4(s) : null,
+		alive: s.alive,
+		holder: s.holder,
+		flight: s.flight ? {
+			from: s.flight.from,
+			to: s.flight.to,
+			leftMs: Math.max(0, s.flight.landAt - now)
+		} : null,
+		holdLeftMs: holdLeft(s),
+		phase: phase.kind,
+		leftMs: phase.kind === "play" ? 0 : Math.max(0, phase.until - now),
+		elapsedMs: phase.kind === "play" ? now - phase.start : 0,
+		victim: phase.kind === "boom" ? phase.victim : null,
+		round: s.round,
+		ranking: rankingOf$1(s)
+	};
+}
+/** 친구에게 바로 알려야 할 만큼 바뀌었는지 (그 밖엔 1초마다 보냄) */
+function viewChanged$5(a, b) {
+	if (!a) return true;
+	return a.phase !== b.phase || a.round !== b.round || a.holder !== b.holder || a.flight === null !== (b.flight === null) || a.flight?.to !== b.flight?.to || a.alive.some((x, i) => x !== b.alive[i]);
+}
+//#endregion
+//#region src/server/referees/bomb.ts
+function bombReferee(setup, ctx) {
+	const o = setup ?? {};
+	const players = readPlayers(o.players, ctx, 2, 8);
+	if (!players) return null;
+	const teams = readTeams(o.teams, players.length);
+	if (teams === void 0) return null;
+	return hostEngineReferee(ctx, {
+		state: createEngine$5({
+			now: ctx.now(),
+			seed: serverSeed(),
+			players,
+			teams
+		}),
+		reduce: engineReducer$5,
+		tick: (now) => ({
+			type: "tick",
+			now
+		}),
+		toView: toView$5,
+		changed: viewChanged$5,
+		input: (s, from, m) => {
+			if (m.t !== "pass") return void 0;
+			const who = humanIndex(s.players, from);
+			const to = s.players.findIndex((p) => p.id === m.to);
+			return who >= 0 && to >= 0 ? {
+				type: "pass",
+				from: who,
+				to
+			} : null;
+		},
+		drop: (s, key) => {
+			const player = humanIndex(s.players, key);
+			return player >= 0 ? {
+				type: "drop",
+				player
+			} : null;
+		},
+		done: (s) => s.phase.kind === "done",
+		nowOf: (s) => s.now
+	});
+}
+//#endregion
+//#region src/games/nunchi/constants.ts
+/** 한 판에 누를 수 있는 시간. 끝나면 안 누른 사람 모두 탈락 */
+const CALL_MS = 1e4;
+/** 판 시작 전 3·2·1 */
+const COUNTDOWN_MS$1 = 2400;
+/** 판 결과(탈락자) 보여주기 */
+const RESULT_MS = 2400;
+/** 결승 가위바위보: 고르는 시간, 공개 보여주기 */
+const RPS_PICK_MS = 3e3;
+const RPS_REVEAL_MS = 1800;
+/** 경기가 끝난 뒤 결과 화면으로 넘어가기까지 */
+const DONE_MS$4 = 2500;
+/** 봇이 누를 시각 (판 시작부터): 성격마다 다름 */
+const BOT_STYLES = [
+	[300, 2500],
+	[1200, 5500],
+	[2500, 8500]
+];
+//#endregion
+//#region src/games/nunchi/play/engine.ts
+const HANDS$1 = [
+	"rock",
+	"paper",
+	"scissors"
+];
+const within$3 = (rng, [min, max]) => min + rng.next() * (max - min);
+const aliveIndexes$2 = (s) => s.alive.flatMap((a, i) => a ? [i] : []);
+function createEngine$4(opts) {
+	return countdown({
+		now: opts.now,
+		seed: opts.seed,
+		players: opts.players,
+		teams: opts.teams ?? null,
+		alive: opts.players.map(() => true),
+		out: [],
+		round: 1,
+		presses: [],
+		picks: {},
+		botAt: {},
+		phase: {
+			kind: "countdown",
+			until: 0
+		}
+	});
+}
+/** 끝났는지: 한 명 남음, 팀전이면 한 팀만 남음 (둘이 남았는데 다른 팀이면 결승 가위바위보) */
+function isOver$2(s) {
+	return aliveIndexes$2(s).length <= 1 || !!s.teams && lastTeam(s.alive, s.teams) !== null;
+}
+/** 이긴 팀 (팀전이고 끝났을 때) */
+function winnerTeam$3(s) {
+	return s.teams ? lastTeam(s.alive, s.teams) : null;
+}
+function countdown(s) {
+	return {
+		...s,
+		presses: [],
+		phase: {
+			kind: "countdown",
+			until: s.now + COUNTDOWN_MS$1
+		}
+	};
+}
+function startCall(s) {
+	const rng = createRng(s.seed);
+	const botAt = {};
+	let botNo = 0;
+	s.players.forEach((p, i) => {
+		if (p.kind !== "bot" || !s.alive[i]) return;
+		botAt[i] = s.now + within$3(rng, BOT_STYLES[botNo++ % BOT_STYLES.length]);
+	});
+	return {
+		...s,
+		seed: rng.seed(),
+		botAt,
+		presses: [],
+		phase: {
+			kind: "call",
+			start: s.now,
+			until: s.now + CALL_MS
+		}
+	};
+}
+/** 동시에 누른 사람들: 다른 누군가와 COLLIDE_MS 안에 누름 */
+function collidedOf(presses) {
+	const hit = /* @__PURE__ */ new Set();
+	presses.forEach((a, i) => presses.forEach((b, j) => {
+		if (i !== j && Math.abs(a.at - b.at) <= 300) hit.add(a.player);
+	}));
+	return hit;
+}
+/** 이번 판에 아직 안 누른 살아 있는 사람 */
+function waitingOf(s) {
+	return aliveIndexes$2(s).filter((i) => !s.presses.some((p) => p.player === i));
+}
+/**
+* 판이 끝났으면 탈락자 정리. 아직이면 null
+* - 겹치면 그 자리에서 판이 끝나고 겹친 사람만 탈락, 남은 사람끼리 1부터 다시 (처음엔 판 끝까지 갔는데 바꿈)
+* - 안 겹치면 마지막 한 명 / 시간 초과면 안 누른 사람 모두 탈락
+*/
+function judgeCall(s) {
+	if (s.phase.kind !== "call") return null;
+	const waiting = waitingOf(s);
+	const lastPress = s.presses.at(-1)?.at ?? -Infinity;
+	const settled = s.now - lastPress > 300;
+	const collided = collidedOf(s.presses);
+	const timeout = s.now >= s.phase.until;
+	let losers;
+	if (collided.size > 0 && (settled || timeout)) losers = [...collided].map((player) => ({
+		player,
+		reason: "collide"
+	}));
+	else if (timeout || waiting.length <= 1 && settled) losers = waiting.map((player) => ({
+		player,
+		reason: timeout && waiting.length > 1 ? "timeout" : "last"
+	}));
+	else return null;
+	const replay = losers.length >= aliveIndexes$2(s).length;
+	return {
+		...s,
+		botAt: {},
+		phase: {
+			kind: "result",
+			losers: replay ? [] : losers,
+			replay,
+			until: s.now + RESULT_MS
+		}
+	};
+}
+function afterResult(s) {
+	if (s.phase.kind !== "result") return s;
+	const losers = s.phase.losers.map((l) => l.player);
+	const next = losers.length ? {
+		...s,
+		alive: s.alive.map((a, i) => a && !losers.includes(i)),
+		out: [...s.out, losers]
+	} : s;
+	const left = aliveIndexes$2(next).length;
+	if (isOver$2(next)) return {
+		...next,
+		phase: {
+			kind: "done",
+			until: s.now + DONE_MS$4
+		}
+	};
+	if (left === 2) return startRps({
+		...next,
+		round: next.round + 1
+	});
+	return countdown({
+		...next,
+		round: next.round + 1
+	});
+}
+function startRps(s) {
+	const rng = createRng(s.seed);
+	const botAt = {};
+	for (const i of aliveIndexes$2(s)) if (s.players[i].kind === "bot") botAt[i] = s.now + within$3(rng, [400, 2700]);
+	return {
+		...s,
+		seed: rng.seed(),
+		picks: {},
+		botAt,
+		presses: [],
+		phase: {
+			kind: "rps",
+			until: s.now + RPS_PICK_MS
+		}
+	};
+}
+const BEATS = {
+	rock: "scissors",
+	paper: "rock",
+	scissors: "paper"
+};
+function revealRps(s) {
+	const rng = createRng(s.seed);
+	const [a, b] = aliveIndexes$2(s);
+	const hands = {
+		[a]: s.picks[a] ?? pickOne(rng, HANDS$1),
+		[b]: s.picks[b] ?? pickOne(rng, HANDS$1)
+	};
+	const ha = hands[a];
+	const hb = hands[b];
+	const winner = ha === hb ? null : BEATS[ha] === hb ? a : b;
+	return {
+		...s,
+		seed: rng.seed(),
+		botAt: {},
+		phase: {
+			kind: "reveal",
+			hands,
+			winner,
+			until: s.now + RPS_REVEAL_MS
+		}
+	};
+}
+function afterReveal$1(s) {
+	if (s.phase.kind !== "reveal") return s;
+	const { winner } = s.phase;
+	if (winner === null) return startRps(s);
+	const loser = aliveIndexes$2(s).find((i) => i !== winner);
+	return {
+		...s,
+		alive: s.alive.map((a, i) => a && i !== loser),
+		out: [...s.out, [loser]],
+		phase: {
+			kind: "done",
+			until: s.now + DONE_MS$4
+		}
+	};
+}
+function bots$2(s) {
+	let next = s;
+	for (const [key, at] of Object.entries(s.botAt)) {
+		const i = Number(key);
+		if (at === void 0 || s.now < at) continue;
+		const rest = { ...next.botAt };
+		delete rest[i];
+		next = {
+			...next,
+			botAt: rest
+		};
+		if (s.phase.kind === "call") next = press(next, i);
+		if (s.phase.kind === "rps") {
+			const rng = createRng(next.seed);
+			const hand = pickOne(rng, HANDS$1);
+			next = pick({
+				...next,
+				seed: rng.seed()
+			}, i, hand);
+		}
+	}
+	return next;
+}
+function press(s, player) {
+	if (s.phase.kind !== "call" || !s.alive[player] || s.presses.some((p) => p.player === player)) return s;
+	return {
+		...s,
+		presses: [...s.presses, {
+			player,
+			at: s.now
+		}]
+	};
+}
+function pick(s, player, hand) {
+	if (s.phase.kind !== "rps" || !s.alive[player]) return s;
+	return {
+		...s,
+		picks: {
+			...s.picks,
+			[player]: hand
+		}
+	};
+}
+function drop$4(s, player) {
+	if (!s.alive[player] || s.phase.kind === "done") return s;
+	const next = {
+		...s,
+		alive: s.alive.map((a, i) => a && i !== player),
+		out: [...s.out, [player]]
+	};
+	const left = aliveIndexes$2(next).length;
+	if (isOver$2(next)) return {
+		...next,
+		phase: {
+			kind: "done",
+			until: s.now + DONE_MS$4
+		}
+	};
+	if (left === 2) return startRps(next);
+	return s.phase.kind === "call" ? countdown(next) : next;
+}
+function tick$4(s) {
+	const { phase, now } = s;
+	switch (phase.kind) {
+		case "countdown": return now >= phase.until ? startCall(s) : s;
+		case "call": {
+			const b = bots$2(s);
+			return judgeCall(b) ?? b;
+		}
+		case "result": return now >= phase.until ? afterResult(s) : s;
+		case "rps": {
+			const b = bots$2(s);
+			return now >= phase.until ? revealRps(b) : b;
+		}
+		case "reveal": return now >= phase.until ? afterReveal$1(s) : s;
+		case "done": return s;
+	}
+}
+function engineReducer$4(state, action) {
+	switch (action.type) {
+		case "tick": return tick$4({
+			...state,
+			now: action.now
+		});
+		case "press": return press(state, action.player);
+		case "pick": return pick(state, action.player, action.hand);
+		case "drop": return drop$4(state, action.player);
+	}
+}
+/** 사람별 등수 (1 = 우승). 끝나기 전이면 남은 사람은 모두 1 */
+function ranksOf$2(s) {
+	const ranks = s.players.map(() => 1);
+	let next = aliveIndexes$2(s).length + 1;
+	for (const group of [...s.out].reverse()) {
+		for (const i of group) ranks[i] = next;
+		next += group.length;
+	}
+	return ranks;
+}
+//#endregion
+//#region src/games/nunchi/play/view.ts
+/** 심판 상태 → 화면 */
+function toView$4(s) {
+	const { phase, now } = s;
+	const collided = collidedOf(s.presses);
+	return {
+		players: s.players.map(({ id, name, avatar }) => ({
+			id,
+			name,
+			avatar
+		})),
+		teams: s.teams,
+		winTeam: phase.kind === "done" ? winnerTeam$3(s) : null,
+		alive: s.alive,
+		round: s.round,
+		phase: phase.kind,
+		leftMs: Math.max(0, phase.until - now),
+		presses: s.presses.map((p, i) => ({
+			player: p.player,
+			n: i + 1,
+			collided: collided.has(p.player)
+		})),
+		losers: phase.kind === "result" ? phase.losers : [],
+		replay: phase.kind === "result" && phase.replay,
+		picked: phase.kind === "rps" ? aliveIndexes$2(s).filter((i) => s.picks[i] !== void 0) : [],
+		hands: phase.kind === "reveal" ? phase.hands : {},
+		winner: phase.kind === "reveal" ? phase.winner : null,
+		ranks: ranksOf$2(s)
+	};
+}
+/** 친구에게 바로 알려야 할 만큼 바뀌었는지 (그 밖엔 1초마다 보냄) */
+function viewChanged$4(a, b) {
+	if (!a) return true;
+	return a.phase !== b.phase || a.round !== b.round || a.presses.length !== b.presses.length || a.presses.some((p, i) => p.collided !== b.presses[i]?.collided) || a.picked.length !== b.picked.length || a.alive.some((x, i) => x !== b.alive[i]);
+}
+//#endregion
+//#region src/server/referees/nunchi.ts
+const HANDS = [
+	"rock",
+	"paper",
+	"scissors"
+];
+function nunchiReferee(setup, ctx) {
+	const o = setup ?? {};
+	const players = readPlayers(o.players, ctx, 3, 6);
+	if (!players) return null;
+	const teams = readTeams(o.teams, players.length);
+	if (teams === void 0) return null;
+	return hostEngineReferee(ctx, {
+		state: createEngine$4({
+			now: ctx.now(),
+			seed: serverSeed(),
+			players,
+			teams
+		}),
+		reduce: engineReducer$4,
+		tick: (now) => ({
+			type: "tick",
+			now
+		}),
+		toView: toView$4,
+		changed: viewChanged$4,
+		input: (s, from, m) => {
+			if (m.t !== "press" && m.t !== "pick") return void 0;
+			const player = humanIndex(s.players, from);
+			if (player < 0) return null;
+			if (m.t === "press") return {
+				type: "press",
+				player
+			};
+			return typeof m.hand === "string" && HANDS.includes(m.hand) ? {
+				type: "pick",
+				player,
+				hand: m.hand
+			} : null;
+		},
+		drop: (s, key) => {
+			const player = humanIndex(s.players, key);
+			return player >= 0 ? {
+				type: "drop",
+				player
+			} : null;
+		},
+		done: (s) => s.phase.kind === "done",
+		nowOf: (s) => s.now
+	});
+}
+//#endregion
+//#region src/games/roulette/constants.ts
+/** 시작 전 안내 */
+const INTRO_MS$2 = 1500;
+/** 한 차례 시간. 넘기면 골라 둔 사람(없으면 아무나)을 쏜다 */
+const TURN_MS$1 = 15e3;
+/** 방아쇠: 철컥 뒤 SUSPENSE_MS에 '틱' 또는 '탕' */
+const SUSPENSE_MS = 1100;
+const BANG_SHOW_MS = 2400;
+/** 경기가 끝난 뒤 결과 화면으로 넘어가기까지 */
+const DONE_MS$3 = 2500;
+/** 봇: 누구를 쏠지 고르기까지, 고른 뒤 당기기까지 */
+const BOT_AIM_MS = [700, 1600];
+const BOT_PULL_MS = [500, 1100];
+//#endregion
+//#region src/games/roulette/bot/rouletteBot.ts
+function chooseTarget(rng, me, alive, pulls) {
+	const others = alive.filter((i) => i !== me);
+	if (others.length === 0) return me;
+	const risk = 1 / (6 - pulls);
+	return chance(rng, risk <= 1 / 6 ? .45 : risk <= 1 / 5 ? .2 : risk < 1 ? .05 : 0) ? me : pickOne(rng, others);
+}
+//#endregion
+//#region src/games/roulette/play/engine.ts
+const aliveIndexes$1 = (s) => s.alive.flatMap((a, i) => a ? [i] : []);
+const within$2 = (rng, [min, max]) => min + rng.next() * (max - min);
+/** 자리 순서로 from 다음 살아 있는 사람 */
+function nextAlive(alive, from) {
+	for (let k = 1; k <= alive.length; k++) {
+		const i = (from + k) % alive.length;
+		if (alive[i]) return i;
+	}
+	return from;
+}
+/** player가 target을 쏠 수 있는지 (살아 있고, 같은 팀 공격을 껐으면 같은 팀이 아님 — 나는 늘 됨) */
+function canTarget(s, player, target) {
+	return !!s.alive[target] && (s.friendlyFire || !sameTeam(s.teams, player, target));
+}
+/** 봇이 고르는 사람들: 같은 팀 공격이 켜져 있어도 같은 팀은 빼고 (나는 됨) */
+const botTargetsOf = (s, player) => aliveIndexes$1(s).filter((i) => !sameTeam(s.teams, player, i));
+/** 끝났는지: 한 명 남음, 팀전이면 한 팀만 남음 */
+function isOver$1(s) {
+	return aliveIndexes$1(s).length <= 1 || !!s.teams && lastTeam(s.alive, s.teams) !== null;
+}
+/** 이긴 팀 (팀전이고 끝났을 때) */
+function winnerTeam$2(s) {
+	return s.teams ? lastTeam(s.alive, s.teams) : null;
+}
+function reload(s) {
+	const rng = createRng(s.seed);
+	const chamber = 1 + Math.floor(rng.next() * 6);
+	return {
+		...s,
+		seed: rng.seed(),
+		chamber,
+		pulls: 0
+	};
+}
+function createEngine$3(opts) {
+	const rng = createRng(opts.seed);
+	const turn = Math.floor(rng.next() * opts.players.length);
+	return reload({
+		now: opts.now,
+		seed: rng.seed(),
+		players: opts.players,
+		teams: opts.teams ?? null,
+		friendlyFire: !!opts.friendlyFire,
+		alive: opts.players.map(() => true),
+		out: [],
+		kills: opts.players.map(() => 0),
+		turn,
+		aimAt: null,
+		chamber: 1,
+		pulls: 0,
+		bot: null,
+		phase: {
+			kind: "intro",
+			until: opts.now + INTRO_MS$2
+		}
+	});
+}
+/** turn 사람 차례 시작 (봇이면 언제 고르고 당길지 정해 둔다) */
+function startTurn$1(s, turn) {
+	let next = {
+		...s,
+		turn,
+		aimAt: null,
+		bot: null,
+		phase: {
+			kind: "aim",
+			until: s.now + TURN_MS$1
+		}
+	};
+	if (s.players[turn].kind === "bot") {
+		const rng = createRng(s.seed);
+		const target = chooseTarget(rng, turn, botTargetsOf(s, turn), s.pulls);
+		const aimAt = s.now + within$2(rng, BOT_AIM_MS);
+		next = {
+			...next,
+			seed: rng.seed(),
+			bot: {
+				aimAt,
+				pullAt: aimAt + within$2(rng, BOT_PULL_MS),
+				target
+			}
+		};
+	}
+	return next;
+}
+function aim(s, player, target) {
+	if (s.phase.kind !== "aim" || player !== s.turn || !canTarget(s, player, target)) return s;
+	return {
+		...s,
+		aimAt: target
+	};
+}
+function pull(s, player, target = s.aimAt) {
+	if (s.phase.kind !== "aim" || player !== s.turn || target === null || !canTarget(s, player, target)) return s;
+	const pulls = s.pulls + 1;
+	const bang = pulls >= s.chamber;
+	const fire = {
+		shooter: player,
+		target,
+		bang
+	};
+	return {
+		...s,
+		aimAt: target,
+		pulls,
+		bot: null,
+		phase: {
+			kind: "fire",
+			fire,
+			until: s.now + SUSPENSE_MS + (bang ? BANG_SHOW_MS : 900)
+		}
+	};
+}
+function afterFire(s) {
+	if (s.phase.kind !== "fire") return s;
+	const { shooter, target, bang } = s.phase.fire;
+	if (!bang) return startTurn$1(s, s.alive[target] ? target : nextAlive(s.alive, target));
+	const next = {
+		...s,
+		alive: s.alive.map((a, i) => a && i !== target),
+		out: [...s.out, target],
+		kills: s.kills.map((k, i) => i === shooter && shooter !== target ? k + 1 : k)
+	};
+	if (isOver$1(next)) return {
+		...next,
+		aimAt: null,
+		phase: {
+			kind: "done",
+			until: s.now + DONE_MS$3
+		}
+	};
+	const turn = next.alive[shooter] ? shooter : nextAlive(next.alive, shooter);
+	return startTurn$1(reload(next), turn);
+}
+function timeout(s) {
+	const rng = createRng(s.seed);
+	const alive = aliveIndexes$1(s).filter((i) => canTarget(s, s.turn, i));
+	const target = s.aimAt ?? alive[Math.floor(rng.next() * alive.length)];
+	return pull({
+		...s,
+		seed: rng.seed()
+	}, s.turn, target);
+}
+function bots$1(s) {
+	const b = s.bot;
+	if (!b) return s;
+	let next = s;
+	if (s.now >= b.aimAt && s.aimAt !== b.target) next = aim(next, s.turn, b.target);
+	if (s.now >= b.pullAt) next = pull(next, s.turn, b.target);
+	return next;
+}
+function drop$3(s, player) {
+	if (!s.alive[player] || s.phase.kind === "done") return s;
+	const next = {
+		...s,
+		alive: s.alive.map((a, i) => a && i !== player),
+		out: [...s.out, player]
+	};
+	if (isOver$1(next)) return {
+		...next,
+		aimAt: null,
+		phase: {
+			kind: "done",
+			until: s.now + DONE_MS$3
+		}
+	};
+	if (s.phase.kind === "aim") {
+		if (s.turn === player) return startTurn$1(next, nextAlive(next.alive, player));
+		if (s.aimAt === player) return {
+			...next,
+			aimAt: null
+		};
+	}
+	return next;
+}
+function tick$3(s) {
+	const { phase, now } = s;
+	switch (phase.kind) {
+		case "intro": return now >= phase.until ? startTurn$1(s, s.turn) : s;
+		case "aim": {
+			const b = bots$1(s);
+			if (b.phase.kind !== "aim") return b;
+			return now >= phase.until ? timeout(b) : b;
+		}
+		case "fire": return now >= phase.until ? afterFire(s) : s;
+		case "done": return s;
+	}
+}
+function engineReducer$3(state, action) {
+	switch (action.type) {
+		case "tick": return tick$3({
+			...state,
+			now: action.now
+		});
+		case "aim": return aim(state, action.player, action.target);
+		case "pull": return pull(state, action.player, action.target ?? state.aimAt);
+		case "drop": return drop$3(state, action.player);
+	}
+}
+/** 사람별 등수 (1 = 우승). 늦게 탈락할수록 앞. 끝나기 전이면 남은 사람은 모두 1 */
+function ranksOf$1(s) {
+	const ranks = s.players.map(() => 1);
+	const left = aliveIndexes$1(s).length;
+	[...s.out].reverse().forEach((i, k) => ranks[i] = left + 1 + k);
+	return ranks;
+}
+//#endregion
+//#region src/games/roulette/play/view.ts
+/** 심판 상태 → 화면 */
+function toView$3(s) {
+	const { phase, now } = s;
+	return {
+		players: s.players.map(({ id, name, avatar }) => ({
+			id,
+			name,
+			avatar
+		})),
+		teams: s.teams,
+		friendlyFire: s.friendlyFire,
+		winTeam: s.phase.kind === "done" ? winnerTeam$2(s) : null,
+		alive: s.alive,
+		kills: s.kills,
+		turn: s.turn,
+		aimAt: s.aimAt,
+		pulls: s.pulls,
+		phase: phase.kind,
+		leftMs: Math.max(0, phase.until - now),
+		fire: phase.kind === "fire" ? phase.fire : null,
+		ranks: ranksOf$1(s)
+	};
+}
+/** 친구에게 바로 알려야 할 만큼 바뀌었는지 (그 밖엔 1초마다 보냄) */
+function viewChanged$3(a, b) {
+	if (!a) return true;
+	return a.phase !== b.phase || a.turn !== b.turn || a.aimAt !== b.aimAt || a.pulls !== b.pulls || a.alive.some((x, i) => x !== b.alive[i]);
+}
+//#endregion
+//#region src/server/referees/roulette.ts
+function rouletteReferee(setup, ctx) {
+	const o = setup ?? {};
+	const players = readPlayers(o.players, ctx, 2, 8);
+	if (!players) return null;
+	const teams = readTeams(o.teams, players.length);
+	if (teams === void 0) return null;
+	return hostEngineReferee(ctx, {
+		state: createEngine$3({
+			now: ctx.now(),
+			seed: serverSeed(),
+			players,
+			teams,
+			friendlyFire: o.friendlyFire === true
+		}),
+		reduce: engineReducer$3,
+		tick: (now) => ({
+			type: "tick",
+			now
+		}),
+		toView: toView$3,
+		changed: viewChanged$3,
+		input: (s, from, m) => {
+			if (m.t !== "aim" && m.t !== "pull") return void 0;
+			const player = humanIndex(s.players, from);
+			if (player < 0 || !isInt$1(m.target)) return null;
+			return m.t === "aim" ? {
 				type: "aim",
 				player,
 				target: m.target
@@ -4428,32 +5827,1749 @@ function rouletteReferee(setup, ctx) {
 				type: "pull",
 				player,
 				target: m.target
-			});
-			flush();
-			return true;
+			};
 		},
-		tick(now) {
-			s = engineReducer(s, {
-				type: "tick",
-				now
-			});
-			if (s.phase.kind === "done" && doneAt === null) doneAt = now;
-			flush();
-		},
-		leave(key) {
-			const player = indexOf(key);
-			if (player >= 0) s = engineReducer(s, {
+		drop: (s, key) => {
+			const player = humanIndex(s.players, key);
+			return player >= 0 ? {
 				type: "drop",
 				player
-			});
-			flush();
+			} : null;
 		},
-		finished: () => doneAt !== null && s.now - doneAt > LINGER_MS
+		done: (s) => s.phase.kind === "done",
+		nowOf: (s) => s.now
+	});
+}
+//#endregion
+//#region src/games/survival/constants.ts
+/** 남은 사람 수별 맵 반지름 (2명 → 30 … 8명 → 60). 누가 탈락하면 다음 라운드에 줄어든다.
+*  처음엔 5라운드까지 라운드마다 줄였는데(50→20), 사람 수에 맞추고 둘이면 적당히 넓게 두기로 바꿈 */
+const ARENA_BY_PLAYERS = {
+	2: 30,
+	3: 35,
+	4: 40,
+	5: 45,
+	6: 50,
+	7: 55,
+	8: 60
+};
+const MAX_ARENA = ARENA_BY_PLAYERS[8];
+/** 엄폐물(벽): 길이·두께. 라운드마다 무작위로 새로 짓는다 */
+const WALL_LEN = [10, 18];
+/** 라운드 시작 안내(맵 줄어듦) */
+const COUNTDOWN_MS = 1800;
+/** 위치·방향 고르는 시간. 넘기면 고른 것까지만 쓰고 나머지는 무작위 */
+const PLAN_MS = 15e3;
+/** 레이저 속도 (맵 단위/ms). 맵 끝에서 끝(100)까지 2초 — 천천히 뻗어 가며 닿는 순간 ✕ */
+const LASER_SPEED = .05;
+/** 레이저가 다 멈춘 뒤 결과 보여주기 */
+const AFTER_SHOT_MS = 1800;
+/** 경기가 끝난 뒤 결과 화면으로 넘어가기까지 */
+const DONE_MS$2 = 2500;
+/** 봇이 정하는 데 걸리는 시간 (고르기 시작부터) */
+const BOT_PLAN_MS = [1500, 6e3];
+//#endregion
+//#region src/games/survival/rules/geometry.ts
+/** 남은 사람 수에 맞는 맵 반지름 */
+const halfFor = (alive) => ARENA_BY_PLAYERS[Math.max(2, Math.min(8, alive))] ?? MAX_ARENA;
+/** 말이 맵 밖으로 나가지 않게 (말 반지름만큼 안쪽) */
+function clampToArena(p, half) {
+	const m = half - 4;
+	const d = Math.hypot(p.x, p.y);
+	return d <= m ? p : {
+		x: p.x / d * m,
+		y: p.y / d * m
+	};
+}
+/** 벽 기준 좌표 (벽 가운데가 0, 길이 방향이 x) */
+function toLocal(p, w) {
+	const c = Math.cos(w.angle);
+	const s = Math.sin(w.angle);
+	const dx = p.x - w.x;
+	const dy = p.y - w.y;
+	return {
+		x: dx * c + dy * s,
+		y: -dx * s + dy * c
+	};
+}
+function fromLocal(q, w) {
+	const c = Math.cos(w.angle);
+	const s = Math.sin(w.angle);
+	return {
+		x: w.x + q.x * c - q.y * s,
+		y: w.y + q.x * s + q.y * c
+	};
+}
+/** 말이 벽에 걸치면 가까운 쪽 바깥으로 밀어낸다 */
+function pushOutOfWalls(p, walls) {
+	let out = p;
+	for (const w of walls) {
+		const q = toLocal(out, w);
+		const ex = w.w / 2 + 4;
+		const ey = w.h / 2 + 4;
+		if (Math.abs(q.x) >= ex || Math.abs(q.y) >= ey) continue;
+		out = fromLocal(ex - Math.abs(q.x) < ey - Math.abs(q.y) ? {
+			x: Math.sign(q.x || 1) * ex,
+			y: q.y
+		} : {
+			x: q.x,
+			y: Math.sign(q.y || 1) * ey
+		}, w);
+	}
+	return out;
+}
+/** 말을 놓을 수 있는 자리로: 맵 안, 벽 밖 (밀어낸 뒤 다시 맵 안으로) */
+function placeAt(p, half, walls) {
+	let out = clampToArena(p, half);
+	for (let k = 0; k < 3; k++) out = clampToArena(pushOutOfWalls(out, walls), half);
+	return out;
+}
+/** 앞으로 나가는 선이 벽에 닿는 거리 (안 닿으면 null) */
+function rayWall(from, dx, dy, w) {
+	const o = toLocal(from, w);
+	const c = Math.cos(w.angle);
+	const s = Math.sin(w.angle);
+	const d = {
+		x: dx * c + dy * s,
+		y: -dx * s + dy * c
+	};
+	let tMin = -Infinity;
+	let tMax = Infinity;
+	for (const [oo, dd, e] of [[
+		o.x,
+		d.x,
+		w.w / 2
+	], [
+		o.y,
+		d.y,
+		w.h / 2
+	]]) {
+		if (Math.abs(dd) < 1e-9) {
+			if (Math.abs(oo) > e) return null;
+			continue;
+		}
+		const t1 = (-e - oo) / dd;
+		const t2 = (e - oo) / dd;
+		tMin = Math.max(tMin, Math.min(t1, t2));
+		tMax = Math.min(tMax, Math.max(t1, t2));
+	}
+	if (tMax < Math.max(0, tMin)) return null;
+	return Math.max(0, tMin);
+}
+/** 라운드마다 엄폐물 짓기: 맵이 클수록 많이(7~8명 4개 · 5~6명 3개 · 3~4명 2개 · 2명 1개, 처음 5~3개는 너무 많아 줄임), 서로 떨어지게, 맵 안에 다 들어오게 */
+function makeWalls(rng, half) {
+	const count = half < 24 ? 0 : Math.max(1, Math.min(4, Math.round((half - 20) / 10)));
+	const walls = [];
+	for (let tries = 0; walls.length < count && tries < 200; tries++) {
+		const w = WALL_LEN[0] + rng.next() * (WALL_LEN[1] - WALL_LEN[0]);
+		const r = Math.sqrt(rng.next()) * (half - w / 2 - 3);
+		const a = rng.next() * Math.PI * 2;
+		const wall = {
+			x: Math.cos(a) * r,
+			y: Math.sin(a) * r,
+			w,
+			h: 3,
+			angle: rng.next() * Math.PI
+		};
+		if (walls.every((o) => Math.hypot(o.x - wall.x, o.y - wall.y) >= Math.min(16, half * .45))) walls.push(wall);
+	}
+	return walls;
+}
+/** 맵 안 아무 곳 (넓이 고르게) */
+function randomInArena(rng, half) {
+	const r = Math.sqrt(rng.next()) * (half - 4);
+	const a = rng.next() * Math.PI * 2;
+	return {
+		x: Math.cos(a) * r,
+		y: Math.sin(a) * r
+	};
+}
+/** 맵 안, 벽 밖 아무 곳 */
+function randomSpot(rng, half, walls) {
+	return placeAt(randomInArena(rng, half), half, walls);
+}
+/** 쏜 자리에서 그 방향으로 맵 끝에 닿는 곳 */
+function edgeOf(from, angle, half) {
+	const dx = Math.cos(angle);
+	const dy = Math.sin(angle);
+	const b = from.x * dx + from.y * dy;
+	const c = from.x * from.x + from.y * from.y - half * half;
+	const t = Math.max(0, -b + Math.sqrt(Math.max(0, b * b - c)));
+	return {
+		x: from.x + dx * t,
+		y: from.y + dy * t
+	};
+}
+/**
+* 총알: 처음 맞는 사람과 총알이 멈춘 곳.
+* 말(반지름 PIECE_R)에 닿는 첫 지점까지 거리로 가장 가까운 사람. 쏜 사람 뒤쪽은 안 맞는다
+*/
+function shoot(from, angle, targets, half, walls = []) {
+	const dx = Math.cos(angle);
+	const dy = Math.sin(angle);
+	let best = null;
+	for (const w of walls) {
+		const t = rayWall(from, dx, dy, w);
+		if (t !== null && (!best || t < best.t)) best = {
+			player: null,
+			t
+		};
+	}
+	for (const { player, pos } of targets) {
+		const vx = pos.x - from.x;
+		const vy = pos.y - from.y;
+		const along = vx * dx + vy * dy;
+		if (along <= 0) continue;
+		const side2 = vx * vx + vy * vy - along * along;
+		if (side2 > 16) continue;
+		const t = Math.max(0, along - Math.sqrt(16 - side2));
+		if (!best || t < best.t) best = {
+			player,
+			t
+		};
+	}
+	if (!best) return {
+		hit: null,
+		end: edgeOf(from, angle, half)
+	};
+	return {
+		hit: best.player,
+		end: {
+			x: from.x + dx * best.t,
+			y: from.y + dy * best.t
+		}
 	};
 }
 //#endregion
+//#region src/games/survival/bot/survivalBot.ts
+/** lastSeen: 살아 있는 상대들의 지난 라운드 자리 (첫 라운드면 null) */
+function chooseBotPlan(rng, half, walls, lastSeen) {
+	const pos = randomSpot(rng, half, walls);
+	const known = lastSeen.filter((p) => p !== null);
+	const aimAt = known.length > 0 && chance(rng, .6) ? pickOne(rng, known) : randomInArena(rng, half * .8);
+	const jitter = (rng.next() - .5) * half * .3;
+	const dx = aimAt.x + jitter - pos.x;
+	const dy = aimAt.y - jitter - pos.y;
+	return {
+		pos,
+		angle: Math.hypot(dx, dy) < 1 ? rng.next() * Math.PI * 2 : Math.atan2(dy, dx)
+	};
+}
+//#endregion
+//#region src/games/survival/play/engine.ts
+/** 레이저가 끝(맞은 곳·맵 끝)까지 가는 데 걸리는 시간 */
+const laserMs = (sh) => Math.hypot(sh.end.x - sh.pos.x, sh.end.y - sh.pos.y) / LASER_SPEED;
+/** 공개 시작부터 레이저가 모두 멈추는 시각 */
+const lasersDoneAt = (r) => 700 + Math.max(0, ...r.shots.map(laserMs));
+const aliveIndexes = (s) => s.alive.flatMap((a, i) => a ? [i] : []);
+/** 라운드 준비: 남은 사람 수로 맵 크기를 정하고(줄이는 중이면 그 크기) 엄폐물을 새로 짓는다 */
+function buildWalls(s, half = halfFor(aliveIndexes(s).length)) {
+	const rng = createRng(s.seed);
+	const walls = makeWalls(rng, half);
+	return {
+		...s,
+		seed: rng.seed(),
+		half,
+		walls
+	};
+}
+function createEngine$2(opts) {
+	return buildWalls({
+		now: opts.now,
+		seed: opts.seed,
+		players: opts.players,
+		teams: opts.teams ?? null,
+		friendlyFire: !!opts.friendlyFire,
+		alive: opts.players.map(() => true),
+		out: [],
+		kills: opts.players.map(() => 0),
+		round: 1,
+		half: 0,
+		walls: [],
+		plans: {},
+		botAt: {},
+		lastReveal: null,
+		phase: {
+			kind: "countdown",
+			until: opts.now + COUNTDOWN_MS
+		}
+	});
+}
+/** 끝났는지: 한 명 남음, 팀전이면 한 팀만 남음 */
+function isOver(s) {
+	return aliveIndexes(s).length <= 1 || !!s.teams && lastTeam(s.alive, s.teams) !== null;
+}
+/** 이긴 팀 (팀전이고 끝났을 때) */
+function winnerTeam$1(s) {
+	return s.teams ? lastTeam(s.alive, s.teams) : null;
+}
+const within$1 = (rng, [min, max]) => min + rng.next() * (max - min);
+function startPlan(s) {
+	const rng = createRng(s.seed);
+	const botAt = {};
+	for (const i of aliveIndexes(s)) if (s.players[i].kind === "bot") botAt[i] = s.now + within$1(rng, BOT_PLAN_MS);
+	return {
+		...s,
+		seed: rng.seed(),
+		plans: {},
+		botAt,
+		phase: {
+			kind: "plan",
+			until: s.now + PLAN_MS
+		}
+	};
+}
+function bots(s) {
+	let next = s;
+	for (const [key, at] of Object.entries(s.botAt)) {
+		const i = Number(key);
+		if (at === void 0 || s.now < at) continue;
+		const rest = { ...next.botAt };
+		delete rest[i];
+		const rng = createRng(next.seed);
+		const lastSeen = aliveIndexes(next).filter((j) => j !== i && !sameTeam(next.teams, i, j)).map((j) => next.lastReveal?.positions[j] ?? null);
+		const { pos, angle } = chooseBotPlan(rng, next.half, next.walls, lastSeen);
+		next = {
+			...next,
+			seed: rng.seed(),
+			botAt: rest,
+			plans: {
+				...next.plans,
+				[i]: {
+					pos,
+					angle,
+					locked: true
+				}
+			}
+		};
+	}
+	return next;
+}
+function plan(s, player, p) {
+	if (s.phase.kind !== "plan" || !s.alive[player] || s.plans[player]?.locked) return s;
+	const half = s.half;
+	const pos = p.pos && placeAt(p.pos, half, s.walls);
+	return {
+		...s,
+		plans: {
+			...s.plans,
+			[player]: {
+				pos,
+				angle: p.angle,
+				locked: p.locked && pos !== null && p.angle !== null
+			}
+		}
+	};
+}
+/** 공개: 안 고른 건 무작위로 채우고 모두 동시에 쏜다 */
+function reveal(s) {
+	const rng = createRng(s.seed);
+	const half = s.half;
+	const alive = aliveIndexes(s);
+	const positions = s.players.map(() => null);
+	const angles = s.players.map(() => 0);
+	for (const i of alive) {
+		const p = s.plans[i];
+		positions[i] = p?.pos ?? randomSpot(rng, half, s.walls);
+		angles[i] = p?.angle ?? rng.next() * Math.PI * 2;
+	}
+	const shots = alive.map((i) => {
+		const targets = alive.filter((j) => j !== i && (s.friendlyFire || !sameTeam(s.teams, i, j))).map((j) => ({
+			player: j,
+			pos: positions[j]
+		}));
+		const { hit, end } = shoot(positions[i], angles[i], targets, half, s.walls);
+		return {
+			from: i,
+			pos: positions[i],
+			end,
+			hit
+		};
+	});
+	const hits = [...new Set(shots.flatMap((sh) => sh.hit === null ? [] : [sh.hit]))].sort((a, b) => a - b);
+	const voided = hits.length >= alive.length;
+	const ms = lasersDoneAt({ shots }) + AFTER_SHOT_MS;
+	return {
+		...s,
+		seed: rng.seed(),
+		botAt: {},
+		lastReveal: {
+			round: s.round,
+			half,
+			positions,
+			shots,
+			dead: voided ? [] : hits,
+			voided,
+			ms
+		},
+		phase: {
+			kind: "reveal",
+			until: s.now + ms
+		}
+	};
+}
+function afterReveal(s) {
+	const r = s.lastReveal;
+	if (!r) return s;
+	const kills = r.voided ? s.kills : s.kills.map((k, i) => k + r.shots.filter((sh) => sh.from === i && sh.hit !== null).length);
+	const next = r.dead.length ? {
+		...s,
+		kills,
+		alive: s.alive.map((a, i) => a && !r.dead.includes(i)),
+		out: [...s.out, r.dead]
+	} : {
+		...s,
+		kills
+	};
+	if (isOver(next)) return {
+		...next,
+		phase: {
+			kind: "done",
+			until: s.now + DONE_MS$2
+		}
+	};
+	const alive = aliveIndexes(next).length;
+	const half = (alive === 2 || s.teams) && r.dead.length === 0 ? Math.max(14, Math.min(s.half, halfFor(alive)) - 4) : halfFor(alive);
+	return buildWalls({
+		...next,
+		round: next.round + 1,
+		plans: {},
+		phase: {
+			kind: "countdown",
+			until: s.now + COUNTDOWN_MS
+		}
+	}, half);
+}
+function drop$2(s, player) {
+	if (!s.alive[player] || s.phase.kind === "done") return s;
+	const next = {
+		...s,
+		alive: s.alive.map((a, i) => a && i !== player),
+		out: [...s.out, [player]]
+	};
+	if (isOver(next)) return {
+		...next,
+		phase: {
+			kind: "done",
+			until: s.now + DONE_MS$2
+		}
+	};
+	return next;
+}
+/** 살아 있는 사람이 모두 확정했는지 */
+const allLocked = (s) => aliveIndexes(s).every((i) => s.plans[i]?.locked);
+function tick$2(s) {
+	const { phase, now } = s;
+	switch (phase.kind) {
+		case "countdown": return now >= phase.until ? startPlan(s) : s;
+		case "plan": {
+			const b = bots(s);
+			return now >= phase.until || allLocked(b) ? reveal(b) : b;
+		}
+		case "reveal": return now >= phase.until ? afterReveal(s) : s;
+		case "done": return s;
+	}
+}
+function engineReducer$2(state, action) {
+	switch (action.type) {
+		case "tick": return tick$2({
+			...state,
+			now: action.now
+		});
+		case "plan": return plan(state, action.player, action.plan);
+		case "drop": return drop$2(state, action.player);
+	}
+}
+/** 사람별 등수 (1 = 우승). 끝나기 전이면 남은 사람은 모두 1 */
+function ranksOf(s) {
+	const ranks = s.players.map(() => 1);
+	let next = aliveIndexes(s).length + 1;
+	for (const group of [...s.out].reverse()) {
+		for (const i of group) ranks[i] = next;
+		next += group.length;
+	}
+	return ranks;
+}
+//#endregion
+//#region src/games/survival/play/view.ts
+/** 심판 상태 → 화면 */
+function toView$2(s) {
+	const { phase, now } = s;
+	return {
+		players: s.players.map(({ id, name, avatar }) => ({
+			id,
+			name,
+			avatar
+		})),
+		teams: s.teams,
+		winTeam: phase.kind === "done" ? winnerTeam$1(s) : null,
+		alive: s.alive,
+		kills: s.kills,
+		round: s.round,
+		half: s.half,
+		prevHalf: s.lastReveal?.half ?? s.half,
+		startHalf: halfFor(s.players.length),
+		walls: s.walls,
+		phase: phase.kind,
+		leftMs: Math.max(0, phase.until - now),
+		locked: phase.kind === "plan" ? aliveIndexes(s).filter((i) => s.plans[i]?.locked) : [],
+		reveal: phase.kind === "reveal" || phase.kind === "done" ? s.lastReveal : null,
+		ranks: ranksOf(s)
+	};
+}
+/** 친구에게 바로 알려야 할 만큼 바뀌었는지 (그 밖엔 1초마다 보냄) */
+function viewChanged$2(a, b) {
+	if (!a) return true;
+	return a.phase !== b.phase || a.round !== b.round || a.locked.length !== b.locked.length || a.alive.some((x, i) => x !== b.alive[i]);
+}
+//#endregion
+//#region src/server/referees/survival.ts
+function survivalReferee(setup, ctx) {
+	const o = setup ?? {};
+	const players = readPlayers(o.players, ctx, 2, 8);
+	if (!players) return null;
+	const teams = readTeams(o.teams, players.length);
+	if (teams === void 0) return null;
+	return hostEngineReferee(ctx, {
+		state: createEngine$2({
+			now: ctx.now(),
+			seed: serverSeed(),
+			players,
+			teams,
+			friendlyFire: o.friendlyFire === true
+		}),
+		reduce: engineReducer$2,
+		tick: (now) => ({
+			type: "tick",
+			now
+		}),
+		toView: toView$2,
+		changed: viewChanged$2,
+		input: (s, from, m) => {
+			if (m.t !== "plan") return void 0;
+			const player = humanIndex(s.players, from);
+			const p = m.plan;
+			if (player < 0 || m.round !== s.round || !p || typeof p !== "object") return null;
+			if (p.pos !== null && !isVec(p.pos) || p.angle !== null && !isNum(p.angle) || typeof p.locked !== "boolean") return null;
+			return {
+				type: "plan",
+				player,
+				plan: {
+					pos: p.pos,
+					angle: p.angle,
+					locked: p.locked
+				}
+			};
+		},
+		drop: (s, key) => {
+			const player = humanIndex(s.players, key);
+			return player >= 0 ? {
+				type: "drop",
+				player
+			} : null;
+		},
+		done: (s) => s.phase.kind === "done",
+		nowOf: (s) => s.now
+	});
+}
+//#endregion
+//#region src/games/tiles/constants.ts
+/** 첫 차례 전 안내 */
+const INTRO_MS$1 = 1800;
+/** 한 차례 시간. 넘기면 하던 것은 되돌리고 1장 가져온다 */
+const TURN_MS = 6e4;
+/** 봇이 한 차례 생각하는 시간 */
+const BOT_THINK_MS = [1200, 2600];
+/** 경기가 끝난 뒤 결과 화면으로 넘어가기까지 */
+const DONE_MS$1 = 3e3;
+//#endregion
+//#region src/games/tiles/rules/tiles.ts
+const NUMBER_TILES = 104;
+const TILE_COUNT = 106;
+function isWild(id) {
+	return id >= NUMBER_TILES;
+}
+/** 1~13 (와일드는 0) */
+function numOf(id) {
+	return isWild(id) ? 0 : id % 13 + 1;
+}
+/** 0~3 (와일드는 -1) */
+function colorOf(id) {
+	return isWild(id) ? -1 : Math.floor(id / 13) % 4;
+}
+Array.from({ length: 2 }, (_, i) => NUMBER_TILES + i);
+/** 섞은 타일 더미 */
+function shuffledDeck(rng) {
+	const deck = Array.from({ length: TILE_COUNT }, (_, i) => i);
+	for (let i = deck.length - 1; i > 0; i--) {
+		const j = Math.floor(rng.next() * (i + 1));
+		[deck[i], deck[j]] = [deck[j], deck[i]];
+	}
+	return deck;
+}
+/** 남은 손패 점수 (끝났을 때 순위용). 와일드는 MAX_NUM(13) */
+function handValue(ids) {
+	return ids.reduce((sum, id) => sum + (isWild(id) ? 13 : numOf(id)), 0);
+}
+//#endregion
+//#region src/games/tiles/rules/sets.ts
+/** 놓인 순서대로 같은 색 연속이면 각 자리 숫자 */
+function runNumbers(ids) {
+	if (ids.length < 3 || ids.length > 13) return null;
+	const first = ids.findIndex((id) => !isWild(id));
+	if (first < 0) return null;
+	const color = colorOf(ids[first]);
+	const start = numOf(ids[first]) - first;
+	if (start < 1 || start + ids.length - 1 > 13) return null;
+	return ids.every((id, i) => isWild(id) || colorOf(id) === color && numOf(id) === start + i) ? ids.map((_, i) => start + i) : null;
+}
+/** 같은 숫자 다른 색이면 그 숫자 */
+function groupNumber(ids) {
+	const plain = ids.filter((id) => !isWild(id));
+	if (ids.length < 3 || ids.length > 4 || plain.length === 0) return null;
+	const n = numOf(plain[0]);
+	if (plain.some((id) => numOf(id) !== n)) return null;
+	return new Set(plain.map(colorOf)).size === plain.length ? n : null;
+}
+/** 올바른 줄이면 그 종류 (둘 다 되면 점수가 큰 쪽), 아니면 null */
+function setKind(ids) {
+	const run = runNumbers(ids);
+	const group = groupNumber(ids);
+	if (run && group !== null) return sum(run) >= group * ids.length ? "run" : "group";
+	return run ? "run" : group !== null ? "group" : null;
+}
+function isValidSet(ids) {
+	return setKind(ids) !== null;
+}
+const sum = (ns) => ns.reduce((a, b) => a + b, 0);
+/** 줄의 점수 (첫 등록 합). 와일드는 그 자리 숫자. 올바르지 않으면 0 */
+function setValue(ids) {
+	const kind = setKind(ids);
+	if (kind === "run") return sum(runNumbers(ids));
+	if (kind === "group") return groupNumber(ids) * ids.length;
+	return 0;
+}
+/**
+* 순서 없는 타일 묶음을 올바른 줄로 놓는 순서 (봇이 줄을 만들 때 씀). 안 되면 null.
+* 연속이면 작은 숫자부터, 와일드는 빈 곳 → 남으면 위쪽 끝 → 13을 넘으면 아래쪽 끝
+*/
+function orderSet(ids) {
+	const plain = ids.filter((id) => !isWild(id)).sort((a, b) => numOf(a) - numOf(b));
+	const wilds = ids.filter(isWild);
+	const group = [...plain, ...wilds];
+	if (groupNumber(group) !== null) return group;
+	if (plain.length === 0) return null;
+	const lo = numOf(plain[0]);
+	const span = numOf(plain[plain.length - 1]) - lo + 1;
+	const start = Math.min(13, lo + Math.max(span, ids.length) - 1) - ids.length + 1;
+	const left = [...wilds];
+	const out = Array.from({ length: ids.length }, (_, i) => plain.find((id) => numOf(id) === start + i) ?? left.shift());
+	if (out.some((id) => id === void 0) || new Set(out).size !== ids.length) return null;
+	const run = out;
+	return isValidSet(run) ? run : null;
+}
+//#endregion
+//#region src/games/tiles/bot/tilesBot.ts
+/** 손패에서 만들 수 있는 줄 후보 (와일드는 한 장까지 끼워 봄) */
+function candidates(hand) {
+	const wild = hand.find(isWild);
+	const plain = hand.filter((id) => !isWild(id));
+	const out = [];
+	for (let n = 1; n <= 13; n++) {
+		const byColor = /* @__PURE__ */ new Map();
+		for (const id of plain) if (numOf(id) === n && !byColor.has(colorOf(id))) byColor.set(colorOf(id), id);
+		const g = [...byColor.values()];
+		if (g.length >= 3) out.push(g);
+		if (wild !== void 0 && g.length >= 2 && g.length < 4) out.push([...g, wild]);
+	}
+	for (let c = 0; c < 4; c++) {
+		const at = /* @__PURE__ */ new Map();
+		for (const id of plain) if (colorOf(id) === c && !at.has(numOf(id))) at.set(numOf(id), id);
+		for (let lo = 1; lo <= 13; lo++) {
+			const seq = [];
+			let usedWild = false;
+			for (let n = lo; n <= 13; n++) {
+				const id = at.get(n);
+				if (id !== void 0) seq.push(id);
+				else if (wild !== void 0 && !usedWild && seq.length > 0) {
+					seq.push(wild);
+					usedWild = true;
+				} else break;
+				if (seq.length >= 3) out.push([...seq]);
+			}
+		}
+	}
+	return out.filter(isValidSet);
+}
+/** 손패만으로 줄을 욕심껏 고른다 (점수 큰 것부터) */
+function setsFromHand(hand) {
+	let left = [...hand];
+	const sets = [];
+	for (;;) {
+		const best = candidates(left).sort((a, b) => setValue(b) - setValue(a) || b.length - a.length)[0];
+		if (!best) return sets;
+		sets.push(best);
+		left = left.filter((id) => !best.includes(id));
+	}
+}
+/** 낼 바닥 전체, 낼 게 없으면 null */
+function chooseBotPlay(table, hand, melded) {
+	const sets = setsFromHand(hand);
+	if (!melded) return sets.reduce((sum, s) => sum + setValue(s), 0) >= 30 ? [...table, ...sets] : null;
+	const next = [...table.map((s) => [...s]), ...sets];
+	let left = hand.filter((id) => !sets.some((s) => s.includes(id)));
+	for (let changed = true; changed;) {
+		changed = false;
+		for (const id of left) if (attach(next, id) || split(next, id) || borrow(next, id, left)) {
+			left = left.filter((x) => !next.some((s) => s.includes(x)));
+			changed = true;
+			break;
+		}
+	}
+	return left.length === hand.length ? null : next;
+}
+/** 줄 뒤(위쪽 숫자)나 앞(아래쪽 숫자)에 붙이기 */
+function attach(table, id) {
+	for (const s of table) {
+		if (isValidSet([...s, id])) {
+			s.push(id);
+			return true;
+		}
+		if (isValidSet([id, ...s])) {
+			s.unshift(id);
+			return true;
+		}
+	}
+	return false;
+}
+/** 빨강 3~8에 빨강 5 → 3·4·5 / 5·6·7·8 (양쪽 다 3장 이상) */
+function split(table, id) {
+	if (isWild(id)) return false;
+	for (const [i, s] of table.entries()) {
+		if (s.some(isWild) || setKind(s) !== "run" || colorOf(s[0]) !== colorOf(id)) continue;
+		const low = s.filter((x) => numOf(x) <= numOf(id));
+		const high = [id, ...s.filter((x) => numOf(x) > numOf(id))];
+		if (low.length >= 3 && high.length >= 3 && isValidSet(low) && isValidSet(high)) {
+			table.splice(i, 1, low, high);
+			return true;
+		}
+	}
+	return false;
+}
+/** 빼도 줄이 남는 바닥 타일(긴 연속의 끝, 4장 이상 같은 숫자의 한 장)을 빌려 손패와 새 줄 */
+function borrow(table, id, hand) {
+	const spares = [];
+	for (const s of table) {
+		if (s.length <= 3) continue;
+		for (const tile of s) if (isValidSet(s.filter((x) => x !== tile))) spares.push({
+			set: s,
+			tile
+		});
+	}
+	const others = hand.filter((x) => x !== id);
+	for (const a of spares) {
+		for (const x of others) {
+			const set = orderSet([
+				id,
+				x,
+				a.tile
+			]);
+			if (set) return take(table, set, [a]);
+		}
+		for (const b of spares) {
+			const set = b.set !== a.set ? orderSet([
+				id,
+				a.tile,
+				b.tile
+			]) : null;
+			if (set) return take(table, set, [a, b]);
+		}
+	}
+	return false;
+}
+/** 빌린 타일을 원래 줄에서 빼고 새 줄(이미 순서대로)을 놓는다 */
+function take(table, set, borrowed) {
+	for (const b of borrowed) b.set.splice(b.set.indexOf(b.tile), 1);
+	table.push(set);
+	return true;
+}
+//#endregion
+//#region src/games/tiles/rules/turn.ts
+const sameSet = (a, b) => a.length === b.length && [...a].sort().join() === [...b].sort().join();
+function checkPlay(opts) {
+	const { oldTable, hand, newTable, melded } = opts;
+	const onTable = new Set(oldTable.flat());
+	const inHand = new Set(hand);
+	const seen = /* @__PURE__ */ new Set();
+	const placed = [];
+	for (const id of newTable.flat()) {
+		if (seen.has(id)) return {
+			ok: false,
+			problem: "bad-tiles"
+		};
+		seen.add(id);
+		if (onTable.has(id)) continue;
+		if (!inHand.has(id)) return {
+			ok: false,
+			problem: "bad-tiles"
+		};
+		placed.push(id);
+	}
+	if ([...onTable].some((id) => !seen.has(id))) return {
+		ok: false,
+		problem: "took-tile"
+	};
+	if (placed.length === 0) return {
+		ok: false,
+		problem: "nothing"
+	};
+	const sets = newTable.filter((s) => s.length > 0);
+	if (sets.some((s) => !isValidSet(s))) return {
+		ok: false,
+		problem: "bad-set"
+	};
+	if (!melded) {
+		const left = [...sets];
+		for (const old of oldTable) {
+			const i = left.findIndex((s) => sameSet(s, old));
+			if (i < 0) return {
+				ok: false,
+				problem: "touched"
+			};
+			left.splice(i, 1);
+		}
+		if (left.some((s) => s.some((id) => onTable.has(id)))) return {
+			ok: false,
+			problem: "touched"
+		};
+		if (left.reduce((sum, s) => sum + setValue(s), 0) < 30) return {
+			ok: false,
+			problem: "too-small"
+		};
+	}
+	return {
+		ok: true,
+		placed
+	};
+}
+//#endregion
+//#region src/games/tiles/play/engine.ts
+function createEngine$1(opts) {
+	const rng = createRng(opts.seed);
+	const deck = shuffledDeck(rng);
+	const hands = opts.players.map((_, i) => deck.slice(i * 13, (i + 1) * 13));
+	return {
+		now: opts.now,
+		seed: rng.seed(),
+		players: opts.players,
+		teams: opts.teams ?? null,
+		hands,
+		pool: deck.slice(opts.players.length * 13),
+		table: [],
+		melded: opts.players.map(() => false),
+		turn: Math.floor(rng.next() * opts.players.length),
+		left: opts.players.map(() => false),
+		stuck: 0,
+		last: null,
+		draft: null,
+		botAt: null,
+		botPlan: null,
+		seq: 0,
+		phase: {
+			kind: "intro",
+			until: opts.now + INTRO_MS$1
+		}
+	};
+}
+const within = (r, [min, max]) => min + r * (max - min);
+const staying = (s) => s.left.flatMap((l, i) => l ? [] : [i]);
+function startTurn(s, turn) {
+	return {
+		...s,
+		turn,
+		draft: null,
+		botAt: null,
+		botPlan: null,
+		phase: {
+			kind: "turn",
+			until: s.now + TURN_MS
+		}
+	};
+}
+function nextTurn$1(s) {
+	const n = s.players.length;
+	for (let k = 1; k <= n; k++) {
+		const t = (s.turn + k) % n;
+		if (!s.left[t]) return startTurn(s, t);
+	}
+	return s;
+}
+const finish = (s) => ({
+	...s,
+	botAt: null,
+	botPlan: null,
+	phase: {
+		kind: "done",
+		until: s.now + DONE_MS$1
+	}
+});
+function canAct(s, player) {
+	return s.phase.kind === "turn" && s.turn === player;
+}
+function play(s, player, table) {
+	if (!canAct(s, player)) return s;
+	const check = checkPlay({
+		oldTable: s.table,
+		hand: s.hands[player],
+		newTable: table,
+		melded: s.melded[player]
+	});
+	if (!check.ok) return s;
+	const hand = s.hands[player].filter((id) => !check.placed.includes(id));
+	const seq = s.seq + 1;
+	const next = {
+		...s,
+		seq,
+		table: table.filter((set) => set.length > 0),
+		hands: s.hands.map((h, i) => i === player ? hand : h),
+		melded: s.melded.map((m, i) => m || i === player),
+		stuck: 0,
+		last: {
+			player,
+			kind: "play",
+			placed: check.placed,
+			seq
+		}
+	};
+	return hand.length === 0 ? finish(next) : nextTurn$1(next);
+}
+function draw(s, player) {
+	if (!canAct(s, player)) return s;
+	const seq = s.seq + 1;
+	if (s.pool.length === 0) {
+		const next = {
+			...s,
+			seq,
+			stuck: s.stuck + 1,
+			last: {
+				player,
+				kind: "pass",
+				placed: [],
+				seq
+			}
+		};
+		return next.stuck >= staying(next).length ? finish(next) : nextTurn$1(next);
+	}
+	const [tile, ...pool] = s.pool;
+	return nextTurn$1({
+		...s,
+		seq,
+		pool,
+		hands: s.hands.map((h, i) => i === player ? [...h, tile] : h),
+		stuck: 0,
+		last: {
+			player,
+			kind: "draw",
+			placed: [],
+			seq,
+			drawn: tile
+		}
+	});
+}
+/** 차례가 시작될 때의 번호 (짜던 바닥이 이번 차례 것인지 알아보려고) */
+function turnSeqOf(s) {
+	return s.last?.seq ?? 0;
+}
+function saveDraft(s, player, turnSeq, table) {
+	if (!canAct(s, player) || turnSeq !== turnSeqOf(s)) return s;
+	return {
+		...s,
+		draft: {
+			player,
+			turnSeq,
+			table
+		}
+	};
+}
+/** 시간 초과: 짜던 바닥이 다 맞으면 그대로 내려놓고, 아니면(안 짰거나 틀림) 1장 가져오기 */
+function timeUp(s, player) {
+	if (s.draft && s.draft.player === player) {
+		const next = play(s, player, s.draft.table);
+		if (next !== s) return next;
+	}
+	return draw(s, player);
+}
+/** 처음 바닥에 없던(바뀐) 줄 */
+function changedSets(from, to) {
+	const old = new Set(from.map((set) => set.join(",")));
+	return to.filter((set) => !old.has(set.join(",")));
+}
+/** 바뀐 줄을 앞에서 n개까지 놓은 중간 바닥: 거기 쓰인 타일은 원래 줄에서 뺀다 */
+function partialTable(from, to, n) {
+	const shown = changedSets(from, to).slice(0, n);
+	const used = new Set(shown.flat());
+	return [...from.map((set) => set.filter((id) => !used.has(id))).filter((set) => set.length > 0), ...shown];
+}
+/** 봇 차례: 생각 → 바뀐 줄을 하나씩 보여 줌 → 냄 (못 내면 1장) */
+function botTick(s, p) {
+	const { now } = s;
+	if (s.botAt === null) {
+		const rng = createRng(s.seed);
+		return {
+			...s,
+			botAt: now + within(rng.next(), BOT_THINK_MS),
+			seed: rng.seed()
+		};
+	}
+	if (now < s.botAt) return s;
+	if (!s.botPlan) {
+		const table = chooseBotPlay(s.table, s.hands[p], s.melded[p]);
+		const ok = table && checkPlay({
+			oldTable: s.table,
+			hand: s.hands[p],
+			newTable: table,
+			melded: s.melded[p]
+		}).ok;
+		if (!table || !ok) return draw(s, p);
+		return {
+			...s,
+			botPlan: {
+				table,
+				shown: 0
+			},
+			botAt: now
+		};
+	}
+	const { table, shown } = s.botPlan;
+	if (shown >= changedSets(s.table, table).length) return play(s, p, table);
+	const next = shown + 1;
+	return {
+		...s,
+		botPlan: {
+			table,
+			shown: next
+		},
+		botAt: now + 700,
+		draft: {
+			player: p,
+			turnSeq: turnSeqOf(s),
+			table: partialTable(s.table, table, next)
+		}
+	};
+}
+function drop$1(s, player) {
+	if (s.left[player] || s.phase.kind === "done") return s;
+	const next = {
+		...s,
+		left: s.left.map((l, i) => l || i === player)
+	};
+	if (staying(next).length <= 1 || next.teams && lastTeam(next.left.map((l) => !l), next.teams) !== null) return finish(next);
+	return s.turn === player && s.phase.kind === "turn" ? nextTurn$1(next) : next;
+}
+function tick$1(s) {
+	const { phase, now } = s;
+	switch (phase.kind) {
+		case "intro": return now >= phase.until ? startTurn(s, s.turn) : s;
+		case "turn": {
+			const p = s.turn;
+			if (s.players[p].kind === "bot") return botTick(s, p);
+			return now >= phase.until ? timeUp(s, p) : s;
+		}
+		case "done": return s;
+	}
+}
+function engineReducer$1(s, action) {
+	switch (action.type) {
+		case "tick": return tick$1({
+			...s,
+			now: action.now
+		});
+		case "play": return play(s, action.player, action.table);
+		case "draw": return draw(s, action.player);
+		case "draft": return saveDraft(s, action.player, action.turnSeq, action.table);
+		case "drop": return drop$1(s, action.player);
+	}
+}
+/**
+* 순위: 손패를 다 턴 사람(또는 남은 점수가 가장 적은 사람)부터 남은 점수 적은 순, 같으면 장수 적은 순.
+* 나간 사람은 맨 뒤
+*/
+function rankingOf(s) {
+	return s.hands.map((_, i) => i).sort((a, b) => Number(s.left[a]) - Number(s.left[b]) || handValue(s.hands[a]) - handValue(s.hands[b]) || s.hands[a].length - s.hands[b].length || a - b);
+}
+/** 이긴 팀: 1등(손패를 다 턴 사람, 아니면 남은 점수가 가장 적은 사람)의 팀 */
+function winnerTeam(s) {
+	return s.teams ? s.teams[rankingOf(s)[0]] : null;
+}
+//#endregion
+//#region src/games/tiles/play/view.ts
+function toView$1(s) {
+	return {
+		players: s.players.map(({ id, name }) => ({
+			id,
+			name
+		})),
+		teams: s.teams,
+		winTeam: s.phase.kind === "done" ? winnerTeam(s) : null,
+		left: s.left,
+		hands: s.hands,
+		table: s.table,
+		draft: s.phase.kind === "turn" && s.draft?.player === s.turn ? s.draft.table : null,
+		melded: s.melded,
+		poolCount: s.pool.length,
+		turn: s.turn,
+		phase: s.phase.kind,
+		leftMs: Math.max(0, s.phase.until - s.now),
+		last: s.last,
+		ranking: s.phase.kind === "done" ? rankingOf(s) : null
+	};
+}
+/** 친구에게 바로 알려야 할 만큼 바뀌었는지 (그 밖엔 1초마다 보냄) */
+function viewChanged$1(a, b) {
+	if (!a) return true;
+	return a.phase !== b.phase || a.turn !== b.turn || a.last?.seq !== b.last?.seq || a.draft !== b.draft || a.left.some((x, i) => x !== b.left[i]);
+}
+//#endregion
+//#region src/server/referees/tiles.ts
+const hideFor = (v, key) => {
+	if (v.phase === "done") return v;
+	const me = v.players.findIndex((p) => p.id === key);
+	return {
+		...v,
+		hands: v.hands.map((h, i) => i === me ? h : h.map(() => -1)),
+		last: v.last && v.last.drawn !== void 0 && v.last.player !== me ? {
+			...v.last,
+			drawn: void 0
+		} : v.last
+	};
+};
+function tilesReferee(setup, ctx) {
+	const o = setup ?? {};
+	const players = readPlayers(o.players, ctx, 2, 4);
+	if (!players) return null;
+	const teams = readTeams(o.teams, players.length);
+	if (teams === void 0) return null;
+	return hostEngineReferee(ctx, {
+		state: createEngine$1({
+			now: ctx.now(),
+			seed: serverSeed(),
+			players,
+			teams
+		}),
+		reduce: engineReducer$1,
+		tick: (now) => ({
+			type: "tick",
+			now
+		}),
+		toView: toView$1,
+		changed: viewChanged$1,
+		viewFor: hideFor,
+		input: (s, from, m) => {
+			if (m.t !== "play" && m.t !== "draw" && m.t !== "draft") return void 0;
+			const player = humanIndex(s.players, from);
+			if (player < 0) return null;
+			if (m.t === "draw") return {
+				type: "draw",
+				player
+			};
+			if (!isTable(m.table)) return null;
+			if (m.t === "play") return {
+				type: "play",
+				player,
+				table: m.table
+			};
+			return isInt(m.turnSeq, 0) ? {
+				type: "draft",
+				player,
+				turnSeq: m.turnSeq,
+				table: m.table
+			} : null;
+		},
+		drop: (s, key) => {
+			const player = humanIndex(s.players, key);
+			return player >= 0 ? {
+				type: "drop",
+				player
+			} : null;
+		},
+		done: (s) => s.phase.kind === "done",
+		nowOf: (s) => s.now
+	});
+}
+//#endregion
+//#region src/games/yut/rules/board.ts
+/** 길마다 지나가는 칸. 마지막 칸(0)이 '끝'이고, 넘어가면 나간다 */
+const ROUTES = {
+	outer: [
+		0,
+		1,
+		2,
+		3,
+		4,
+		5,
+		6,
+		7,
+		8,
+		9,
+		10,
+		11,
+		12,
+		13,
+		14,
+		15,
+		16,
+		17,
+		18,
+		19,
+		0
+	],
+	r5: [
+		5,
+		20,
+		21,
+		22,
+		23,
+		24,
+		15,
+		16,
+		17,
+		18,
+		19,
+		0
+	],
+	r10: [
+		10,
+		25,
+		26,
+		22,
+		27,
+		28,
+		0
+	],
+	rc: [
+		22,
+		27,
+		28,
+		0
+	]
+};
+const nodeOf = (p) => ROUTES[p.route][p.idx];
+/** 멈춘 칸이 꺾이는 칸이면 그 지름길로 갈아탄다 */
+function settle(p) {
+	const node = nodeOf(p);
+	if (p.route === "outer" && node === 5) return {
+		route: "r5",
+		idx: 0
+	};
+	if (p.route === "outer" && node === 10) return {
+		route: "r10",
+		idx: 0
+	};
+	if (p.route === "r5" && node === 22) return {
+		route: "rc",
+		idx: 0
+	};
+	return p;
+}
+/** 처음 판에 올리며 steps칸 (빽도는 못 함) */
+function enter(steps) {
+	return settle({
+		route: "outer",
+		idx: steps
+	});
+}
+/** 앞으로 steps칸. 끝을 넘어가면 'out'(나감) */
+function advance(p, steps) {
+	const idx = p.idx + steps;
+	if (idx >= ROUTES[p.route].length) return "out";
+	return settle({
+		route: p.route,
+		idx
+	});
+}
+/** 한 칸 뒤로 (빽도). 지름길 첫 칸에서는 들어온 길로 돌아간다 */
+function back(p) {
+	if (p.idx > 0) {
+		if (p.route === "outer" && p.idx === 1) return {
+			route: "outer",
+			idx: ROUTES.outer.length - 1
+		};
+		return settle({
+			route: p.route,
+			idx: p.idx - 1
+		});
+	}
+	switch (p.route) {
+		case "r5": return {
+			route: "outer",
+			idx: 4
+		};
+		case "r10": return {
+			route: "outer",
+			idx: 9
+		};
+		case "rc": return {
+			route: "r5",
+			idx: 2
+		};
+		case "outer": return p;
+	}
+}
+/** 남은 거리 (봇이 누가 앞서는지 볼 때) */
+function distanceLeft(p) {
+	return ROUTES[p.route].length - p.idx;
+}
+(() => {
+	const xy = {};
+	const lo = 30;
+	const hi = 270;
+	const step = 48;
+	for (let k = 0; k <= 5; k++) {
+		xy[k] = [hi, hi - k * step];
+		xy[5 + k] = [hi - k * step, lo];
+		xy[10 + k] = [lo, lo + k * step];
+		if (k < 5) xy[15 + k] = [lo + k * step, hi];
+	}
+	const mid = 150;
+	const along = (a, t) => [a[0] + (mid - a[0]) * t, a[1] + (mid - a[1]) * t];
+	xy[20] = along(xy[5], 1 / 3);
+	xy[21] = along(xy[5], 2 / 3);
+	xy[22] = [mid, mid];
+	xy[23] = along(xy[15], 2 / 3);
+	xy[24] = along(xy[15], 1 / 3);
+	xy[25] = along(xy[10], 1 / 3);
+	xy[26] = along(xy[10], 2 / 3);
+	xy[27] = along(xy[0], 2 / 3);
+	xy[28] = along(xy[0], 1 / 3);
+	return xy;
+})();
+//#endregion
+//#region src/games/yut/rules/throw.ts
+/** 움직이는 칸 수 (빽도 = 뒤로 한 칸) */
+const STEPS = {
+	backdo: -1,
+	do: 1,
+	gae: 2,
+	geol: 3,
+	yut: 4,
+	mo: 5
+};
+/** 16번 중 몇 번 */
+const THROW_WEIGHTS = {
+	backdo: 1,
+	do: 3,
+	gae: 6,
+	geol: 4,
+	yut: 1,
+	mo: 1
+};
+function throwYut(rng) {
+	return pickWeighted(rng, THROW_WEIGHTS);
+}
+/** 나오면 한 번 더 던지는 결과 */
+const isBonus = (t) => t === "yut" || t === "mo";
+//#endregion
+//#region src/games/yut/rules/moves.ts
+const onBoard$1 = (p) => p !== "home" && p !== "out";
+/** 내 말이 있는 칸들 (업힌 말은 한 번만) */
+function groupsOf(mine) {
+	return [...new Set(mine.filter(onBoard$1).map(nodeOf))];
+}
+/** 한 결과로 갈 수 있는 곳 */
+function destOf(mine, from, t) {
+	if (from === "home") {
+		if (t === "backdo" || !mine.includes("home")) return null;
+		return enter(STEPS[t]);
+	}
+	const p = mine.find((x) => onBoard$1(x) && nodeOf(x) === from);
+	if (!p) return null;
+	return t === "backdo" ? back(p) : advance(p, STEPS[t]);
+}
+/** 지금 쓸 수 있는 움직임 전부. 같은 결과가 여러 개면 첫 번째만 */
+function movesFor(pieces, player, pending) {
+	const mine = pieces[player];
+	const froms = [...groupsOf(mine), ...mine.includes("home") ? ["home"] : []];
+	const moves = [];
+	pending.forEach((t, throwIdx) => {
+		if (pending.indexOf(t) !== throwIdx) return;
+		for (const from of froms) {
+			const to = destOf(mine, from, t);
+			if (to !== null) moves.push({
+				throwIdx,
+				from,
+				to
+			});
+		}
+	});
+	return moves;
+}
+/** 움직임을 판에 적용. 업기(같은 칸 내 말과 합침)·잡기(상대 말 처음으로) */
+function applyMove(pieces, player, t, from, to) {
+	const next = pieces.map((row) => [...row]);
+	const mine = next[player];
+	const moving = from === "home" ? [mine.indexOf("home")] : mine.flatMap((p, i) => onBoard$1(p) && nodeOf(p) === from ? [i] : []);
+	for (const i of moving) mine[i] = to;
+	let captured = 0;
+	if (to !== "out") {
+		const node = nodeOf(to);
+		mine.forEach((p, i) => {
+			if (onBoard$1(p) && nodeOf(p) === node) mine[i] = to;
+		});
+		next.forEach((row, other) => {
+			if (other === player) return;
+			row.forEach((p, i) => {
+				if (onBoard$1(p) && nodeOf(p) === node) {
+					row[i] = "home";
+					captured++;
+				}
+			});
+		});
+	}
+	return {
+		pieces: next,
+		captured,
+		bonus: captured > 0 && !isBonus(t)
+	};
+}
+/** 다 나갔는지 */
+const allOut = (mine) => mine.every((p) => p === "out");
+//#endregion
+//#region src/games/yut/bot/yutBot.ts
+const onBoard = (p) => typeof p === "object" && p !== null;
+/** 상대 말이 한 번에 올 수 있는 칸들 */
+function threatened(pieces, player) {
+	const nodes = /* @__PURE__ */ new Set();
+	pieces.forEach((row, other) => {
+		if (other === player) return;
+		for (const p of row) {
+			if (!onBoard(p)) continue;
+			for (let steps = 1; steps <= 5; steps++) {
+				const to = advance(p, steps);
+				if (to !== "out") nodes.add(nodeOf(to));
+			}
+		}
+	});
+	return nodes;
+}
+function score(pieces, player, pending, m) {
+	const t = pending[m.throwIdx];
+	const mine = pieces[player];
+	const group = m.from === "home" ? 1 : mine.filter((p) => onBoard(p) && nodeOf(p) === m.from).length;
+	const before = m.from === "home" ? 21 : distanceLeft(mine.find((p) => onBoard(p) && nodeOf(p) === m.from));
+	if (m.to === "out") return 1e3 + group * 50;
+	const { pieces: after, captured, bonus } = applyMove(pieces, player, t, m.from, m.to);
+	let s = (before - distanceLeft(m.to)) * 3 * group;
+	s += captured * 120 + (bonus ? 40 : 0);
+	const node = nodeOf(m.to);
+	const stacked = after[player].filter((p) => onBoard(p) && nodeOf(p) === node).length;
+	if (stacked > group) s += 15;
+	if (threatened(after, player).has(node)) s -= 25 * stacked;
+	return s;
+}
+function chooseBotMove(rng, pieces, player, pending) {
+	const moves = movesFor(pieces, player, pending);
+	if (moves.length === 0) return null;
+	let best = [];
+	let bestScore = -Infinity;
+	for (const m of moves) {
+		const s = score(pieces, player, pending, m);
+		if (s > bestScore) {
+			bestScore = s;
+			best = [m];
+		} else if (s === bestScore) best.push(m);
+	}
+	return best[Math.floor(rng.next() * best.length)];
+}
+//#endregion
+//#region src/games/yut/constants.ts
+/** 첫 차례 전 안내 */
+const INTRO_MS = 1800;
+/** 던질지·무엇을 옮길지 고르는 시간. 넘기면 저절로 */
+const DECIDE_MS = 2e4;
+/** 경기가 끝난 뒤 결과 화면으로 넘어가기까지 */
+const DONE_MS = 2500;
+//#endregion
+//#region src/games/yut/play/engine.ts
+function createEngine(opts) {
+	const rng = createRng(opts.seed);
+	const first = Math.floor(rng.next() * opts.players.length);
+	return {
+		now: opts.now,
+		seed: rng.seed(),
+		players: opts.players,
+		teams: opts.teams ?? null,
+		pieces: (opts.teams ? [0, 1] : opts.players).map(() => Array.from({ length: opts.pieceCount }, () => "home")),
+		turn: first,
+		pending: [],
+		throwsLeft: 1,
+		lockUntil: 0,
+		lastThrow: null,
+		lastMove: null,
+		left: opts.players.map(() => false),
+		botAt: null,
+		seq: 0,
+		phase: {
+			kind: "intro",
+			until: opts.now + INTRO_MS
+		}
+	};
+}
+/** 이 사람이 움직이는 말 줄 (팀전이면 팀, 아니면 자기) */
+const ownerOf = (teams, player) => teams ? teams[player] : player;
+/** 지금 이 사람이 던질 수 있는지 */
+function canThrow(s, player) {
+	return s.phase.kind === "turn" && s.turn === player && s.throwsLeft > 0 && s.now >= s.lockUntil;
+}
+/** 지금 이 사람이 말을 옮길 수 있는지 (던질 게 남아 있으면 먼저 던져야 함) */
+function canMove(s, player) {
+	return s.phase.kind === "turn" && s.turn === player && s.throwsLeft === 0 && s.now >= s.lockUntil;
+}
+function decide(s) {
+	return {
+		...s,
+		botAt: null,
+		phase: {
+			kind: "turn",
+			until: s.now + DECIDE_MS
+		}
+	};
+}
+/** 쓸 수 없는 결과는 버리고, 다 썼으면 다음 사람 */
+function tidy(s) {
+	if (s.phase.kind !== "turn" || s.throwsLeft > 0) return s;
+	let pending = s.pending;
+	if (movesFor(s.pieces, ownerOf(s.teams, s.turn), pending).length === 0) pending = [];
+	if (pending.length > 0) return {
+		...s,
+		pending
+	};
+	return nextTurn({
+		...s,
+		pending
+	});
+}
+function nextTurn(s) {
+	const n = s.players.length;
+	let turn = s.turn;
+	for (let k = 1; k <= n; k++) {
+		const t = (s.turn + k) % n;
+		if (!s.left[t]) {
+			turn = t;
+			break;
+		}
+	}
+	return decide({
+		...s,
+		turn,
+		pending: [],
+		throwsLeft: 1
+	});
+}
+function doThrow(s, player) {
+	if (!canThrow(s, player)) return s;
+	const rng = createRng(s.seed);
+	const result = throwYut(rng);
+	const seq = s.seq + 1;
+	return tidy(decide({
+		...s,
+		seed: rng.seed(),
+		seq,
+		pending: [...s.pending, result],
+		throwsLeft: s.throwsLeft - 1 + (isBonus(result) ? 1 : 0),
+		lockUntil: s.now + 700,
+		lastThrow: {
+			player,
+			result,
+			seq
+		}
+	}));
+}
+function doMove(s, player, throwIdx, from) {
+	if (!canMove(s, player)) return s;
+	const own = ownerOf(s.teams, player);
+	const move = movesFor(s.pieces, own, s.pending).find((m) => m.throwIdx === throwIdx && m.from === from);
+	if (!move) return s;
+	const t = s.pending[throwIdx];
+	const { pieces, captured, bonus } = applyMove(s.pieces, own, t, from, move.to);
+	const seq = s.seq + 1;
+	const next = {
+		...s,
+		seq,
+		pieces,
+		pending: s.pending.filter((_, i) => i !== throwIdx),
+		throwsLeft: bonus ? 1 : 0,
+		lastMove: {
+			player,
+			from,
+			to: move.to === "out" ? "out" : nodeOf(move.to),
+			captured,
+			seq
+		}
+	};
+	if (allOut(pieces[own])) return {
+		...next,
+		pending: [],
+		phase: {
+			kind: "done",
+			winner: player,
+			until: s.now + DONE_MS
+		}
+	};
+	return tidy(decide(next));
+}
+/** 봇·시간 초과: 던질 게 있으면 던지고, 아니면 봇처럼 고른다 */
+function auto(s) {
+	if (s.throwsLeft > 0) return doThrow(s, s.turn);
+	const rng = createRng(s.seed);
+	const m = chooseBotMove(rng, s.pieces, ownerOf(s.teams, s.turn), s.pending);
+	const next = {
+		...s,
+		seed: rng.seed()
+	};
+	return m ? doMove(next, s.turn, m.throwIdx, m.from) : tidy(next);
+}
+function drop(s, player) {
+	if (s.left[player] || s.phase.kind === "done") return s;
+	const left = s.left.map((l, i) => l || i === player);
+	const pieces = s.teams ? s.pieces : s.pieces.map((row, i) => i === player ? row.map(() => "home") : row);
+	const stay = left.flatMap((l, i) => l ? [] : [i]);
+	if (stay.length === 1 || s.teams && lastTeam(left.map((l) => !l), s.teams) !== null) return {
+		...s,
+		left,
+		pieces,
+		phase: {
+			kind: "done",
+			winner: stay[0],
+			until: s.now + DONE_MS
+		}
+	};
+	const next = {
+		...s,
+		left,
+		pieces
+	};
+	return s.turn === player ? nextTurn(next) : next;
+}
+function tick(s) {
+	const { phase, now } = s;
+	switch (phase.kind) {
+		case "intro": return now >= phase.until ? decide(s) : s;
+		case "turn":
+			if (now < s.lockUntil) return s;
+			if (s.players[s.turn].kind === "bot") {
+				if (s.botAt === null) return {
+					...s,
+					botAt: now + 800
+				};
+				return now >= s.botAt ? auto({
+					...s,
+					botAt: null
+				}) : s;
+			}
+			return now >= phase.until ? auto(s) : s;
+		case "done": return s;
+	}
+}
+function engineReducer(s, action) {
+	switch (action.type) {
+		case "tick": return tick({
+			...s,
+			now: action.now
+		});
+		case "throw": return doThrow(s, action.player);
+		case "move": return doMove(s, action.player, action.throwIdx, action.from);
+		case "drop": return drop(s, action.player);
+	}
+}
+//#endregion
+//#region src/games/yut/play/view.ts
+function toView(s) {
+	return {
+		players: s.players.map(({ id, name, avatar }) => ({
+			id,
+			name,
+			...avatar ? { avatar } : {}
+		})),
+		teams: s.teams,
+		left: s.left,
+		pieces: s.pieces,
+		turn: s.turn,
+		pending: s.pending,
+		throwsLeft: s.throwsLeft,
+		phase: s.phase.kind,
+		leftMs: Math.max(0, s.phase.until - s.now),
+		lockMs: Math.max(0, s.lockUntil - s.now),
+		lastThrow: s.lastThrow,
+		lastMove: s.lastMove,
+		winner: s.phase.kind === "done" ? s.phase.winner : null
+	};
+}
+/** 친구에게 바로 알려야 할 만큼 바뀌었는지 (그 밖엔 1초마다 보냄) */
+function viewChanged(a, b) {
+	if (!a) return true;
+	return a.phase !== b.phase || a.turn !== b.turn || a.throwsLeft !== b.throwsLeft || a.pending.length !== b.pending.length || a.lastThrow?.seq !== b.lastThrow?.seq || a.lastMove?.seq !== b.lastMove?.seq || a.left.some((x, i) => x !== b.left[i]);
+}
+//#endregion
+//#region src/server/referees/yut.ts
+function yutReferee(setup, ctx) {
+	const o = setup ?? {};
+	const players = readPlayers(o.players, ctx, 2, 4);
+	if (!players) return null;
+	const teams = readTeams(o.teams, players.length);
+	if (teams === void 0 || !isInt(o.pieceCount, 2, 4)) return null;
+	return hostEngineReferee(ctx, {
+		state: createEngine({
+			now: ctx.now(),
+			seed: serverSeed(),
+			players,
+			teams,
+			pieceCount: o.pieceCount
+		}),
+		reduce: engineReducer,
+		tick: (now) => ({
+			type: "tick",
+			now
+		}),
+		toView,
+		changed: viewChanged,
+		input: (s, from, m) => {
+			if (m.t !== "throw" && m.t !== "move") return void 0;
+			const player = humanIndex(s.players, from);
+			if (player < 0) return null;
+			if (m.t === "throw") return {
+				type: "throw",
+				player
+			};
+			const piece = m.piece === "home" ? "home" : isInt(m.piece, 0, 100) ? m.piece : null;
+			return piece !== null && isInt(m.throwIdx, 0, 30) ? {
+				type: "move",
+				player,
+				throwIdx: m.throwIdx,
+				from: piece
+			} : null;
+		},
+		drop: (s, key) => {
+			const player = humanIndex(s.players, key);
+			return player >= 0 ? {
+				type: "drop",
+				player
+			} : null;
+		},
+		done: (s) => s.phase.kind === "done",
+		nowOf: (s) => s.now
+	});
+}
+//#endregion
 //#region src/server/referees/index.ts
-const REFEREES = { roulette: rouletteReferee };
+const REFEREES = {
+	roulette: rouletteReferee,
+	bomb: bombReferee,
+	nunchi: nunchiReferee,
+	survival: survivalReferee,
+	yut: yutReferee,
+	tiles: tilesReferee,
+	artillery: artilleryReferee
+};
 //#endregion
 //#region game-server/main.ts
 const PORT = Number(process.env.PORT ?? 8090);

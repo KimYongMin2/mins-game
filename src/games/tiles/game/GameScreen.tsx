@@ -1,4 +1,5 @@
 import { useEffect, useReducer, useRef, useState } from 'react'
+import { REFEREE_FROM } from '../../../shared/online/hubProtocol'
 import type { Member, Room } from '../../../shared/online/room'
 import { randomSeed } from '../../../shared/random'
 import { TEAM_NAMES, type Team, type TeamPick, planTeams, teamOutcome } from '../../../shared/team/teams'
@@ -112,10 +113,12 @@ function PlayerBar({ v, me }: { v: TilesView; me: number }) {
 }
 
 export function GameScreen(props: Props) {
-  const isGuest = props.mode === 'guest'
+  // 우리 게임 서버가 심판이면 방장도 친구처럼 화면만 받는다 (조작 막기 3단계)
+  const [serverRef] = useState(() => props.mode === 'host' && !!props.room.startReferee)
+  const isGuest = props.mode === 'guest' || serverRef
   const [host, hostDispatch] = useReducer(hostReducer, props, initHost)
   const [guest, guestDispatch] = useReducer(guestReducer, undefined, () =>
-    createScreen(props.mode === 'guest' ? props.room.myId : '', performance.now()),
+    createScreen(props.mode !== 'bot' ? props.room.myId : '', performance.now()),
   )
   const screen = isGuest ? guest : host.screen
   const [hostGone, setHostGone] = useState(false)
@@ -138,8 +141,10 @@ export function GameScreen(props: Props) {
   useEffect(() => {
     if (!room) return
     const indexOf = (id: string) => engineRef.current.players.findIndex((p) => p.id === id && p.kind === 'remote')
-    const offMsg = room.onMessage((msg) => {
-      if (room.role === 'guest' && msg.t === 'view') guestDispatch({ type: 'view', view: msg.v })
+    const offMsg = room.onMessage((msg, from) => {
+      // 화면은 심판(서버, 아니면 방장)이 보낸 것만
+      if ((room.role === 'guest' || serverRef) && msg.t === 'view' && (from === undefined || from === REFEREE_FROM)) guestDispatch({ type: 'view', view: msg.v })
+      if (serverRef) return
       if (room.role !== 'host') return
       if (msg.t === 'play' && indexOf(msg.from) >= 0) hostDispatch({ type: 'play', player: indexOf(msg.from), table: msg.table })
       if (msg.t === 'draw' && indexOf(msg.from) >= 0) hostDispatch({ type: 'draw', player: indexOf(msg.from) })
@@ -149,6 +154,7 @@ export function GameScreen(props: Props) {
     // 방장: 나간 친구는 차례에서 뺌 / 친구: 방장이 나가면 경기를 못 이어간다
     const offMembers = room.onMembers((members) => {
       if (room.role === 'host') {
+        if (serverRef) return
         engineRef.current.players.forEach((p, i) => {
           if (p.kind === 'remote' && !members.some((m) => m.id === p.id)) hostDispatch({ type: 'drop', player: i })
         })
@@ -158,19 +164,30 @@ export function GameScreen(props: Props) {
       offMsg()
       offMembers()
     }
-  }, [room])
+  }, [room, serverRef])
+
+  // 서버 심판: 방장이 사람·봇·팀만 보내고 씨앗값·판정은 서버가
+  useEffect(() => {
+    if (!serverRef || props.mode !== 'host') return
+    const e = engineRef.current
+    props.room.startReferee?.('tiles', {
+      players: e.players.map((p) => ({ id: p.id, name: p.name, kind: p.kind === 'bot' ? 'bot' : 'remote' })),
+      teams: e.teams,
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   // 방장: 화면이 바뀌면 바로, 아니어도 1초마다 친구들에게 보낸다
   const sentRef = useRef<{ view: TilesView | null; at: number }>({ view: null, at: 0 })
   useEffect(() => {
-    if (props.mode !== 'host') return
+    if (props.mode !== 'host' || serverRef) return
     const view = toView(host.engine)
     const last = sentRef.current
     if (viewChanged(last.view, view) || host.engine.now - last.at >= HEARTBEAT_MS) {
       props.room.send({ t: 'view', v: view })
       sentRef.current = { view, at: host.engine.now }
     }
-  }, [props, host.engine])
+  }, [props, host.engine, serverRef])
 
   const playedRef = useRef(0)
   useEffect(() => {
@@ -214,7 +231,7 @@ export function GameScreen(props: Props) {
     // 심판에게 짜던 바닥을 알려 둔다: 시간이 끝날 때 다 맞으면 그대로 낸다
     if (d.table === draft.table) return
     const turnSeq = turnSeqOf(v)
-    if (props.mode === 'guest') props.room.send({ t: 'draft', from: props.room.myId, turnSeq, table: d.table })
+    if (props.mode !== 'bot' && isGuest) props.room.send({ t: 'draft', from: props.room.myId, turnSeq, table: d.table })
     else hostDispatch({ type: 'draft', player: me, turnSeq, table: d.table })
   }
 
@@ -225,13 +242,13 @@ export function GameScreen(props: Props) {
       sound('nope')
       return
     }
-    if (props.mode === 'guest') props.room.send({ t: 'play', from: props.room.myId, table: draft.table })
+    if (props.mode !== 'bot' && isGuest) props.room.send({ t: 'play', from: props.room.myId, table: draft.table })
     else hostDispatch({ type: 'play', player: me, table: draft.table })
   }
 
   function draw() {
     if (!mine) return
-    if (props.mode === 'guest') props.room.send({ t: 'draw', from: props.room.myId })
+    if (props.mode !== 'bot' && isGuest) props.room.send({ t: 'draw', from: props.room.myId })
     else hostDispatch({ type: 'draw', player: me })
   }
 

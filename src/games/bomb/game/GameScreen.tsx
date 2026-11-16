@@ -1,6 +1,7 @@
 import { Suspense, lazy, useEffect, useReducer, useRef, useState } from 'react'
 import type { Member, Room } from '../../../shared/online/room'
 import { LinkBadge } from '../../../shared/ui/LinkBadge'
+import { REFEREE_FROM } from '../../../shared/online/hubProtocol'
 import { randomSeed } from '../../../shared/random'
 import { TEAM_NAMES, type Team, type TeamPick, planTeams, teamOutcome } from '../../../shared/team/teams'
 import { assignLooks, decodeLook } from '../../../shared/art3d/animalKinds'
@@ -131,10 +132,12 @@ function Banner({ screen }: { screen: ScreenState }) {
 }
 
 export function GameScreen(props: Props) {
-  const isGuest = props.mode === 'guest'
+  // 우리 게임 서버가 심판이면 방장도 친구처럼 화면만 받는다 (터지는 시각은 서버만 앎 — 조작 막기 3단계)
+  const [serverRef] = useState(() => props.mode === 'host' && !!props.room.startReferee)
+  const isGuest = props.mode === 'guest' || serverRef
   const [host, hostDispatch] = useReducer(hostReducer, props, initHost)
   const [guest, guestDispatch] = useReducer(guestReducer, undefined, () =>
-    createScreen(props.mode === 'guest' ? props.room.myId : '', performance.now()),
+    createScreen(props.mode !== 'bot' ? props.room.myId : '', performance.now()),
   )
   const screen = isGuest ? guest : host.screen
   // 3D 탁자 (WebGL이 안 되는 기기는 예전 2D 그림)
@@ -159,9 +162,10 @@ export function GameScreen(props: Props) {
   })
   useEffect(() => {
     if (!room) return
-    const offMsg = room.onMessage((msg) => {
-      if (room.role === 'guest' && msg.t === 'view') guestDispatch({ type: 'view', view: msg.v })
-      if (room.role === 'host' && msg.t === 'pass') {
+    const offMsg = room.onMessage((msg, from) => {
+      // 화면은 심판(서버, 아니면 방장)이 보낸 것만
+      if ((room.role === 'guest' || serverRef) && msg.t === 'view' && (from === undefined || from === REFEREE_FROM)) guestDispatch({ type: 'view', view: msg.v })
+      if (room.role === 'host' && !serverRef && msg.t === 'pass') {
         const players = engineRef.current.players
         const from = players.findIndex((p) => p.id === msg.from && p.kind === 'remote')
         const to = players.findIndex((p) => p.id === msg.to)
@@ -171,6 +175,7 @@ export function GameScreen(props: Props) {
     // 방장: 나간 친구는 탈락 / 친구: 방장이 나가면 경기를 못 이어간다
     const offMembers = room.onMembers((members) => {
       if (room.role === 'host') {
+        if (serverRef) return
         engineRef.current.players.forEach((p, i) => {
           if (p.kind === 'remote' && !members.some((m) => m.id === p.id)) hostDispatch({ type: 'drop', player: i })
         })
@@ -180,19 +185,30 @@ export function GameScreen(props: Props) {
       offMsg()
       offMembers()
     }
-  }, [room])
+  }, [room, serverRef])
+
+  // 서버 심판: 방장이 사람·봇·팀만 보내고 씨앗값(터지는 시각)은 서버가 정한다
+  useEffect(() => {
+    if (!serverRef || props.mode !== 'host') return
+    const e = engineRef.current
+    props.room.startReferee?.('bomb', {
+      players: e.players.map((p) => ({ id: p.id, name: p.name, kind: p.kind === 'bot' ? 'bot' : 'remote', avatar: p.avatar })),
+      teams: e.teams,
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   // 방장: 화면이 바뀌면 바로, 아니어도 1초마다 친구들에게 보낸다
   const sentRef = useRef<{ view: BombView | null; at: number }>({ view: null, at: 0 })
   useEffect(() => {
-    if (props.mode !== 'host') return
+    if (props.mode !== 'host' || serverRef) return
     const view = toView(host.engine)
     const last = sentRef.current
     if (viewChanged(last.view, view) || host.engine.now - last.at >= HEARTBEAT_MS) {
       props.room.send({ t: 'view', v: view })
       sentRef.current = { view, at: host.engine.now }
     }
-  }, [props, host.engine])
+  }, [props, host.engine, serverRef])
 
   const playedRef = useRef(0)
   useEffect(() => {
@@ -227,7 +243,7 @@ export function GameScreen(props: Props) {
     const v = screen.view
     const me = myIndex(screen)
     if (!v || me < 0) return
-    if (props.mode === 'guest') {
+    if (props.mode !== 'bot' && isGuest) {
       props.room.send({ t: 'pass', from: props.room.myId, to: v.players[to].id })
       guestPasses.current += 1
     }

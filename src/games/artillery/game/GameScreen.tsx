@@ -1,4 +1,5 @@
 import { Suspense, lazy, useEffect, useReducer, useRef, useState } from 'react'
+import { REFEREE_FROM } from '../../../shared/online/hubProtocol'
 import { assignLooks, decodeLook } from '../../../shared/art3d/animalKinds'
 import { canWebGL } from '../../../shared/art3d/webgl'
 import { loadLook } from '../../../shared/storage/avatar'
@@ -144,9 +145,11 @@ function Wind({ wind }: { wind: number }) {
 }
 
 export function GameScreen(props: Props) {
-  const isGuest = props.mode === 'guest'
+  // 우리 게임 서버가 심판이면 방장도 친구처럼 화면만 받는다 (조작 막기 3단계)
+  const [serverRef] = useState(() => props.mode === 'host' && !!props.room.startReferee)
+  const isGuest = props.mode === 'guest' || serverRef
   const [host, hostDispatch] = useReducer(hostReducer, props, initHost)
-  const [guest, guestDispatch] = useReducer(screenReducer, undefined, () => createScreen(props.mode === 'guest' ? props.room.myId : '', performance.now()))
+  const [guest, guestDispatch] = useReducer(screenReducer, undefined, () => createScreen(props.mode !== 'bot' ? props.room.myId : '', performance.now()))
   const [use3D] = useState(canWebGL)
   /** 3D 동물이 그려지기 시작하면 이름표를 위로 */
   const [riders, setRiders] = useState(false)
@@ -194,8 +197,10 @@ export function GameScreen(props: Props) {
   useEffect(() => {
     if (!room) return
     const indexOf = (id: string) => engineRef.current.players.findIndex((p) => p.id === id && p.kind === 'remote')
-    const offMsg = room.onMessage((msg) => {
-      if (room.role === 'guest' && msg.t === 'view') guestDispatch({ type: 'view', view: msg.v })
+    const offMsg = room.onMessage((msg, from) => {
+      // 화면은 심판(서버, 아니면 방장)이 보낸 것만
+      if ((room.role === 'guest' || serverRef) && msg.t === 'view' && (from === undefined || from === REFEREE_FROM)) guestDispatch({ type: 'view', view: msg.v })
+      if (serverRef) return
       if (room.role !== 'host' || (msg.t !== 'aim' && msg.t !== 'fire')) return
       const player = indexOf(msg.from)
       if (player < 0 || msg.turnNo !== engineRef.current.turnNo) return
@@ -204,6 +209,7 @@ export function GameScreen(props: Props) {
     // 방장: 나간 친구는 탈락 / 친구: 방장이 나가면 경기를 못 이어간다
     const offMembers = room.onMembers((members) => {
       if (room.role === 'host') {
+        if (serverRef) return
         engineRef.current.players.forEach((p, i) => {
           if (p.kind === 'remote' && !members.some((m) => m.id === p.id)) hostDispatch({ type: 'drop', player: i })
         })
@@ -213,12 +219,23 @@ export function GameScreen(props: Props) {
       offMsg()
       offMembers()
     }
-  }, [room])
+  }, [room, serverRef])
+
+  // 서버 심판: 방장이 사람·봇·팀만 보내고 씨앗값·판정은 서버가
+  useEffect(() => {
+    if (!serverRef || props.mode !== 'host') return
+    const e = engineRef.current
+    props.room.startReferee?.('artillery', {
+      players: e.players.map((p) => ({ id: p.id, name: p.name, kind: p.kind === 'bot' ? 'bot' : 'remote', avatar: p.avatar })),
+      teams: e.teams, friendlyFire: e.friendlyFire,
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   // 방장: 화면이 바뀌면(차례인 사람이 움직이거나 겨누는 것도) 조금씩 모아서, 안 바뀌어도 1초마다 친구들에게 보낸다
   const sentRef = useRef<{ view: ArtilleryView | null; at: number }>({ view: null, at: 0 })
   useEffect(() => {
-    if (props.mode !== 'host') return
+    if (props.mode !== 'host' || serverRef) return
     const view = toView(host.engine)
     const last = sentRef.current
     const phaseChanged = !last.view || last.view.phase !== view.phase || last.view.turnNo !== view.turnNo
@@ -227,14 +244,14 @@ export function GameScreen(props: Props) {
       props.room.send({ t: 'view', v: view })
       sentRef.current = { view, at: host.engine.now }
     }
-  }, [props, host.engine])
+  }, [props, host.engine, serverRef])
 
   // 친구: 겨누는 중인 걸 방장에게 (발사는 바로)
   const guestDraft = guest.draft
   const guestFired = guest.fired
   const guestTurnNo = guest.view?.turnNo ?? 0
   useEffect(() => {
-    if (props.mode !== 'guest' || !guestDraft) return
+    if (props.mode === 'bot' || !isGuest || !guestDraft) return
     const msg = { from: props.room.myId, turnNo: guestTurnNo, ...guestDraft }
     if (guestFired) {
       props.room.send({ t: 'fire', ...msg })
