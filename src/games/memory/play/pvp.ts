@@ -9,7 +9,7 @@ export type MemoryMsg =
   /** 방장 → 친구: 새 경기. 덱 시드와 친구가 먼저 하는지 */
   | { t: 'start'; deckSeed: number; guestFirst: boolean }
   /** 차례인 쪽 → 상대: n번째로 연 카드 */
-  | { t: 'flip'; n: number; index: number }
+  | { t: 'flip'; n: number; index: number; /** 서버 심판이 보낼 때만: 그 카드 그림 */ face?: number }
 
 /** 경기 시작 메시지에서 내 쪽 선공 (나 = 0) */
 export function firstOf(msg: Extract<MemoryMsg, { t: 'start' }>, role: 'host' | 'guest'): Side {

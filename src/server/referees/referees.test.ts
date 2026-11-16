@@ -1,3 +1,4 @@
+import { createRng } from '../../shared/random'
 import { describe, expect, it } from 'vitest'
 import type { RefereeContext } from '../hub'
 import { rouletteReferee } from './roulette'
@@ -167,5 +168,43 @@ describe('숫자야구 서버 심판', () => {
     const wg = g.phase.kind === 'done' ? g.phase.winner : null
     expect(wh === 'draw' ? wg === 'draw' : wg === (wh === 0 ? 1 : 0)).toBe(true)
     expect(revealedEarly).toBe(false)
+  })
+})
+
+import { canFlip as mmCanFlip, createMatch as createMm, matchReducer as mmReducer, type MatchState as MmState } from '../../games/memory/play/matchState'
+import { memoryReferee } from './memory'
+
+describe('짝맞추기 서버 심판', () => {
+  it('두 폰은 그림을 모른 채 시작하고, 서버를 거쳐 끝까지 같은 점수', () => {
+    const f = fakeCtx([{ id: 'H', role: 'host' }, { id: 'G', role: 'guest' }])
+    const out: { n: number; index: number; face: number }[] = []
+    f.ctx.broadcast = (m) => out.push(m as { n: number; index: number; face: number })
+    const ref = memoryReferee({ guestFirst: true }, f.ctx)!
+    let h: MmState = createMm({ now: f.now, seed: 1, difficulty: 'normal', controllers: ['user', 'remote'], first: 1, hidden: true })
+    let g: MmState = createMm({ now: f.now, seed: 2, difficulty: 'normal', controllers: ['user', 'remote'], first: 0, hidden: true })
+    expect(h.cards.every((c) => c.face === -1)).toBe(true)
+    let seen = 0
+    const pickRng = createRng(42)
+    for (let i = 0; i < 20000 && (h.phase.kind !== 'done' || g.phase.kind !== 'done'); i++) {
+      f.advance(100)
+      ref.tick(f.now)
+      h = mmReducer(h, { type: 'tick', now: f.now })
+      g = mmReducer(g, { type: 'tick', now: f.now })
+      // 차례인 쪽이 가끔 아무 카드나 누름 (남의 차례에 누른 건 서버가 버림)
+      for (const [key, st] of [['H', h], ['G', g]] as const) {
+        if (i % 3) continue
+        const options = st.cards.flatMap((_, k) => (mmCanFlip(st, k) ? [k] : []))
+        if (options.length) ref.input(key, { t: 'flip', n: st.flips.length, index: options[Math.floor(pickRng.next() * options.length)] })
+      }
+      for (; seen < out.length; seen++) {
+        const m = out[seen]
+        h = mmReducer(h, { type: 'serverFlip', ...m })
+        g = mmReducer(g, { type: 'serverFlip', ...m })
+      }
+    }
+    expect(h.phase.kind).toBe('done')
+    expect(g.phase.kind).toBe('done')
+    const own = (s: MmState, side: 0 | 1) => s.cards.filter((c) => c.owner === side).length
+    expect([own(h, 0), own(h, 1)]).toEqual([own(g, 1), own(g, 0)])
   })
 })

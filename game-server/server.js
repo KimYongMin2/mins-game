@@ -3995,7 +3995,7 @@ const BARREL = 7.5;
 const COUNTDOWN_MS$3 = 1500;
 const TURN_MS$2 = 2e4;
 const BOOM_MS$1 = 1600;
-const DONE_MS$6 = 2500;
+const DONE_MS$7 = 2500;
 /** 봇이 생각하는 시간 */
 const BOT_THINK_MS$1 = [1200, 2400];
 //#endregion
@@ -4464,7 +4464,7 @@ function afterBoom$1(s) {
 		...s,
 		phase: {
 			kind: "done",
-			until: s.now + DONE_MS$6
+			until: s.now + DONE_MS$7
 		}
 	};
 	return startTurn$2(s, nextAlive$1(s, s.turn));
@@ -4484,13 +4484,13 @@ function drop$6(s, player) {
 		...next,
 		phase: {
 			kind: "done",
-			until: s.now + DONE_MS$6
+			until: s.now + DONE_MS$7
 		}
 	};
 	if (s.phase.kind === "aim" && s.turn === player) return startTurn$2(next, nextAlive$1(next, player));
 	return next;
 }
-function tick$6(s) {
+function tick$7(s) {
 	const { phase, now } = s;
 	switch (phase.kind) {
 		case "countdown": return now >= phase.until ? startTurn$2(s, s.turn) : s;
@@ -4512,7 +4512,7 @@ function tick$6(s) {
 }
 function engineReducer$6(state, action) {
 	switch (action.type) {
-		case "tick": return tick$6({
+		case "tick": return tick$7({
 			...state,
 			now: action.now
 		});
@@ -4844,7 +4844,7 @@ const COUNTDOWN_MS$2 = 2400;
 /** 펑! 보여주기 */
 const BOOM_MS = 2200;
 /** 경기가 끝난 뒤 결과 화면으로 넘어가기까지 */
-const DONE_MS$5 = 2500;
+const DONE_MS$6 = 2500;
 /** 봇이 폭탄을 받고 넘기기까지 */
 const BOT_HOLD_MS = [350, 1500];
 //#endregion
@@ -4933,7 +4933,7 @@ function afterBoom(state) {
 		...state,
 		phase: {
 			kind: "done",
-			until: state.now + DONE_MS$5
+			until: state.now + DONE_MS$6
 		}
 	};
 	return countdown$1({
@@ -5017,7 +5017,7 @@ function drop$5(state, player) {
 		flight: null,
 		phase: {
 			kind: "done",
-			until: state.now + DONE_MS$5
+			until: state.now + DONE_MS$6
 		}
 	};
 	if (next.holder === player || next.flight?.to === player || next.flight?.from === player) {
@@ -5033,7 +5033,7 @@ function drop$5(state, player) {
 	}
 	return next;
 }
-function tick$5(state) {
+function tick$6(state) {
 	const { phase, now } = state;
 	switch (phase.kind) {
 		case "countdown": return now >= phase.until ? startPlay(state) : state;
@@ -5046,7 +5046,7 @@ function tick$5(state) {
 }
 function engineReducer$5(state, action) {
 	switch (action.type) {
-		case "tick": return tick$5({
+		case "tick": return tick$6({
 			...state,
 			now: action.now
 		});
@@ -5134,6 +5134,332 @@ function bombReferee(setup, ctx) {
 		done: (s) => s.phase.kind === "done",
 		nowOf: (s) => s.now
 	});
+}
+//#endregion
+//#region src/games/memory/bot/memoryBot.ts
+/** 열 수 있는 카드 중 기억에 없는 것을 우선, 없으면 아무거나 */
+function unknownOrAny(rng, view, exclude) {
+	const open = view.available.flatMap((ok, i) => ok && i !== exclude ? [i] : []);
+	const unknown = open.filter((i) => view.memory[i] === null);
+	return pickOne(rng, unknown.length > 0 ? unknown : open);
+}
+function chooseBotCard(rng, view) {
+	const known = (i) => view.available[i] && view.memory[i] !== null;
+	if (view.first) {
+		const { index, face } = view.first;
+		const pair = view.memory.findIndex((f, i) => i !== index && known(i) && f === face);
+		return pair >= 0 ? pair : unknownOrAny(rng, view, index);
+	}
+	const seen = /* @__PURE__ */ new Map();
+	for (let i = 0; i < view.memory.length; i++) {
+		if (!known(i)) continue;
+		const f = view.memory[i];
+		if (seen.has(f)) return seen.get(f);
+		seen.set(f, i);
+	}
+	return unknownOrAny(rng, view, null);
+}
+//#endregion
+//#region src/games/memory/constants.ts
+/** 한 장 고르는 시간. 넘기면 무작위로 열린다 */
+const PICK_MS = 1e4;
+/** 첫 차례 전 '시작!' 표시 */
+const INTRO_MS$3 = 1500;
+/** 틀린 두 장을 보여주는 시간 (그다음 덮고 차례가 넘어간다) */
+const MISS_SHOW_MS = 1e3;
+/** 경기가 끝난 뒤 결과 화면으로 넘어가기까지 */
+const DONE_MS$5 = 1800;
+/** 봇 기억력: 열린 카드를 기억할 확률, 차례가 바뀔 때 기억한 카드 하나를 잊을 확률 */
+const BOT_MEMORY = {
+	normal: {
+		remember: .5,
+		forget: .2
+	},
+	hard: {
+		remember: .9,
+		forget: .03
+	}
+};
+//#endregion
+//#region src/games/memory/play/matchState.ts
+/** 시드로 덱을 섞는다. 친구 대전은 둘이 같은 시드를 써서 같은 덱이 된다 */
+function shuffleDeck(seed) {
+	const rng = createRng(seed);
+	const faces = Array.from({ length: 22 }, (_, i) => i % 11);
+	for (let i = faces.length - 1; i > 0; i--) {
+		const j = Math.floor(rng.next() * (i + 1));
+		[faces[i], faces[j]] = [faces[j], faces[i]];
+	}
+	return faces;
+}
+function withSounds(state, ...names) {
+	let seq = state.soundSeq;
+	const added = names.map((name) => ({
+		id: ++seq,
+		name
+	}));
+	return {
+		...state,
+		sounds: [...state.sounds, ...added].slice(-8),
+		soundSeq: seq
+	};
+}
+function createMatch(opts) {
+	const rng = createRng(opts.seed);
+	const deckSeed = opts.deckSeed ?? Math.floor(rng.next() * 2 ** 32);
+	const first = opts.first ?? (rng.next() < .5 ? 0 : 1);
+	return {
+		now: opts.now,
+		seed: rng.seed(),
+		difficulty: opts.difficulty,
+		controllers: opts.controllers ?? ["user", "bot"],
+		cards: shuffleDeck(deckSeed).map((face) => ({
+			face: opts.hidden ? -1 : face,
+			owner: null
+		})),
+		turn: first,
+		open: [],
+		flips: [],
+		memory: Array.from({ length: 22 }, () => null),
+		phase: {
+			kind: "intro",
+			until: opts.now + INTRO_MS$3
+		},
+		sounds: [],
+		soundSeq: 0,
+		hidden: !!opts.hidden
+	};
+}
+/** 지금 열 수 있는 카드인지 */
+function canFlip(state, index) {
+	const card = state.cards[index];
+	return state.phase.kind === "picking" && card !== void 0 && card.owner === null && !state.open.includes(index);
+}
+function pairsOf(state) {
+	const count = (side) => state.cards.filter((c) => c.owner === side).length / 2;
+	return [count(0), count(1)];
+}
+function picking(state) {
+	return {
+		...state,
+		phase: {
+			kind: "picking",
+			until: state.now + PICK_MS,
+			botAt: state.now + 700
+		}
+	};
+}
+const hasBot = (state) => state.controllers.includes("bot");
+function flip(state, index) {
+	if (!canFlip(state, index)) return state;
+	const rng = createRng(state.seed);
+	const side = state.turn;
+	const card = state.cards[index];
+	let memory = state.memory;
+	if (hasBot(state) && rng.next() < BOT_MEMORY[state.difficulty].remember) memory = memory.map((f, i) => i === index ? card.face : f);
+	const open = [...state.open, index];
+	const next = {
+		...state,
+		seed: rng.seed(),
+		memory,
+		open,
+		flips: [...state.flips, {
+			side,
+			index
+		}]
+	};
+	if (open.length < 2) return withSounds(picking(next), "flip");
+	const [a, b] = open;
+	const match = state.cards[a].face === state.cards[b].face;
+	const cards = match ? state.cards.map((c, i) => i === a || i === b ? {
+		...c,
+		owner: side
+	} : c) : state.cards;
+	return withSounds({
+		...next,
+		cards,
+		phase: {
+			kind: "showing",
+			until: state.now + (match ? 700 : MISS_SHOW_MS),
+			match
+		}
+	}, "flip", match ? "match" : "miss");
+}
+/** 봇 기억에서 카드를 확률로 잊는다 (차례가 바뀔 때) */
+function forget(rng, state) {
+	if (!hasBot(state)) return state.memory;
+	const p = BOT_MEMORY[state.difficulty].forget;
+	return state.memory.map((f) => f !== null && rng.next() < p ? null : f);
+}
+function endShowing(state) {
+	if (state.phase.kind !== "showing") return state;
+	if (state.phase.match) {
+		if (state.cards.every((c) => c.owner !== null)) return finish$1({
+			...state,
+			open: []
+		});
+		return picking({
+			...state,
+			open: []
+		});
+	}
+	const rng = createRng(state.seed);
+	const memory = forget(rng, state);
+	return picking({
+		...state,
+		seed: rng.seed(),
+		memory,
+		open: [],
+		turn: 1 - state.turn
+	});
+}
+function finish$1(state) {
+	const [mine, theirs] = pairsOf(state);
+	const winner = mine === theirs ? "draw" : mine > theirs ? 0 : 1;
+	const userSide = state.controllers.indexOf("user");
+	return withSounds({
+		...state,
+		phase: {
+			kind: "done",
+			winner,
+			until: state.now + DONE_MS$5
+		}
+	}, winner === userSide ? "win" : "lose");
+}
+/** 보여주기·시작 안내가 남아 있으면 바로 끝낸다 (친구 카드가 조금 일찍 도착했을 때) */
+function settle$1(state) {
+	if (state.phase.kind === "intro") return picking(state);
+	if (state.phase.kind === "showing") return endShowing(state);
+	return state;
+}
+function tick$5(state) {
+	const { phase, now } = state;
+	switch (phase.kind) {
+		case "intro": return now >= phase.until ? picking(state) : state;
+		case "showing": return now >= phase.until ? endShowing(state) : state;
+		case "picking": {
+			const who = state.controllers[state.turn];
+			if (who === "bot" && now >= phase.botAt) return botFlip(state);
+			if (who === "user" && now >= phase.until && !state.hidden) return randomFlip(state);
+			return state;
+		}
+		case "done": return state;
+	}
+}
+function closedCards(state) {
+	return state.cards.flatMap((c, i) => c.owner === null && !state.open.includes(i) ? [i] : []);
+}
+function randomFlip(state) {
+	const rng = createRng(state.seed);
+	const index = pickOne(rng, closedCards(state));
+	return flip({
+		...state,
+		seed: rng.seed()
+	}, index);
+}
+function botFlip(state) {
+	const rng = createRng(state.seed);
+	const first = state.open[0];
+	const index = chooseBotCard(rng, {
+		memory: state.memory,
+		available: state.cards.map((c, i) => c.owner === null && !state.open.includes(i)),
+		first: first === void 0 ? null : {
+			index: first,
+			face: state.cards[first].face
+		}
+	});
+	return flip({
+		...state,
+		seed: rng.seed()
+	}, index);
+}
+function matchReducer(state, action) {
+	switch (action.type) {
+		case "tick": return tick$5({
+			...state,
+			now: action.now
+		});
+		case "pick": return state.controllers[state.turn] === "user" && !state.hidden ? flip(state, action.index) : state;
+		case "remoteFlip": {
+			if (action.n !== state.flips.length) return state;
+			const settled = settle$1(state);
+			return settled.controllers[settled.turn] === "remote" && !state.hidden ? flip(settled, action.index) : state;
+		}
+		case "serverFlip": {
+			if (!state.hidden || action.n !== state.flips.length) return state;
+			const settled = settle$1(state);
+			const cards = settled.cards.map((c, i) => i === action.index ? {
+				...c,
+				face: action.face
+			} : c);
+			return flip({
+				...settled,
+				cards
+			}, action.index);
+		}
+	}
+}
+//#endregion
+//#region src/server/referees/memory.ts
+function memoryReferee(setup, ctx) {
+	const o = setup ?? {};
+	const members = ctx.members();
+	const host = members.find((m) => m.role === "host");
+	const guest = members.find((m) => m.role === "guest");
+	if (!host || !guest || typeof o.guestFirst !== "boolean") return null;
+	let s = createMatch({
+		now: ctx.now(),
+		seed: serverSeed(),
+		difficulty: "normal",
+		controllers: ["user", "user"],
+		deckSeed: serverSeed(),
+		first: o.guestFirst ? 1 : 0
+	});
+	let sent = 0;
+	let doneAt = null;
+	const flush = () => {
+		for (; sent < s.flips.length; sent++) {
+			const { index } = s.flips[sent];
+			ctx.broadcast({
+				t: "flip",
+				n: sent,
+				index,
+				face: s.cards[index].face
+			});
+		}
+		if (doneAt === null && s.phase.kind === "done") doneAt = s.now;
+	};
+	return {
+		input(from, msg) {
+			const m = msg ?? {};
+			if (m.t !== "flip") return false;
+			const side = from === host.id ? 0 : from === guest.id ? 1 : null;
+			if (side === null || m.n !== s.flips.length || typeof m.index !== "number") return true;
+			s = matchReducer(s, {
+				type: "tick",
+				now: ctx.now()
+			});
+			for (let k = 0; k < 3 && (s.phase.kind === "intro" || s.phase.kind === "showing"); k++) s = matchReducer(s, {
+				type: "tick",
+				now: s.phase.until
+			});
+			if (s.phase.kind === "picking" && s.turn === side) s = matchReducer(s, {
+				type: "pick",
+				index: m.index
+			});
+			flush();
+			return true;
+		},
+		tick(now) {
+			s = matchReducer(s, {
+				type: "tick",
+				now: Math.max(now, s.now)
+			});
+			flush();
+		},
+		leave() {},
+		finished: () => doneAt !== null && s.now - doneAt > 5e3
+	};
 }
 //#endregion
 //#region src/games/nunchi/constants.ts
@@ -7659,7 +7985,8 @@ const REFEREES = {
 	yut: yutReferee,
 	tiles: tilesReferee,
 	artillery: artilleryReferee,
-	numbaseball: numbaseballReferee
+	numbaseball: numbaseballReferee,
+	memory: memoryReferee
 };
 //#endregion
 //#region game-server/main.ts

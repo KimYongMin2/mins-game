@@ -59,6 +59,8 @@ export type MatchState = {
   phase: Phase
   sounds: { id: number; name: SoundName }[]
   soundSeq: number
+  /** 우리 게임 서버가 심판: 카드 그림을 모르고(-1) 서버가 뒤집을 때마다 알려 준다. 내 차례 누르기·시간 초과도 서버가 정함 */
+  hidden: boolean
 }
 
 export type MatchAction =
@@ -67,6 +69,8 @@ export type MatchAction =
   | { type: 'pick'; index: number }
   /** 친구가 n번째로 연 카드 */
   | { type: 'remoteFlip'; n: number; index: number }
+  /** 서버 심판이 n번째로 연 카드와 그 그림 (누가 열었든) */
+  | { type: 'serverFlip'; n: number; index: number; face: number }
 
 /** 시드로 덱을 섞는다. 친구 대전은 둘이 같은 시드를 써서 같은 덱이 된다 */
 export function shuffleDeck(seed: number): number[] {
@@ -94,6 +98,8 @@ export function createMatch(opts: {
   /** 친구 대전: 방장이 정해서 보낸 덱 시드와 선공. 봇전은 seed로 정한다 */
   deckSeed?: number
   first?: Side
+  /** 서버 심판: 카드 그림을 숨긴 채로 시작 */
+  hidden?: boolean
 }): MatchState {
   const rng = createRng(opts.seed)
   const deckSeed = opts.deckSeed ?? Math.floor(rng.next() * 2 ** 32)
@@ -103,7 +109,7 @@ export function createMatch(opts: {
     seed: rng.seed(),
     difficulty: opts.difficulty,
     controllers: opts.controllers ?? ['user', 'bot'],
-    cards: shuffleDeck(deckSeed).map((face) => ({ face, owner: null })),
+    cards: shuffleDeck(deckSeed).map((face) => ({ face: opts.hidden ? -1 : face, owner: null })),
     turn: first,
     open: [],
     flips: [],
@@ -111,6 +117,7 @@ export function createMatch(opts: {
     phase: { kind: 'intro', until: opts.now + INTRO_MS },
     sounds: [],
     soundSeq: 0,
+    hidden: !!opts.hidden,
   }
 }
 
@@ -197,7 +204,7 @@ function tick(state: MatchState): MatchState {
       const who = state.controllers[state.turn]
       if (who === 'bot' && now >= phase.botAt) return botFlip(state)
       // 시간 초과는 차례인 사람 기기만 처리한다 (친구 차례면 친구가 보낸다)
-      if (who === 'user' && now >= phase.until) return randomFlip(state)
+      if (who === 'user' && now >= phase.until && !state.hidden) return randomFlip(state)
       return state
     }
     case 'done':
@@ -231,11 +238,17 @@ export function matchReducer(state: MatchState, action: MatchAction): MatchState
     case 'tick':
       return tick({ ...state, now: action.now })
     case 'pick':
-      return state.controllers[state.turn] === 'user' ? flip(state, action.index) : state
+      return state.controllers[state.turn] === 'user' && !state.hidden ? flip(state, action.index) : state
     case 'remoteFlip': {
       if (action.n !== state.flips.length) return state
       const settled = settle(state)
-      return settled.controllers[settled.turn] === 'remote' ? flip(settled, action.index) : state
+      return settled.controllers[settled.turn] === 'remote' && !state.hidden ? flip(settled, action.index) : state
+    }
+    case 'serverFlip': {
+      if (!state.hidden || action.n !== state.flips.length) return state
+      const settled = settle(state)
+      const cards = settled.cards.map((c, i) => (i === action.index ? { ...c, face: action.face } : c))
+      return flip({ ...settled, cards }, action.index)
     }
   }
 }

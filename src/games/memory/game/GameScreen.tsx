@@ -1,4 +1,5 @@
 import { Suspense, lazy, useEffect, useReducer, useRef, useState } from 'react'
+import { REFEREE_FROM } from '../../../shared/online/hubProtocol'
 import { ANIMAL_EMOJI, type Look, opponentLook, plainLook } from '../../../shared/art3d/animalKinds'
 import { canWebGL } from '../../../shared/art3d/webgl'
 import { loadLook } from '../../../shared/storage/avatar'
@@ -58,6 +59,8 @@ function TurnInfo({ state, names }: { state: MatchState; names: readonly [string
 }
 
 export function GameScreen({ difficulty, pvp, onFinish, onQuit }: Props) {
+  // 우리 게임 서버가 심판이면 카드 배치를 모르고 서버가 뒤집을 때마다 그림을 받는다 (조작 막기 3단계)
+  const [hidden] = useState(() => !!pvp?.room.hasReferee?.('memory'))
   const [state, dispatch] = useReducer(matchReducer, undefined, () =>
     createMatch({
       now: performance.now(),
@@ -66,6 +69,7 @@ export function GameScreen({ difficulty, pvp, onFinish, onQuit }: Props) {
       controllers: ['user', pvp ? 'remote' : 'bot'],
       deckSeed: pvp?.deckSeed,
       first: pvp?.first,
+      hidden,
     }),
   )
   const done = state.phase.kind === 'done'
@@ -78,7 +82,12 @@ export function GameScreen({ difficulty, pvp, onFinish, onQuit }: Props) {
   // 친구 대전: 받은 카드를 경기에 넣고, 상대가 나가면 알린다
   useEffect(() => {
     if (!pvp) return
-    const offMsg = pvp.room.onMessage((msg) => {
+    const offMsg = pvp.room.onMessage((msg, from) => {
+      if (hidden) {
+        // 서버가 보낸 것만 (n번째 카드와 그 그림)
+        if (from === REFEREE_FROM && msg.t === 'flip' && typeof msg.face === 'number') dispatch({ type: 'serverFlip', n: msg.n, index: msg.index, face: msg.face })
+        return
+      }
       const action = actionOf(msg)
       if (action) dispatch(action)
     })
@@ -89,15 +98,15 @@ export function GameScreen({ difficulty, pvp, onFinish, onQuit }: Props) {
       offMsg()
       offPeer()
     }
-  }, [pvp])
+  }, [pvp, hidden])
 
-  // 친구 대전: 내가 연 카드를 보낸다 (시간 초과로 열린 것도)
+  // 친구 대전: 내가 연 카드를 보낸다 (시간 초과로 열린 것도). 서버 심판이면 누를 때 바로 서버에 묻는다
   const sentRef = useRef(state)
   useEffect(() => {
-    if (!pvp) return
+    if (!pvp || hidden) return
     for (const msg of outbox(sentRef.current, state)) pvp.room.send(msg)
     sentRef.current = state
-  }, [pvp, state])
+  }, [pvp, state, hidden])
 
   const playedRef = useRef(0)
   useEffect(() => {
@@ -135,6 +144,16 @@ export function GameScreen({ difficulty, pvp, onFinish, onQuit }: Props) {
   const myTurn = state.turn === 0 && phase.kind === 'picking'
   const left = phase.kind === 'picking' && state.turn === 0 ? Math.max(0, phase.until - state.now) : 0
   const showing = phase.kind === 'showing' ? (phase.match ? 'match' : 'miss') : null
+
+  /** 카드 누르기: 서버 심판이면 서버에 '이 카드' (같은 카드를 여러 번 눌러도 n이 같아 한 번만) */
+  const askedRef = useRef(-1)
+  function pick(index: number) {
+    if (!hidden || !pvp) return dispatch({ type: 'pick', index })
+    const n = state.flips.length
+    if (!canFlip(state, index) || state.controllers[state.turn] !== 'user' || askedRef.current === n) return
+    askedRef.current = n
+    pvp.room.send({ t: 'flip', n, index })
+  }
 
   return (
     <div className="mm-game">
@@ -185,10 +204,10 @@ export function GameScreen({ difficulty, pvp, onFinish, onQuit }: Props) {
                 onPointerDown={(e) => {
                   // 터치하자마자 열리도록 (click은 손을 뗄 때라 늦다)
                   e.preventDefault()
-                  dispatch({ type: 'pick', index: i })
+                  pick(i)
                 }}
                 // 키보드(Enter·Space)로도 열 수 있게. 이미 연 카드는 무시된다
-                onClick={() => dispatch({ type: 'pick', index: i })}
+                onClick={() => pick(i)}
               >
                 <span className="mm-card__inner">
                   <span className="mm-card__back" />

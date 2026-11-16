@@ -112,6 +112,8 @@ export function MemoryPage() {
   function startPvp(room: Room<MemoryMsg>) {
     goRef.current = false
     const msg = { t: 'start', deckSeed: randomSeed(), guestFirst: Math.random() < 0.5 } as const
+    // 우리 게임 서버가 있으면 카드 배치·차례를 서버가 (조작 막기 3단계). 시작 메시지보다 먼저
+    if (room.hasReferee?.('memory')) room.startReferee?.('memory', { guestFirst: msg.guestFirst })
     room.send(msg)
     setScreen({ kind: 'pvp-game', key: Date.now(), deckSeed: msg.deckSeed, first: firstOf(msg, 'host') })
   }
