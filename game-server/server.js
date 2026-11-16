@@ -3563,8 +3563,17 @@ const LIMIT = {
 	watches: 20,
 	adverts: 4,
 	advertText: 1e3,
-	capacity: 16
+	capacity: 16,
+	/** 한 계정(익명 로그인)이 동시에 열 수 있는 접속 (탭 여러 개 정도만) */
+	connPerUser: 6,
+	/** 틀린 방 코드를 이만큼 넣으면 잠깐 막음 (비공개 코드 숫자 4자리를 다 넣어 보는 것 막기) */
+	badJoins: 8,
+	badJoinWindowMs: 3e5
 };
+/** 이만큼 메시지가 없으면 '지금 하는 중'으로 안 침 (서버 업데이트를 미룰지 볼 때) */
+const ACTIVE_MS = 9e5;
+/** 이만큼 아무 일 없는 방은 서버가 닫음 (탭만 켜 두고 자리를 뜬 방이 영영 남지 않게) */
+const IDLE_CLOSE_MS = 108e5;
 const ID_RE = /^[A-Z0-9]{4,12}$/;
 const PIN_RE = /^\d{4}$/;
 const GAME_RE = /^[a-z0-9-]{2,24}$/;
@@ -3597,9 +3606,18 @@ var Hub = class {
 	watchers = /* @__PURE__ */ new Map();
 	opts;
 	now;
+	/** 계정별: 열린 접속 수, 틀린 방 코드 기록 */
+	conns = /* @__PURE__ */ new Map();
+	badJoins = /* @__PURE__ */ new Map();
 	constructor(opts) {
 		this.opts = opts;
 		this.now = opts.now ?? Date.now;
+	}
+	/** 오래 아무 일 없는 방 닫기 (game-server/main.ts가 10분마다 부름) */
+	sweep() {
+		const now = this.now();
+		for (const room of [...this.rooms.values()]) if (now - room.lastActive > IDLE_CLOSE_MS) this.dropRoom(room);
+		for (const [uid, ts] of this.badJoins) if (ts.every((t) => now - t > LIMIT.badJoinWindowMs)) this.badJoins.delete(uid);
 	}
 	/** 새 접속. 받은 글자는 receive, 끊기면 close */
 	open(conn) {
@@ -3612,8 +3630,11 @@ var Hub = class {
 	}
 	/** 지금 방 수 (테스트·상태 보기) */
 	stats() {
+		const now = this.now();
+		const active = [...this.rooms.values()].filter((r) => now - r.lastActive < ACTIVE_MS && [...r.members.values()].some((m) => m.session)).length;
 		return {
 			rooms: this.rooms.size,
+			active,
 			lists: this.lists.size
 		};
 	}
@@ -3646,6 +3667,15 @@ var Hub = class {
 				});
 				return s.conn.close(4001);
 			}
+			const open = this.conns.get(uid) ?? 0;
+			if (open >= LIMIT.connPerUser) {
+				s.push({
+					t: "error",
+					reason: "too-many"
+				});
+				return s.conn.close(4002);
+			}
+			this.conns.set(uid, open + 1);
 			s.uid = uid;
 			return s.push({
 				t: "hello-ok",
@@ -3672,6 +3702,13 @@ var Hub = class {
 			ref: m.ref,
 			reason
 		});
+		const now = this.now();
+		const bad = (this.badJoins.get(s.uid) ?? []).filter((t) => now - t < LIMIT.badJoinWindowMs);
+		if (m.role === "guest" && bad.length >= LIMIT.badJoins) return fail("not-found");
+		const failJoin = () => {
+			this.badJoins.set(s.uid, [...bad, now]);
+			return fail("not-found");
+		};
 		if (typeof m.game !== "string" || !GAME_RE.test(m.game) || typeof m.code !== "string") return fail("not-found");
 		const [id, pin = null, ...rest] = m.code.split("-");
 		if (!ID_RE.test(id) || rest.length || pin !== null && !PIN_RE.test(pin)) return fail("not-found");
@@ -3708,11 +3745,12 @@ var Hub = class {
 				pin,
 				capacity: Number.isInteger(m.capacity) ? Math.min(LIMIT.capacity, Math.max(2, m.capacity)) : 2,
 				members: /* @__PURE__ */ new Map(),
-				referee: null
+				referee: null,
+				lastActive: this.now()
 			};
 			this.rooms.set(topic, room);
 		} else {
-			if (!room || !hostOf(room) || room.pin !== pin) return fail("not-found");
+			if (!room || !hostOf(room) || room.pin !== pin) return failJoin();
 			if (room.members.size >= room.capacity) return fail("full");
 		}
 		const mem = {
@@ -3726,6 +3764,7 @@ var Hub = class {
 			grace: null
 		};
 		room.members.set(mem.key, mem);
+		room.lastActive = this.now();
 		s.rooms.set(topic, mem.key);
 		s.push({
 			t: "joined",
@@ -3749,6 +3788,7 @@ var Hub = class {
 	relay(s, topic, msg) {
 		const at = this.memberOf(s, topic);
 		if (!at) return;
+		at.room.lastActive = this.now();
 		if (at.room.referee?.ref.input(at.mem.key, msg)) return;
 		for (const other of at.room.members.values()) if (other !== at.mem) other.session?.push({
 			t: "msg",
@@ -3796,6 +3836,7 @@ var Hub = class {
 		if (!ref) return;
 		const timer = setInterval(() => {
 			try {
+				room.lastActive = this.now();
 				ref.tick(this.now());
 				if (ref.finished()) this.stopReferee(room);
 			} catch (e) {
@@ -3927,6 +3968,11 @@ var Hub = class {
 		if (at) this.removeMember(at.room, at.mem);
 	}
 	closeSession(s) {
+		if (s.uid) {
+			const n = (this.conns.get(s.uid) ?? 1) - 1;
+			if (n <= 0) this.conns.delete(s.uid);
+			else this.conns.set(s.uid, n);
+		}
 		for (const list of [...s.watches]) this.unwatch(s, list);
 		for (const [topic, key] of s.rooms) {
 			const room = this.rooms.get(topic);
@@ -10066,6 +10112,7 @@ const hub = new Hub({
 	graceMs: 15e3,
 	referees: REFEREES
 });
+setInterval(() => hub.sweep(), 6e5);
 const ALLOWED_ORIGIN = /^https:\/\/mins-game[a-z0-9-]*\.vercel\.app$|^http:\/\/localhost:\d+$/;
 const http = createServer((req, res) => {
 	res.writeHead(200, { "content-type": "text/plain" });

@@ -29,6 +29,8 @@ async function verify(token: string, apikey: string): Promise<string | null> {
 }
 
 const hub = new Hub({ verify, graceMs: 15_000, referees: REFEREES })
+// 오래 아무 일 없는 방 닫기
+setInterval(() => hub.sweep(), 10 * 60_000)
 const ALLOWED_ORIGIN = /^https:\/\/mins-game[a-z0-9-]*\.vercel\.app$|^http:\/\/localhost:\d+$/
 
 const http = createServer((req, res) => {

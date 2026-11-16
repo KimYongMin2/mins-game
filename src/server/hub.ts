@@ -55,7 +55,17 @@ const LIMIT = {
   adverts: 4,
   advertText: 1000,
   capacity: 16,
+  /** 한 계정(익명 로그인)이 동시에 열 수 있는 접속 (탭 여러 개 정도만) */
+  connPerUser: 6,
+  /** 틀린 방 코드를 이만큼 넣으면 잠깐 막음 (비공개 코드 숫자 4자리를 다 넣어 보는 것 막기) */
+  badJoins: 8,
+  badJoinWindowMs: 5 * 60_000,
 }
+
+/** 이만큼 메시지가 없으면 '지금 하는 중'으로 안 침 (서버 업데이트를 미룰지 볼 때) */
+const ACTIVE_MS = 15 * 60_000
+/** 이만큼 아무 일 없는 방은 서버가 닫음 (탭만 켜 두고 자리를 뜬 방이 영영 남지 않게) */
+const IDLE_CLOSE_MS = 3 * 60 * 60_000
 
 const ID_RE = /^[A-Z0-9]{4,12}$/
 const PIN_RE = /^\d{4}$/
@@ -83,6 +93,8 @@ type HubRoom = {
   pin: string | null
   capacity: number
   members: Map<string, Member>
+  /** 마지막으로 무슨 일이 있었던 시각 (들어옴·메시지·준비 등) */
+  lastActive: number
   referee: { game: string; ref: Referee; timer: ReturnType<typeof setInterval> } | null
 }
 
@@ -118,9 +130,20 @@ export class Hub {
   private opts: HubOptions
   private now: () => number
 
+  /** 계정별: 열린 접속 수, 틀린 방 코드 기록 */
+  private conns = new Map<string, number>()
+  private badJoins = new Map<string, number[]>()
+
   constructor(opts: HubOptions) {
     this.opts = opts
     this.now = opts.now ?? Date.now
+  }
+
+  /** 오래 아무 일 없는 방 닫기 (game-server/main.ts가 10분마다 부름) */
+  sweep() {
+    const now = this.now()
+    for (const room of [...this.rooms.values()]) if (now - room.lastActive > IDLE_CLOSE_MS) this.dropRoom(room)
+    for (const [uid, ts] of this.badJoins) if (ts.every((t) => now - t > LIMIT.badJoinWindowMs)) this.badJoins.delete(uid)
   }
 
   /** 새 접속. 받은 글자는 receive, 끊기면 close */
@@ -135,7 +158,10 @@ export class Hub {
 
   /** 지금 방 수 (테스트·상태 보기) */
   stats() {
-    return { rooms: this.rooms.size, lists: this.lists.size }
+    const now = this.now()
+    // active = 최근 15분 안에 무슨 일이 있었고 접속한 사람이 있는 방 (서버 업데이트는 이게 0일 때)
+    const active = [...this.rooms.values()].filter((r) => now - r.lastActive < ACTIVE_MS && [...r.members.values()].some((m) => m.session)).length
+    return { rooms: this.rooms.size, active, lists: this.lists.size }
   }
 
   private allow(s: Session): boolean {
@@ -165,6 +191,12 @@ export class Hub {
         s.push({ t: 'error', reason: 'unauthorized' })
         return s.conn.close(4001)
       }
+      const open = this.conns.get(uid) ?? 0
+      if (open >= LIMIT.connPerUser) {
+        s.push({ t: 'error', reason: 'too-many' })
+        return s.conn.close(4002)
+      }
+      this.conns.set(uid, open + 1)
       s.uid = uid
       return s.push({ t: 'hello-ok', referees: Object.keys(this.opts.referees ?? {}) })
     }
@@ -195,6 +227,14 @@ export class Hub {
 
   private join(s: Session, m: Extract<ClientMsg, { t: 'join' }>) {
     const fail = (reason: JoinError) => s.push({ t: 'join-error', ref: m.ref, reason })
+    // 틀린 코드를 너무 많이 넣었으면 잠깐은 맞는 코드여도 '방 없음' (다 넣어 보기 막기)
+    const now = this.now()
+    const bad = (this.badJoins.get(s.uid!) ?? []).filter((t) => now - t < LIMIT.badJoinWindowMs)
+    if (m.role === 'guest' && bad.length >= LIMIT.badJoins) return fail('not-found')
+    const failJoin = () => {
+      this.badJoins.set(s.uid!, [...bad, now])
+      return fail('not-found')
+    }
     if (typeof m.game !== 'string' || !GAME_RE.test(m.game) || typeof m.code !== 'string') return fail('not-found')
     const [id, pin = null, ...rest] = m.code.split('-')
     if (!ID_RE.test(id) || rest.length || (pin !== null && !PIN_RE.test(pin))) return fail('not-found')
@@ -224,11 +264,11 @@ export class Hub {
       if (room && hostOf(room)) return fail('full')
       if (room) this.dropRoom(room)
       const capacity = Number.isInteger(m.capacity) ? Math.min(LIMIT.capacity, Math.max(2, m.capacity)) : 2
-      room = { topic, id, pin, capacity, members: new Map(), referee: null }
+      room = { topic, id, pin, capacity, members: new Map(), referee: null, lastActive: this.now() }
       this.rooms.set(topic, room)
     } else {
       // 방장이 있고, 코드가 맞아야 (비공개 코드는 서버가 검사)
-      if (!room || !hostOf(room) || room.pin !== pin) return fail('not-found')
+      if (!room || !hostOf(room) || room.pin !== pin) return failJoin()
       if (room.members.size >= room.capacity) return fail('full')
     }
     const mem: Member = {
@@ -242,6 +282,7 @@ export class Hub {
       grace: null,
     }
     room.members.set(mem.key, mem)
+    room.lastActive = this.now()
     s.rooms.set(topic, mem.key)
     s.push({ t: 'joined', ref: m.ref, room: topic, key: mem.key, resume: mem.resume })
     this.pushMembers(room)
@@ -258,6 +299,7 @@ export class Hub {
   private relay(s: Session, topic: string, msg: unknown) {
     const at = this.memberOf(s, topic)
     if (!at) return
+    at.room.lastActive = this.now()
     // 서버가 심판이면 입력은 심판에게만 (다른 사람에게 안 감 — 고른 것·비밀이 새지 않게)
     if (at.room.referee?.ref.input(at.mem.key, msg)) return
     for (const other of at.room.members.values()) {
@@ -289,6 +331,8 @@ export class Hub {
     if (!ref) return
     const timer = setInterval(() => {
       try {
+        // 심판이 도는 동안은 하는 중으로 침
+        room.lastActive = this.now()
         ref.tick(this.now())
         if (ref.finished()) this.stopReferee(room)
       } catch (e) {
@@ -413,6 +457,11 @@ export class Hub {
   }
 
   private closeSession(s: Session) {
+    if (s.uid) {
+      const n = (this.conns.get(s.uid) ?? 1) - 1
+      if (n <= 0) this.conns.delete(s.uid)
+      else this.conns.set(s.uid, n)
+    }
     for (const list of [...s.watches]) this.unwatch(s, list)
     // 들어가 있던 방은 잠깐 자리를 들고 있다가 (다시 붙으면 그대로) 안 오면 뺀다
     for (const [topic, key] of s.rooms) {

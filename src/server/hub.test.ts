@@ -169,3 +169,44 @@ describe('서버 심판 자리', () => {
     await g.send({ t: 'leave', room })
   })
 })
+
+describe('막기 (2026-11-16)', () => {
+  it('틀린 코드를 8번 넣으면 5분 동안은 맞는 코드도 방 없음', async () => {
+    const hub = new Hub({ verify })
+    const h = client(hub)
+    await h.hello()
+    await h.send(join('host', 'SAFE-1234'))
+    const g = client(hub)
+    await g.hello()
+    for (let i = 0; i < 8; i++) await g.send(join('guest', `SAFE-${String(i).padStart(4, '0')}`))
+    await g.send(join('guest', 'SAFE-1234'))
+    expect(g.last('join-error')?.reason).toBe('not-found')
+    expect(g.last('joined')).toBeUndefined()
+  })
+
+  it('한 계정은 접속 6개까지', async () => {
+    const hub = new Hub({ verify })
+    const cs = Array.from({ length: 7 }, () => client(hub))
+    for (const c of cs) await c.hello()
+    expect(cs.slice(0, 6).every((c) => !c.closed)).toBe(true)
+    expect(cs[6].closed).toBe(true)
+    cs[0].close()
+    const again = client(hub)
+    await again.hello()
+    expect(again.closed).toBe(false)
+  })
+
+  it('15분 아무 일 없으면 하는 중 아님, 3시간이면 서버가 닫음', async () => {
+    let now = 0
+    const hub = new Hub({ verify, now: () => now })
+    const h = client(hub)
+    await h.hello()
+    await h.send(join('host', 'IDLE'))
+    expect(hub.stats().active).toBe(1)
+    now += 16 * 60_000
+    expect(hub.stats().active).toBe(0)
+    now += 3 * 60 * 60_000
+    hub.sweep()
+    expect(hub.stats().rooms).toBe(0)
+  })
+})
