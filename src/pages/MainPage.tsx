@@ -308,7 +308,7 @@ export function MainPage({ nickname }: { nickname: string }) {
           </span>
           <span className="talk__body">
             <strong>수다방</strong>
-            <span>게임 없이 음성 통화만 · 2–8명</span>
+            <span>게임 없이 음성 통화만 · 2–16명</span>
           </span>
           <IconChevronRight className="talk__go" />
         </Link>

@@ -3,7 +3,9 @@ import { HomeLink } from '../../shared/ui/HomeLink'
 import { levelContext, watchLevel } from '../../shared/call/level'
 import { LISTEN_VOLUME, Speaker } from '../../shared/call/speaker'
 import { DEFAULT_VOICE_SETTINGS, MIC_VOLUME, VoiceChanger, type VoiceSettings } from '../../shared/call/voiceFx'
-import { type CallPeer, type CallSignal, VoiceMesh } from '../../shared/call/voiceMesh'
+import type { CallPeer, CallSignal } from '../../shared/call/voiceMesh'
+import { SfuCall } from '../../shared/call/sfuCall'
+import { SFU_URL, sfuToken } from '../../shared/call/sfuToken'
 import { type Member, type Room, RoomError, createRoom, joinRoom, makeRoomCode } from '../../shared/online/room'
 import { advertiseRoom, cleanId, cleanList, cleanName, isInt, watchRooms } from '../../shared/online/roomList'
 import { readLocal, writeLocal } from '../../shared/storage/local'
@@ -14,11 +16,11 @@ import './meeting.css'
 
 // 회의방: 열린 방 목록에서 골라 들어가 음성 통화. 방장이 방을 만들 때 이름과 전체 공개/비공개(코드)를 정한다.
 // 비공개 방도 목록에 🔒로 보이고, 누르면 코드를 물어본다. 코드는 방 채널 이름에 들어가 있어서 틀리면 '방 없음'이 된다.
-// 게임과 같은 방(Supabase Realtime)으로 연결 정보만 주고받고, 소리는 기기끼리 직접.
+// 방 목록·사람 목록은 게임과 같은 방(Supabase Realtime), 소리는 우리 음성 서버(LiveKit, 2026-11-16부터 — 기기끼리 직접은 막힌 망에서 안 돼서).
 // 들어갈 때 마이크를 허락받는다. 거절하면 듣기만 (나중에 다시 허락할 수 있음).
 
-/** 정원 (나 포함). 서로 다 잇는 방식이라 이보다 많으면 폰이 버겁다 */
-const CAPACITY = 8
+/** 정원 (나 포함). 음성 서버가 나눠 줘서 늘림 (api/livekit-token.ts의 CAPACITY와 같게) */
+const CAPACITY = 16
 const ROOM_ID = 'meeting'
 /** 비공개 방 코드 자리 수 (숫자) */
 const PIN_LENGTH = 4
@@ -167,7 +169,7 @@ function MeetingRoom({ room, name, pin, nickname, voice, settings, onSettings, o
   const [asking, setAsking] = useState(false)
   /** 통화 상태 (바뀔 때마다 새로 받아 그린다) */
   const [call, setCall] = useState<{ peers: CallPeer[]; mic: boolean }>({ peers: [], mic: true })
-  const meshRef = useRef<VoiceMesh | null>(null)
+  const meshRef = useRef<SfuCall | null>(null)
   const [micVolume, setMicVolume] = useState(() => voice?.volume ?? loadVolume(MIC_VOLUME_KEY, MIC_VOLUME))
   const [speaker] = useState(() => {
     const s = new Speaker(levelContext())
@@ -185,25 +187,23 @@ function MeetingRoom({ room, name, pin, nickname, voice, settings, onSettings, o
   }, [voice, settings])
 
   useEffect(() => {
-    const mesh: VoiceMesh = new VoiceMesh({
-      myId: room.myId,
-      send: (m) => room.send(m),
+    const mesh: SfuCall = new SfuCall({
+      url: SFU_URL ?? '',
+      getToken: () => sfuToken(`meeting-${room.code}`, room.myId, nickname),
       onChange: () => setCall({ peers: mesh.peers(), mic: mesh.mic }),
     })
     meshRef.current = mesh
     mesh.setTrack(voiceRef.current?.track ?? null)
-    const offMsg = room.onMessage((m) => mesh.receive(m))
     const offMembers = room.onMembers((ms) => {
       setMembers(ms)
       mesh.setMembers(ms.map((m) => m.id))
     })
     return () => {
-      offMsg()
       offMembers()
       mesh.close()
       meshRef.current = null
     }
-  }, [room])
+  }, [room, nickname])
 
   // 폰을 다른 앱으로 보냈다 돌아오면(또는 인터넷이 다시 붙으면) 끊긴 걸 다시 잇는다:
   // 소리 처리 깨우기 → 끝나 버린 마이크 다시 받기 → 멈춘 소리 다시 틀기 → 조금 뒤(서버 연결이 다시 붙을 틈) 끊긴 사람과 다시 잇기
