@@ -21,6 +21,11 @@ export function lastUploadError(): string | null {
   return lastError
 }
 
+/** 서버 확인 랭킹(verified.ts)이 거절 이유를 남길 때 */
+export function setUploadError(text: string | null) {
+  lastError = text
+}
+
 function describeError(e: unknown): string {
   if (e && typeof e === 'object') {
     const { code, message } = e as { code?: string; message?: string }

@@ -8,7 +8,7 @@ import { SoundToggle } from '../../shared/ui/SoundToggle'
 import { GameScreen } from './game/GameScreen'
 import type { SessionSummary } from './play/session'
 import { flushPendingGames, submitGame } from './ranking/online'
-import { type Ticket, prefetchTicket, takeTicket } from '../../shared/online/verified'
+import { type Ticket, prefetchTicket, waitTicket } from '../../shared/online/verified'
 import { type BattingRecord, addGame, loadRecord, saveRecord } from './records'
 import { RankingScreen } from './screens/RankingScreen'
 import { ResultScreen } from './screens/ResultScreen'
@@ -39,9 +39,11 @@ export function BattingPage() {
     setRecord(next)
   }
 
-  function start() {
+  async function start() {
+    // 판 입장권이 아직 안 왔으면 잠깐 기다림 (처음 들어와 바로 시작해도 랭킹에 올라가게)
+    const ticket = await waitTicket('batting')
     setGames((n) => n + 1)
-    setScreen({ kind: 'game', key: games + 1, ticket: takeTicket('batting') })
+    setScreen({ kind: 'game', key: games + 1, ticket })
   }
 
   function finish(summary: SessionSummary) {

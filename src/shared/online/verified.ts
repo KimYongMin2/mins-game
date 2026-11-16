@@ -1,7 +1,7 @@
 import { readLocal, writeLocal } from '../storage/local'
 import { postApi } from './api'
 import { isOnlineConfigured } from './supabase'
-import type { UploadStatus } from './uploadQueue'
+import { type UploadStatus, setUploadError } from './uploadQueue'
 
 // 서버가 확인하는 랭킹 올리기 (사용자 요청 2026-11-16 — 점수를 지어내 올리지 못하게).
 // 판을 시작하기 전에 서버에서 시드가 든 입장권(티켓)을 받아 그 시드로 경기하고, 끝나면 티켓 + 입력 기록을 보낸다.
@@ -31,6 +31,24 @@ export function prefetchTicket(game: string): Promise<void> {
     loading.set(game, p)
   }
   return p
+}
+
+/**
+ * 이번 판에 쓸 티켓. 아직 안 왔으면 조금(기본 4초) 기다린다 — 처음 들어와 바로 시작하면 로그인·티켓 받기가 끝나기 전이라
+ * 그 판이 무조건 '서버가 받지 않았어요'가 됐음 (사용자 제보 2026-11-16). 그래도 없으면 null (그 판은 랭킹에 안 올라감)
+ */
+export async function waitTicket(game: string, ms = 4000): Promise<Ticket | null> {
+  if (!ready.has(game)) await Promise.race([prefetchTicket(game), new Promise((r) => setTimeout(r, ms))])
+  const t = takeTicket(game)
+  setUploadError(t ? null : '판 입장권을 못 받았어요 (인터넷 연결을 확인해 주세요)')
+  return t
+}
+
+/** 서버가 거절한 이유 → 결과 화면에 보일 말 */
+const REASON: Record<string, string> = {
+  'replay-mismatch': '서버가 다시 돌려 본 결과와 달라요',
+  'bad-ticket': '판 입장권이 맞지 않거나 오래됐어요',
+  'bad-request': '기록 모양이 이상해요',
 }
 
 /** 이번 판에 쓸 티켓 (없으면 null → 그 판은 랭킹에 안 올라감). 꺼내면서 다음 것을 받아 둔다 */
@@ -66,7 +84,15 @@ export function createVerifiedQueue(storageKey: string) {
         const res = await postApi('/api/submit', row)
         if (res.ok || res.status === 409) continue
         if (res.status === 400 || Date.now() > row.ticket.exp) {
-          console.warn('[submit] 서버가 받지 않은 기록', row.game, res.status, await res.text().catch(() => ''))
+          const body = await res.text().catch(() => '')
+          console.warn('[submit] 서버가 받지 않은 기록', row.game, res.status, body)
+          let code = ''
+          try {
+            code = String((JSON.parse(body) as { error?: unknown }).error ?? '')
+          } catch {
+            // 이유 없음
+          }
+          setUploadError(REASON[code] ?? (res.status === 400 ? `거절됨 (${code || res.status})` : '판 입장권이 오래됐어요'))
           dropped.push(row.ticket.id)
           continue
         }

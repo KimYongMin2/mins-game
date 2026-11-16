@@ -14,7 +14,7 @@ import type { BaseballMsg } from './match/pvp'
 import { BattingPractice } from './practice/BattingPractice'
 import { type UploadStatus, flushPendingGames, submitGame } from './ranking/online'
 import { userSideForSeed } from './ranking/row'
-import { type Ticket, prefetchTicket, takeTicket } from '../../shared/online/verified'
+import { type Ticket, prefetchTicket, waitTicket } from '../../shared/online/verified'
 import { type ZolaballRecord, addMatch, loadRecord, saveRecord } from './records'
 import type { Side } from './rules/game'
 import type { Difficulty } from './rules/judge'
@@ -62,9 +62,9 @@ export function ZolaballPage() {
     void flushPendingGames()
   }, [])
 
-  function startMatch(difficulty: Difficulty) {
-    // 선공·후공은 매 경기 무작위 — 서버 입장권이 있으면 그 시드로 (서버가 다시 돌릴 때 같게)
-    const ticket = takeTicket('zolaball')
+  async function startMatch(difficulty: Difficulty) {
+    // 선공·후공은 매 경기 무작위 — 서버 입장권이 있으면 그 시드로 (서버가 다시 돌릴 때 같게). 아직 안 왔으면 잠깐 기다림
+    const ticket = await waitTicket('zolaball')
     const userSide = ticket ? userSideForSeed(ticket.seed) : Math.random() < 0.5 ? 'away' : 'home'
     setScreen({ kind: 'match', config: { difficulty, userSide }, key: Date.now(), ticket })
   }
