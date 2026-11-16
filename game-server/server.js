@@ -3995,7 +3995,7 @@ const BARREL = 7.5;
 const COUNTDOWN_MS$3 = 1500;
 const TURN_MS$2 = 2e4;
 const BOOM_MS$1 = 1600;
-const DONE_MS$7 = 2500;
+const DONE_MS$8 = 2500;
 /** 봇이 생각하는 시간 */
 const BOT_THINK_MS$1 = [1200, 2400];
 //#endregion
@@ -4464,7 +4464,7 @@ function afterBoom$1(s) {
 		...s,
 		phase: {
 			kind: "done",
-			until: s.now + DONE_MS$7
+			until: s.now + DONE_MS$8
 		}
 	};
 	return startTurn$2(s, nextAlive$1(s, s.turn));
@@ -4484,13 +4484,13 @@ function drop$6(s, player) {
 		...next,
 		phase: {
 			kind: "done",
-			until: s.now + DONE_MS$7
+			until: s.now + DONE_MS$8
 		}
 	};
 	if (s.phase.kind === "aim" && s.turn === player) return startTurn$2(next, nextAlive$1(next, player));
 	return next;
 }
-function tick$7(s) {
+function tick$8(s) {
 	const { phase, now } = s;
 	switch (phase.kind) {
 		case "countdown": return now >= phase.until ? startTurn$2(s, s.turn) : s;
@@ -4512,7 +4512,7 @@ function tick$7(s) {
 }
 function engineReducer$6(state, action) {
 	switch (action.type) {
-		case "tick": return tick$7({
+		case "tick": return tick$8({
 			...state,
 			now: action.now
 		});
@@ -4643,7 +4643,7 @@ const clampNumber = (n) => {
 	const x = Math.floor(Number(n));
 	return Number.isFinite(x) ? Math.min(99, Math.max(0, x)) : 7;
 };
-const pick$1 = (list, x, fallback) => typeof x === "string" && list.includes(x) ? x : fallback;
+const pick$2 = (list, x, fallback) => typeof x === "string" && list.includes(x) ? x : fallback;
 /** 방으로 보낼 짧은 글자: '동물.모자.안경.목.털.옷.색.번호' */
 const encodeLook = (l) => [
 	l.animal,
@@ -4663,12 +4663,12 @@ function decodeLook(x) {
 	if (!animal) return void 0;
 	return {
 		animal,
-		hat: pick$1(HATS, hat, "none"),
-		glasses: pick$1(GLASSES, glasses, "none"),
-		neck: pick$1(NECKS, neck, "none"),
-		fur: pick$1(FURS, fur, "base"),
-		outfit: pick$1(OUTFITS, outfit, "shirt"),
-		tint: pick$1(TINTS, tint, "red"),
+		hat: pick$2(HATS, hat, "none"),
+		glasses: pick$2(GLASSES, glasses, "none"),
+		neck: pick$2(NECKS, neck, "none"),
+		fur: pick$2(FURS, fur, "base"),
+		outfit: pick$2(OUTFITS, outfit, "shirt"),
+		tint: pick$2(TINTS, tint, "red"),
 		number: number === void 0 ? 7 : clampNumber(number)
 	};
 }
@@ -4844,7 +4844,7 @@ const COUNTDOWN_MS$2 = 2400;
 /** 펑! 보여주기 */
 const BOOM_MS = 2200;
 /** 경기가 끝난 뒤 결과 화면으로 넘어가기까지 */
-const DONE_MS$6 = 2500;
+const DONE_MS$7 = 2500;
 /** 봇이 폭탄을 받고 넘기기까지 */
 const BOT_HOLD_MS = [350, 1500];
 //#endregion
@@ -4933,7 +4933,7 @@ function afterBoom(state) {
 		...state,
 		phase: {
 			kind: "done",
-			until: state.now + DONE_MS$6
+			until: state.now + DONE_MS$7
 		}
 	};
 	return countdown$1({
@@ -5017,7 +5017,7 @@ function drop$5(state, player) {
 		flight: null,
 		phase: {
 			kind: "done",
-			until: state.now + DONE_MS$6
+			until: state.now + DONE_MS$7
 		}
 	};
 	if (next.holder === player || next.flight?.to === player || next.flight?.from === player) {
@@ -5033,7 +5033,7 @@ function drop$5(state, player) {
 	}
 	return next;
 }
-function tick$6(state) {
+function tick$7(state) {
 	const { phase, now } = state;
 	switch (phase.kind) {
 		case "countdown": return now >= phase.until ? startPlay(state) : state;
@@ -5046,7 +5046,7 @@ function tick$6(state) {
 }
 function engineReducer$5(state, action) {
 	switch (action.type) {
-		case "tick": return tick$6({
+		case "tick": return tick$7({
 			...state,
 			now: action.now
 		});
@@ -5134,6 +5134,362 @@ function bombReferee(setup, ctx) {
 		done: (s) => s.phase.kind === "done",
 		nowOf: (s) => s.now
 	});
+}
+//#endregion
+//#region src/games/fight/constants.ts
+/** 자세를 고르는 시간 */
+const CHOOSE_MS = 2e3;
+/** 공개한 결과를 보여주는 시간 */
+const REVEAL_MS = 1200;
+/** 첫 턴 전 '시작!' 표시 */
+const INTRO_MS$4 = 1200;
+/** 경기가 끝난 뒤 결과 화면으로 넘어가기까지 */
+const DONE_MS$6 = 1800;
+//#endregion
+//#region src/games/fight/rules/turn.ts
+const STANCES = [
+	"ready",
+	"guard",
+	"attack",
+	"smash"
+];
+/** 자세마다 쓰는 스택 */
+const STANCE_COST = {
+	ready: 0,
+	guard: 0,
+	attack: 1,
+	smash: 3
+};
+const FRESH = {
+	life: 3,
+	stacks: 0
+};
+/** 생명력이 깎이는 일 */
+const HURT_EVENTS = [
+	"hurt",
+	"pierced",
+	"overpowered"
+];
+function isHurt(event) {
+	return HURT_EVENTS.includes(event);
+}
+function canChoose(fighter, stance) {
+	return fighter.stacks >= STANCE_COST[stance];
+}
+/** 고를 수 없는 자세(스택이 모자란 공격)는 준비로 바꾼다 */
+function sanitize(fighter, stance) {
+	return canChoose(fighter, stance) ? stance : "ready";
+}
+function eventOf(mine, theirs, me) {
+	if (mine === "smash") return theirs === "smash" ? "clash" : "smash-hit";
+	if (mine === "attack") {
+		if (theirs === "smash") return "overpowered";
+		if (theirs === "attack") return "clash";
+		return theirs === "guard" ? "blocked" : "strike";
+	}
+	if (mine === "guard") {
+		if (theirs === "smash") return "pierced";
+		return theirs === "attack" ? "block" : "guard";
+	}
+	if (theirs === "attack" || theirs === "smash") return "hurt";
+	return me.stacks >= 3 ? "charge-full" : "charge";
+}
+function apply(f, stance, event) {
+	const gained = event === "charge" ? 1 : 0;
+	return {
+		life: Math.max(0, f.life - (isHurt(event) ? 1 : 0)),
+		stacks: f.stacks - STANCE_COST[stance] + gained
+	};
+}
+function resolveTurn(fighters, chosen) {
+	const stances = [sanitize(fighters[0], chosen[0]), sanitize(fighters[1], chosen[1])];
+	const events = [eventOf(stances[0], stances[1], fighters[0]), eventOf(stances[1], stances[0], fighters[1])];
+	return {
+		stances,
+		events,
+		fighters: [apply(fighters[0], stances[0], events[0]), apply(fighters[1], stances[1], events[1])]
+	};
+}
+/** turnsPlayed: 지금까지 끝난 턴 수 */
+function winnerOf(fighters, turnsPlayed) {
+	const [a, b] = fighters;
+	if (a.life <= 0 && b.life <= 0) return "draw";
+	if (b.life <= 0) return 0;
+	if (a.life <= 0) return 1;
+	if (turnsPlayed < 30) return null;
+	if (a.life === b.life) return "draw";
+	return a.life > b.life ? 0 : 1;
+}
+//#endregion
+//#region src/games/fight/bot/fightBot.ts
+const w = (ready, guard, attack, smash = 0) => ({
+	ready,
+	guard,
+	attack,
+	smash
+});
+/** 일반: 내 스택만 보고 대충 고른다. 꽉 차면 강타를 자주 */
+function normalWeights(self) {
+	if (self.stacks === 0) return w(70, 30, 0);
+	if (self.stacks < 3) return w(40, 25, 35);
+	return w(0, 15, 25, 60);
+}
+/** 어려움: 상대 스택과 상대가 고른 자세의 흐름을 읽는다 */
+function hardWeights(self, foe, foeHistory) {
+	const full = self.stacks >= 3;
+	let weights;
+	if (foe.stacks === 0) {
+		if (self.stacks === 0) weights = w(100, 0, 0);
+		else if (!full) weights = w(45, 0, 55);
+		else weights = w(0, 0, 25, 75);
+	} else if (foe.stacks >= 3) {
+		if (full) weights = w(0, 10, 10, 80);
+		else if (self.stacks > 0) weights = w(30, 30, 40);
+		else weights = w(50, 50, 0);
+	} else if (self.stacks === 0) weights = w(50, 50, 0);
+	else if (!full) weights = w(25, 40, 35);
+	else weights = w(0, 20, 10, 70);
+	const [last, before] = [foeHistory.at(-1), foeHistory.at(-2)];
+	if (last && last === before) {
+		if (last === "ready" && self.stacks > 0) weights = {
+			...weights,
+			attack: weights.attack + 40
+		};
+		if (last === "guard") weights = full ? {
+			...weights,
+			smash: weights.smash + 40
+		} : {
+			...weights,
+			ready: weights.ready + 40
+		};
+		if (last === "attack") weights = {
+			...weights,
+			guard: weights.guard + 40
+		};
+	}
+	return weights;
+}
+function chooseBotStance(opts) {
+	const { rng, difficulty, self, foe, foeHistory } = opts;
+	return sanitize(self, pickWeighted(rng, difficulty === "hard" ? hardWeights(self, foe, foeHistory) : normalWeights(self)));
+}
+function withSounds$1(state, ...names) {
+	let seq = state.soundSeq;
+	const added = names.map((name) => ({
+		id: ++seq,
+		name
+	}));
+	return {
+		...state,
+		sounds: [...state.sounds, ...added].slice(-8),
+		soundSeq: seq
+	};
+}
+function createMatch$1(opts) {
+	return {
+		now: opts.now,
+		seed: opts.seed,
+		difficulty: opts.difficulty,
+		controllers: opts.controllers ?? ["user", "bot"],
+		follow: opts.follow ?? false,
+		fighters: [FRESH, FRESH],
+		turns: [],
+		phase: {
+			kind: "intro",
+			until: opts.now + INTRO_MS$4
+		},
+		sounds: [],
+		soundSeq: 0
+	};
+}
+/** 새 턴: 봇은 이때 몰래 고른다 */
+function startChoosing(state) {
+	const rng = createRng(state.seed);
+	const picks = [null, null];
+	state.controllers.forEach((c, i) => {
+		if (c !== "bot") return;
+		const side = i;
+		const other = 1 - side;
+		picks[side] = chooseBotStance({
+			rng,
+			difficulty: state.difficulty,
+			self: state.fighters[side],
+			foe: state.fighters[other],
+			foeHistory: state.turns.map((t) => t.stances[other])
+		});
+	});
+	const inputUntil = state.now + CHOOSE_MS;
+	const waitRemote = !state.follow && state.controllers.includes("remote");
+	return {
+		...state,
+		seed: rng.seed(),
+		phase: {
+			kind: "choosing",
+			index: state.turns.length,
+			inputUntil,
+			until: inputUntil + (waitRemote ? 300 : 0),
+			picks
+		}
+	};
+}
+function turnSounds(result) {
+	const e = result.events;
+	if (e.includes("smash-hit")) return ["smash"];
+	if (e.includes("strike")) return ["hit"];
+	if (e.includes("clash")) return ["clash"];
+	if (e.includes("block")) return ["block"];
+	if (e.includes("charge")) return ["charge"];
+	return ["guard"];
+}
+function reveal$1(state, picks) {
+	const chosen = [picks[0] ?? "ready", picks[1] ?? "ready"];
+	const result = resolveTurn(state.fighters, chosen);
+	return withSounds$1({
+		...state,
+		fighters: result.fighters,
+		turns: [...state.turns, result],
+		phase: {
+			kind: "reveal",
+			result,
+			until: state.now + REVEAL_MS
+		}
+	}, ...turnSounds(result));
+}
+function tick$6(state) {
+	const { phase, now } = state;
+	switch (phase.kind) {
+		case "intro": return now >= phase.until && !state.follow ? startChoosing(state) : state;
+		case "choosing": return now >= phase.until && !state.follow ? reveal$1(state, phase.picks) : state;
+		case "reveal": {
+			if (now < phase.until) return state;
+			const winner = winnerOf(state.fighters, state.turns.length);
+			if (winner === null) return state.follow ? state : startChoosing(state);
+			const userSide = state.controllers.indexOf("user");
+			return withSounds$1({
+				...state,
+				phase: {
+					kind: "done",
+					winner,
+					until: now + DONE_MS$6
+				}
+			}, winner === userSide ? "win" : "lose");
+		}
+		case "done": return state;
+	}
+}
+function pick$1(state, side, stance) {
+	const { phase } = state;
+	if (phase.kind !== "choosing" || state.controllers[side] !== "user" || state.now >= phase.inputUntil) return state;
+	if (!canChoose(state.fighters[side], stance) || phase.picks[side] === stance) return state;
+	return withSounds$1({
+		...state,
+		phase: {
+			...phase,
+			picks: withPick(phase.picks, side, stance)
+		}
+	}, "tick");
+}
+function withPick(picks, side, stance) {
+	return side === 0 ? [stance, picks[1]] : [picks[0], stance];
+}
+function remotePick(state, side, turn, stance) {
+	const { phase } = state;
+	if (phase.kind !== "choosing" || phase.index !== turn || state.controllers[side] !== "remote") return state;
+	if (!canChoose(state.fighters[side], stance)) return state;
+	return {
+		...state,
+		phase: {
+			...phase,
+			picks: withPick(phase.picks, side, stance)
+		}
+	};
+}
+/** 지금 이 턴을 받을 수 있는지 (친구 쪽, 아직 경기 중) */
+function awaitingTurn(state, turn) {
+	const { kind } = state.phase;
+	return state.follow && turn === state.turns.length && (kind === "intro" || kind === "reveal");
+}
+function remoteTurn(state, turn) {
+	if (!awaitingTurn(state, turn) || winnerOf(state.fighters, state.turns.length) !== null) return state;
+	return startChoosing(state);
+}
+function remoteReveal(state, turn, stances) {
+	if (!state.follow || turn !== state.turns.length) return state;
+	const { kind } = state.phase;
+	if (kind !== "choosing" && kind !== "intro" && kind !== "reveal") return state;
+	return reveal$1(state, stances);
+}
+function matchReducer$1(state, action) {
+	switch (action.type) {
+		case "tick": return tick$6({
+			...state,
+			now: action.now
+		});
+		case "pick": return pick$1(state, action.side, action.stance);
+		case "remotePick": return remotePick(state, action.side, action.turn, action.stance);
+		case "remoteTurn": return remoteTurn(state, action.turn);
+		case "remoteReveal": return remoteReveal(state, action.turn, action.stances);
+	}
+}
+//#endregion
+//#region src/server/referees/fight.ts
+function fightReferee(_setup, ctx) {
+	const members = ctx.members();
+	const host = members.find((m) => m.role === "host");
+	const guest = members.find((m) => m.role === "guest");
+	if (!host || !guest) return null;
+	let s = createMatch$1({
+		now: ctx.now(),
+		seed: serverSeed(),
+		difficulty: "normal",
+		controllers: ["remote", "remote"]
+	});
+	let doneAt = null;
+	const flush = (prev) => {
+		if (s.turns.length > prev.turns.length) {
+			const t = s.turns.at(-1);
+			ctx.broadcast({
+				t: "reveal",
+				turn: s.turns.length - 1,
+				host: t.stances[0],
+				guest: t.stances[1]
+			});
+		}
+		const p = s.phase;
+		if (p.kind === "choosing" && (prev.phase.kind !== "choosing" || prev.phase.index !== p.index)) ctx.broadcast({
+			t: "turn",
+			turn: p.index
+		});
+		if (doneAt === null && p.kind === "done") doneAt = s.now;
+	};
+	return {
+		input(from, msg) {
+			const m = msg ?? {};
+			if (m.t === "turn" || m.t === "reveal") return true;
+			if (m.t !== "pick") return false;
+			const side = from === host.id ? 0 : from === guest.id ? 1 : null;
+			if (side === null || typeof m.turn !== "number" || !STANCES.includes(m.stance)) return true;
+			const prev = s;
+			s = matchReducer$1(s, {
+				type: "remotePick",
+				side,
+				turn: m.turn,
+				stance: m.stance
+			});
+			flush(prev);
+			return true;
+		},
+		tick(now) {
+			const prev = s;
+			s = matchReducer$1(s, {
+				type: "tick",
+				now: Math.max(now, s.now)
+			});
+			flush(prev);
+		},
+		leave() {},
+		finished: () => doneAt !== null && s.now - doneAt > 5e3
+	};
 }
 //#endregion
 //#region src/games/memory/bot/memoryBot.ts
@@ -7986,7 +8342,8 @@ const REFEREES = {
 	tiles: tilesReferee,
 	artillery: artilleryReferee,
 	numbaseball: numbaseballReferee,
-	memory: memoryReferee
+	memory: memoryReferee,
+	fight: fightReferee
 };
 //#endregion
 //#region game-server/main.ts

@@ -208,3 +208,43 @@ describe('짝맞추기 서버 심판', () => {
     expect([own(h, 0), own(h, 1)]).toEqual([own(g, 1), own(g, 0)])
   })
 })
+
+import { createMatch as createFt, matchReducer as ftReducer, type MatchState as FtState } from '../../games/fight/play/matchState'
+import { guestPickMsg, serverActionOf, type FightMsg } from '../../games/fight/play/pvp'
+import { fightReferee } from './fight'
+
+describe('격투 서버 심판', () => {
+  it('두 폰 모두 서버 턴·공개를 따라 끝까지 같은 결과, 공개 전엔 상대 자세가 안 감', () => {
+    const f = fakeCtx([{ id: 'H', role: 'host' }, { id: 'G', role: 'guest' }])
+    const out: FightMsg[] = []
+    f.ctx.broadcast = (m) => out.push(m as FightMsg)
+    const ref = fightReferee({}, f.ctx)!
+    let h: FtState = createFt({ now: f.now, seed: 1, difficulty: 'normal', controllers: ['user', 'remote'], follow: true })
+    let g: FtState = createFt({ now: f.now, seed: 2, difficulty: 'normal', controllers: ['user', 'remote'], follow: true })
+    const rng = createRng(7)
+    let seen = 0
+    for (let i = 0; i < 5000 && (h.phase.kind !== 'done' || g.phase.kind !== 'done'); i++) {
+      f.advance(100)
+      ref.tick(f.now)
+      h = ftReducer(h, { type: 'tick', now: f.now })
+      g = ftReducer(g, { type: 'tick', now: f.now })
+      for (const [key, st] of [['H', h], ['G', g]] as const) {
+        if (rng.next() > 0.3) continue
+        const stance = (['ready', 'guard', 'attack', 'smash'] as const)[Math.floor(rng.next() * 4)]
+        const m = guestPickMsg(st, stance)
+        if (m) ref.input(key, m)
+      }
+      for (; seen < out.length; seen++) {
+        // 공개 메시지 말고는 자세가 안 담김
+        if (out[seen].t !== 'reveal') expect(JSON.stringify(out[seen])).not.toMatch(/ready|guard|attack|smash/)
+        const ah = serverActionOf(out[seen], 'host')
+        const ag = serverActionOf(out[seen], 'guest')
+        if (ah) h = ftReducer(h, ah)
+        if (ag) g = ftReducer(g, ag)
+      }
+    }
+    expect(h.phase.kind).toBe('done')
+    expect(g.phase.kind).toBe('done')
+    expect([h.fighters[0].life, h.fighters[1].life]).toEqual([g.fighters[1].life, g.fighters[0].life])
+  })
+})

@@ -1,4 +1,5 @@
 import { Suspense, lazy, useEffect, useReducer, useRef, useState } from 'react'
+import { REFEREE_FROM } from '../../../shared/online/hubProtocol'
 import type { Room } from '../../../shared/online/room'
 import { loadNickname } from '../../../shared/storage/nickname'
 import { randomSeed } from '../../../shared/random'
@@ -8,7 +9,7 @@ import { type Look, opponentLook, plainLook } from '../../../shared/art3d/animal
 import { canWebGL } from '../../../shared/art3d/webgl'
 import { loadLook } from '../../../shared/storage/avatar'
 import { type MatchState, type MatchSummary, createMatch, matchReducer, summarizeMatch } from '../play/matchState'
-import { type FightMsg, guestActionOf, guestPickMsg, hostActionOf, hostOutbox } from '../play/pvp'
+import { type FightMsg, guestActionOf, guestPickMsg, hostActionOf, hostOutbox, serverActionOf } from '../play/pvp'
 import { type Fighter, STANCES, STANCE_COST, STANCE_LABEL, type Stance, canChoose } from '../rules/turn'
 import { playSound } from '../sounds'
 
@@ -87,13 +88,15 @@ function showOf(state: MatchState, side: 0 | 1): FighterShow {
 }
 
 export function GameScreen({ difficulty, seed, pvp, onFinish, onQuit }: Props) {
+  // 우리 게임 서버가 심판이면 방장도 친구처럼 턴·공개를 서버에서 받고, 고른 자세는 서버에만 보낸다 (조작 막기 3단계)
+  const [server] = useState(() => !!pvp?.room.hasReferee?.('fight'))
   const [state, dispatch] = useReducer(matchReducer, undefined, () =>
     createMatch({
       now: performance.now(),
       seed: seed ?? randomSeed(),
       difficulty,
       controllers: ['user', pvp ? 'remote' : 'bot'],
-      follow: pvp?.room.role === 'guest',
+      follow: pvp?.room.role === 'guest' || server,
     }),
   )
   const done = state.phase.kind === 'done'
@@ -106,8 +109,9 @@ export function GameScreen({ difficulty, seed, pvp, onFinish, onQuit }: Props) {
     if (!pvp) return
     const { room } = pvp
     const toAction = room.role === 'host' ? hostActionOf : guestActionOf
-    const offMsg = room.onMessage((msg) => {
-      const action = toAction(msg)
+    const offMsg = room.onMessage((msg, from) => {
+      if (server && from !== REFEREE_FROM) return
+      const action = server ? serverActionOf(msg, room.role) : toAction(msg)
       if (action) dispatch(action)
     })
     const offPeer = room.onPeer((peer) => {
@@ -117,19 +121,19 @@ export function GameScreen({ difficulty, seed, pvp, onFinish, onQuit }: Props) {
       offMsg()
       offPeer()
     }
-  }, [pvp])
+  }, [pvp, server])
 
   // 방장: 턴 시작·공개를 친구에게 보낸다
   const sentRef = useRef(state)
   useEffect(() => {
-    if (pvp?.room.role !== 'host') return
+    if (pvp?.room.role !== 'host' || server) return
     for (const msg of hostOutbox(sentRef.current, state)) pvp.room.send(msg)
     sentRef.current = state
-  }, [pvp, state])
+  }, [pvp, state, server])
 
   function choose(stance: Stance) {
     dispatch({ type: 'pick', side: 0, stance })
-    if (pvp?.room.role === 'guest') {
+    if (pvp && (pvp.room.role === 'guest' || server)) {
       const msg = guestPickMsg(stateRef.current, stance)
       if (msg) pvp.room.send(msg)
     }

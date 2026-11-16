@@ -1,6 +1,7 @@
 import type { RefereeFactory } from '../hub'
 import { artilleryReferee } from './artillery'
 import { bombReferee } from './bomb'
+import { fightReferee } from './fight'
 import { memoryReferee } from './memory'
 import { nunchiReferee } from './nunchi'
 import { numbaseballReferee } from './numbaseball'
@@ -20,4 +21,5 @@ export const REFEREES: Record<string, RefereeFactory> = {
   artillery: artilleryReferee,
   numbaseball: numbaseballReferee,
   memory: memoryReferee,
+  fight: fightReferee,
 }

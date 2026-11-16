@@ -42,6 +42,13 @@ export function guestActionOf(msg: FightMsg): MatchAction | null {
   return null
 }
 
+/** 서버 심판(우리 게임 서버)이 보낸 턴·공개 → 내 경기에 넣을 액션 (나는 늘 왼쪽) */
+export function serverActionOf(msg: FightMsg, role: 'host' | 'guest'): MatchAction | null {
+  if (msg.t === 'turn') return { type: 'remoteTurn', turn: msg.turn }
+  if (msg.t === 'reveal') return { type: 'remoteReveal', turn: msg.turn, stances: role === 'host' ? [msg.host, msg.guest] : [msg.guest, msg.host] }
+  return null
+}
+
 /** 친구: 지금 고른 자세를 방장에게 보낼 메시지. 고를 수 없는 때면 null */
 export function guestPickMsg(state: MatchState, stance: Stance): FightMsg | null {
   return state.phase.kind === 'choosing' ? { t: 'pick', turn: state.phase.index, stance } : null

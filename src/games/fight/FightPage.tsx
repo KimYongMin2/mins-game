@@ -141,6 +141,8 @@ export function FightPage() {
 
   function startPvp(room: Room<FightMsg>) {
     goRef.current = false
+    // 우리 게임 서버가 있으면 턴 시간·공개를 서버가 (조작 막기 3단계). 시작 메시지보다 먼저
+    if (room.hasReferee?.('fight')) room.startReferee?.('fight', {})
     room.send({ t: 'start' })
     setGames((n) => n + 1)
     setScreen({ kind: 'pvp-game', key: gamesRef.current + 1 })
