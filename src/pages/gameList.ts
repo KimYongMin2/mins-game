@@ -16,6 +16,8 @@ export type GameEntry = {
   colors: readonly [string, string]
   /** 메인 게임 창의 [조작법] (누를 때만 펼침, 3~4줄 — 규칙 설명이지 규칙을 바꾸는 게 아님) */
   howto: readonly string[]
+  /** 봇이 없는 친구 대전 게임 (그림 맞히기) — 메인의 [혼자 연습]·[봇이랑 연습]을 안 보임 */
+  noBots?: boolean
 }
 
 export const GAMES: GameEntry[] = [
@@ -100,6 +102,7 @@ export const GAMES: GameEntry[] = [
     play: 'pvp',
     players: '2~8인',
     icon: '🎨',
+    noBots: true,
     colors: ['#fbbf24', '#db2777'],
     howto: ['그릴 차례: 제시어 2개 중 하나를 골라 60초 동안 그려요 (색·굵기·지우개·되돌리기)', '맞힐 차례: 채팅으로 정답 입력, 마지막 20초엔 보기 4개 (한 번만, 점수 절반)', '빨리 맞힐수록 점수가 높고, 그린 사람도 맞힌 사람 1명당 3점', '모두 한 번씩(3명 이하면 두 번) 그리면 총점 1등이 우승'],
   },

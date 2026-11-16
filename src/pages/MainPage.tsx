@@ -225,9 +225,11 @@ export function MainPage({ nickname }: { nickname: string }) {
                 <button type="button" className="arc-button" onClick={() => setSheet({ kind: 'game', game: hero })}>
                   친구랑 대전
                 </button>
-                <button type="button" className="arc-button arc-button--ghost" onClick={() => go(hero, hero.path)}>
-                  혼자 연습
-                </button>
+                {!hero.noBots && (
+                  <button type="button" className="arc-button arc-button--ghost" onClick={() => go(hero, hero.path)}>
+                    혼자 연습
+                  </button>
+                )}
               </>
             ) : (
               <button type="button" className="arc-button" onClick={() => go(hero, hero.path)}>
@@ -344,9 +346,12 @@ export function MainPage({ nickname }: { nickname: string }) {
                       gameId={sheet.game.id}
                       nickname={nickname}
                       side={
-                        <button type="button" className="button pvp-lobby__big arc-practice" onClick={() => go(sheet.game, sheet.game.path)}>
-                          봇이랑 연습
-                        </button>
+                        // 봇이 없는 게임(그림 맞히기)은 연습 버튼 없음 (사용자 요청)
+                        sheet.game.noBots ? undefined : (
+                          <button type="button" className="button pvp-lobby__big arc-practice" onClick={() => go(sheet.game, sheet.game.path)}>
+                            봇이랑 연습
+                          </button>
+                        )
                       }
                       onCreate={(name, pin) => go(sheet.game, pvpLink(sheet.game.path, { kind: 'create', name, pin }))}
                       onJoin={(r, pin) => go(sheet.game, pvpLink(sheet.game.path, { kind: 'join', room: r, pin }))}
