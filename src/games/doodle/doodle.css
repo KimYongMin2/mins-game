@@ -40,7 +40,7 @@
   color: var(--ink);
   letter-spacing: 0.04em;
 }
-.dd-top__word--reveal { color: var(--brand); }
+.dd-top__word--reveal { color: #e8473f; }
 .dd-top__time { font-weight: 800; font-variant-numeric: tabular-nums; min-width: 3ch; text-align: right; color: var(--ink); }
 .dd-top__time--low { color: #e8473f; }
 

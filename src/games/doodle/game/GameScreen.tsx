@@ -78,18 +78,20 @@ export function GameScreen({ room, members, onFinish, onQuit }: Props) {
     for (const s of strokesRef.current) drawStroke(ctx, s)
   }
 
-  /** 바뀐 그림 넣기: 선 시작·이어 그리기는 그 부분만, 지우기는 다시 그림 */
+  /** 바뀐 그림 넣기: 선 시작·이어 그리기는 그 부분만 (한 묶음에 여러 조각이 와도 하나씩), 지우기는 다시 그림 */
   const apply = (ops: readonly InkOp[]) => {
-    const before = strokesRef.current
-    strokesRef.current = applyOps(before, ops)
     const ctx = canvasRef.current?.getContext('2d')
-    if (!ctx || ops.some((o) => o.op === 'u' || o.op === 'x')) return redraw()
     for (const o of ops) {
-      if (o.op !== 's' && o.op !== 'a') continue
+      strokesRef.current = applyOps(strokesRef.current, [o])
+      if (!ctx) continue
+      if (o.op === 'u' || o.op === 'x') {
+        redraw()
+        continue
+      }
       const s = strokesRef.current.find((x) => x.id === o.id)
       if (!s) continue
       if (o.op === 's') drawStroke(ctx, s)
-      else if (o.op === 'a') drawStroke(ctx, s, s.p.length - o.p.length)
+      else drawStroke(ctx, s, s.p.length - o.p.length)
     }
   }
 
