@@ -9,6 +9,7 @@ const game = (outcome: MatchSummary['outcome'], difficulty: 'normal' | 'hard' = 
   turns: 8,
   life: [1, 0],
   strikes: 3,
+  moves: [],
 })
 
 describe('addGame', () => {

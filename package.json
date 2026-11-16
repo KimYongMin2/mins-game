@@ -8,7 +8,8 @@
     "build": "tsc -b && vite build",
     "lint": "oxlint",
     "preview": "vite preview",
-    "test": "vitest run"
+    "test": "vitest run",
+    "build:api": "rolldown server-entry/ticket.ts -o api/ticket.js -p node -f esm && rolldown server-entry/submit.ts -o api/submit.js -p node -f esm"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.118.0",

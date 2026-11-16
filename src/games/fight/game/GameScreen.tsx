@@ -23,6 +23,8 @@ function fightLooks(peerAvatar?: string): readonly [Look, Look] {
 
 type Props = {
   difficulty: Difficulty
+  /** 서버 입장권의 시드 (봇 대전 랭킹 확인용). 없으면 아무 시드 */
+  seed?: number
   /** 친구 대전이면 방과 상대 이름 */
   pvp?: { room: Room<FightMsg>; peerName: string; peerAvatar?: string }
   onFinish: (summary: MatchSummary) => void
@@ -84,11 +86,11 @@ function showOf(state: MatchState, side: 0 | 1): FighterShow {
   return { stance: null, event: null, hidden: false }
 }
 
-export function GameScreen({ difficulty, pvp, onFinish, onQuit }: Props) {
+export function GameScreen({ difficulty, seed, pvp, onFinish, onQuit }: Props) {
   const [state, dispatch] = useReducer(matchReducer, undefined, () =>
     createMatch({
       now: performance.now(),
-      seed: randomSeed(),
+      seed: seed ?? randomSeed(),
       difficulty,
       controllers: ['user', pvp ? 'remote' : 'bot'],
       follow: pvp?.room.role === 'guest',

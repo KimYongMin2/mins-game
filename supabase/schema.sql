@@ -356,3 +356,11 @@ $$;
 
 revoke all on function public.fight_leaderboard(text) from public;
 grant execute on function public.fight_leaderboard(text) to anon, authenticated;
+
+-- ============================================================
+-- 랭킹 조작 막기 (2026-11-16): 서버가 판을 다시 돌려 확인한 기록만 넣는다.
+-- 넣기는 Vercel 서버 함수(/api/submit, 비밀 키)만 하고, 브라우저가 테이블에 바로 넣는 길은 닫는다.
+-- 게임을 하나씩 옮길 때마다 아래에 그 테이블을 추가한다.
+-- ============================================================
+drop policy if exists "본인 기록 추가" on public.fight_games;
+revoke insert on public.fight_games from authenticated;

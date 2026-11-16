@@ -220,6 +220,8 @@ export type MatchSummary = {
   life: Pair<number>
   /** 내가 넣은 타격 수 */
   strikes: number
+  /** 내가 턴마다 낸 자세 (랭킹 올릴 때 서버가 이걸로 판을 다시 돌려 확인) */
+  moves: Stance[]
 }
 
 export function summarizeMatch(state: MatchState): MatchSummary {
@@ -233,5 +235,6 @@ export function summarizeMatch(state: MatchState): MatchSummary {
     turns: state.turns.length,
     life: [state.fighters[me].life, state.fighters[1 - me].life],
     strikes: state.turns.filter((t) => t.events[me] === 'strike').length,
+    moves: state.turns.map((t) => t.stances[me]),
   }
 }
