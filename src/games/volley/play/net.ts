@@ -40,15 +40,20 @@ export type VolleyMsg =
   | { t: 'ping'; id: number }
   | { t: 'pong'; id: number }
 
+/** 내 키와 상대 키를 자리 순서 [0번, 1번]으로 */
+const pair = (side: Side, mine: Input, foe: Input): [Input, Input] => (side === 0 ? [mine, foe] : [foe, mine])
+
 export const sameInput = (a: Input, b: Input) => a.left === b.left && a.right === b.right && a.jump === b.jump && a.down === b.down && a.hit === b.hit
 
-/** 친구(1번 자리) 기기의 예측 상태 */
+/** 예측하는 기기의 상태 (친구 = 1번 자리. 서버 심판이면 방장도 0번 자리로 같은 방식) */
 export type Guest = {
+  /** 내 자리 */
+  side: Side
   /** 화면에 그리는 예측 경기 */
   local: SimState
   /** 마지막으로 받은 방장 상태의 스텝 */
   authTick: number
-  /** 방장이 마지막으로 누르던 키 (예측할 때 그대로 누르고 있다고 친다) */
+  /** 상대가 마지막으로 누르던 키 (예측할 때 그대로 누르고 있다고 친다) */
   hostInput: Input
   /** 스텝별로 내가 누른 키 (재현용) */
   history: Map<number, Input>
@@ -59,14 +64,14 @@ export type Guest = {
   count: number
 }
 
-export function createGuest(initial: SimState): Guest {
-  return { local: initial, authTick: initial.tick, hostInput: NO_INPUT, history: new Map(), rttMs: DEFAULT_RTT_MS, drift: 0, count: 0 }
+export function createGuest(initial: SimState, side: Side = 1): Guest {
+  return { side, local: initial, authTick: initial.tick, hostInput: NO_INPUT, history: new Map(), rttMs: DEFAULT_RTT_MS, drift: 0, count: 0 }
 }
 
 const leadOf = (g: Guest) => Math.min(MAX_LEAD, Math.round((g.rttMs / 1000) * STEP_HZ))
 
 function advance(g: Guest, mine: Input): Guest {
-  const local = step(g.local, [g.hostInput, mine])
+  const local = step(g.local, pair(g.side, mine, g.hostInput))
   const history = new Map(g.history)
   history.set(local.tick, mine)
   return { ...g, local, history }
@@ -99,12 +104,12 @@ export function guestReceive(g: Guest, s: SimState, inputs: [Input, Input]): Gue
   const snap = Math.abs(measured) > SNAP_DRIFT
   const target = snap ? ideal : Math.max(g.local.tick, s.tick)
   const drift = snap ? 0 : g.drift * 0.8 + measured * 0.2
-  const hostInput = inputs[0]
+  const hostInput = inputs[g.side === 1 ? 0 : 1]
   let local = s
   // 끝난 경기는 스텝이 안 늘어서 거기서 멈춘다
   while (local.tick < target && local.phase.kind !== 'done') {
-    const mine = g.history.get(local.tick + 1) ?? inputs[1]
-    local = step(local, [hostInput, mine])
+    const mine = g.history.get(local.tick + 1) ?? inputs[g.side]
+    local = step(local, pair(g.side, mine, hostInput))
   }
   // 오래된 기록은 버린다
   const history = new Map([...g.history].filter(([tick]) => tick > s.tick))

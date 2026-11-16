@@ -3843,7 +3843,7 @@ var Hub = class {
 				console.warn("[hub] 심판 오류", game, e);
 				this.stopReferee(room);
 			}
-		}, this.opts.tickMs ?? 50);
+		}, ref.tickMs ?? this.opts.tickMs ?? 50);
 		room.referee = {
 			game,
 			ref,
@@ -7108,7 +7108,7 @@ function resolveTurn(fighters, chosen) {
 	};
 }
 /** turnsPlayed: 지금까지 끝난 턴 수 */
-function winnerOf(fighters, turnsPlayed) {
+function winnerOf$1(fighters, turnsPlayed) {
 	const [a, b] = fighters;
 	if (a.life <= 0 && b.life <= 0) return "draw";
 	if (b.life <= 0) return 0;
@@ -7259,7 +7259,7 @@ function tick$7(state) {
 		case "choosing": return now >= phase.until && !state.follow ? reveal$1(state, phase.picks) : state;
 		case "reveal": {
 			if (now < phase.until) return state;
-			const winner = winnerOf(state.fighters, state.turns.length);
+			const winner = winnerOf$1(state.fighters, state.turns.length);
 			if (winner === null) return state.follow ? state : startChoosing(state);
 			const userSide = state.controllers.indexOf("user");
 			return withSounds$1({
@@ -7307,7 +7307,7 @@ function awaitingTurn(state, turn) {
 	return state.follow && turn === state.turns.length && (kind === "intro" || kind === "reveal");
 }
 function remoteTurn(state, turn) {
-	if (!awaitingTurn(state, turn) || winnerOf(state.fighters, state.turns.length) !== null) return state;
+	if (!awaitingTurn(state, turn) || winnerOf$1(state.fighters, state.turns.length) !== null) return state;
 	return startChoosing(state);
 }
 function remoteReveal(state, turn, stances) {
@@ -9704,6 +9704,428 @@ function tilesReferee(setup, ctx) {
 	});
 }
 //#endregion
+//#region src/games/volley/constants.ts
+/** 그 게임 1칸 = 16m / 432칸 */
+const PX = 16 / 432;
+const FPS = 25;
+const V = PX * FPS;
+const A = PX * FPS * FPS;
+const DT = 1 / 60;
+/** 중력 (공·선수 같음) */
+const GRAVITY = 1 * A;
+/** 공 (선수 키의 절반쯤으로 크다) */
+const BALL_R = 20 * PX;
+/**
+* 선수: 공과 부딪히는 판정은 네모 하나 (가운데에서 가로·세로 PLAYER_HALF 안에 공 가운데가 들어오면).
+* 가운데 높이는 발(y)에서 PLAYER_CY 위
+*/
+const PLAYER_HALF = 32 * PX;
+const PLAYER_CY = 1.037037037037037;
+/** 걷기 (누르는 순간 바로 이 속도, 공중에서도 움직인다) */
+const MOVE_SPEED = 6 * V;
+/** 점프 높이 = JUMP_SPEED² / (2 × 중력) ≈ 4.7m */
+const JUMP_SPEED = 16 * V;
+/**
+* 몸에 맞으면: 공은 늘 위로 튄다 (위로 가는 속도는 들어온 속도와 BUMP_UP 중 큰 것).
+* 옆으로는 몸 가운데에서 떨어진 만큼: 3칸당 1칸/프레임 (가운데에 맞으면 거의 수직, 몸 끝에 맞으면 옆으로 멀리)
+*/
+const BUMP_UP = 15 * V;
+const BUMP_SIDE_PER_PX = 1 / 3;
+const PX_LEN = PX;
+const V_UNIT = V;
+/**
+* 스파이크: 공중에서 치기를 누르면 땅에 닿을 때까지 '치는 자세'. 그동안 공이 몸에 닿으면 강타.
+* 옆으로: 방향키 ←→ 아무거나 누르면 빠르게, 안 누르면 보통 (늘 상대 쪽으로).
+* 위아래: ↑(점프 키) 위로 · ↓ 아래로 · 없으면 수평. 세기는 위로 튀는 속도의 2배
+*/
+const SPIKE_SIDE_SLOW = 10 * V;
+const SPIKE_SIDE_FAST = 20 * V;
+/** 몸 날리기: 땅에서 방향키와 같이 치기. 옆으로 미끄러지며 살짝 뜨고, 끝나면 잠깐 누워 있다 */
+const DIVE_SPEED = 8 * V;
+const DIVE_HOP = 5 * V;
+const DIVE_RECOVER_S = .2;
+/** 점수가 나면 보여주는 시간 */
+const POINT_S = 1.4;
+/** 서브: 공이 서브하는 사람 조금 앞 하늘 꼭대기에서 떨어진다 */
+const SERVE_BALL_X = 56 * PX;
+const SERVE_PLAYER_X = 36 * PX;
+/** 서브 전 준비 시간 */
+const SERVE_WAIT_S = .8;
+//#endregion
+//#region src/games/volley/play/sim.ts
+const NO_INPUT = {
+	left: false,
+	right: false,
+	jump: false,
+	down: false,
+	hit: false
+};
+const steps = (s) => Math.round(s * 60);
+/** 사람이 서 있을 수 있는 범위 (네트 앞 PLAYER_HALF 만큼은 못 들어감) */
+function sideBounds(side) {
+	return side === 0 ? [PLAYER_HALF, 6.814814814814815] : [9.185185185185185, 14.814814814814815];
+}
+/** 네트 쪽 방향 */
+const towardNet = (side) => side === 0 ? 1 : -1;
+function freshPlayer(side) {
+	return {
+		x: side === 0 ? SERVE_PLAYER_X : 14.666666666666666,
+		y: 0,
+		vx: 0,
+		vy: 0,
+		facing: towardNet(side),
+		dive: 0,
+		recover: 0,
+		power: false,
+		prevHit: false,
+		touching: false
+	};
+}
+function serveBall(server) {
+	return {
+		x: server === 0 ? SERVE_BALL_X : 13.925925925925926,
+		y: 10.074074074074073,
+		vx: 0,
+		vy: 0
+	};
+}
+function createSim(server) {
+	return {
+		tick: 0,
+		players: [freshPlayer(0), freshPlayer(1)],
+		ball: serveBall(server),
+		score: [0, 0],
+		spikes: [0, 0],
+		server,
+		phase: {
+			kind: "serve",
+			t: steps(SERVE_WAIT_S)
+		},
+		lastHit: null,
+		hitSeq: 0
+	};
+}
+/** 선수 판정 네모의 가운데 */
+function centerOf(p) {
+	return {
+		x: p.x,
+		y: p.y + PLAYER_CY
+	};
+}
+/** 공 가운데가 선수 네모 안인지 */
+function touchesBall(p, b) {
+	const c = centerOf(p);
+	return Math.abs(b.x - c.x) <= 1.1851851851851851 && Math.abs(b.y - c.y) <= 1.1851851851851851;
+}
+/** 틱마다 같은 값이 나오는 -1·0·1 (공이 몸 한가운데에 맞았을 때 옆으로 살짝) */
+function wobble(tick) {
+	return (Math.imul(tick ^ 1540483477, 668265261) >>> 0) % 3 - 1;
+}
+/**
+* 공이 선수 몸에 맞은 뒤 속도. power(치는 자세)면 강타.
+* 강타 방향: ←→ 아무거나 = 빠르게(늘 상대 쪽), ↑ 위로 · ↓ 아래로 · 없음 수평
+*/
+function hitBall(b, p, side, input, power, tick) {
+	const dxPx = Math.abs(b.x - p.x) / PX_LEN;
+	let vx = Math.floor(dxPx * BUMP_SIDE_PER_PX) * V_UNIT * (b.x < p.x ? -1 : 1);
+	if (vx === 0) vx = wobble(tick) * V_UNIT;
+	let vy = Math.max(Math.abs(b.vy), BUMP_UP);
+	if (power) {
+		vx = (input.left || input.right ? SPIKE_SIDE_FAST : SPIKE_SIDE_SLOW) * towardNet(side);
+		const ydir = input.down ? -1 : input.jump ? 1 : 0;
+		vy = vy * ydir * 2;
+	}
+	return {
+		...b,
+		vx,
+		vy
+	};
+}
+function movePlayer(p, side, input) {
+	const dir = (input.right ? 1 : 0) - (input.left ? 1 : 0);
+	const pressed = input.hit && !p.prevHit;
+	let { x, y, vx, vy, facing, dive, recover, power } = p;
+	const onGround = y <= 0;
+	if (dive > 0) vx = facing * DIVE_SPEED;
+	else if (recover > 0) {
+		recover--;
+		vx = 0;
+	} else {
+		if (dir !== 0) facing = dir;
+		vx = dir * MOVE_SPEED;
+		if (onGround) {
+			if (input.jump) vy = JUMP_SPEED;
+			else if (pressed && dir !== 0) {
+				dive = 1;
+				vx = dir * DIVE_SPEED;
+				vy = DIVE_HOP;
+			}
+		} else if (pressed) power = true;
+	}
+	vy -= GRAVITY * DT;
+	y += vy * DT;
+	if (y <= 0) {
+		y = 0;
+		vy = 0;
+		power = false;
+		if (dive > 0) {
+			dive = 0;
+			recover = steps(DIVE_RECOVER_S);
+		}
+	}
+	x += vx * DT;
+	const [lo, hi] = sideBounds(side);
+	if (x < lo) x = lo;
+	else if (x > hi) x = hi;
+	return {
+		...p,
+		x,
+		y,
+		vx,
+		vy,
+		facing,
+		dive,
+		recover,
+		power,
+		prevHit: input.hit
+	};
+}
+/** 공 한 스텝 (선수 빼고): 벽·천장·네트에 부딪히는지 보고 → 움직이고 → 중력 */
+function moveBall(b) {
+	let { x, y, vx, vy } = b;
+	let hit = null;
+	const fx = x + vx * DT;
+	if (fx < .7407407407407407 && vx < 0 || fx > 15.25925925925926 && vx > 0) {
+		vx = -vx;
+		hit = "wall";
+	}
+	if (y + vy * .016666666666666666 > 10.074074074074073 && vy > 0) {
+		vy = -.9259259259259258;
+		hit = "wall";
+	}
+	if (Math.abs(x - 8) < .9259259259259258 && y < 3.5555555555555554) {
+		if (y >= 2.962962962962963) {
+			if (vy < 0) vy = -vy;
+		} else vx = x < 8 ? -Math.abs(vx) : Math.abs(vx);
+		hit = "net";
+	}
+	x = Math.min(15.25925925925926, Math.max(BALL_R, x + vx * DT));
+	y = Math.min(10.074074074074073, y + vy * DT);
+	vy -= GRAVITY * DT;
+	const speed = Math.hypot(vx, vy);
+	if (speed > 45) {
+		vx *= 45 / speed;
+		vy *= 45 / speed;
+	}
+	return {
+		ball: {
+			x,
+			y,
+			vx,
+			vy
+		},
+		hit
+	};
+}
+function withHit(s, kind, player) {
+	const seq = s.hitSeq + 1;
+	return {
+		...s,
+		hitSeq: seq,
+		lastHit: {
+			kind,
+			player,
+			seq,
+			tick: s.tick
+		}
+	};
+}
+/** 이겼는지: 15점 먼저 (듀스 없음) */
+function winnerOf(score) {
+	const [a, b] = score;
+	if (a >= 15) return 0;
+	if (b >= 15) return 1;
+	return null;
+}
+function startServe(s, server) {
+	return {
+		...s,
+		server,
+		players: [freshPlayer(0), freshPlayer(1)],
+		ball: serveBall(server),
+		phase: {
+			kind: "serve",
+			t: steps(SERVE_WAIT_S)
+		}
+	};
+}
+function step(s, inputs) {
+	if (s.phase.kind === "done") return s;
+	const tick = s.tick + 1;
+	let players = [movePlayer(s.players[0], 0, inputs[0]), movePlayer(s.players[1], 1, inputs[1])];
+	let next = {
+		...s,
+		tick,
+		players
+	};
+	switch (s.phase.kind) {
+		case "serve":
+			if (s.phase.t > 1) return {
+				...next,
+				phase: {
+					kind: "serve",
+					t: s.phase.t - 1
+				}
+			};
+			return {
+				...next,
+				phase: { kind: "rally" }
+			};
+		case "point": {
+			if (s.phase.t > 1) return {
+				...next,
+				phase: {
+					...s.phase,
+					t: s.phase.t - 1
+				}
+			};
+			const winner = winnerOf(s.score);
+			if (winner !== null) return {
+				...next,
+				phase: {
+					kind: "done",
+					winner
+				}
+			};
+			return startServe(next, s.phase.scorer);
+		}
+		case "rally": {
+			const w = moveBall(s.ball);
+			let ball = w.ball;
+			if (w.hit) next = withHit(next, w.hit, null);
+			let spikes = s.spikes;
+			players = players.map((p, i) => {
+				const side = i;
+				const touching = touchesBall(p, ball);
+				if (touching && !p.touching) {
+					ball = hitBall(ball, p, side, inputs[side], p.power, tick);
+					if (p.power) spikes = side === 0 ? [spikes[0] + 1, spikes[1]] : [spikes[0], spikes[1] + 1];
+					next = withHit(next, p.power ? "spike" : "bump", side);
+				}
+				return touching === p.touching ? p : {
+					...p,
+					touching
+				};
+			});
+			next = {
+				...next,
+				players,
+				ball,
+				spikes
+			};
+			if (ball.y - .7407407407407407 <= 0) {
+				const scorer = ball.x < 8 ? 1 : 0;
+				const score = scorer === 0 ? [s.score[0] + 1, s.score[1]] : [s.score[0], s.score[1] + 1];
+				return {
+					...next,
+					ball: {
+						...ball,
+						y: BALL_R,
+						vx: 0,
+						vy: 0
+					},
+					score,
+					phase: {
+						kind: "point",
+						scorer,
+						t: steps(POINT_S)
+					}
+				};
+			}
+			return next;
+		}
+	}
+}
+//#endregion
+//#region src/server/referees/volley.ts
+const STEP_MS = 1e3 / 60;
+/** 한 번에 따라잡는 최대 스텝 (서버가 잠깐 멈췄다 돌아와도 폭주하지 않게) */
+const MAX_CATCHUP = 10;
+const isInput = (x) => {
+	const i = x;
+	return !!i && typeof i === "object" && [
+		"left",
+		"right",
+		"jump",
+		"down",
+		"hit"
+	].every((k) => typeof i[k] === "boolean");
+};
+function volleyReferee(setup, ctx) {
+	const o = setup ?? {};
+	const members = ctx.members();
+	const host = members.find((m) => m.role === "host");
+	const guest = members.find((m) => m.role === "guest");
+	if (!host || !guest || o.server !== 0 && o.server !== 1) return null;
+	let sim = createSim(o.server);
+	const t0 = ctx.now();
+	const inputs = [NO_INPUT, NO_INPUT];
+	/** 아주 짧게 눌렀다 뗀 치기도 한 스텝은 꼭 '누름'으로 */
+	const tapped = [false, false];
+	let doneAt = null;
+	return {
+		tickMs: STEP_MS,
+		input(from, msg) {
+			const m = msg ?? {};
+			if (m.t === "state") return true;
+			if (m.t === "ping") {
+				ctx.sendTo(from, {
+					t: "pong",
+					id: m.id
+				});
+				return true;
+			}
+			if (m.t !== "input") return false;
+			const side = from === host.id ? 0 : from === guest.id ? 1 : null;
+			if (side === null || !isInput(m.i)) return true;
+			if (m.i.hit && !inputs[side].hit) tapped[side] = true;
+			inputs[side] = {
+				left: m.i.left,
+				right: m.i.right,
+				jump: m.i.jump,
+				down: m.i.down,
+				hit: m.i.hit
+			};
+			return true;
+		},
+		tick(now) {
+			const target = Math.floor((now - t0) / STEP_MS);
+			let n = 0;
+			let used = inputs;
+			while (sim.tick < target && n < MAX_CATCHUP && sim.phase.kind !== "done") {
+				used = [tapped[0] ? {
+					...inputs[0],
+					hit: true
+				} : inputs[0], tapped[1] ? {
+					...inputs[1],
+					hit: true
+				} : inputs[1]];
+				tapped[0] = tapped[1] = false;
+				sim = step(sim, used);
+				n++;
+			}
+			if (n > 0 || sim.phase.kind === "done" && doneAt === null) ctx.broadcast({
+				t: "state",
+				s: sim,
+				i: used
+			});
+			if (doneAt === null && sim.phase.kind === "done") doneAt = now;
+		},
+		leave() {},
+		finished: () => doneAt !== null && ctx.now() - doneAt > 5e3
+	};
+}
+//#endregion
 //#region src/games/wordchain/constants.ts
 const INTRO_MS$1 = 2500;
 /** 한 차례 (넘기면 탈락) */
@@ -10600,7 +11022,8 @@ const REFEREES = {
 	doodle: doodleReferee,
 	chosung: chosungReferee,
 	wordchain: wordchainReferee,
-	armwrestle: armwrestleReferee
+	armwrestle: armwrestleReferee,
+	volley: volleyReferee
 };
 //#endregion
 //#region game-server/main.ts

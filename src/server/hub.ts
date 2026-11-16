@@ -19,6 +19,8 @@ export type Referee = {
   leave(key: string): void
   /** 끝나서 그만 돌려도 되는지 */
   finished(): boolean
+  /** 이 심판만 다른 박자 (점프 배구 물리는 1초에 60번) */
+  tickMs?: number
 }
 
 export type RefereeContext = {
@@ -339,7 +341,7 @@ export class Hub {
         console.warn('[hub] 심판 오류', game, e)
         this.stopReferee(room)
       }
-    }, this.opts.tickMs ?? 50)
+    }, ref.tickMs ?? this.opts.tickMs ?? 50)
     room.referee = { game, ref, timer }
   }
 

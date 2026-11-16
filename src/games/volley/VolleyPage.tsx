@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { HomeLink } from '../../shared/ui/HomeLink'
 import { wantsPvp } from '../../shared/nav'
 import { installAudioUnlock } from '../../shared/audio/synth'
-import { type DirectRoom, withDirectLink } from '../../shared/online/directLink'
+import { withDirectLink } from '../../shared/online/directLink'
 import type { Peer, Room } from '../../shared/online/room'
 import { loadNickname } from '../../shared/storage/nickname'
 import { PvpLobby } from '../../shared/ui/PvpLobby'
@@ -30,7 +30,7 @@ type Screen =
   | { kind: 'pvp-game'; key: number; server: Side }
   | { kind: 'pvp-result'; summary: GameSummary }
 
-type Pvp = { room: DirectRoom<VolleyMsg>; peer: Peer }
+type Pvp = { room: Room<VolleyMsg>; peer: Peer }
 
 export function VolleyPage() {
   const [screen, setScreen] = useState<Screen>(() => (wantsPvp() ? { kind: 'lobby' } : { kind: 'start' }))
@@ -100,7 +100,8 @@ export function VolleyPage() {
 
   function connected(room: Room<VolleyMsg>, peer: Peer) {
     // 경기 메시지는 되도록 기기끼리 직접 (WebRTC). 자주 오는 상태는 빠져도 다음 것이 오므로 다시 안 보내는 채널로 (끝난 상태는 꼭 가게)
-    setPvp({ room: withDirectLink(room, { lossy: (m) => m.t === 'state' && m.s.phase.kind !== 'done' }), peer })
+    // 우리 게임 서버가 물리를 돌리면 서버를 거침 (직접 연결 안 씀)
+    setPvp({ room: room.hasReferee?.('volley') ? room : withDirectLink(room, { lossy: (m) => m.t === 'state' && m.s.phase.kind !== 'done' }), peer })
     setPeerGone(false)
     goRef.current = false
     listeningRef.current = false
@@ -108,9 +109,11 @@ export function VolleyPage() {
   }
 
   /** 방장: 첫 서브를 무작위로 정해 친구에게 보내고 시작 */
-  function startPvp(room: DirectRoom<VolleyMsg>) {
+  function startPvp(room: Room<VolleyMsg>) {
     goRef.current = false
     const server: Side = Math.random() < 0.5 ? 0 : 1
+    // 우리 게임 서버가 있으면 물리를 서버가 (시작 메시지보다 먼저)
+    if (room.hasReferee?.('volley')) room.startReferee?.('volley', { server })
     room.send({ t: 'start', server })
     setScreen({ kind: 'pvp-game', key: Date.now(), server })
   }

@@ -1,8 +1,9 @@
 import { Suspense, lazy, useEffect, useRef, useState } from 'react'
+import { REFEREE_FROM } from '../../../shared/online/hubProtocol'
 import { type Look, opponentLook, plainLook } from '../../../shared/art3d/animalKinds'
 import { canWebGL } from '../../../shared/art3d/webgl'
 import { loadLook } from '../../../shared/storage/avatar'
-import type { DirectRoom } from '../../../shared/online/directLink'
+import type { Room } from '../../../shared/online/room'
 import { LinkBadge } from '../../../shared/ui/LinkBadge'
 import { loadNickname } from '../../../shared/storage/nickname'
 import { type BotLevel, botInput, createBotMind } from '../bot/volleyBot'
@@ -21,7 +22,7 @@ import { type SoundName, playSound } from '../sounds'
 
 type Props =
   | { mode: 'bot'; level: BotLevel; onFinish: (s: GameSummary) => void }
-  | { mode: 'pvp'; room: DirectRoom<VolleyMsg>; peerName: string; peerAvatar?: string; server: Side; peerGone: boolean; onFinish: (s: GameSummary) => void; onQuit: () => void }
+  | { mode: 'pvp'; room: Room<VolleyMsg>; peerName: string; peerAvatar?: string; server: Side; peerGone: boolean; onFinish: (s: GameSummary) => void; onQuit: () => void }
 
 // 선수만 3D 동물 (야구처럼 2D 코트 위에 겹침). three.js는 이때만 불러온다
 const Players3D = lazy(() => import('../field/Players3D').then((m) => ({ default: m.Players3D })))
@@ -62,10 +63,14 @@ export function GameScreen(props: Props) {
   const me: Side = role === 'guest' ? 1 : 0
   const foe: Side = me === 0 ? 1 : 0
   const mirror = me === 1
+  // 우리 게임 서버가 물리를 돌리면 방장도 친구처럼 예측해서 따라간다 (사용자 요청 2026-11-16)
+  const [server] = useState(() => props.mode === 'pvp' && !!props.room.hasReferee?.('volley'))
+  /** 예측해서 그리는지 (친구, 또는 서버 심판일 때 방장도) */
+  const predict = role === 'guest' || server
   // 물리 상태는 ref에 두고, 프레임마다 그릴 것만 state로. 첫 서브: 친구 대전은 방장이 정함, 봇전은 무작위
   const [initial] = useState(() => createSim(props.mode === 'pvp' ? props.server : Math.random() < 0.5 ? 0 : 1))
   const simRef = useRef<SimState>(initial)
-  const guestRef = useRef<Guest>(createGuest(initial))
+  const guestRef = useRef<Guest>(createGuest(initial, me))
   // 그릴 것: 경기 상태 + 공 꼬리
   const [frame, setFrame] = useState<{ sim: SimState; trail: { x: number; y: number }[] }>({ sim: initial, trail: [] })
   const view = frame.sim
@@ -122,8 +127,9 @@ export function GameScreen(props: Props) {
   useEffect(() => {
     if (!room) return
     const pings = new Map<number, number>()
-    const off = room.onMessage((msg) => {
-      if (room.role === 'host') {
+    const off = room.onMessage((msg, from) => {
+      if (server && from !== REFEREE_FROM) return
+      if (room.role === 'host' && !server) {
         if (msg.t === 'input') {
           // 친구가 짧게 누른 것도 놓치지 않게 (누름·뗌이 한 프레임에 같이 와도)
           if (msg.i.hit && !remoteRef.current.hit) remoteTapRef.current = true
@@ -145,7 +151,7 @@ export function GameScreen(props: Props) {
     // 친구: 왕복 지연 재기
     let id = 0
     const timer =
-      room.role === 'guest'
+      predict
         ? setInterval(() => {
             id++
             pings.set(id, performance.now())
@@ -156,7 +162,7 @@ export function GameScreen(props: Props) {
       off()
       clearInterval(timer)
     }
-  }, [room])
+  }, [room, server, predict])
 
   // 게임 루프
   useEffect(() => {
@@ -193,7 +199,7 @@ export function GameScreen(props: Props) {
           const b = botInput(simRef.current, 1, p.level, mind)
           mind = b.mind
           simRef.current = step(simRef.current, [mine, b.input])
-        } else if (p.room.role === 'host') {
+        } else if (p.room.role === 'host' && !server) {
           if (p.peerGone) continue
           simRef.current = step(simRef.current, [mine, remote])
           // 끝난 뒤엔 스텝이 안 늘어서 한 번만 보낸다
@@ -211,16 +217,16 @@ export function GameScreen(props: Props) {
       // 스텝이 없던 프레임에 누른 것도 보낼 수 있게 (친구)
       if (n === 0) mine = toWorld({ ...keysRef.current, hit: keysRef.current.hit || tap }, mirror)
       // 친구: 키가 바뀌면 바로, 아니어도 가끔
-      if (p.mode === 'pvp' && p.room.role === 'guest' && (!sameInput(mine, sentInput) || t - sentAt > INPUT_RESEND_MS)) {
+      if (p.mode === 'pvp' && predict && (!sameInput(mine, sentInput) || t - sentAt > INPUT_RESEND_MS)) {
         p.room.send({ t: 'input', i: mine })
         sentInput = mine
         sentAt = t
         if (mine.hit) hitTapRef.current = false
       }
       // 그릴 상태
-      let shown = role === 'guest' ? guestRef.current.local : simRef.current
+      let shown = predict ? guestRef.current.local : simRef.current
       const o = offsetRef.current
-      if (role === 'guest' && shown.phase.kind === 'rally') {
+      if (predict && shown.phase.kind === 'rally') {
         shown = {
           ...shown,
           ball: { ...shown.ball, x: shown.ball.x + o.bx, y: shown.ball.y + o.by },
@@ -240,7 +246,7 @@ export function GameScreen(props: Props) {
     }
     raf = requestAnimationFrame(loop)
     return () => cancelAnimationFrame(raf)
-  }, [mirror, role])
+  }, [mirror, role, predict, server])
 
   // 소리·흔들림: 새로 생긴 일만
   const seen = useRef({ hit: 0, phase: view.phase.kind, air: false })
@@ -269,7 +275,7 @@ export function GameScreen(props: Props) {
     if (!done) return
     const id = setTimeout(() => {
       const p = propsRef.current
-      const s = role === 'guest' ? guestRef.current.local : simRef.current
+      const s = predict ? guestRef.current.local : simRef.current
       if (s.phase.kind !== 'done') return
       p.onFinish({
         mode: p.mode,
@@ -281,7 +287,7 @@ export function GameScreen(props: Props) {
       })
     }, DONE_MS)
     return () => clearTimeout(id)
-  }, [done, role, me, foe])
+  }, [done, predict, me, foe])
 
   // 터치 버튼: 누르는 동안만
   function touch(k: keyof Keys, down: boolean) {

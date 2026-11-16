@@ -350,3 +350,47 @@ describe('팔씨름 서버 심판', () => {
     expect(g.phase.kind === 'done' && g.phase.winner).toBe(1)
   })
 })
+
+import { createSim as createVb } from '../../games/volley/play/sim'
+import { createGuest as vbGuest, guestReceive as vbReceive, guestStep as vbStep } from '../../games/volley/play/net'
+import { botInput as vbBot, createBotMind as vbMind } from '../../games/volley/bot/volleyBot'
+import { volleyReferee } from './volley'
+
+describe('점프 배구 서버 물리', () => {
+  it('두 폰(방장 0번·친구 1번)이 예측하며 서버 경기를 따라가고 점수가 같아짐', () => {
+    const f = fakeCtx([{ id: 'H', role: 'host' }, { id: 'G', role: 'guest' }])
+    const states: { s: ReturnType<typeof createVb>; i: [never, never] }[] = []
+    f.ctx.broadcast = (m) => states.push(m as never)
+    const ref = volleyReferee({ server: 0 }, f.ctx)!
+    expect(ref.tickMs).toBeCloseTo(1000 / 60)
+    let h = vbGuest(createVb(0), 0)
+    let g = vbGuest(createVb(0), 1)
+    let mh = vbMind()
+    let mg = vbMind()
+    let seen = 0
+    for (let i = 0; i < 60 * 90; i++) {
+      f.advance(1000 / 60)
+      const bh = vbBot(h.local, 0, 'hard', mh)
+      const bg = vbBot(g.local, 1, 'hard', mg)
+      mh = bh.mind
+      mg = bg.mind
+      ref.input('H', { t: 'input', i: bh.input })
+      ref.input('G', { t: 'input', i: bg.input })
+      ref.tick(f.now)
+      h = vbStep(h, bh.input)
+      g = vbStep(g, bg.input)
+      for (; seen < states.length; seen++) {
+        h = vbReceive(h, states[seen].s, states[seen].i)
+        g = vbReceive(g, states[seen].s, states[seen].i)
+      }
+    }
+    const last = states.at(-1)!.s
+    expect(last.tick).toBeGreaterThan(60 * 80)
+    expect(h.authTick).toBe(last.tick)
+    expect(g.authTick).toBe(last.tick)
+    expect([...h.local.score]).toEqual([...last.score])
+    expect([...g.local.score]).toEqual([...last.score])
+    // 폰이 보낸 가짜 상태는 버림
+    expect(ref.input('G', { t: 'state', s: last })).toBe(true)
+  })
+})

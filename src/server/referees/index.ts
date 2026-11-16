@@ -12,6 +12,7 @@ import { numbaseballReferee } from './numbaseball'
 import { rouletteReferee } from './roulette'
 import { survivalReferee } from './survival'
 import { tilesReferee } from './tiles'
+import { volleyReferee } from './volley'
 import { wordchainReferee } from './wordchain'
 import { yutReferee } from './yut'
 
@@ -32,4 +33,5 @@ export const REFEREES: Record<string, RefereeFactory> = {
   chosung: chosungReferee,
   wordchain: wordchainReferee,
   armwrestle: armwrestleReferee,
+  volley: volleyReferee,
 }
