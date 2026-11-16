@@ -8,6 +8,7 @@ import { SoundToggle } from '../../shared/ui/SoundToggle'
 import { GameScreen } from './game/GameScreen'
 import type { SessionSummary } from './play/session'
 import { flushPendingGames, submitGame } from './ranking/online'
+import { type Ticket, prefetchTicket, takeTicket } from '../../shared/online/verified'
 import { type BattingRecord, addGame, loadRecord, saveRecord } from './records'
 import { RankingScreen } from './screens/RankingScreen'
 import { ResultScreen } from './screens/ResultScreen'
@@ -18,7 +19,7 @@ import './batting.css'
 type Screen =
   | { kind: 'start' }
   | { kind: 'ranking' }
-  | { kind: 'game'; key: number }
+  | { kind: 'game'; key: number; ticket: Ticket | null }
   | { kind: 'result'; summary: SessionSummary; newBest: boolean }
 
 export function BattingPage() {
@@ -29,6 +30,7 @@ export function BattingPage() {
   useEffect(installAudioUnlock, [])
   // 지난번에 못 올린 기록이 있으면 다시 보낸다.
   useEffect(() => {
+    void prefetchTicket('batting')
     void flushPendingGames()
   }, [])
 
@@ -39,15 +41,21 @@ export function BattingPage() {
 
   function start() {
     setGames((n) => n + 1)
-    setScreen({ kind: 'game', key: games + 1 })
+    setScreen({ kind: 'game', key: games + 1, ticket: takeTicket('batting') })
   }
 
   function finish(summary: SessionSummary) {
     const { record: next, newBest } = addGame(record, summary)
     update(next)
     setScreen({ kind: 'result', summary, newBest })
+    // 서버 입장권 없이 한 판(오프라인 등)은 랭킹에 안 올라감 — 서버가 다시 쳐 볼 수 없어서
+    const ticket = screen.kind === 'game' ? screen.ticket : null
+    if (!ticket) {
+      setUpload('rejected')
+      return
+    }
     setUpload('saving')
-    submitGame(summary, loadNickname() ?? '익명')
+    submitGame(summary, ticket, loadNickname() ?? '익명')
       .then(setUpload)
       .catch(() => setUpload('queued'))
   }
@@ -80,7 +88,7 @@ export function BattingPage() {
         <RankingScreen initialDifficulty={record.difficulty} onBack={toStart} />
       )}
       {screen.kind === 'game' && (
-        <GameScreen key={screen.key} difficulty={record.difficulty} hand={record.hand} onFinish={finish} />
+        <GameScreen key={screen.key} difficulty={record.difficulty} hand={record.hand} seed={screen.ticket?.seed} onFinish={finish} />
       )}
       {screen.kind === 'result' && (
         <ResultScreen

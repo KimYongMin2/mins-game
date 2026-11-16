@@ -164,7 +164,7 @@ function distanceOfArrow(i) {
 function isFirstAtDistance(i) {
 	return i === 0 || distanceOfArrow(i) !== distanceOfArrow(i - 1);
 }
-function totalOf(scores) {
+function totalOf$1(scores) {
 	return {
 		points: round1(scores.reduce((sum, s) => sum + s.points, 0)),
 		xCount: scores.filter((s) => s.x).length,
@@ -289,7 +289,7 @@ const CENTER = {
 function currentDistance(state) {
 	return distanceOfArrow(Math.min(state.arrowIndex, TOTAL_ARROWS - 1));
 }
-function withSounds$1(state, ...names) {
+function withSounds$2(state, ...names) {
 	let seq = state.soundSeq;
 	const added = names.map((name) => ({
 		id: ++seq,
@@ -366,7 +366,7 @@ function fire(state, at) {
 		releaseAt: at,
 		aim: state.aim
 	};
-	return withSounds$1({
+	return withSounds$2({
 		...state,
 		phase: {
 			kind: "flying",
@@ -389,7 +389,7 @@ function timeOut(state) {
 		releaseAt: null,
 		aim: CENTER
 	};
-	return withSounds$1({
+	return withSounds$2({
 		...state,
 		shots: [...state.shots, shot],
 		phase: {
@@ -399,13 +399,13 @@ function timeOut(state) {
 		}
 	}, "miss");
 }
-function hitSound(score) {
+function hitSound$1(score) {
 	if (score.x) return "x";
 	if (score.ring === 10) return "ten";
 	if (score.ring === 0) return "miss";
 	return "hit";
 }
-function tick$1(state) {
+function tick$2(state) {
 	const { phase, now } = state;
 	switch (phase.kind) {
 		case "announce": return now >= phase.until ? {
@@ -420,7 +420,7 @@ function tick$1(state) {
 		}
 		case "flying":
 			if (now < phase.until) return state;
-			return withSounds$1({
+			return withSounds$2({
 				...state,
 				shots: [...state.shots, phase.shot],
 				phase: {
@@ -428,11 +428,11 @@ function tick$1(state) {
 					shot: phase.shot,
 					until: now + SCORED_MS
 				}
-			}, hitSound(phase.shot.score));
+			}, hitSound$1(phase.shot.score));
 		case "scored": {
 			if (now < phase.until) return state;
 			const next = state.arrowIndex + 1;
-			if (next >= TOTAL_ARROWS) return withSounds$1({
+			if (next >= TOTAL_ARROWS) return withSounds$2({
 				...state,
 				arrowIndex: next,
 				phase: { kind: "done" }
@@ -456,13 +456,13 @@ function aimBy(state, dx, dy) {
 }
 function roundReducer(state, action) {
 	switch (action.type) {
-		case "tick": return tick$1({
+		case "tick": return tick$2({
 			...state,
 			now: action.now
 		});
 		case "press":
 			if (state.phase.kind !== "ready") return state;
-			return withSounds$1({
+			return withSounds$2({
 				...state,
 				phase: {
 					kind: "drawing",
@@ -477,12 +477,12 @@ function summarizeRound(state) {
 	return {
 		t0: state.t0,
 		shots: state.shots,
-		...totalOf(state.shots.map((s) => s.score))
+		...totalOf$1(state.shots.map((s) => s.score))
 	};
 }
 //#endregion
 //#region src/server/games/archery.ts
-const isNum = (x) => typeof x === "number" && Number.isFinite(x);
+const isNum$1 = (x) => typeof x === "number" && Number.isFinite(x);
 /** 놓은 시각이 자동 발사·시간 끝보다 이만큼 늦어도 봐줌 (화면 한 프레임) */
 const SLACK_MS = 50;
 function readShots(x) {
@@ -491,9 +491,9 @@ function readShots(x) {
 	for (const s of x) {
 		if (!s || typeof s !== "object") return null;
 		const aim = s.aim;
-		if (!aim || !isNum(aim.x) || !isNum(aim.y)) return null;
-		const pressAt = s.pressAt === null ? null : isNum(s.pressAt) ? s.pressAt : void 0;
-		const releaseAt = s.releaseAt === null ? null : isNum(s.releaseAt) ? s.releaseAt : void 0;
+		if (!aim || !isNum$1(aim.x) || !isNum$1(aim.y)) return null;
+		const pressAt = s.pressAt === null ? null : isNum$1(s.pressAt) ? s.pressAt : void 0;
+		const releaseAt = s.releaseAt === null ? null : isNum$1(s.releaseAt) ? s.releaseAt : void 0;
 		if (pressAt === void 0 || releaseAt === void 0 || pressAt === null !== (releaseAt === null)) return null;
 		if (pressAt !== null && releaseAt !== null && (releaseAt < pressAt || releaseAt - pressAt > 10050)) return null;
 		out.push({
@@ -509,7 +509,7 @@ function readShots(x) {
 }
 function replayArchery(seed, t0, shotsIn) {
 	const shots = readShots(shotsIn);
-	if (!shots || !isNum(t0)) return null;
+	if (!shots || !isNum$1(t0)) return null;
 	let s = createRound(t0, seed);
 	let t = t0;
 	const end = t0 + TOTAL_ARROWS * 16e3;
@@ -558,6 +558,602 @@ function replayArchery(seed, t0, shotsIn) {
 		points: sum.points,
 		xCount: sum.xCount,
 		tenCount: sum.tenCount
+	};
+}
+//#endregion
+//#region src/games/batting/constants.ts
+/**
+* 타이밍 구간(일반, |터치 시각 − 도착 시각|).
+* fair 안이면 앞으로 날아가고(가까울수록 멀리), foul 안이면 파울, 밖이면 헛스윙.
+* perfect는 '딱 맞았어요' 표시용
+*/
+const TIMING_MS = {
+	perfect: 20,
+	fair: 130,
+	foul: 180
+};
+/** 어려움은 모든 구간 폭을 이 비율로 줄인다 */
+const HARD_WINDOW_SCALE = .7;
+//#endregion
+//#region src/games/batting/rules/judge.ts
+const CELLS = [
+	1,
+	2,
+	3,
+	4,
+	5,
+	6,
+	7,
+	8,
+	9
+];
+/** 칸의 열(0=왼쪽)과 행(0=위) */
+function cellPosition(cell) {
+	return {
+		col: (cell - 1) % 3,
+		row: Math.floor((cell - 1) / 3)
+	};
+}
+function cellMiddle(cell) {
+	const { col, row } = cellPosition(cell);
+	return {
+		col: col + .5,
+		row: row + .5
+	};
+}
+/** 가장 가까운 정수. 딱 절반(칸 경계)이면 0 쪽(더 좋은 판정)으로 */
+function roundLenient(v) {
+	return Math.sign(v) * Math.max(0, Math.ceil(Math.abs(v) - .5));
+}
+/**
+* 배트는 타자 쪽에 손잡이, 터치한 칸에 스윗스팟이 있고 그 너머로는 짧다.
+* 우타는 왼쪽에 서서 오른쪽으로 휘두르니, 공이 터치보다 왼쪽이면 손잡이 쪽, 오른쪽이면 배트 끝 너머.
+*/
+function contactAt(hand, touch, ball) {
+	const awaySign = hand === "right" ? 1 : -1;
+	/** +면 배트 끝 너머, -면 손잡이 쪽 (칸 수) */
+	const along = roundLenient((ball.col - touch.col) * awaySign);
+	const vertical = Math.abs(roundLenient(ball.row - touch.row));
+	if (along > 0) return "miss";
+	if (along === 0 && vertical === 0) return "sweet";
+	if (along === -1 && vertical === 0 || along === 0 && vertical === 1) return "off";
+	if (along === -2 && vertical === 0 || along === -1 && vertical === 1) return "graze";
+	return "miss";
+}
+/** 비거리별 결과 (멀리 간 것부터) */
+const DISTANCE_TIERS = [
+	{
+		min: 115,
+		outcome: "homerun"
+	},
+	{
+		min: 95,
+		outcome: "triple"
+	},
+	{
+		min: 70,
+		outcome: "double"
+	},
+	{
+		min: 30,
+		outcome: "single"
+	},
+	{
+		min: 0,
+		outcome: "out"
+	}
+];
+function outcomeByDistance(distance) {
+	return DISTANCE_TIERS.find((t) => distance >= t.min).outcome;
+}
+/** 빗맞으면 힘이 이만큼만 실린다 (완벽한 타이밍이어도 3루타 정도까지) */
+const OFF_POWER = .65;
+/** 정타라도 공 가운데에서 1칸 벗어날 때마다 힘이 이만큼 줄어든다 */
+const SWEET_FALLOFF = .2;
+/** 힘 → 비거리 곡선. 1보다 작으면 조금만 맞아도 꽤 날아간다 */
+const DISTANCE_CURVE = .8;
+function timingWindows(difficulty) {
+	const scale = difficulty === "hard" ? HARD_WINDOW_SCALE : 1;
+	return {
+		perfect: TIMING_MS.perfect * scale,
+		fair: TIMING_MS.fair * scale,
+		foul: TIMING_MS.foul * scale
+	};
+}
+function judgeSwing(opts) {
+	const ball = cellMiddle(opts.ball);
+	const contact = contactAt(opts.hand, opts.touch, ball);
+	const offsetMs = opts.swingAt - opts.arriveAt;
+	const windows = timingWindows(opts.difficulty);
+	const diff = Math.abs(offsetMs);
+	if (contact === "miss" || diff > windows.foul) return {
+		outcome: "whiff",
+		contact,
+		offsetMs,
+		distance: null
+	};
+	if (contact === "graze" || diff > windows.fair) return {
+		outcome: "foul",
+		contact,
+		offsetMs,
+		distance: null
+	};
+	const timing = 1 - diff / windows.fair;
+	const miss = Math.hypot(ball.col - opts.touch.col, ball.row - opts.touch.row);
+	const power = timing * (contact === "sweet" ? Math.max(0, 1 - SWEET_FALLOFF * miss) : OFF_POWER);
+	const distance = Math.round(15 + 125 * power ** DISTANCE_CURVE);
+	return {
+		outcome: outcomeByDistance(distance),
+		contact,
+		offsetMs,
+		distance
+	};
+}
+//#endregion
+//#region src/games/batting/rules/scoring.ts
+const HITS = [
+	"homerun",
+	"triple",
+	"double",
+	"single"
+];
+function isHit(outcome) {
+	return HITS.includes(outcome);
+}
+/** 공 하나의 점수 */
+function pointsOf(r) {
+	return r.distance ?? 0;
+}
+function totalOf(records) {
+	return {
+		points: records.reduce((sum, r) => sum + pointsOf(r), 0),
+		homeruns: records.filter((r) => r.outcome === "homerun").length,
+		hits: records.filter((r) => isHit(r.outcome)).length
+	};
+}
+//#endregion
+//#region src/games/batting/play/battedBall.ts
+const GRAVITY = 9.8;
+/** 결과별 띄우는 각도(도). 범타는 땅볼 */
+const LAUNCH_DEG = {
+	homerun: [27, 32],
+	triple: [20, 24],
+	double: [15, 19],
+	single: [8, 12]
+};
+/** 길게 날아가도 이만큼만 보여준다 */
+const MAX_SHOW_MS = 2200;
+/** 페어 타구의 최대 좌우 각도 */
+const MAX_FAIR_ANGLE = 38 * Math.PI / 180;
+function within(rng, [min, max]) {
+	return min + rng.next() * (max - min);
+}
+function createBattedBall(opts) {
+	const { outcome, contact, hand, offsetMs, distance, foulWindowMs, start, startAt, rng } = opts;
+	if (outcome === "whiff" || outcome === "looking") return null;
+	/** 우타 기준 +면 밀어 친 쪽(오른쪽) */
+	const handSign = hand === "right" ? 1 : -1;
+	const lateness = Math.max(-1, Math.min(1, offsetMs / foulWindowMs));
+	if (outcome === "foul" || distance === null) {
+		if (contact === "graze") return {
+			startAt,
+			duration: 1100,
+			start,
+			velocity: {
+				x: (rng.next() - .5) * 4,
+				y: within(rng, [11, 14]),
+				z: within(rng, [-9, -6])
+			}
+		};
+		const angle = Math.sign(lateness || 1) * handSign * within(rng, [55, 72]) * Math.PI / 180;
+		const speed = within(rng, [22, 28]);
+		return {
+			startAt,
+			duration: 1300,
+			start,
+			velocity: {
+				x: Math.sin(angle) * speed,
+				y: within(rng, [6, 10]),
+				z: Math.cos(angle) * speed
+			}
+		};
+	}
+	const spray = lateness * handSign * MAX_FAIR_ANGLE + (rng.next() - .5) * .1;
+	if (outcome === "out") {
+		const forward = distance / 1.2;
+		return {
+			startAt,
+			duration: 1200,
+			start,
+			velocity: {
+				x: Math.sin(spray) * forward,
+				y: -3,
+				z: Math.cos(spray) * forward
+			}
+		};
+	}
+	const launch = within(rng, LAUNCH_DEG[outcome]) * Math.PI / 180;
+	const speed = Math.sqrt(distance * GRAVITY / Math.sin(2 * launch));
+	const forward = speed * Math.cos(launch);
+	const flightMs = 2 * speed * Math.sin(launch) / GRAVITY * 1e3;
+	return {
+		startAt,
+		duration: Math.min(MAX_SHOW_MS, flightMs + 300),
+		start,
+		velocity: {
+			x: Math.sin(spray) * forward,
+			y: speed * Math.sin(launch),
+			z: Math.cos(spray) * forward
+		}
+	};
+}
+function battedBallEndAt(ball) {
+	return ball.startAt + ball.duration;
+}
+//#endregion
+//#region src/games/batting/play/pitch.ts
+const PITCH_TYPES = [
+	"fastball",
+	"slider",
+	"curve"
+];
+/** 스트라이크 존(m). 한 칸은 가로 0.2 × 세로 0.28 (위아래가 잘 구분되게 세로를 길게) */
+const ZONE = {
+	left: -.3,
+	right: .3,
+	bottom: .45,
+	top: 1.29
+};
+const CELL_WIDTH = (ZONE.right - ZONE.left) / 3;
+const CELL_HEIGHT = (ZONE.top - ZONE.bottom) / 3;
+/** 우완 투수가 공을 놓는 곳 (포수 시점 왼쪽 위) */
+const RELEASE = {
+	x: -.45,
+	y: 1.8,
+	z: 17
+};
+/** 포수 미트. 공이 홈을 지나 여기서 멈춘다 */
+const MITT_Z = -1.1;
+/** 구종별 비행 시간(놓은 순간 → 홈 도착) */
+const FLIGHT_MS = {
+	normal: {
+		fastball: 620,
+		slider: 710,
+		curve: 820
+	},
+	hard: {
+		fastball: 510,
+		slider: 590,
+		curve: 680
+	}
+};
+/**
+* 궤적의 휨. break는 휘는 총량(m)과 방향, power가 클수록 홈 근처에서 늦게 휜다.
+* 위치 = 직선(놓은 곳 → 도착 칸) + break × (s^power − s). 처음과 끝은 직선과 같고 그 사이가 볼록해진다.
+*/
+const SHAPE = {
+	fastball: {
+		breakX: 0,
+		breakY: -.12,
+		power: 2
+	},
+	slider: {
+		breakX: .75,
+		breakY: -.2,
+		power: 3
+	},
+	curve: {
+		breakX: .35,
+		breakY: -1.5,
+		power: 2.4
+	}
+};
+/** 칸 가운데(공이 도착하는 곳) */
+function cellCenter(cell) {
+	const { col, row } = cellPosition(cell);
+	return {
+		x: ZONE.left + CELL_WIDTH * (col + .5),
+		y: ZONE.top - CELL_HEIGHT * (row + .5)
+	};
+}
+function createPitch(rng, difficulty, releaseAt) {
+	const type = pickOne(rng, PITCH_TYPES);
+	const cell = pickOne(rng, CELLS);
+	const jitter = (rng.next() * 2 - 1) * 25;
+	return {
+		type,
+		cell,
+		releaseAt,
+		arriveAt: releaseAt + FLIGHT_MS[difficulty][type] + jitter
+	};
+}
+/** 진행도 s(0=놓음, 1=홈 도착)의 위치 */
+function pathAt(pitch, s) {
+	const end = cellCenter(pitch.cell);
+	const { breakX, breakY, power } = SHAPE[pitch.type];
+	const bend = s ** power - s;
+	return {
+		x: RELEASE.x + (end.x - RELEASE.x) * s + breakX * bend,
+		y: RELEASE.y + (end.y - RELEASE.y) * s + breakY * bend,
+		z: RELEASE.z * (1 - s)
+	};
+}
+/** 시각 t의 공 위치. 놓기 전이면 null. 홈을 지난 뒤엔 그 방향 그대로 미트까지 가서 멈춘다 */
+function ballPosition(pitch, t) {
+	if (t < pitch.releaseAt) return null;
+	const s = (t - pitch.releaseAt) / (pitch.arriveAt - pitch.releaseAt);
+	if (s <= 1) return pathAt(pitch, s);
+	const end = pathAt(pitch, 1);
+	const before = pathAt(pitch, .99);
+	const maxK = (end.z - MITT_Z) / (before.z - end.z);
+	const k = Math.min((s - 1) / .01, maxK);
+	return {
+		x: end.x + (end.x - before.x) * k,
+		y: end.y + (end.y - before.y) * k,
+		z: end.z + (end.z - before.z) * k
+	};
+}
+function pitchEndAt(pitch) {
+	return pitch.arriveAt + 320;
+}
+//#endregion
+//#region src/games/batting/play/session.ts
+const FIRST_READY_MS = 1200;
+/** 공과 공 사이 쉬는 시간 */
+const READY_MS = 1500;
+/** 결과를 보여주는 최소 시간 */
+const RESULT_MS = 1800;
+/** 마지막 공 뒤 '경기 끝'을 보여주고 결과 화면으로 넘어가기까지 */
+const DONE_MS$1 = 1800;
+function withSounds$1(state, ...names) {
+	let seq = state.soundSeq;
+	const added = names.map((name) => ({
+		id: ++seq,
+		name
+	}));
+	return {
+		...state,
+		sounds: [...state.sounds, ...added].slice(-8),
+		soundSeq: seq
+	};
+}
+function createSession(opts) {
+	return {
+		now: opts.now,
+		seed: opts.seed,
+		difficulty: opts.difficulty,
+		hand: opts.hand,
+		index: 0,
+		records: [],
+		phase: {
+			kind: "ready",
+			until: opts.now + FIRST_READY_MS
+		},
+		sounds: [],
+		soundSeq: 0
+	};
+}
+function startWindup(state) {
+	const rng = createRng(state.seed);
+	const releaseAt = state.now + 900;
+	const pitch = createPitch(rng, state.difficulty, releaseAt);
+	return {
+		...state,
+		seed: rng.seed(),
+		phase: {
+			kind: "windup",
+			pitch,
+			until: releaseAt
+		}
+	};
+}
+function hitSound(record) {
+	if (record.outcome === "homerun") return ["hit", "homerun"];
+	if (record.contact === "sweet") return ["hit"];
+	return ["weak"];
+}
+/** 결과 단계로. 친 공이면 타구 비행을 만든다 */
+function showResult(state, pitch, swing, record) {
+	const rng = createRng(state.seed);
+	const batted = swing && record.contact && record.offsetMs !== null ? createBattedBall({
+		outcome: record.outcome,
+		contact: record.contact,
+		hand: state.hand,
+		offsetMs: record.offsetMs,
+		distance: record.distance,
+		foulWindowMs: timingWindows(state.difficulty).foul,
+		start: ballPosition(pitch, swing.at) ?? {
+			x: 0,
+			y: 1,
+			z: 0
+		},
+		startAt: swing.at,
+		rng
+	}) : null;
+	const until = Math.max(state.now + RESULT_MS, batted ? battedBallEndAt(batted) : 0);
+	return {
+		...state,
+		seed: rng.seed(),
+		records: [...state.records, record],
+		phase: {
+			kind: "result",
+			pitch,
+			swing,
+			record,
+			batted,
+			until
+		}
+	};
+}
+function swing(state, point, at) {
+	const { phase } = state;
+	if (phase.kind !== "pitching" || phase.swing) return state;
+	const { pitch } = phase;
+	const result = judgeSwing({
+		difficulty: state.difficulty,
+		hand: state.hand,
+		touch: point,
+		ball: pitch.cell,
+		swingAt: at,
+		arriveAt: pitch.arriveAt
+	});
+	const record = {
+		index: state.index,
+		pitch,
+		touched: point,
+		...result
+	};
+	const s = {
+		point,
+		at
+	};
+	if (result.outcome === "whiff") return withSounds$1({
+		...state,
+		phase: {
+			...phase,
+			swing: s,
+			record
+		}
+	}, "whiff");
+	return withSounds$1(showResult(state, pitch, s, record), ...hitSound(record));
+}
+function tick$1(state) {
+	const { phase, now } = state;
+	switch (phase.kind) {
+		case "ready": return now >= phase.until ? startWindup(state) : state;
+		case "windup":
+			if (now < phase.until) return state;
+			return withSounds$1({
+				...state,
+				phase: {
+					kind: "pitching",
+					pitch: phase.pitch,
+					swing: null,
+					record: null
+				}
+			}, "pitch");
+		case "pitching": {
+			if (now < pitchEndAt(phase.pitch)) return state;
+			const record = phase.record ?? {
+				index: state.index,
+				pitch: phase.pitch,
+				touched: null,
+				outcome: "looking",
+				contact: null,
+				offsetMs: null,
+				distance: null
+			};
+			return withSounds$1(showResult(state, phase.pitch, phase.swing, record), "mitt");
+		}
+		case "result": {
+			if (now < phase.until) return state;
+			const next = state.index + 1;
+			if (next >= 10) return withSounds$1({
+				...state,
+				index: next,
+				phase: {
+					kind: "done",
+					until: now + DONE_MS$1
+				}
+			}, "end");
+			return {
+				...state,
+				index: next,
+				phase: {
+					kind: "ready",
+					until: now + READY_MS
+				}
+			};
+		}
+		case "done": return state;
+	}
+}
+function sessionReducer(state, action) {
+	switch (action.type) {
+		case "tick": return tick$1({
+			...state,
+			now: action.now
+		});
+		case "swing": return swing(state, action.point, action.at);
+	}
+}
+function summarizeSession(state) {
+	return {
+		difficulty: state.difficulty,
+		hand: state.hand,
+		records: state.records,
+		...totalOf(state.records)
+	};
+}
+//#endregion
+//#region src/server/games/batting.ts
+const isNum = (x) => typeof x === "number" && Number.isFinite(x);
+function readSwings(x) {
+	if (!Array.isArray(x) || x.length !== 10) return null;
+	const out = [];
+	for (const s of x) {
+		if (s === null) {
+			out.push(null);
+			continue;
+		}
+		const o = s;
+		const p = o?.point;
+		if (!p || !isNum(p.col) || !isNum(p.row) || Math.abs(p.col - 1) > 3 || Math.abs(p.row - 1) > 3 || !isNum(o.offsetMs) || Math.abs(o.offsetMs) > 5e3) return null;
+		out.push({
+			point: {
+				col: p.col,
+				row: p.row
+			},
+			offsetMs: o.offsetMs
+		});
+	}
+	return out;
+}
+function replayBatting(seed, difficulty, hand, swingsIn) {
+	if (difficulty !== "normal" && difficulty !== "hard" || hand !== "right" && hand !== "left") return null;
+	const swings = readSwings(swingsIn);
+	if (!swings) return null;
+	let s = createSession({
+		now: 0,
+		seed,
+		difficulty,
+		hand
+	});
+	let t = 0;
+	while (s.phase.kind !== "done") {
+		if (t > 6e5) return null;
+		const { phase } = s;
+		const log = swings[s.index];
+		if (phase.kind === "pitching" && !phase.swing && log) {
+			const at = phase.pitch.arriveAt + log.offsetMs;
+			if (at < phase.pitch.releaseAt) return null;
+			if (t + 1 >= at) {
+				s = sessionReducer({
+					...s,
+					now: Math.max(t, at)
+				}, {
+					type: "swing",
+					point: log.point,
+					at
+				});
+				if (s.phase.kind === "pitching" && !s.phase.swing) return null;
+				continue;
+			}
+		}
+		t += 1;
+		s = sessionReducer(s, {
+			type: "tick",
+			now: t
+		});
+	}
+	if (s.records.filter((r) => r.touched !== null).length !== swings.filter(Boolean).length) return null;
+	const sum = summarizeSession(s);
+	return {
+		difficulty,
+		hand,
+		points: sum.points,
+		homeruns: sum.homeruns,
+		hits: sum.hits
 	};
 }
 //#endregion
@@ -1023,6 +1619,24 @@ async function submitApi(req) {
 			points: r.points,
 			x_count: r.xCount,
 			ten_count: r.tenCount
+		});
+		return res === "ok" ? json(200, {
+			ok: true,
+			points: r.points
+		}) : res === "duplicate" ? json(409, { error: "duplicate" }) : json(500, { error: "db" });
+	}
+	if (body.game === "batting") {
+		const r = replayBatting(ticket.seed, data.difficulty, data.hand, data.swings);
+		if (!r) return json(400, { error: "replay-mismatch" });
+		const res = await insertRow(secret, "batting_games", {
+			id: ticket.id,
+			player_id: uid,
+			nickname,
+			difficulty: r.difficulty,
+			hand: r.hand,
+			points: r.points,
+			homeruns: r.homeruns,
+			hits: r.hits
 		});
 		return res === "ok" ? json(200, {
 			ok: true,

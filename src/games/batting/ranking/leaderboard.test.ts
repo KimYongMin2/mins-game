@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest'
 import { type BattingLeaderRow, buildBoards } from './leaderboard'
-import { toGameRow } from './online'
 
 const AT = '2026-10-20T10:00:00Z'
 
@@ -54,16 +53,5 @@ describe('한 경기 최다 홈런', () => {
     const e = board(rows, 'mostHr')
     expect(ids(e)).toEqual(['b', 'c', 'a'])
     expect(e[0]).toMatchObject({ display: '홈런 4개', detail: '그 경기 550점' })
-  })
-})
-
-describe('toGameRow', () => {
-  it('닉네임은 앞뒤 공백을 빼고 10자까지', () => {
-    const r = toGameRow(
-      { difficulty: 'hard', hand: 'left', records: [], points: 412, homeruns: 1, hits: 4 },
-      '  아주아주긴닉네임입니다요  ',
-      'id-1',
-    )
-    expect(r).toEqual({ id: 'id-1', nickname: '아주아주긴닉네임입니', difficulty: 'hard', hand: 'left', points: 412, homeruns: 1, hits: 4 })
   })
 })

@@ -35,6 +35,8 @@ import { timingText } from './describe'
 type Props = {
   difficulty: Difficulty
   hand: Hand
+  /** 서버 입장권의 시드 (랭킹 확인용). 없으면 아무 시드 */
+  seed?: number
   onFinish: (summary: SessionSummary) => void
 }
 
@@ -123,9 +125,9 @@ function ScoreStrip({ state }: { state: SessionState }) {
   )
 }
 
-export function GameScreen({ difficulty, hand, onFinish }: Props) {
+export function GameScreen({ difficulty, hand, seed, onFinish }: Props) {
   const [state, dispatch] = useReducer(sessionReducer, undefined, () =>
-    createSession({ now: performance.now(), seed: randomSeed(), difficulty, hand }),
+    createSession({ now: performance.now(), seed: seed ?? randomSeed(), difficulty, hand }),
   )
   const done = state.phase.kind === 'done'
   const [use3D] = useState(canWebGL)

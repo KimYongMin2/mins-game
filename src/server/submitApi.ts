@@ -1,6 +1,7 @@
 import { latestRow, insertRow } from './db'
 import { supabaseSecret } from './env'
 import { replayArchery } from './games/archery'
+import { replayBatting } from './games/batting'
 import { replayFight } from './games/fight'
 import { fromOurSite, json, readJson, userIdOf } from './http'
 import { checkTicket } from './ticket'
@@ -36,6 +37,12 @@ export async function submitApi(req: Request): Promise<Response> {
     const r = replayArchery(ticket.seed, data.t0, data.shots)
     if (!r) return json(400, { error: 'replay-mismatch' })
     const res = await insertRow(secret, 'archery_games', { id: ticket.id, player_id: uid, nickname, points: r.points, x_count: r.xCount, ten_count: r.tenCount })
+    return res === 'ok' ? json(200, { ok: true, points: r.points }) : res === 'duplicate' ? json(409, { error: 'duplicate' }) : json(500, { error: 'db' })
+  }
+  if (body.game === 'batting') {
+    const r = replayBatting(ticket.seed, data.difficulty, data.hand, data.swings)
+    if (!r) return json(400, { error: 'replay-mismatch' })
+    const res = await insertRow(secret, 'batting_games', { id: ticket.id, player_id: uid, nickname, difficulty: r.difficulty, hand: r.hand, points: r.points, homeruns: r.homeruns, hits: r.hits })
     return res === 'ok' ? json(200, { ok: true, points: r.points }) : res === 'duplicate' ? json(409, { error: 'duplicate' }) : json(500, { error: 'db' })
   }
   return json(400, { error: 'bad-request' })

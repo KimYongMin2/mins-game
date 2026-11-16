@@ -101,3 +101,35 @@ describe('양궁 다시 쏘기', () => {
     expect(other?.points).not.toBe(sum.points)
   })
 })
+
+import { createSession, sessionReducer, summarizeSession } from '../games/batting/play/session'
+import { replayBatting } from './games/batting'
+
+function playBatting(seed: number, pickSeed: number) {
+  const rng = createRng(pickSeed)
+  let s = createSession({ now: 777.7, seed, difficulty: pickSeed % 2 ? 'hard' : 'normal', hand: pickSeed % 3 ? 'right' : 'left' })
+  let t = 777.7
+  while (s.phase.kind !== 'done') {
+    t += 16.7
+    if (s.phase.kind === 'pitching' && !s.phase.swing && t > s.phase.pitch.arriveAt - 150 && rng.next() < 0.15) {
+      s = sessionReducer(s, { type: 'swing', point: { col: rng.next() * 3 - 0.5, row: rng.next() * 3 - 0.5 }, at: t - rng.next() * 8 })
+    }
+    s = sessionReducer(s, { type: 'tick', now: t })
+  }
+  return summarizeSession(s)
+}
+
+describe('배팅 다시 치기', () => {
+  it('화면에서 친 점수와 똑같다', () => {
+    for (let i = 0; i < 30; i++) {
+      const sum = playBatting(300 + i, i)
+      const swings = sum.records.map((r) => (r.touched && r.offsetMs !== null ? { point: r.touched, offsetMs: r.offsetMs } : null))
+      expect(replayBatting(300 + i, sum.difficulty, sum.hand, swings)).toEqual({ difficulty: sum.difficulty, hand: sum.hand, points: sum.points, homeruns: sum.homeruns, hits: sum.hits })
+    }
+  })
+
+  it('지어낸 기록 거절', () => {
+    expect(replayBatting(1, 'normal', 'right', [])).toBeNull()
+    expect(replayBatting(1, 'normal', 'right', Array(10).fill({ point: { col: 1, row: 1 }, offsetMs: 99999 }))).toBeNull()
+  })
+})

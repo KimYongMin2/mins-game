@@ -72,7 +72,11 @@ async function issueTicket(secret, game, uid, now = Date.now()) {
 }
 //#endregion
 //#region src/server/ticketApi.ts
-const VERIFIED_GAMES = ["fight", "archery"];
+const VERIFIED_GAMES = [
+	"fight",
+	"archery",
+	"batting"
+];
 async function ticketApi(req) {
 	if (!fromOurSite(req)) return json(403, { error: "forbidden" });
 	const secret = supabaseSecret();
