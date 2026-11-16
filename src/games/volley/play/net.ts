@@ -8,6 +8,11 @@ import { type Input, NO_INPUT, type Side, type SimState, step } from './sim'
 
 /** 방장이 상태를 보내는 횟수 (1초에). 많을수록 정확하지만 Supabase 무료 메시지를 많이 씀 */
 export const STATE_HZ = 20
+/**
+ * 우리 게임 서버(민스서버)로 잇는 방이면 메시지 한도가 없어서 매 스텝(1초에 60번) 보낸다 (사용자 요청 2026-11-16 — '배구가 부드럽지 않다').
+ * 친구 폰이 짐작해 그리다 보정하는 간격이 1/20초 → 1/60초로 줄어 툭툭 끊기던 게 줄어든다
+ */
+export const STATE_HZ_SERVER = 60
 /** 친구가 키를 안 바꿔도 다시 보내는 간격 (메시지가 빠졌을 때 대비) */
 export const INPUT_RESEND_MS = 500
 /** 왕복 지연을 재는 간격 */

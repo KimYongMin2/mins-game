@@ -128,7 +128,7 @@ describe('게임 서버', () => {
     const room = h.last('joined')!.room
     const before = g.got.filter((m) => m.t === 'msg').length
     for (let i = 0; i < 300; i++) await h.send({ t: 'send', room, msg: i })
-    expect(g.got.filter((m) => m.t === 'msg').length - before).toBeLessThan(90)
+    expect(g.got.filter((m) => m.t === 'msg').length - before).toBeLessThan(160)
     now += 1000
     await h.send({ t: 'send', room, msg: 'ok' })
     expect(g.last('msg')?.msg).toBe('ok')

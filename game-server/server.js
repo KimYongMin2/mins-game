@@ -3557,8 +3557,8 @@ const REFEREE_FROM = "server";
 const LIMIT = {
 	/** 메시지 한 개 최대 글자 수 */
 	text: 16e3,
-	/** 1초에 보낼 수 있는 메시지 (배구가 상태를 1초에 20번 + 키) */
-	perSecond: 80,
+	/** 1초에 보낼 수 있는 메시지 (배구 방장이 상태를 1초에 60번 + 키·핑, 넉넉히) */
+	perSecond: 150,
 	rooms: 4,
 	watches: 20,
 	adverts: 4,

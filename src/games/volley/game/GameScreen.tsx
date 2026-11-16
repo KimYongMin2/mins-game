@@ -8,7 +8,8 @@ import { loadNickname } from '../../../shared/storage/nickname'
 import { type BotLevel, botInput, createBotMind } from '../bot/volleyBot'
 import { DONE_MS, STEP_HZ } from '../constants'
 import { Court } from '../field/Court'
-import { type Guest, INPUT_RESEND_MS, PING_MS, STATE_HZ, type VolleyMsg, createGuest, guestReceive, guestStep, sameInput, withRtt } from '../play/net'
+import { GAME_SERVER_URL } from '../../../shared/online/hubClient'
+import { type Guest, INPUT_RESEND_MS, PING_MS, STATE_HZ, STATE_HZ_SERVER, type VolleyMsg, createGuest, guestReceive, guestStep, sameInput, withRtt } from '../play/net'
 import { type Input, NO_INPUT, type Side, type SimState, createSim, step } from '../play/sim'
 import type { GameSummary } from '../records'
 import { type SoundName, playSound } from '../sounds'
@@ -197,7 +198,7 @@ export function GameScreen(props: Props) {
           simRef.current = step(simRef.current, [mine, remote])
           // 끝난 뒤엔 스텝이 안 늘어서 한 번만 보낸다
           const s = simRef.current
-          if (s.tick !== sentTick && (s.tick % (STEP_HZ / STATE_HZ) === 0 || s.phase.kind === 'done')) {
+          if (s.tick !== sentTick && (s.tick % (STEP_HZ / (GAME_SERVER_URL ? STATE_HZ_SERVER : STATE_HZ)) === 0 || s.phase.kind === 'done')) {
             p.room.send({ t: 'state', s, i: [mine, remote] })
             sentTick = s.tick
           }
