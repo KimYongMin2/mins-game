@@ -3993,9 +3993,9 @@ const STEP = 1 / 60;
 const BARREL = 7.5;
 /** 시간 (ms): 시작 안내, 한 차례, 터진 뒤 보여주기, 끝 */
 const COUNTDOWN_MS$3 = 1500;
-const TURN_MS$2 = 2e4;
+const TURN_MS$3 = 2e4;
 const BOOM_MS$1 = 1600;
-const DONE_MS$10 = 2500;
+const DONE_MS$11 = 2500;
 /** 봇이 생각하는 시간 */
 const BOT_THINK_MS$1 = [1200, 2400];
 //#endregion
@@ -4316,7 +4316,7 @@ function startSpots(rng, n) {
 	}
 	return spots;
 }
-function createEngine$8(opts) {
+function createEngine$9(opts) {
 	const rng = createRng(opts.seed);
 	const { land, terrain } = makeLand(rng);
 	const tanks = startSpots(rng, opts.players.length).map((x) => ({
@@ -4371,12 +4371,12 @@ function startTurn$2(s, turn) {
 		botAt,
 		phase: {
 			kind: "aim",
-			until: s.now + TURN_MS$2,
+			until: s.now + TURN_MS$3,
 			startX: s.tanks[turn].x
 		}
 	};
 }
-function nextAlive$1(s, from) {
+function nextAlive$2(s, from) {
 	for (let k = 1; k <= s.players.length; k++) {
 		const i = (from + k) % s.players.length;
 		if (s.tanks[i].alive) return i;
@@ -4464,10 +4464,10 @@ function afterBoom$1(s) {
 		...s,
 		phase: {
 			kind: "done",
-			until: s.now + DONE_MS$10
+			until: s.now + DONE_MS$11
 		}
 	};
-	return startTurn$2(s, nextAlive$1(s, s.turn));
+	return startTurn$2(s, nextAlive$2(s, s.turn));
 }
 function drop$9(s, player) {
 	if (!s.tanks[player].alive || s.phase.kind === "done") return s;
@@ -4484,13 +4484,13 @@ function drop$9(s, player) {
 		...next,
 		phase: {
 			kind: "done",
-			until: s.now + DONE_MS$10
+			until: s.now + DONE_MS$11
 		}
 	};
-	if (s.phase.kind === "aim" && s.turn === player) return startTurn$2(next, nextAlive$1(next, player));
+	if (s.phase.kind === "aim" && s.turn === player) return startTurn$2(next, nextAlive$2(next, player));
 	return next;
 }
-function tick$11(s) {
+function tick$12(s) {
 	const { phase, now } = s;
 	switch (phase.kind) {
 		case "countdown": return now >= phase.until ? startTurn$2(s, s.turn) : s;
@@ -4510,9 +4510,9 @@ function tick$11(s) {
 		case "done": return s;
 	}
 }
-function engineReducer$8(state, action) {
+function engineReducer$9(state, action) {
 	switch (action.type) {
-		case "tick": return tick$11({
+		case "tick": return tick$12({
 			...state,
 			now: action.now
 		});
@@ -4524,7 +4524,7 @@ function engineReducer$8(state, action) {
 	}
 }
 /** 사람별 등수 (1 = 우승). 끝나기 전이면 남은 사람은 모두 1 */
-function ranksOf$5(s) {
+function ranksOf$6(s) {
 	const ranks = s.players.map(() => 1);
 	let next = aliveIndexes$4(s).length + 1;
 	for (const group of [...s.out].reverse()) {
@@ -4535,7 +4535,7 @@ function ranksOf$5(s) {
 }
 //#endregion
 //#region src/games/artillery/play/view.ts
-function toView$6(s) {
+function toView$7(s) {
 	const { phase, now } = s;
 	return {
 		players: s.players.map(({ id, name, avatar }) => ({
@@ -4563,7 +4563,7 @@ function toView$6(s) {
 		shot: phase.kind === "flight" ? phase.shot : null,
 		boom: phase.kind === "boom" ? phase.boom : null,
 		kills: s.kills,
-		ranks: ranksOf$5(s)
+		ranks: ranksOf$6(s)
 	};
 }
 /** 친구에게 바로 알려야 할 만큼 바뀌었는지 (차례인 사람이 움직이거나 겨누는 것도) */
@@ -4748,11 +4748,21 @@ function hostEngineReferee(ctx, spec) {
 		}
 	};
 	flush(true);
+	let stopped = false;
+	const later = (a) => {
+		if (stopped) return;
+		try {
+			s = spec.reduce(spec.reduce(s, spec.tick(ctx.now())), a);
+			flush();
+		} catch (e) {
+			console.warn("[referee] 나중 동작 무시", e);
+		}
+	};
 	return {
 		input(from, msg) {
 			if (!msg || typeof msg !== "object") return false;
 			try {
-				const a = spec.input(s, from, msg);
+				const a = spec.input(s, from, msg, later);
 				if (a === void 0) return false;
 				if (a !== null) {
 					s = spec.reduce(spec.reduce(s, spec.tick(ctx.now())), a);
@@ -4775,7 +4785,11 @@ function hostEngineReferee(ctx, spec) {
 				flush();
 			}
 		},
-		finished: () => doneAt !== null && spec.nowOf(s) - doneAt > LINGER_MS
+		finished: () => {
+			const over = doneAt !== null && spec.nowOf(s) - doneAt > LINGER_MS;
+			if (over) stopped = true;
+			return over;
+		}
 	};
 }
 /** 사람 번호 (서버가 정한 접속 번호로, 사람 자리만) */
@@ -4797,7 +4811,7 @@ function artilleryReferee(setup, ctx) {
 	const teams = readTeams(o.teams, players.length);
 	if (teams === void 0) return null;
 	return hostEngineReferee(ctx, {
-		state: createEngine$8({
+		state: createEngine$9({
 			now: ctx.now(),
 			seed: serverSeed(),
 			players,
@@ -4805,12 +4819,12 @@ function artilleryReferee(setup, ctx) {
 			friendlyFire: o.friendlyFire === true,
 			level: "normal"
 		}),
-		reduce: engineReducer$8,
+		reduce: engineReducer$9,
 		tick: (now) => ({
 			type: "tick",
 			now
 		}),
-		toView: toView$6,
+		toView: toView$7,
 		changed: viewChanged$6,
 		input: (s, from, m) => {
 			if (m.t !== "aim" && m.t !== "fire") return void 0;
@@ -4844,13 +4858,13 @@ const COUNTDOWN_MS$2 = 2400;
 /** 펑! 보여주기 */
 const BOOM_MS = 2200;
 /** 경기가 끝난 뒤 결과 화면으로 넘어가기까지 */
-const DONE_MS$9 = 2500;
+const DONE_MS$10 = 2500;
 /** 봇이 폭탄을 받고 넘기기까지 */
 const BOT_HOLD_MS = [350, 1500];
 //#endregion
 //#region src/games/bomb/play/engine.ts
 const within$4 = (rng, [min, max]) => min + rng.next() * (max - min);
-function createEngine$7(opts) {
+function createEngine$8(opts) {
 	return countdown$1({
 		now: opts.now,
 		seed: opts.seed,
@@ -4899,7 +4913,7 @@ function startPlay(state) {
 	};
 }
 /** 그 사람을 탈락시킨다. 한 명만 남으면 끝 */
-function eliminate(state, victim) {
+function eliminate$1(state, victim) {
 	return {
 		...state,
 		alive: state.alive.map((a, i) => a && i !== victim),
@@ -4909,7 +4923,7 @@ function eliminate(state, victim) {
 function explode(state) {
 	const victim = state.flight ? state.flight.to : state.holder;
 	return {
-		...eliminate(state, victim),
+		...eliminate$1(state, victim),
 		flight: null,
 		botAt: null,
 		phase: {
@@ -4933,7 +4947,7 @@ function afterBoom(state) {
 		...state,
 		phase: {
 			kind: "done",
-			until: state.now + DONE_MS$9
+			until: state.now + DONE_MS$10
 		}
 	};
 	return countdown$1({
@@ -5010,14 +5024,14 @@ function pass(state, from, to) {
 }
 function drop$8(state, player) {
 	if (!state.alive[player] || state.phase.kind === "done") return state;
-	let next = eliminate(state, player);
+	let next = eliminate$1(state, player);
 	const left = aliveIndexes$3(next);
 	if (isOver$3(next)) return {
 		...next,
 		flight: null,
 		phase: {
 			kind: "done",
-			until: state.now + DONE_MS$9
+			until: state.now + DONE_MS$10
 		}
 	};
 	if (next.holder === player || next.flight?.to === player || next.flight?.from === player) {
@@ -5033,7 +5047,7 @@ function drop$8(state, player) {
 	}
 	return next;
 }
-function tick$10(state) {
+function tick$11(state) {
 	const { phase, now } = state;
 	switch (phase.kind) {
 		case "countdown": return now >= phase.until ? startPlay(state) : state;
@@ -5044,9 +5058,9 @@ function tick$10(state) {
 		case "done": return state;
 	}
 }
-function engineReducer$7(state, action) {
+function engineReducer$8(state, action) {
 	switch (action.type) {
-		case "tick": return tick$10({
+		case "tick": return tick$11({
 			...state,
 			now: action.now
 		});
@@ -5061,7 +5075,7 @@ function rankingOf$1(state) {
 //#endregion
 //#region src/games/bomb/play/view.ts
 /** 심판 상태 → 화면 (터지는 시각은 넣지 않는다) */
-function toView$5(s) {
+function toView$6(s) {
 	const { phase, now } = s;
 	return {
 		players: s.players.map(({ id, name, avatar }) => ({
@@ -5101,18 +5115,18 @@ function bombReferee(setup, ctx) {
 	const teams = readTeams(o.teams, players.length);
 	if (teams === void 0) return null;
 	return hostEngineReferee(ctx, {
-		state: createEngine$7({
+		state: createEngine$8({
 			now: ctx.now(),
 			seed: serverSeed(),
 			players,
 			teams
 		}),
-		reduce: engineReducer$7,
+		reduce: engineReducer$8,
 		tick: (now) => ({
 			type: "tick",
 			now
 		}),
-		toView: toView$5,
+		toView: toView$6,
 		changed: viewChanged$5,
 		input: (s, from, m) => {
 			if (m.t !== "pass") return void 0;
@@ -5427,6 +5441,29 @@ const CHOSUNG = [
 	"ㅍ",
 	"ㅎ"
 ];
+const JUNG = [
+	"ㅏ",
+	"ㅐ",
+	"ㅑ",
+	"ㅒ",
+	"ㅓ",
+	"ㅔ",
+	"ㅕ",
+	"ㅖ",
+	"ㅗ",
+	"ㅘ",
+	"ㅙ",
+	"ㅚ",
+	"ㅛ",
+	"ㅜ",
+	"ㅝ",
+	"ㅞ",
+	"ㅟ",
+	"ㅠ",
+	"ㅡ",
+	"ㅢ",
+	"ㅣ"
+];
 const BASE = 44032;
 const END = 55203;
 const isSyllable = (ch) => {
@@ -5443,15 +5480,40 @@ function splitSyllable(ch) {
 		n % 28
 	];
 }
+const joinSyllable = (cho, jung, jong) => String.fromCharCode(BASE + cho * 588 + jung * 28 + jong);
 /** 낱말의 초성 ('기린' → 'ㄱㄹ'). 한글이 아닌 글자는 그대로 */
 const chosungOf = (word) => [...word].map((ch) => splitSyllable(ch) ? CHOSUNG[splitSyllable(ch)[0]] : ch).join("");
+/**
+* 두음법칙으로 바꿀 수 있는 첫 글자 (끝말잇기): 'ㄹ' → 'ㄴ'(라→나), 'ㄹ'·'ㄴ' + ㅑㅕㅖㅛㅠㅣ → 'ㅇ'(려→여, 녀→여).
+* 원래 글자 포함해서 돌려준다
+*/
+function initialVariants(ch) {
+	const s = splitSyllable(ch);
+	if (!s) return [ch];
+	const [cho, jung, jong] = s;
+	const out = [ch];
+	const yVowel = [
+		"ㅑ",
+		"ㅕ",
+		"ㅖ",
+		"ㅛ",
+		"ㅠ",
+		"ㅣ"
+	].includes(JUNG[jung]);
+	const R = 5;
+	const N = 2;
+	const O = 11;
+	if (cho === R) out.push(joinSyllable(yVowel ? O : N, jung, jong));
+	if (cho === N && yVowel) out.push(joinSyllable(O, jung, jong));
+	return out;
+}
 //#endregion
 //#region src/games/chosung/constants.ts
-const INTRO_MS$6 = 2e3;
+const INTRO_MS$7 = 2e3;
 /** 한 문제 */
 const ASK_MS = 2e4;
 const REVEAL_MS$2 = 2500;
-const DONE_MS$8 = 2e3;
+const DONE_MS$9 = 2e3;
 /** 맞힌 순서대로 (그 뒤 1점). 힌트가 나온 뒤에 맞히면 절반(올림) */
 const POINTS = [
 	10,
@@ -5480,7 +5542,7 @@ function pickQuestions(rng, n = 10) {
 		hintAt: Math.floor(rng.next() * [...x.word].length)
 	}));
 }
-function addLog$1(s, kind, player, text) {
+function addLog$2(s, kind, player, text) {
 	const seq = s.logSeq + 1;
 	return {
 		...s,
@@ -5494,7 +5556,7 @@ function addLog$1(s, kind, player, text) {
 	};
 }
 const activePlayers$1 = (s) => s.players.flatMap((_, i) => s.left[i] ? [] : [i]);
-function createEngine$6(opts) {
+function createEngine$7(opts) {
 	const rng = createRng(opts.seed);
 	return {
 		now: opts.now,
@@ -5506,7 +5568,7 @@ function createEngine$6(opts) {
 		q: -1,
 		phase: {
 			kind: "intro",
-			until: opts.now + INTRO_MS$6
+			until: opts.now + INTRO_MS$7
 		},
 		log: [],
 		logSeq: 0
@@ -5519,7 +5581,7 @@ function ask(s) {
 		...s,
 		phase: {
 			kind: "done",
-			until: s.now + DONE_MS$8
+			until: s.now + DONE_MS$9
 		}
 	};
 	return {
@@ -5535,7 +5597,7 @@ function ask(s) {
 }
 function reveal$3(s) {
 	if (s.phase.kind !== "ask") return s;
-	return addLog$1({
+	return addLog$2({
 		...s,
 		phase: {
 			kind: "reveal",
@@ -5552,7 +5614,7 @@ function guess$1(s, player, text) {
 	if (!canGuess$1(s, player) || p.kind !== "ask") return s;
 	const clean = [...text.replace(/[\u0000-\u001f\u007f]/g, "").trim()].slice(0, 20).join("");
 	if (!clean) return s;
-	if (normalizeGuess(clean) !== normalizeGuess(s.questions[s.q].word)) return addLog$1(s, "chat", player, clean);
+	if (normalizeGuess(clean) !== normalizeGuess(s.questions[s.q].word)) return addLog$2(s, "chat", player, clean);
 	const hinted = hintShown(s);
 	const base = POINTS[p.guessed.length] ?? 1;
 	const points = hinted ? Math.ceil(base / 2) : base;
@@ -5561,7 +5623,7 @@ function guess$1(s, player, text) {
 		points,
 		hinted
 	}];
-	let next = addLog$1({
+	let next = addLog$2({
 		...s,
 		scores: s.scores.map((v, i) => i === player ? v + points : v),
 		phase: {
@@ -5574,7 +5636,7 @@ function guess$1(s, player, text) {
 }
 function drop$7(s, player) {
 	if (s.left[player] || s.phase.kind === "done") return s;
-	const next = addLog$1({
+	const next = addLog$2({
 		...s,
 		left: s.left.map((l, i) => l || i === player)
 	}, "system", null, `${s.players[player].name}님이 나갔어요`);
@@ -5582,22 +5644,22 @@ function drop$7(s, player) {
 		...next,
 		phase: {
 			kind: "done",
-			until: s.now + DONE_MS$8
+			until: s.now + DONE_MS$9
 		}
 	};
 	const p = next.phase;
 	if (p.kind === "ask" && activePlayers$1(next).every((i) => p.guessed.some((g) => g.player === i))) return reveal$3(next);
 	return next;
 }
-function tick$9(s) {
+function tick$10(s) {
 	const { phase, now } = s;
 	if (phase.kind === "done" || now < phase.until) return s;
 	if (phase.kind === "ask") return reveal$3(s);
 	return ask(s);
 }
-function engineReducer$6(s, a) {
+function engineReducer$7(s, a) {
 	switch (a.type) {
-		case "tick": return tick$9({
+		case "tick": return tick$10({
 			...s,
 			now: a.now
 		});
@@ -5605,7 +5667,7 @@ function engineReducer$6(s, a) {
 		case "drop": return drop$7(s, a.player);
 	}
 }
-const ranksOf$4 = (s) => s.scores.map((v) => 1 + s.scores.filter((o) => o > v).length);
+const ranksOf$5 = (s) => s.scores.map((v) => 1 + s.scores.filter((o) => o > v).length);
 //#endregion
 //#region src/games/chosung/play/view.ts
 function viewFor$1(s, viewerId) {
@@ -5638,10 +5700,10 @@ function viewFor$1(s, viewerId) {
 		canGuess: canGuess$1(s, me),
 		guessed: p.kind === "ask" || p.kind === "reveal" ? p.guessed : [],
 		log: s.log.slice(-15),
-		ranks: ranksOf$4(s)
+		ranks: ranksOf$5(s)
 	};
 }
-function changeKey$1(s) {
+function changeKey$2(s) {
 	return [
 		s.phase.kind,
 		s.q,
@@ -5656,18 +5718,18 @@ function chosungReferee(setup, ctx) {
 	const players = readPlayers((setup ?? {}).players, ctx, 2, 8);
 	if (!players || players.some((p) => p.kind === "bot")) return null;
 	return hostEngineReferee(ctx, {
-		state: createEngine$6({
+		state: createEngine$7({
 			now: ctx.now(),
 			seed: serverSeed(),
 			players
 		}),
-		reduce: engineReducer$6,
+		reduce: engineReducer$7,
 		tick: (now) => ({
 			type: "tick",
 			now
 		}),
 		toView: (s) => s,
-		changed: (a, b) => !a || changeKey$1(a) !== changeKey$1(b),
+		changed: (a, b) => !a || changeKey$2(a) !== changeKey$2(b),
 		viewFor: (_v, key, s) => viewFor$1(s, key),
 		input: (s, from, m) => {
 			if (m.t !== "guess") return void 0;
@@ -5692,14 +5754,14 @@ function chosungReferee(setup, ctx) {
 //#endregion
 //#region src/games/doodle/constants.ts
 /** 시작 안내 */
-const INTRO_MS$5 = 2e3;
+const INTRO_MS$6 = 2e3;
 /** 그릴 사람이 제시어 2개 중 고르는 시간 (넘으면 무작위) */
 const CHOOSE_MS$1 = 6e3;
 /** 그리는 시간 */
 const DRAW_MS = 6e4;
 /** 정답 보여주기 */
 const REVEAL_MS$1 = 4e3;
-const DONE_MS$7 = 2500;
+const DONE_MS$8 = 2500;
 /** 맞힌 순서대로 점수 (그 뒤는 1점) */
 const GUESS_POINTS = [
 	10,
@@ -5728,7 +5790,7 @@ function shuffle$1(rng, xs) {
 	}
 	return a;
 }
-function addLog(s, kind, player, text) {
+function addLog$1(s, kind, player, text) {
 	const seq = s.logSeq + 1;
 	return {
 		...s,
@@ -5742,7 +5804,7 @@ function addLog(s, kind, player, text) {
 	};
 }
 const activePlayers = (s) => s.players.flatMap((_, i) => s.left[i] ? [] : [i]);
-function createEngine$5(opts) {
+function createEngine$6(opts) {
 	const rng = createRng(opts.seed);
 	const n = opts.players.length;
 	const base = shuffle$1(rng, opts.players.map((_, i) => i));
@@ -5757,7 +5819,7 @@ function createEngine$5(opts) {
 		turnNo: -1,
 		phase: {
 			kind: "intro",
-			until: opts.now + INTRO_MS$5
+			until: opts.now + INTRO_MS$6
 		},
 		log: [],
 		logSeq: 0,
@@ -5801,7 +5863,7 @@ function startDraw(s, index) {
 	const word = options[index === 1 ? 1 : 0];
 	const rng = createRng(s.seed);
 	const choices = choicesFor(rng, word);
-	return addLog({
+	return addLog$1({
 		...s,
 		seed: rng.seed(),
 		used: [...s.used, word],
@@ -5820,7 +5882,7 @@ function startDraw(s, index) {
 function reveal$2(s) {
 	if (s.phase.kind !== "draw") return s;
 	const { drawer, word, guessed } = s.phase;
-	return addLog({
+	return addLog$1({
 		...s,
 		phase: {
 			kind: "reveal",
@@ -5836,7 +5898,7 @@ function finish$2(s) {
 		...s,
 		phase: {
 			kind: "done",
-			until: s.now + DONE_MS$7
+			until: s.now + DONE_MS$8
 		}
 	};
 }
@@ -5854,7 +5916,7 @@ function correct(s, player, viaChoice) {
 		viaChoice
 	}];
 	const scores = s.scores.map((v, i) => i === player ? v + points : i === phase.drawer ? v + 3 : v);
-	let next = addLog({
+	let next = addLog$1({
 		...s,
 		scores,
 		phase: {
@@ -5874,7 +5936,7 @@ function guess(s, player, text) {
 	const clean = [...text.replace(/[\u0000-\u001f\u007f]/g, "").trim()].slice(0, 30).join("");
 	if (!clean) return s;
 	if (normalizeGuess(clean) === normalizeGuess(s.phase.word)) return correct(s, player, false);
-	return addLog(s, "chat", player, clean);
+	return addLog$1(s, "chat", player, clean);
 }
 function pick$2(s, player, index) {
 	if (!canGuess(s, player) || s.phase.kind !== "draw" || !choicesOpen(s) || s.phase.choiceTried.includes(player)) return s;
@@ -5891,7 +5953,7 @@ function pick$2(s, player, index) {
 }
 function drop$6(s, player) {
 	if (s.left[player] || s.phase.kind === "done") return s;
-	let next = addLog({
+	let next = addLog$1({
 		...s,
 		left: s.left.map((l, i) => l || i === player)
 	}, "system", null, `${s.players[player].name}님이 나갔어요`);
@@ -5903,7 +5965,7 @@ function drop$6(s, player) {
 	}
 	return next;
 }
-function tick$8(s) {
+function tick$9(s) {
 	const { phase, now } = s;
 	switch (phase.kind) {
 		case "intro": return now >= phase.until ? nextTurn$2(s) : s;
@@ -5920,9 +5982,9 @@ function tick$8(s) {
 		case "done": return s;
 	}
 }
-function engineReducer$5(s, a) {
+function engineReducer$6(s, a) {
 	switch (a.type) {
-		case "tick": return tick$8({
+		case "tick": return tick$9({
 			...s,
 			now: a.now
 		});
@@ -5933,7 +5995,7 @@ function engineReducer$5(s, a) {
 	}
 }
 /** 순위 (점수 높은 순, 같으면 같은 등수) */
-function ranksOf$3(s) {
+function ranksOf$4(s) {
 	return s.scores.map((v) => 1 + s.scores.filter((o) => o > v).length);
 }
 //#endregion
@@ -6029,11 +6091,11 @@ function viewFor(s, viewerId) {
 		canGuess: canGuess(s, me),
 		guessed: p.kind === "draw" || p.kind === "reveal" ? p.guessed : [],
 		log: s.log.slice(-20),
-		ranks: ranksOf$3(s)
+		ranks: ranksOf$4(s)
 	};
 }
 /** 바로 보내야 할 만큼 바뀌었는지 (그 밖엔 1초마다) */
-function changeKey(s) {
+function changeKey$1(s) {
 	const p = s.phase;
 	return [
 		p.kind,
@@ -6064,7 +6126,7 @@ function createVote(opts) {
 		round: 0,
 		phase: {
 			kind: "intro",
-			until: opts.now + INTRO_MS$5
+			until: opts.now + INTRO_MS$6
 		},
 		used: [],
 		history: [],
@@ -6076,7 +6138,7 @@ function nextRound(s) {
 		...s,
 		phase: {
 			kind: "done",
-			until: s.now + DONE_MS$7
+			until: s.now + DONE_MS$8
 		}
 	};
 	const rng = createRng(s.seed);
@@ -6159,12 +6221,12 @@ function drop$5(s, player) {
 		...next,
 		phase: {
 			kind: "done",
-			until: s.now + DONE_MS$7
+			until: s.now + DONE_MS$8
 		}
 	};
 	return allVoted(next) ? finishVote(next) : next;
 }
-function tick$7(s) {
+function tick$8(s) {
 	const { phase, now } = s;
 	if (phase.kind === "done" || now < phase.until) return s;
 	switch (phase.kind) {
@@ -6184,7 +6246,7 @@ function tick$7(s) {
 }
 function voteReducer(s, a) {
 	switch (a.type) {
-		case "tick": return tick$7({
+		case "tick": return tick$8({
 			...s,
 			now: a.now
 		});
@@ -6248,18 +6310,18 @@ function doodleReferee(setup, ctx) {
 	let history = [];
 	const drawerKey = (s) => s.phase.kind === "draw" ? s.players[s.phase.drawer].id : null;
 	return hostEngineReferee(ctx, {
-		state: createEngine$5({
+		state: createEngine$6({
 			now: ctx.now(),
 			seed: serverSeed(),
 			players
 		}),
-		reduce: engineReducer$5,
+		reduce: engineReducer$6,
 		tick: (now) => ({
 			type: "tick",
 			now
 		}),
 		toView: (s) => s,
-		changed: (a, b) => !a || changeKey(a) !== changeKey(b),
+		changed: (a, b) => !a || changeKey$1(a) !== changeKey$1(b),
 		viewFor: (_v, key, s) => viewFor(s, key),
 		input: (s, from, m) => {
 			if (inkTurn !== s.turnNo) {
@@ -6410,9 +6472,9 @@ const CHOOSE_MS = 2e3;
 /** 공개한 결과를 보여주는 시간 */
 const REVEAL_MS = 1200;
 /** 첫 턴 전 '시작!' 표시 */
-const INTRO_MS$4 = 1200;
+const INTRO_MS$5 = 1200;
 /** 경기가 끝난 뒤 결과 화면으로 넘어가기까지 */
-const DONE_MS$6 = 1800;
+const DONE_MS$7 = 1800;
 //#endregion
 //#region src/games/fight/rules/turn.ts
 const STANCES = [
@@ -6564,7 +6626,7 @@ function createMatch$1(opts) {
 		turns: [],
 		phase: {
 			kind: "intro",
-			until: opts.now + INTRO_MS$4
+			until: opts.now + INTRO_MS$5
 		},
 		sounds: [],
 		soundSeq: 0
@@ -6623,7 +6685,7 @@ function reveal$1(state, picks) {
 		}
 	}, ...turnSounds(result));
 }
-function tick$6(state) {
+function tick$7(state) {
 	const { phase, now } = state;
 	switch (phase.kind) {
 		case "intro": return now >= phase.until && !state.follow ? startChoosing(state) : state;
@@ -6638,7 +6700,7 @@ function tick$6(state) {
 				phase: {
 					kind: "done",
 					winner,
-					until: now + DONE_MS$6
+					until: now + DONE_MS$7
 				}
 			}, winner === userSide ? "win" : "lose");
 		}
@@ -6689,7 +6751,7 @@ function remoteReveal(state, turn, stances) {
 }
 function matchReducer$1(state, action) {
 	switch (action.type) {
-		case "tick": return tick$6({
+		case "tick": return tick$7({
 			...state,
 			now: action.now
 		});
@@ -6788,11 +6850,11 @@ function chooseBotCard(rng, view) {
 /** 한 장 고르는 시간. 넘기면 무작위로 열린다 */
 const PICK_MS$1 = 1e4;
 /** 첫 차례 전 '시작!' 표시 */
-const INTRO_MS$3 = 1500;
+const INTRO_MS$4 = 1500;
 /** 틀린 두 장을 보여주는 시간 (그다음 덮고 차례가 넘어간다) */
 const MISS_SHOW_MS = 1e3;
 /** 경기가 끝난 뒤 결과 화면으로 넘어가기까지 */
-const DONE_MS$5 = 1800;
+const DONE_MS$6 = 1800;
 /** 봇 기억력: 열린 카드를 기억할 확률, 차례가 바뀔 때 기억한 카드 하나를 잊을 확률 */
 const BOT_MEMORY = {
 	normal: {
@@ -6847,7 +6909,7 @@ function createMatch(opts) {
 		memory: Array.from({ length: 22 }, () => null),
 		phase: {
 			kind: "intro",
-			until: opts.now + INTRO_MS$3
+			until: opts.now + INTRO_MS$4
 		},
 		sounds: [],
 		soundSeq: 0,
@@ -6946,7 +7008,7 @@ function finish$1(state) {
 		phase: {
 			kind: "done",
 			winner,
-			until: state.now + DONE_MS$5
+			until: state.now + DONE_MS$6
 		}
 	}, winner === userSide ? "win" : "lose");
 }
@@ -6956,7 +7018,7 @@ function settle$1(state) {
 	if (state.phase.kind === "showing") return endShowing(state);
 	return state;
 }
-function tick$5(state) {
+function tick$6(state) {
 	const { phase, now } = state;
 	switch (phase.kind) {
 		case "intro": return now >= phase.until ? picking(state) : state;
@@ -6999,7 +7061,7 @@ function botFlip(state) {
 }
 function matchReducer(state, action) {
 	switch (action.type) {
-		case "tick": return tick$5({
+		case "tick": return tick$6({
 			...state,
 			now: action.now
 		});
@@ -7097,7 +7159,7 @@ const RESULT_MS = 2400;
 const RPS_PICK_MS = 3e3;
 const RPS_REVEAL_MS = 1800;
 /** 경기가 끝난 뒤 결과 화면으로 넘어가기까지 */
-const DONE_MS$4 = 2500;
+const DONE_MS$5 = 2500;
 /** 봇이 누를 시각 (판 시작부터): 성격마다 다름 */
 const BOT_STYLES = [
 	[300, 2500],
@@ -7113,7 +7175,7 @@ const HANDS$1 = [
 ];
 const within$3 = (rng, [min, max]) => min + rng.next() * (max - min);
 const aliveIndexes$2 = (s) => s.alive.flatMap((a, i) => a ? [i] : []);
-function createEngine$4(opts) {
+function createEngine$5(opts) {
 	return countdown({
 		now: opts.now,
 		seed: opts.seed,
@@ -7228,7 +7290,7 @@ function afterResult(s) {
 		...next,
 		phase: {
 			kind: "done",
-			until: s.now + DONE_MS$4
+			until: s.now + DONE_MS$5
 		}
 	};
 	if (left === 2) return startRps({
@@ -7294,7 +7356,7 @@ function afterReveal$1(s) {
 		out: [...s.out, [loser]],
 		phase: {
 			kind: "done",
-			until: s.now + DONE_MS$4
+			until: s.now + DONE_MS$5
 		}
 	};
 }
@@ -7353,13 +7415,13 @@ function drop$4(s, player) {
 		...next,
 		phase: {
 			kind: "done",
-			until: s.now + DONE_MS$4
+			until: s.now + DONE_MS$5
 		}
 	};
 	if (left === 2) return startRps(next);
 	return s.phase.kind === "call" ? countdown(next) : next;
 }
-function tick$4(s) {
+function tick$5(s) {
 	const { phase, now } = s;
 	switch (phase.kind) {
 		case "countdown": return now >= phase.until ? startCall(s) : s;
@@ -7376,9 +7438,9 @@ function tick$4(s) {
 		case "done": return s;
 	}
 }
-function engineReducer$4(state, action) {
+function engineReducer$5(state, action) {
 	switch (action.type) {
-		case "tick": return tick$4({
+		case "tick": return tick$5({
 			...state,
 			now: action.now
 		});
@@ -7388,7 +7450,7 @@ function engineReducer$4(state, action) {
 	}
 }
 /** 사람별 등수 (1 = 우승). 끝나기 전이면 남은 사람은 모두 1 */
-function ranksOf$2(s) {
+function ranksOf$3(s) {
 	const ranks = s.players.map(() => 1);
 	let next = aliveIndexes$2(s).length + 1;
 	for (const group of [...s.out].reverse()) {
@@ -7400,7 +7462,7 @@ function ranksOf$2(s) {
 //#endregion
 //#region src/games/nunchi/play/view.ts
 /** 심판 상태 → 화면 */
-function toView$4(s) {
+function toView$5(s) {
 	const { phase, now } = s;
 	const collided = collidedOf(s.presses);
 	return {
@@ -7425,7 +7487,7 @@ function toView$4(s) {
 		picked: phase.kind === "rps" ? aliveIndexes$2(s).filter((i) => s.picks[i] !== void 0) : [],
 		hands: phase.kind === "reveal" ? phase.hands : {},
 		winner: phase.kind === "reveal" ? phase.winner : null,
-		ranks: ranksOf$2(s)
+		ranks: ranksOf$3(s)
 	};
 }
 /** 친구에게 바로 알려야 할 만큼 바뀌었는지 (그 밖엔 1초마다 보냄) */
@@ -7447,18 +7509,18 @@ function nunchiReferee(setup, ctx) {
 	const teams = readTeams(o.teams, players.length);
 	if (teams === void 0) return null;
 	return hostEngineReferee(ctx, {
-		state: createEngine$4({
+		state: createEngine$5({
 			now: ctx.now(),
 			seed: serverSeed(),
 			players,
 			teams
 		}),
-		reduce: engineReducer$4,
+		reduce: engineReducer$5,
 		tick: (now) => ({
 			type: "tick",
 			now
 		}),
-		toView: toView$4,
+		toView: toView$5,
 		changed: viewChanged$4,
 		input: (s, from, m) => {
 			if (m.t !== "press" && m.t !== "pick") return void 0;
@@ -7613,14 +7675,14 @@ function numbaseballReferee(setup, ctx) {
 //#endregion
 //#region src/games/roulette/constants.ts
 /** 시작 전 안내 */
-const INTRO_MS$2 = 1500;
+const INTRO_MS$3 = 1500;
 /** 한 차례 시간. 넘기면 골라 둔 사람(없으면 아무나)을 쏜다 */
-const TURN_MS$1 = 15e3;
+const TURN_MS$2 = 15e3;
 /** 방아쇠: 철컥 뒤 SUSPENSE_MS에 '틱' 또는 '탕' */
 const SUSPENSE_MS = 1100;
 const BANG_SHOW_MS = 2400;
 /** 경기가 끝난 뒤 결과 화면으로 넘어가기까지 */
-const DONE_MS$3 = 2500;
+const DONE_MS$4 = 2500;
 /** 봇: 누구를 쏠지 고르기까지, 고른 뒤 당기기까지 */
 const BOT_AIM_MS = [700, 1600];
 const BOT_PULL_MS = [500, 1100];
@@ -7637,7 +7699,7 @@ function chooseTarget(rng, me, alive, pulls) {
 const aliveIndexes$1 = (s) => s.alive.flatMap((a, i) => a ? [i] : []);
 const within$2 = (rng, [min, max]) => min + rng.next() * (max - min);
 /** 자리 순서로 from 다음 살아 있는 사람 */
-function nextAlive(alive, from) {
+function nextAlive$1(alive, from) {
 	for (let k = 1; k <= alive.length; k++) {
 		const i = (from + k) % alive.length;
 		if (alive[i]) return i;
@@ -7668,7 +7730,7 @@ function reload(s) {
 		pulls: 0
 	};
 }
-function createEngine$3(opts) {
+function createEngine$4(opts) {
 	const rng = createRng(opts.seed);
 	const turn = Math.floor(rng.next() * opts.players.length);
 	return reload({
@@ -7687,7 +7749,7 @@ function createEngine$3(opts) {
 		bot: null,
 		phase: {
 			kind: "intro",
-			until: opts.now + INTRO_MS$2
+			until: opts.now + INTRO_MS$3
 		}
 	});
 }
@@ -7700,7 +7762,7 @@ function startTurn$1(s, turn) {
 		bot: null,
 		phase: {
 			kind: "aim",
-			until: s.now + TURN_MS$1
+			until: s.now + TURN_MS$2
 		}
 	};
 	if (s.players[turn].kind === "bot") {
@@ -7750,7 +7812,7 @@ function pull(s, player, target = s.aimAt) {
 function afterFire(s) {
 	if (s.phase.kind !== "fire") return s;
 	const { shooter, target, bang } = s.phase.fire;
-	if (!bang) return startTurn$1(s, s.alive[target] ? target : nextAlive(s.alive, target));
+	if (!bang) return startTurn$1(s, s.alive[target] ? target : nextAlive$1(s.alive, target));
 	const next = {
 		...s,
 		alive: s.alive.map((a, i) => a && i !== target),
@@ -7762,10 +7824,10 @@ function afterFire(s) {
 		aimAt: null,
 		phase: {
 			kind: "done",
-			until: s.now + DONE_MS$3
+			until: s.now + DONE_MS$4
 		}
 	};
-	const turn = next.alive[shooter] ? shooter : nextAlive(next.alive, shooter);
+	const turn = next.alive[shooter] ? shooter : nextAlive$1(next.alive, shooter);
 	return startTurn$1(reload(next), turn);
 }
 function timeout(s) {
@@ -7797,11 +7859,11 @@ function drop$3(s, player) {
 		aimAt: null,
 		phase: {
 			kind: "done",
-			until: s.now + DONE_MS$3
+			until: s.now + DONE_MS$4
 		}
 	};
 	if (s.phase.kind === "aim") {
-		if (s.turn === player) return startTurn$1(next, nextAlive(next.alive, player));
+		if (s.turn === player) return startTurn$1(next, nextAlive$1(next.alive, player));
 		if (s.aimAt === player) return {
 			...next,
 			aimAt: null
@@ -7809,7 +7871,7 @@ function drop$3(s, player) {
 	}
 	return next;
 }
-function tick$3(s) {
+function tick$4(s) {
 	const { phase, now } = s;
 	switch (phase.kind) {
 		case "intro": return now >= phase.until ? startTurn$1(s, s.turn) : s;
@@ -7822,9 +7884,9 @@ function tick$3(s) {
 		case "done": return s;
 	}
 }
-function engineReducer$3(state, action) {
+function engineReducer$4(state, action) {
 	switch (action.type) {
-		case "tick": return tick$3({
+		case "tick": return tick$4({
 			...state,
 			now: action.now
 		});
@@ -7834,7 +7896,7 @@ function engineReducer$3(state, action) {
 	}
 }
 /** 사람별 등수 (1 = 우승). 늦게 탈락할수록 앞. 끝나기 전이면 남은 사람은 모두 1 */
-function ranksOf$1(s) {
+function ranksOf$2(s) {
 	const ranks = s.players.map(() => 1);
 	const left = aliveIndexes$1(s).length;
 	[...s.out].reverse().forEach((i, k) => ranks[i] = left + 1 + k);
@@ -7843,7 +7905,7 @@ function ranksOf$1(s) {
 //#endregion
 //#region src/games/roulette/play/view.ts
 /** 심판 상태 → 화면 */
-function toView$3(s) {
+function toView$4(s) {
 	const { phase, now } = s;
 	return {
 		players: s.players.map(({ id, name, avatar }) => ({
@@ -7862,7 +7924,7 @@ function toView$3(s) {
 		phase: phase.kind,
 		leftMs: Math.max(0, phase.until - now),
 		fire: phase.kind === "fire" ? phase.fire : null,
-		ranks: ranksOf$1(s)
+		ranks: ranksOf$2(s)
 	};
 }
 /** 친구에게 바로 알려야 할 만큼 바뀌었는지 (그 밖엔 1초마다 보냄) */
@@ -7879,19 +7941,19 @@ function rouletteReferee(setup, ctx) {
 	const teams = readTeams(o.teams, players.length);
 	if (teams === void 0) return null;
 	return hostEngineReferee(ctx, {
-		state: createEngine$3({
+		state: createEngine$4({
 			now: ctx.now(),
 			seed: serverSeed(),
 			players,
 			teams,
 			friendlyFire: o.friendlyFire === true
 		}),
-		reduce: engineReducer$3,
+		reduce: engineReducer$4,
 		tick: (now) => ({
 			type: "tick",
 			now
 		}),
-		toView: toView$3,
+		toView: toView$4,
 		changed: viewChanged$3,
 		input: (s, from, m) => {
 			if (m.t !== "aim" && m.t !== "pull") return void 0;
@@ -7943,7 +8005,7 @@ const LASER_SPEED = .05;
 /** 레이저가 다 멈춘 뒤 결과 보여주기 */
 const AFTER_SHOT_MS = 1800;
 /** 경기가 끝난 뒤 결과 화면으로 넘어가기까지 */
-const DONE_MS$2 = 2500;
+const DONE_MS$3 = 2500;
 /** 봇이 정하는 데 걸리는 시간 (고르기 시작부터) */
 const BOT_PLAN_MS = [1500, 6e3];
 //#endregion
@@ -8151,7 +8213,7 @@ function buildWalls(s, half = halfFor(aliveIndexes(s).length)) {
 		walls
 	};
 }
-function createEngine$2(opts) {
+function createEngine$3(opts) {
 	return buildWalls({
 		now: opts.now,
 		seed: opts.seed,
@@ -8303,7 +8365,7 @@ function afterReveal(s) {
 		...next,
 		phase: {
 			kind: "done",
-			until: s.now + DONE_MS$2
+			until: s.now + DONE_MS$3
 		}
 	};
 	const alive = aliveIndexes(next).length;
@@ -8329,14 +8391,14 @@ function drop$2(s, player) {
 		...next,
 		phase: {
 			kind: "done",
-			until: s.now + DONE_MS$2
+			until: s.now + DONE_MS$3
 		}
 	};
 	return next;
 }
 /** 살아 있는 사람이 모두 확정했는지 */
 const allLocked = (s) => aliveIndexes(s).every((i) => s.plans[i]?.locked);
-function tick$2(s) {
+function tick$3(s) {
 	const { phase, now } = s;
 	switch (phase.kind) {
 		case "countdown": return now >= phase.until ? startPlan(s) : s;
@@ -8348,9 +8410,9 @@ function tick$2(s) {
 		case "done": return s;
 	}
 }
-function engineReducer$2(state, action) {
+function engineReducer$3(state, action) {
 	switch (action.type) {
-		case "tick": return tick$2({
+		case "tick": return tick$3({
 			...state,
 			now: action.now
 		});
@@ -8359,7 +8421,7 @@ function engineReducer$2(state, action) {
 	}
 }
 /** 사람별 등수 (1 = 우승). 끝나기 전이면 남은 사람은 모두 1 */
-function ranksOf(s) {
+function ranksOf$1(s) {
 	const ranks = s.players.map(() => 1);
 	let next = aliveIndexes(s).length + 1;
 	for (const group of [...s.out].reverse()) {
@@ -8371,7 +8433,7 @@ function ranksOf(s) {
 //#endregion
 //#region src/games/survival/play/view.ts
 /** 심판 상태 → 화면 */
-function toView$2(s) {
+function toView$3(s) {
 	const { phase, now } = s;
 	return {
 		players: s.players.map(({ id, name, avatar }) => ({
@@ -8392,7 +8454,7 @@ function toView$2(s) {
 		leftMs: Math.max(0, phase.until - now),
 		locked: phase.kind === "plan" ? aliveIndexes(s).filter((i) => s.plans[i]?.locked) : [],
 		reveal: phase.kind === "reveal" || phase.kind === "done" ? s.lastReveal : null,
-		ranks: ranksOf(s)
+		ranks: ranksOf$1(s)
 	};
 }
 /** 친구에게 바로 알려야 할 만큼 바뀌었는지 (그 밖엔 1초마다 보냄) */
@@ -8409,19 +8471,19 @@ function survivalReferee(setup, ctx) {
 	const teams = readTeams(o.teams, players.length);
 	if (teams === void 0) return null;
 	return hostEngineReferee(ctx, {
-		state: createEngine$2({
+		state: createEngine$3({
 			now: ctx.now(),
 			seed: serverSeed(),
 			players,
 			teams,
 			friendlyFire: o.friendlyFire === true
 		}),
-		reduce: engineReducer$2,
+		reduce: engineReducer$3,
 		tick: (now) => ({
 			type: "tick",
 			now
 		}),
-		toView: toView$2,
+		toView: toView$3,
 		changed: viewChanged$2,
 		input: (s, from, m) => {
 			if (m.t !== "plan") return void 0;
@@ -8453,13 +8515,13 @@ function survivalReferee(setup, ctx) {
 //#endregion
 //#region src/games/tiles/constants.ts
 /** 첫 차례 전 안내 */
-const INTRO_MS$1 = 1800;
+const INTRO_MS$2 = 1800;
 /** 한 차례 시간. 넘기면 하던 것은 되돌리고 1장 가져온다 */
-const TURN_MS = 6e4;
+const TURN_MS$1 = 6e4;
 /** 봇이 한 차례 생각하는 시간 */
 const BOT_THINK_MS = [1200, 2600];
 /** 경기가 끝난 뒤 결과 화면으로 넘어가기까지 */
-const DONE_MS$1 = 3e3;
+const DONE_MS$2 = 3e3;
 //#endregion
 //#region src/games/tiles/rules/tiles.ts
 const NUMBER_TILES = 104;
@@ -8732,7 +8794,7 @@ function checkPlay(opts) {
 }
 //#endregion
 //#region src/games/tiles/play/engine.ts
-function createEngine$1(opts) {
+function createEngine$2(opts) {
 	const rng = createRng(opts.seed);
 	const deck = shuffledDeck(rng);
 	const hands = opts.players.map((_, i) => deck.slice(i * 13, (i + 1) * 13));
@@ -8755,7 +8817,7 @@ function createEngine$1(opts) {
 		seq: 0,
 		phase: {
 			kind: "intro",
-			until: opts.now + INTRO_MS$1
+			until: opts.now + INTRO_MS$2
 		}
 	};
 }
@@ -8770,7 +8832,7 @@ function startTurn(s, turn) {
 		botPlan: null,
 		phase: {
 			kind: "turn",
-			until: s.now + TURN_MS
+			until: s.now + TURN_MS$1
 		}
 	};
 }
@@ -8788,7 +8850,7 @@ const finish = (s) => ({
 	botPlan: null,
 	phase: {
 		kind: "done",
-		until: s.now + DONE_MS$1
+		until: s.now + DONE_MS$2
 	}
 });
 function canAct(s, player) {
@@ -8944,7 +9006,7 @@ function drop$1(s, player) {
 	if (staying(next).length <= 1 || next.teams && lastTeam(next.left.map((l) => !l), next.teams) !== null) return finish(next);
 	return s.turn === player && s.phase.kind === "turn" ? nextTurn$1(next) : next;
 }
-function tick$1(s) {
+function tick$2(s) {
 	const { phase, now } = s;
 	switch (phase.kind) {
 		case "intro": return now >= phase.until ? startTurn(s, s.turn) : s;
@@ -8956,9 +9018,9 @@ function tick$1(s) {
 		case "done": return s;
 	}
 }
-function engineReducer$1(s, action) {
+function engineReducer$2(s, action) {
 	switch (action.type) {
-		case "tick": return tick$1({
+		case "tick": return tick$2({
 			...s,
 			now: action.now
 		});
@@ -8981,7 +9043,7 @@ function winnerTeam(s) {
 }
 //#endregion
 //#region src/games/tiles/play/view.ts
-function toView$1(s) {
+function toView$2(s) {
 	return {
 		players: s.players.map(({ id, name }) => ({
 			id,
@@ -9028,18 +9090,18 @@ function tilesReferee(setup, ctx) {
 	const teams = readTeams(o.teams, players.length);
 	if (teams === void 0) return null;
 	return hostEngineReferee(ctx, {
-		state: createEngine$1({
+		state: createEngine$2({
 			now: ctx.now(),
 			seed: serverSeed(),
 			players,
 			teams
 		}),
-		reduce: engineReducer$1,
+		reduce: engineReducer$2,
 		tick: (now) => ({
 			type: "tick",
 			now
 		}),
-		toView: toView$1,
+		toView: toView$2,
 		changed: viewChanged$1,
 		viewFor: hideFor,
 		input: (s, from, m) => {
@@ -9065,6 +9127,319 @@ function tilesReferee(setup, ctx) {
 		},
 		drop: (s, key) => {
 			const player = humanIndex(s.players, key);
+			return player >= 0 ? {
+				type: "drop",
+				player
+			} : null;
+		},
+		done: (s) => s.phase.kind === "done",
+		nowOf: (s) => s.now
+	});
+}
+//#endregion
+//#region src/games/wordchain/constants.ts
+const INTRO_MS$1 = 2500;
+/** 한 차례 (넘기면 탈락) */
+const TURN_MS = 1e4;
+const DONE_MS$1 = 2500;
+//#endregion
+//#region src/games/wordchain/play/engine.ts
+function addLog(s, kind, player, text) {
+	const seq = s.logSeq + 1;
+	return {
+		...s,
+		logSeq: seq,
+		log: [...s.log, {
+			seq,
+			kind,
+			player,
+			text
+		}].slice(-30)
+	};
+}
+const alive = (s) => s.players.flatMap((_, i) => s.left[i] || s.out.includes(i) ? [] : [i]);
+function createEngine$1(opts) {
+	const rng = createRng(opts.seed);
+	const starters = WORDS.filter((w) => [...w].length >= 2 && [...w].length <= 3);
+	const first = starters[Math.floor(rng.next() * starters.length)];
+	const order = opts.players.map((_, i) => i);
+	for (let i = order.length - 1; i > 0; i--) {
+		const j = Math.floor(rng.next() * (i + 1));
+		[order[i], order[j]] = [order[j], order[i]];
+	}
+	return {
+		now: opts.now,
+		seed: rng.seed(),
+		players: order.map((i) => opts.players[i]),
+		left: opts.players.map(() => false),
+		out: [],
+		chain: [{
+			word: first,
+			player: null
+		}],
+		phase: {
+			kind: "intro",
+			until: opts.now + INTRO_MS$1
+		},
+		log: [],
+		logSeq: 0
+	};
+}
+/** 지금 단어가 시작해야 하는 글자들 (두음법칙 포함) */
+function startsOf(s) {
+	const last = s.chain.at(-1).word;
+	return initialVariants([...last].at(-1));
+}
+/** from 다음 살아 있는 사람 (자리 순서) */
+function nextAlive(s, from) {
+	const n = s.players.length;
+	for (let k = 1; k <= n; k++) {
+		const i = (from + k) % n;
+		if (!s.left[i] && !s.out.includes(i)) return i;
+	}
+	return null;
+}
+function turnOf(s, player) {
+	return {
+		...s,
+		phase: {
+			kind: "turn",
+			player,
+			until: s.now + TURN_MS,
+			checking: null
+		}
+	};
+}
+function finishIfLast(s) {
+	if (alive(s).length > 1) return null;
+	return {
+		...s,
+		phase: {
+			kind: "done",
+			until: s.now + DONE_MS$1
+		}
+	};
+}
+/** 형식·규칙 검사. 틀리면 이유 */
+function checkWord(s, word) {
+	const w = word.replace(/\s+/g, "");
+	const chars = [...w];
+	if (chars.length < 2) return "두 글자 이상만 돼요";
+	if (chars.length > 10) return "너무 길어요";
+	if (!chars.every(isSyllable)) return "한글 낱말만 돼요";
+	if (!startsOf(s).includes(chars[0])) return `'${startsOf(s).join("' 또는 '")}'(으)로 시작해야 해요`;
+	if (s.chain.some((l) => l.word === w)) return "이미 나온 낱말이에요";
+	return null;
+}
+function tryWord(s, player, word) {
+	const p = s.phase;
+	if (p.kind !== "turn" || p.player !== player || p.checking) return s;
+	const w = word.replace(/\s+/g, "").slice(0, 20);
+	const bad = checkWord(s, w);
+	if (bad) return addLog(s, "bad", player, `${w} — ${bad}`);
+	return {
+		...s,
+		phase: {
+			...p,
+			checking: w
+		}
+	};
+}
+function accept(s, word) {
+	const p = s.phase;
+	if (p.kind !== "turn" || p.checking !== word) return s;
+	const next = {
+		...s,
+		chain: [...s.chain, {
+			word,
+			player: p.player
+		}]
+	};
+	const to = nextAlive(next, p.player);
+	return to === null ? {
+		...next,
+		phase: {
+			kind: "done",
+			until: s.now + DONE_MS$1
+		}
+	} : turnOf(next, to);
+}
+function reject(s, word) {
+	const p = s.phase;
+	if (p.kind !== "turn" || p.checking !== word) return s;
+	return addLog({
+		...s,
+		phase: {
+			...p,
+			checking: null
+		}
+	}, "bad", p.player, `${word} — 사전에 없어요`);
+}
+function eliminate(s, player, why) {
+	const next = addLog({
+		...s,
+		out: [...s.out, player]
+	}, "out", player, `${s.players[player].name} 탈락 (${why})`);
+	const end = finishIfLast(next);
+	if (end) return end;
+	const p = s.phase;
+	if (p.kind === "turn" && p.player === player) {
+		const to = nextAlive(next, player);
+		return to === null ? {
+			...next,
+			phase: {
+				kind: "done",
+				until: s.now + DONE_MS$1
+			}
+		} : turnOf(next, to);
+	}
+	return next;
+}
+function tick$1(s) {
+	const { phase, now } = s;
+	if (phase.kind === "intro") return now >= phase.until ? turnOf(s, 0) : s;
+	if (phase.kind === "turn" && !phase.checking && now >= phase.until) return eliminate(s, phase.player, "시간 초과");
+	return s;
+}
+function engineReducer$1(s, a) {
+	switch (a.type) {
+		case "tick": return tick$1({
+			...s,
+			now: a.now
+		});
+		case "try": return tryWord(s, a.player, a.word);
+		case "accept": return accept(s, a.word);
+		case "reject": return reject(s, a.word);
+		case "drop": {
+			if (s.left[a.player] || s.phase.kind === "done") return s;
+			const marked = {
+				...s,
+				left: s.left.map((l, i) => l || i === a.player)
+			};
+			return s.out.includes(a.player) ? marked : eliminate(marked, a.player, "나감");
+		}
+	}
+}
+/** 순위: 남은 사람 1등, 늦게 탈락할수록 위 */
+function ranksOf(s) {
+	const n = s.players.length;
+	return s.players.map((_, i) => {
+		const k = s.out.indexOf(i);
+		return k < 0 ? 1 : n - k;
+	});
+}
+//#endregion
+//#region src/games/wordchain/play/view.ts
+function toView$1(s) {
+	const p = s.phase;
+	return {
+		players: s.players.map(({ id, name }) => ({
+			id,
+			name
+		})),
+		left: s.left,
+		out: s.out,
+		phase: p.kind,
+		leftMs: Math.max(0, p.until - s.now),
+		turn: p.kind === "turn" ? p.player : null,
+		checking: p.kind === "turn" ? p.checking : null,
+		chain: s.chain.slice(-12),
+		count: s.chain.length - 1,
+		starts: startsOf(s),
+		log: s.log.slice(-6),
+		ranks: ranksOf(s)
+	};
+}
+function changeKey(s) {
+	const p = s.phase;
+	return [
+		p.kind,
+		s.chain.length,
+		s.logSeq,
+		s.out.join(),
+		s.left.join(),
+		p.kind === "turn" ? `${p.player}.${p.checking}` : ""
+	].join("|");
+}
+//#endregion
+//#region src/server/dict.ts
+const env = globalThis.process?.env ?? {};
+const cache = /* @__PURE__ */ new Map();
+async function isNoun(word) {
+	const key = env.STDICT_KEY;
+	if (!key) return null;
+	const hit = cache.get(word);
+	if (hit !== void 0) return hit;
+	try {
+		const url = `https://stdict.korean.go.kr/api/search.do?key=${encodeURIComponent(key)}&q=${encodeURIComponent(word)}&req_type=json&type_search=search&advanced=y&method=exact&pos=1&num=10`;
+		const ctl = new AbortController();
+		const timer = setTimeout(() => ctl.abort(), 3e3);
+		const res = await fetch(url, { signal: ctl.signal });
+		clearTimeout(timer);
+		if (!res.ok) return null;
+		const text = (await res.text()).trim();
+		if (!text) return remember(word, false);
+		const json = JSON.parse(text);
+		if (json.error) return null;
+		return remember(word, Number(json.channel?.total ?? 0) > 0);
+	} catch {
+		return null;
+	}
+}
+function remember(word, ok) {
+	if (cache.size > 2e4) cache.clear();
+	cache.set(word, ok);
+	return ok;
+}
+//#endregion
+//#region src/server/referees/wordchain.ts
+function wordchainReferee(setup, ctx) {
+	const players = readPlayers((setup ?? {}).players, ctx, 2, 8);
+	if (!players || players.some((p) => p.kind === "bot")) return null;
+	return hostEngineReferee(ctx, {
+		state: createEngine$1({
+			now: ctx.now(),
+			seed: serverSeed(),
+			players
+		}),
+		reduce: engineReducer$1,
+		tick: (now) => ({
+			type: "tick",
+			now
+		}),
+		toView: (s) => s,
+		changed: (a, b) => !a || changeKey(a) !== changeKey(b),
+		wrap: (s) => ({
+			t: "view",
+			v: toView$1(s)
+		}),
+		input: (s, from, m, later) => {
+			if (m.t !== "say") return void 0;
+			const player = s.players.findIndex((p) => p.id === from);
+			if (player < 0 || typeof m.word !== "string" || m.word.length > 40) return null;
+			const after = engineReducer$1(s, {
+				type: "try",
+				player,
+				word: m.word
+			});
+			if (after.phase.kind === "turn" && after.phase.checking && !(s.phase.kind === "turn" && s.phase.checking)) {
+				const word = after.phase.checking;
+				isNoun(word).then((ok) => later(ok === false ? {
+					type: "reject",
+					word
+				} : {
+					type: "accept",
+					word
+				}));
+			}
+			return {
+				type: "try",
+				player,
+				word: m.word
+			};
+		},
+		drop: (s, key) => {
+			const player = s.players.findIndex((p) => p.id === key);
 			return player >= 0 ? {
 				type: "drop",
 				player
@@ -9652,7 +10027,8 @@ const REFEREES = {
 	fight: fightReferee,
 	omok: omokReferee,
 	doodle: doodleReferee,
-	chosung: chosungReferee
+	chosung: chosungReferee,
+	wordchain: wordchainReferee
 };
 //#endregion
 //#region game-server/main.ts

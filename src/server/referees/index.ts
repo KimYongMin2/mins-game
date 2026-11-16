@@ -11,6 +11,7 @@ import { numbaseballReferee } from './numbaseball'
 import { rouletteReferee } from './roulette'
 import { survivalReferee } from './survival'
 import { tilesReferee } from './tiles'
+import { wordchainReferee } from './wordchain'
 import { yutReferee } from './yut'
 
 // 서버가 심판을 맡는 게임들 (조작 막기 3단계). 예전에 방장 폰이 돌리던 규칙 코드를 서버에서 그대로 돌린다.
@@ -28,4 +29,5 @@ export const REFEREES: Record<string, RefereeFactory> = {
   omok: omokReferee,
   doodle: doodleReferee,
   chosung: chosungReferee,
+  wordchain: wordchainReferee,
 }

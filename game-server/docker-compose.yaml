@@ -3,6 +3,10 @@ services:
   game:
     build: .
     restart: unless-stopped
+    # 비밀 값(끝말잇기 사전 키 STDICT_KEY 등)은 서버의 game-server/.env에만 (저장소엔 없음)
+    env_file:
+      - path: .env
+        required: false
     ports:
       - "127.0.0.1:8090:8090"
     logging:

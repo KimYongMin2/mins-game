@@ -13,8 +13,11 @@ export type EngineSpec<S, V, A> = {
   tick: (now: number) => A
   toView: (s: S) => V
   changed: (a: V | null, b: V) => boolean
-  /** 사람 메시지 → 심판 동작. undefined = 이 게임 메시지가 아님(그대로 전달), null = 이 게임 메시지지만 무시 */
-  input: (s: S, from: string, msg: Record<string, unknown>) => A | null | undefined
+  /**
+   * 사람 메시지 → 심판 동작. undefined = 이 게임 메시지가 아님(그대로 전달), null = 이 게임 메시지지만 무시.
+   * later = 나중에(사전 확인 등 비동기 뒤) 동작을 넣을 때
+   */
+  input: (s: S, from: string, msg: Record<string, unknown>, later: (a: A) => void) => A | null | undefined
   /** 나간 사람 → 동작 (없으면 null) */
   drop: (s: S, key: string) => A | null
   done: (s: S) => boolean
@@ -41,11 +44,21 @@ export function hostEngineReferee<S, V, A>(ctx: RefereeContext, spec: EngineSpec
     }
   }
   flush(true)
+  let stopped = false
+  const later = (a: A) => {
+    if (stopped) return
+    try {
+      s = spec.reduce(spec.reduce(s, spec.tick(ctx.now())), a)
+      flush()
+    } catch (e) {
+      console.warn('[referee] 나중 동작 무시', e)
+    }
+  }
   return {
     input(from, msg) {
       if (!msg || typeof msg !== 'object') return false
       try {
-        const a = spec.input(s, from, msg as Record<string, unknown>)
+        const a = spec.input(s, from, msg as Record<string, unknown>, later)
         if (a === undefined) return false
         if (a !== null) {
           // 받은 순간의 서버 시각으로 (박자 사이에 와도 — 눈치게임 동시 판정 등)
@@ -70,7 +83,11 @@ export function hostEngineReferee<S, V, A>(ctx: RefereeContext, spec: EngineSpec
         flush()
       }
     },
-    finished: () => doneAt !== null && spec.nowOf(s) - doneAt > LINGER_MS,
+    finished: () => {
+      const over = doneAt !== null && spec.nowOf(s) - doneAt > LINGER_MS
+      if (over) stopped = true
+      return over
+    },
   }
 }
 

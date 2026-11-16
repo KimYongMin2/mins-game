@@ -22,3 +22,6 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# 민스서버 게임 서버 비밀 값 (사전 키 등)
+game-server/.env
