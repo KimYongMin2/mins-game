@@ -1,5 +1,6 @@
 import { getSupabase } from '../../../shared/online/supabase'
-import { createUploadQueue, newRecordId, type UploadStatus } from '../../../shared/online/uploadQueue'
+import type { UploadStatus } from '../../../shared/online/uploadQueue'
+import { type Ticket, createVerifiedQueue } from '../../../shared/online/verified'
 import type { MatchSummary } from '../match/matchState'
 import type { Difficulty } from '../rules/judge'
 import type { LeaderRow } from './leaderboard'
@@ -7,39 +8,9 @@ import type { LeaderRow } from './leaderboard'
 // 경기 결과를 서버(Supabase)에 올리고 랭킹 합계를 받아온다.
 // 올리기·재전송은 shared/online/uploadQueue가 맡는다.
 
-const TABLE = 'zolaball_games'
-const PENDING_KEY = 'zolaball:pending-games'
 
-/** zolaball_games 한 줄 (player_id·created_at은 서버가 채운다) */
-export type GameRow = {
-  id: string
-  nickname: string
-  difficulty: Difficulty
-  outcome: MatchSummary['outcome']
-  at_bats: number
-  hits: number
-  homeruns: number
-  rbi: number
-  outs_pitched: number
-  runs_allowed: number
-}
-
-export function toGameRow(summary: MatchSummary, nickname: string, id: string): GameRow {
-  return {
-    id,
-    nickname: nickname.trim().slice(0, 10) || '익명',
-    difficulty: summary.config.difficulty,
-    outcome: summary.outcome,
-    at_bats: summary.userStats.atBats,
-    hits: summary.userStats.hits,
-    homeruns: summary.userStats.homeruns,
-    rbi: summary.userStats.rbi,
-    outs_pitched: summary.userPitching.outs,
-    runs_allowed: summary.userPitching.runsAllowed,
-  }
-}
-
-const queue = createUploadQueue<GameRow>(TABLE, PENDING_KEY)
+// 올리기: 서버가 입장권 시드와 공마다 내 입력으로 경기를 다시 돌려 기록을 직접 매겨 넣는다 (src/server/games/zolaball.ts).
+const queue = createVerifiedQueue('zolaball:verified-games')
 
 export type { UploadStatus } from '../../../shared/online/uploadQueue'
 
@@ -47,8 +18,8 @@ export type { UploadStatus } from '../../../shared/online/uploadQueue'
 export const flushPendingGames = queue.flush
 
 /** 경기 결과를 올린다. */
-export function submitGame(summary: MatchSummary, nickname: string): Promise<Exclude<UploadStatus, 'saving'>> {
-  return queue.submit(toGameRow(summary, nickname, newRecordId()))
+export function submitGame(summary: MatchSummary, ticket: Ticket, nickname: string): Promise<Exclude<UploadStatus, 'saving'>> {
+  return queue.submit({ game: 'zolaball', ticket, nickname: nickname.trim().slice(0, 10) || '익명', data: { difficulty: summary.config.difficulty, inputs: summary.inputs } })
 }
 
 type LeaderboardRpcRow = {

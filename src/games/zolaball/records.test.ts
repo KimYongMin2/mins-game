@@ -13,6 +13,7 @@ function summary(over: Partial<MatchSummary>): MatchSummary {
     linescore: { away: [1, 2, 0], home: [0, 1, 0] },
     userStats: { atBats: 9, hits: 4, homeruns: 1, strikeouts: 2, walks: 1, rbi: 3 },
     userPitching: { outs: 9, runsAllowed: 2 },
+    inputs: [],
     ...over,
   }
 }

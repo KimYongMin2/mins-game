@@ -75,7 +75,8 @@ async function issueTicket(secret, game, uid, now = Date.now()) {
 const VERIFIED_GAMES = [
 	"fight",
 	"archery",
-	"batting"
+	"batting",
+	"zolaball"
 ];
 async function ticketApi(req) {
 	if (!fromOurSite(req)) return json(403, { error: "forbidden" });

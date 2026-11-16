@@ -96,6 +96,9 @@ function createRng(seed) {
 		seed: () => s
 	};
 }
+function chance(rng, p) {
+	return rng.next() < p;
+}
 function pickOne(rng, values) {
 	return values[Math.floor(rng.next() * values.length)];
 }
@@ -280,7 +283,7 @@ function computeImpact(input) {
 }
 //#endregion
 //#region src/games/archery/play/roundState.ts
-const ANNOUNCE_MS = 1400;
+const ANNOUNCE_MS$1 = 1400;
 const SCORED_MS = 1300;
 const CENTER = {
 	x: 0,
@@ -289,7 +292,7 @@ const CENTER = {
 function currentDistance(state) {
 	return distanceOfArrow(Math.min(state.arrowIndex, TOTAL_ARROWS - 1));
 }
-function withSounds$2(state, ...names) {
+function withSounds$3(state, ...names) {
 	let seq = state.soundSeq;
 	const added = names.map((name) => ({
 		id: ++seq,
@@ -309,7 +312,7 @@ function prepareArrow(state, index, now) {
 	const announce = isFirstAtDistance(index);
 	const phase = announce ? {
 		kind: "announce",
-		until: now + ANNOUNCE_MS
+		until: now + ANNOUNCE_MS$1
 	} : { kind: "ready" };
 	return {
 		...state,
@@ -366,7 +369,7 @@ function fire(state, at) {
 		releaseAt: at,
 		aim: state.aim
 	};
-	return withSounds$2({
+	return withSounds$3({
 		...state,
 		phase: {
 			kind: "flying",
@@ -389,7 +392,7 @@ function timeOut(state) {
 		releaseAt: null,
 		aim: CENTER
 	};
-	return withSounds$2({
+	return withSounds$3({
 		...state,
 		shots: [...state.shots, shot],
 		phase: {
@@ -405,7 +408,7 @@ function hitSound$1(score) {
 	if (score.ring === 0) return "miss";
 	return "hit";
 }
-function tick$2(state) {
+function tick$3(state) {
 	const { phase, now } = state;
 	switch (phase.kind) {
 		case "announce": return now >= phase.until ? {
@@ -420,7 +423,7 @@ function tick$2(state) {
 		}
 		case "flying":
 			if (now < phase.until) return state;
-			return withSounds$2({
+			return withSounds$3({
 				...state,
 				shots: [...state.shots, phase.shot],
 				phase: {
@@ -432,7 +435,7 @@ function tick$2(state) {
 		case "scored": {
 			if (now < phase.until) return state;
 			const next = state.arrowIndex + 1;
-			if (next >= TOTAL_ARROWS) return withSounds$2({
+			if (next >= TOTAL_ARROWS) return withSounds$3({
 				...state,
 				arrowIndex: next,
 				phase: { kind: "done" }
@@ -456,13 +459,13 @@ function aimBy(state, dx, dy) {
 }
 function roundReducer(state, action) {
 	switch (action.type) {
-		case "tick": return tick$2({
+		case "tick": return tick$3({
 			...state,
 			now: action.now
 		});
 		case "press":
 			if (state.phase.kind !== "ready") return state;
-			return withSounds$2({
+			return withSounds$3({
 				...state,
 				phase: {
 					kind: "drawing",
@@ -482,7 +485,7 @@ function summarizeRound(state) {
 }
 //#endregion
 //#region src/server/games/archery.ts
-const isNum$1 = (x) => typeof x === "number" && Number.isFinite(x);
+const isNum$2 = (x) => typeof x === "number" && Number.isFinite(x);
 /** 놓은 시각이 자동 발사·시간 끝보다 이만큼 늦어도 봐줌 (화면 한 프레임) */
 const SLACK_MS = 50;
 function readShots(x) {
@@ -491,9 +494,9 @@ function readShots(x) {
 	for (const s of x) {
 		if (!s || typeof s !== "object") return null;
 		const aim = s.aim;
-		if (!aim || !isNum$1(aim.x) || !isNum$1(aim.y)) return null;
-		const pressAt = s.pressAt === null ? null : isNum$1(s.pressAt) ? s.pressAt : void 0;
-		const releaseAt = s.releaseAt === null ? null : isNum$1(s.releaseAt) ? s.releaseAt : void 0;
+		if (!aim || !isNum$2(aim.x) || !isNum$2(aim.y)) return null;
+		const pressAt = s.pressAt === null ? null : isNum$2(s.pressAt) ? s.pressAt : void 0;
+		const releaseAt = s.releaseAt === null ? null : isNum$2(s.releaseAt) ? s.releaseAt : void 0;
 		if (pressAt === void 0 || releaseAt === void 0 || pressAt === null !== (releaseAt === null)) return null;
 		if (pressAt !== null && releaseAt !== null && (releaseAt < pressAt || releaseAt - pressAt > 10050)) return null;
 		out.push({
@@ -509,7 +512,7 @@ function readShots(x) {
 }
 function replayArchery(seed, t0, shotsIn) {
 	const shots = readShots(shotsIn);
-	if (!shots || !isNum$1(t0)) return null;
+	if (!shots || !isNum$2(t0)) return null;
 	let s = createRound(t0, seed);
 	let t = t0;
 	const end = t0 + TOTAL_ARROWS * 16e3;
@@ -660,7 +663,7 @@ function timingWindows(difficulty) {
 		foul: TIMING_MS.foul * scale
 	};
 }
-function judgeSwing(opts) {
+function judgeSwing$1(opts) {
 	const ball = cellMiddle(opts.ball);
 	const contact = contactAt(opts.hand, opts.touch, ball);
 	const offsetMs = opts.swingAt - opts.arriveAt;
@@ -725,10 +728,10 @@ const LAUNCH_DEG = {
 const MAX_SHOW_MS = 2200;
 /** 페어 타구의 최대 좌우 각도 */
 const MAX_FAIR_ANGLE = 38 * Math.PI / 180;
-function within(rng, [min, max]) {
+function within$1(rng, [min, max]) {
 	return min + rng.next() * (max - min);
 }
-function createBattedBall(opts) {
+function createBattedBall$1(opts) {
 	const { outcome, contact, hand, offsetMs, distance, foulWindowMs, start, startAt, rng } = opts;
 	if (outcome === "whiff" || outcome === "looking") return null;
 	/** 우타 기준 +면 밀어 친 쪽(오른쪽) */
@@ -741,19 +744,19 @@ function createBattedBall(opts) {
 			start,
 			velocity: {
 				x: (rng.next() - .5) * 4,
-				y: within(rng, [11, 14]),
-				z: within(rng, [-9, -6])
+				y: within$1(rng, [11, 14]),
+				z: within$1(rng, [-9, -6])
 			}
 		};
-		const angle = Math.sign(lateness || 1) * handSign * within(rng, [55, 72]) * Math.PI / 180;
-		const speed = within(rng, [22, 28]);
+		const angle = Math.sign(lateness || 1) * handSign * within$1(rng, [55, 72]) * Math.PI / 180;
+		const speed = within$1(rng, [22, 28]);
 		return {
 			startAt,
 			duration: 1300,
 			start,
 			velocity: {
 				x: Math.sin(angle) * speed,
-				y: within(rng, [6, 10]),
+				y: within$1(rng, [6, 10]),
 				z: Math.cos(angle) * speed
 			}
 		};
@@ -772,7 +775,7 @@ function createBattedBall(opts) {
 			}
 		};
 	}
-	const launch = within(rng, LAUNCH_DEG[outcome]) * Math.PI / 180;
+	const launch = within$1(rng, LAUNCH_DEG[outcome]) * Math.PI / 180;
 	const speed = Math.sqrt(distance * GRAVITY / Math.sin(2 * launch));
 	const forward = speed * Math.cos(launch);
 	const flightMs = 2 * speed * Math.sin(launch) / GRAVITY * 1e3;
@@ -787,7 +790,7 @@ function createBattedBall(opts) {
 		}
 	};
 }
-function battedBallEndAt(ball) {
+function battedBallEndAt$1(ball) {
 	return ball.startAt + ball.duration;
 }
 //#endregion
@@ -815,7 +818,7 @@ const RELEASE = {
 /** 포수 미트. 공이 홈을 지나 여기서 멈춘다 */
 const MITT_Z = -1.1;
 /** 구종별 비행 시간(놓은 순간 → 홈 도착) */
-const FLIGHT_MS = {
+const FLIGHT_MS$1 = {
 	normal: {
 		fastball: 620,
 		slider: 710,
@@ -856,7 +859,7 @@ function cellCenter(cell) {
 		y: ZONE.top - CELL_HEIGHT * (row + .5)
 	};
 }
-function createPitch(rng, difficulty, releaseAt) {
+function createPitch$1(rng, difficulty, releaseAt) {
 	const type = pickOne(rng, PITCH_TYPES);
 	const cell = pickOne(rng, CELLS);
 	const jitter = (rng.next() * 2 - 1) * 25;
@@ -864,7 +867,7 @@ function createPitch(rng, difficulty, releaseAt) {
 		type,
 		cell,
 		releaseAt,
-		arriveAt: releaseAt + FLIGHT_MS[difficulty][type] + jitter
+		arriveAt: releaseAt + FLIGHT_MS$1[difficulty][type] + jitter
 	};
 }
 /** 진행도 s(0=놓음, 1=홈 도착)의 위치 */
@@ -893,7 +896,7 @@ function ballPosition(pitch, t) {
 		z: end.z + (end.z - before.z) * k
 	};
 }
-function pitchEndAt(pitch) {
+function pitchEndAt$1(pitch) {
 	return pitch.arriveAt + 320;
 }
 //#endregion
@@ -902,10 +905,10 @@ const FIRST_READY_MS = 1200;
 /** 공과 공 사이 쉬는 시간 */
 const READY_MS = 1500;
 /** 결과를 보여주는 최소 시간 */
-const RESULT_MS = 1800;
+const RESULT_MS$1 = 1800;
 /** 마지막 공 뒤 '경기 끝'을 보여주고 결과 화면으로 넘어가기까지 */
 const DONE_MS$1 = 1800;
-function withSounds$1(state, ...names) {
+function withSounds$2(state, ...names) {
 	let seq = state.soundSeq;
 	const added = names.map((name) => ({
 		id: ++seq,
@@ -936,7 +939,7 @@ function createSession(opts) {
 function startWindup(state) {
 	const rng = createRng(state.seed);
 	const releaseAt = state.now + 900;
-	const pitch = createPitch(rng, state.difficulty, releaseAt);
+	const pitch = createPitch$1(rng, state.difficulty, releaseAt);
 	return {
 		...state,
 		seed: rng.seed(),
@@ -955,7 +958,7 @@ function hitSound(record) {
 /** 결과 단계로. 친 공이면 타구 비행을 만든다 */
 function showResult(state, pitch, swing, record) {
 	const rng = createRng(state.seed);
-	const batted = swing && record.contact && record.offsetMs !== null ? createBattedBall({
+	const batted = swing && record.contact && record.offsetMs !== null ? createBattedBall$1({
 		outcome: record.outcome,
 		contact: record.contact,
 		hand: state.hand,
@@ -970,7 +973,7 @@ function showResult(state, pitch, swing, record) {
 		startAt: swing.at,
 		rng
 	}) : null;
-	const until = Math.max(state.now + RESULT_MS, batted ? battedBallEndAt(batted) : 0);
+	const until = Math.max(state.now + RESULT_MS$1, batted ? battedBallEndAt$1(batted) : 0);
 	return {
 		...state,
 		seed: rng.seed(),
@@ -985,11 +988,11 @@ function showResult(state, pitch, swing, record) {
 		}
 	};
 }
-function swing(state, point, at) {
+function swing$1(state, point, at) {
 	const { phase } = state;
 	if (phase.kind !== "pitching" || phase.swing) return state;
 	const { pitch } = phase;
-	const result = judgeSwing({
+	const result = judgeSwing$1({
 		difficulty: state.difficulty,
 		hand: state.hand,
 		touch: point,
@@ -1007,7 +1010,7 @@ function swing(state, point, at) {
 		point,
 		at
 	};
-	if (result.outcome === "whiff") return withSounds$1({
+	if (result.outcome === "whiff") return withSounds$2({
 		...state,
 		phase: {
 			...phase,
@@ -1015,15 +1018,15 @@ function swing(state, point, at) {
 			record
 		}
 	}, "whiff");
-	return withSounds$1(showResult(state, pitch, s, record), ...hitSound(record));
+	return withSounds$2(showResult(state, pitch, s, record), ...hitSound(record));
 }
-function tick$1(state) {
+function tick$2(state) {
 	const { phase, now } = state;
 	switch (phase.kind) {
 		case "ready": return now >= phase.until ? startWindup(state) : state;
 		case "windup":
 			if (now < phase.until) return state;
-			return withSounds$1({
+			return withSounds$2({
 				...state,
 				phase: {
 					kind: "pitching",
@@ -1033,7 +1036,7 @@ function tick$1(state) {
 				}
 			}, "pitch");
 		case "pitching": {
-			if (now < pitchEndAt(phase.pitch)) return state;
+			if (now < pitchEndAt$1(phase.pitch)) return state;
 			const record = phase.record ?? {
 				index: state.index,
 				pitch: phase.pitch,
@@ -1043,12 +1046,12 @@ function tick$1(state) {
 				offsetMs: null,
 				distance: null
 			};
-			return withSounds$1(showResult(state, phase.pitch, phase.swing, record), "mitt");
+			return withSounds$2(showResult(state, phase.pitch, phase.swing, record), "mitt");
 		}
 		case "result": {
 			if (now < phase.until) return state;
 			const next = state.index + 1;
-			if (next >= 10) return withSounds$1({
+			if (next >= 10) return withSounds$2({
 				...state,
 				index: next,
 				phase: {
@@ -1070,11 +1073,11 @@ function tick$1(state) {
 }
 function sessionReducer(state, action) {
 	switch (action.type) {
-		case "tick": return tick$1({
+		case "tick": return tick$2({
 			...state,
 			now: action.now
 		});
-		case "swing": return swing(state, action.point, action.at);
+		case "swing": return swing$1(state, action.point, action.at);
 	}
 }
 function summarizeSession(state) {
@@ -1087,7 +1090,7 @@ function summarizeSession(state) {
 }
 //#endregion
 //#region src/server/games/batting.ts
-const isNum = (x) => typeof x === "number" && Number.isFinite(x);
+const isNum$1 = (x) => typeof x === "number" && Number.isFinite(x);
 function readSwings(x) {
 	if (!Array.isArray(x) || x.length !== 10) return null;
 	const out = [];
@@ -1098,7 +1101,7 @@ function readSwings(x) {
 		}
 		const o = s;
 		const p = o?.point;
-		if (!p || !isNum(p.col) || !isNum(p.row) || Math.abs(p.col - 1) > 3 || Math.abs(p.row - 1) > 3 || !isNum(o.offsetMs) || Math.abs(o.offsetMs) > 5e3) return null;
+		if (!p || !isNum$1(p.col) || !isNum$1(p.row) || Math.abs(p.col - 1) > 3 || Math.abs(p.row - 1) > 3 || !isNum$1(o.offsetMs) || Math.abs(o.offsetMs) > 5e3) return null;
 		out.push({
 			point: {
 				col: p.col,
@@ -1294,7 +1297,7 @@ function chooseBotStance(opts) {
 	const { rng, difficulty, self, foe, foeHistory } = opts;
 	return sanitize(self, pickWeighted(rng, difficulty === "hard" ? hardWeights(self, foe, foeHistory) : normalWeights(self)));
 }
-function withSounds(state, ...names) {
+function withSounds$1(state, ...names) {
 	let seq = state.soundSeq;
 	const added = names.map((name) => ({
 		id: ++seq,
@@ -1306,7 +1309,7 @@ function withSounds(state, ...names) {
 		soundSeq: seq
 	};
 }
-function createMatch(opts) {
+function createMatch$1(opts) {
 	return {
 		now: opts.now,
 		seed: opts.seed,
@@ -1324,7 +1327,7 @@ function createMatch(opts) {
 	};
 }
 /** 새 턴: 봇은 이때 몰래 고른다 */
-function startChoosing(state) {
+function startChoosing$1(state) {
 	const rng = createRng(state.seed);
 	const picks = [null, null];
 	state.controllers.forEach((c, i) => {
@@ -1365,7 +1368,7 @@ function turnSounds(result) {
 function reveal(state, picks) {
 	const chosen = [picks[0] ?? "ready", picks[1] ?? "ready"];
 	const result = resolveTurn(state.fighters, chosen);
-	return withSounds({
+	return withSounds$1({
 		...state,
 		fighters: result.fighters,
 		turns: [...state.turns, result],
@@ -1376,17 +1379,17 @@ function reveal(state, picks) {
 		}
 	}, ...turnSounds(result));
 }
-function tick(state) {
+function tick$1(state) {
 	const { phase, now } = state;
 	switch (phase.kind) {
-		case "intro": return now >= phase.until && !state.follow ? startChoosing(state) : state;
+		case "intro": return now >= phase.until && !state.follow ? startChoosing$1(state) : state;
 		case "choosing": return now >= phase.until && !state.follow ? reveal(state, phase.picks) : state;
 		case "reveal": {
 			if (now < phase.until) return state;
 			const winner = winnerOf(state.fighters, state.turns.length);
-			if (winner === null) return state.follow ? state : startChoosing(state);
+			if (winner === null) return state.follow ? state : startChoosing$1(state);
 			const userSide = state.controllers.indexOf("user");
-			return withSounds({
+			return withSounds$1({
 				...state,
 				phase: {
 					kind: "done",
@@ -1402,7 +1405,7 @@ function pick(state, side, stance) {
 	const { phase } = state;
 	if (phase.kind !== "choosing" || state.controllers[side] !== "user" || state.now >= phase.inputUntil) return state;
 	if (!canChoose(state.fighters[side], stance) || phase.picks[side] === stance) return state;
-	return withSounds({
+	return withSounds$1({
 		...state,
 		phase: {
 			...phase,
@@ -1432,7 +1435,7 @@ function awaitingTurn(state, turn) {
 }
 function remoteTurn(state, turn) {
 	if (!awaitingTurn(state, turn) || winnerOf(state.fighters, state.turns.length) !== null) return state;
-	return startChoosing(state);
+	return startChoosing$1(state);
 }
 function remoteReveal(state, turn, stances) {
 	if (!state.follow || turn !== state.turns.length) return state;
@@ -1440,9 +1443,9 @@ function remoteReveal(state, turn, stances) {
 	if (kind !== "choosing" && kind !== "intro" && kind !== "reveal") return state;
 	return reveal(state, stances);
 }
-function matchReducer(state, action) {
+function matchReducer$1(state, action) {
 	switch (action.type) {
-		case "tick": return tick({
+		case "tick": return tick$1({
 			...state,
 			now: action.now
 		});
@@ -1471,7 +1474,7 @@ function summarizeMatch(state) {
 function replayFight(seed, difficulty, moves) {
 	if (difficulty !== "normal" && difficulty !== "hard") return null;
 	if (!Array.isArray(moves) || moves.length > 30 || !moves.every((m) => STANCES.includes(m))) return null;
-	let s = createMatch({
+	let s = createMatch$1({
 		now: 0,
 		seed,
 		difficulty
@@ -1482,14 +1485,14 @@ function replayFight(seed, difficulty, moves) {
 		if (phase.kind === "choosing") {
 			const move = moves[phase.index];
 			if (move === void 0) return null;
-			s = matchReducer(s, {
+			s = matchReducer$1(s, {
 				type: "pick",
 				side: 0,
 				stance: move
 			});
 			if (((s.phase.kind === "choosing" ? s.phase.picks[0] : null) ?? "ready") !== move) return null;
 		}
-		s = matchReducer(s, {
+		s = matchReducer$1(s, {
 			type: "tick",
 			now: s.phase.kind === "done" ? s.now : s.phase.until
 		});
@@ -1501,6 +1504,974 @@ function replayFight(seed, difficulty, moves) {
 		outcome: sum.outcome,
 		turns: sum.turns
 	};
+}
+//#endregion
+//#region src/games/zolaball/rules/judge.ts
+/** 스윙 결과. 좋은 것부터 나쁜 것 순서. */
+const SWING_RESULTS = [
+	"homerun",
+	"double",
+	"single",
+	"out",
+	"foul",
+	"miss"
+];
+/** 일반 난이도 기준 판정 구간 (공 도착과 스윙 시점 차이의 절댓값, ms 이하). */
+const WINDOWS = [
+	[15, "homerun"],
+	[30, "double"],
+	[55, "single"],
+	[85, "out"],
+	[130, "foul"]
+];
+/** 난이도별 구간 폭(%). 85 × 0.7 같은 소수 곱의 부동소수점 오차를 피하려고 정수 백분율로 계산한다. */
+const WINDOW_PERCENT = {
+	normal: 100,
+	hard: 70
+};
+function judgeSwing({ diffMs, difficulty, pitchIsBall }) {
+	if (pitchIsBall) return "miss";
+	const percent = WINDOW_PERCENT[difficulty];
+	const abs = Math.abs(diffMs);
+	const hit = WINDOWS.find(([max]) => abs * 100 <= max * percent);
+	return hit ? hit[1] : "miss";
+}
+/**
+* 일반 난이도에서 주어진 결과가 나오는 스윙 시각 차이(ms)를 하나 고른다. 봇 타자가 쓴다.
+* random은 0 이상 1 미만 값을 돌려주는 함수.
+*/
+function diffForResult(result, random) {
+	const i = SWING_RESULTS.indexOf(result);
+	const min = i === 0 ? 0 : WINDOWS[i - 1][0] + 1;
+	const max = i < WINDOWS.length ? WINDOWS[i][0] : 300;
+	const abs = min + random() * (max - min);
+	return random() < .5 ? -abs : abs;
+}
+//#endregion
+//#region src/games/zolaball/bot/batterBot.ts
+/**
+* 스윙했을 때 결과 비율(%). '정타'는 배트에 제대로 맞아 페어가 된 타구(범타 이상)로 본다.
+* 일반: 스트라이크에 80% 스윙 × 페어 62.5% ≈ 스트라이크의 50%가 정타.
+*/
+const NORMAL_WEIGHTS = {
+	homerun: 6.25,
+	double: 9.4,
+	single: 21.85,
+	out: 25,
+	foul: 20,
+	miss: 17.5
+};
+const HARD_WEIGHTS = {
+	homerun: 7.8,
+	double: 11.7,
+	single: 22.75,
+	out: 22.75,
+	foul: 20,
+	miss: 15
+};
+/** 지금 공과 같은 구종이 직전에 몇 번 연속으로 왔는지 (최대 2) */
+function repeats(type, recentTypes) {
+	let n = 0;
+	for (let i = recentTypes.length - 1; i >= 0 && recentTypes[i] === type && n < 2; i--) n++;
+	return n;
+}
+function swingChance(difficulty, pitch, count) {
+	if (difficulty === "normal") return pitch.isBall ? .45 : .8;
+	if (pitch.isBall) return count.strikes === 2 ? .25 : .15;
+	return .85;
+}
+/**
+* 봇 타자의 스윙 결정.
+* - 일반: 스트라이크에 약 50% 정타, 볼에도 자주 스윙
+* - 어려움: 볼을 잘 참고, 같은 구종이 반복되면 더 잘 친다
+* 볼에 스윙하면 판정(judgeSwing)에서 헛스윙이 된다.
+*/
+function botDecideSwing(difficulty, pitch, count, recentTypes, rng) {
+	if (!chance(rng, swingChance(difficulty, pitch, count))) return { swing: false };
+	let weights = difficulty === "normal" ? NORMAL_WEIGHTS : HARD_WEIGHTS;
+	if (difficulty === "hard") {
+		const r = repeats(pitch.type, recentTypes);
+		if (r > 0) {
+			const boost = 1 + .25 * r;
+			weights = {
+				homerun: weights.homerun * boost,
+				double: weights.double * boost,
+				single: weights.single * boost,
+				out: weights.out,
+				foul: weights.foul * (1 - .2 * r),
+				miss: weights.miss * (1 - .35 * r)
+			};
+		}
+	}
+	return {
+		swing: true,
+		diffMs: diffForResult(pickWeighted(rng, weights), rng.next)
+	};
+}
+//#endregion
+//#region src/games/zolaball/bot/pitcherBot.ts
+/** 어려움: 볼카운트에 따라 스트라이크를 던질 확률 */
+function hardStrikeChance({ balls, strikes }) {
+	if (balls === 3) return .75;
+	if (strikes === 2) return .3;
+	if (balls > strikes) return .6;
+	return .5;
+}
+/**
+* 봇 투수의 투구 선택.
+* - 일반: 무작위, 스트라이크 약 50%
+* - 어려움: 볼카운트를 보고 스트라이크/볼을 정하고, 같은 구종이 반복되지 않게 섞는다
+* recentTypes는 최근 투구 구종(마지막이 가장 최근).
+*/
+function botChoosePitch(difficulty, count, recentTypes, rng) {
+	const height = pickOne(rng, ["high", "low"]);
+	if (difficulty === "normal") return {
+		type: pickOne(rng, ["fastball", "breaking"]),
+		isBall: !chance(rng, .5),
+		height
+	};
+	const [prev2, prev1] = recentTypes.slice(-2);
+	let type;
+	if (prev1 && prev1 === prev2) {
+		const other = prev1 === "fastball" ? "breaking" : "fastball";
+		type = chance(rng, .75) ? other : prev1;
+	} else type = chance(rng, .45) ? "breaking" : "fastball";
+	return {
+		type,
+		isBall: !chance(rng, hardStrikeChance(count)),
+		height
+	};
+}
+//#endregion
+//#region src/games/zolaball/constants.ts
+const STANDS_STEP_DEPTH = 3.5;
+const STANDS_STEP_RISE = 3.2;
+//#endregion
+//#region src/games/zolaball/play/battedBall.ts
+const PROFILES = {
+	foul: {
+		distance: [-28, -12],
+		apex: [10, 18],
+		duration: [900, 1100]
+	},
+	out: {
+		distance: [45, 95],
+		apex: [24, 34],
+		duration: [1500, 1800]
+	},
+	single: {
+		distance: [35, 65],
+		apex: [3, 7],
+		duration: [800, 1e3]
+	},
+	double: {
+		distance: [75, 105],
+		apex: [12, 20],
+		duration: [1300, 1500]
+	},
+	homerun: {
+		distance: [128, 152],
+		apex: [26, 38],
+		duration: [2e3, 2300]
+	}
+};
+function within(rng, [min, max]) {
+	return min + rng.next() * (max - min);
+}
+/** x 위치의 관중석 높이 (관중석 밖이면 0) */
+function standsHeightAt(x) {
+	if (x < 124) return 0;
+	return Math.min(Math.floor((x - 124) / STANDS_STEP_DEPTH) + 1, 10) * STANDS_STEP_RISE;
+}
+function createBattedBall(kind, start, startAt, rng) {
+	const p = PROFILES[kind];
+	const landX = within(rng, p.distance);
+	return {
+		kind,
+		startAt,
+		duration: within(rng, p.duration),
+		start,
+		end: {
+			x: landX,
+			y: standsHeightAt(landX)
+		},
+		apex: within(rng, p.apex)
+	};
+}
+function battedBallEndAt(ball) {
+	return ball.startAt + ball.duration;
+}
+//#endregion
+//#region src/games/zolaball/play/pitch.ts
+/** 스트라이크 존(m). 졸라맨(키 3m) 기준 무릎~가슴. 필드에 그려서 볼/스트라이크를 구분할 수 있게 한다. */
+const STRIKE_ZONE = {
+	bottom: .8,
+	top: 1.9
+};
+const FLIGHT_MS = {
+	fastball: 400,
+	breaking: 525
+};
+const PLATE_HEIGHT = {
+	fastball: {
+		strike: {
+			high: 1.7,
+			low: 1
+		},
+		ball: {
+			high: 2.45,
+			low: .4
+		}
+	},
+	breaking: {
+		strike: {
+			high: 1.7,
+			low: 1
+		},
+		ball: {
+			high: 2.4,
+			low: .3
+		}
+	}
+};
+/** 높은 공은 조금 빨리, 낮은 공은 조금 늦게 도착한다. 존 가운데에서 1m 벗어날 때마다 이만큼. */
+const ARRIVAL_SHIFT_MS_PER_M = 30;
+function createPitch(call, releaseAt) {
+	const plateHeight = PLATE_HEIGHT[call.type][call.isBall ? "ball" : "strike"][call.height];
+	const shift = -(plateHeight - (STRIKE_ZONE.top + STRIKE_ZONE.bottom) / 2) * ARRIVAL_SHIFT_MS_PER_M;
+	return {
+		...call,
+		releaseAt,
+		arriveAt: releaseAt + FLIGHT_MS[call.type] + shift,
+		plateHeight
+	};
+}
+function pitchEndAt(pitch) {
+	return pitch.arriveAt + 300;
+}
+const PITCH_KEYS = [
+	1,
+	2,
+	3,
+	4
+];
+const PITCH_KEY_INFO = {
+	1: {
+		type: "fastball",
+		isBall: false,
+		label: "직구 스트라이크"
+	},
+	2: {
+		type: "fastball",
+		isBall: true,
+		label: "직구 볼"
+	},
+	3: {
+		type: "breaking",
+		isBall: false,
+		label: "변화구 스트라이크"
+	},
+	4: {
+		type: "breaking",
+		isBall: true,
+		label: "변화구 볼"
+	}
+};
+const EMPTY_SELECTION = {
+	key: null,
+	height: null
+};
+function isSelectionComplete(sel) {
+	return sel.key !== null && sel.height !== null;
+}
+/** 고르지 않은 항목은 무작위로 채워 투구를 확정한다. */
+function completeSelection(sel, rng) {
+	const key = sel.key ?? pickOne(rng, PITCH_KEYS);
+	const height = sel.height ?? pickOne(rng, ["high", "low"]);
+	const { type, isBall } = PITCH_KEY_INFO[key];
+	return {
+		type,
+		isBall,
+		height
+	};
+}
+const EMPTY_BASES = [
+	false,
+	false,
+	false
+];
+function emptyStats() {
+	return {
+		atBats: 0,
+		hits: 0,
+		homeruns: 0,
+		strikeouts: 0,
+		walks: 0,
+		rbi: 0
+	};
+}
+function emptyPitching() {
+	return {
+		outs: 0,
+		runsAllowed: 0
+	};
+}
+function createGame() {
+	return {
+		inning: 1,
+		half: "top",
+		outs: 0,
+		balls: 0,
+		strikes: 0,
+		bases: EMPTY_BASES,
+		linescore: {
+			away: [0],
+			home: []
+		},
+		stats: {
+			away: emptyStats(),
+			home: emptyStats()
+		},
+		pitching: {
+			away: emptyPitching(),
+			home: emptyPitching()
+		},
+		final: false
+	};
+}
+function battingSide(half) {
+	return half === "top" ? "away" : "home";
+}
+function fieldingSide(half) {
+	return half === "top" ? "home" : "away";
+}
+function totalRuns(game, side) {
+	return game.linescore[side].reduce((a, b) => a + b, 0);
+}
+/** 모든 주자와 타자가 n베이스씩 진루. 홈을 밟은 수를 돌려준다. */
+function advance(bases, n) {
+	const next = [
+		false,
+		false,
+		false
+	];
+	let runs = 0;
+	bases.forEach((occupied, i) => {
+		if (!occupied) return;
+		if (i + n >= 3) runs++;
+		else next[i + n] = true;
+	});
+	if (n >= 4) runs++;
+	else next[n - 1] = true;
+	return [next, runs];
+}
+/** 볼넷: 1루부터 꽉 찬 베이스만 밀려서 진루 */
+function walk(bases) {
+	const [first, second, third] = bases;
+	if (!first) return [[
+		true,
+		second,
+		third
+	], 0];
+	if (!second) return [[
+		true,
+		true,
+		third
+	], 0];
+	if (!third) return [[
+		true,
+		true,
+		true
+	], 0];
+	return [[
+		true,
+		true,
+		true
+	], 1];
+}
+function applyPitch(game, outcome) {
+	if (game.final) throw new Error("경기가 이미 끝났습니다");
+	let { balls, strikes, outs, bases } = game;
+	let runs = 0;
+	let plateResult = null;
+	switch (outcome) {
+		case "ball":
+			balls++;
+			if (balls === 4) {
+				[bases, runs] = walk(bases);
+				plateResult = "walk";
+			}
+			break;
+		case "calledStrike":
+		case "swingingStrike":
+			strikes++;
+			if (strikes === 3) {
+				outs++;
+				plateResult = "strikeout";
+			}
+			break;
+		case "foul":
+			if (strikes < 2) strikes++;
+			break;
+		case "out":
+			outs++;
+			plateResult = "out";
+			break;
+		case "single":
+			[bases, runs] = advance(bases, 1);
+			plateResult = "single";
+			break;
+		case "double":
+			[bases, runs] = advance(bases, 2);
+			plateResult = "double";
+			break;
+		case "homerun":
+			[bases, runs] = advance(bases, 4);
+			plateResult = "homerun";
+	}
+	if (plateResult) {
+		balls = 0;
+		strikes = 0;
+	}
+	const side = battingSide(game.half);
+	const stats = { ...game.stats[side] };
+	if (plateResult === "walk") stats.walks++;
+	else if (plateResult) stats.atBats++;
+	if (plateResult === "single" || plateResult === "double" || plateResult === "homerun") stats.hits++;
+	if (plateResult === "homerun") stats.homeruns++;
+	if (plateResult === "strikeout") stats.strikeouts++;
+	stats.rbi += runs;
+	const defense = fieldingSide(game.half);
+	const pitching = {
+		outs: game.pitching[defense].outs + (outs - game.outs),
+		runsAllowed: game.pitching[defense].runsAllowed + runs
+	};
+	const sideLine = [...game.linescore[side]];
+	sideLine[game.inning - 1] += runs;
+	let next = {
+		...game,
+		balls,
+		strikes,
+		outs,
+		bases,
+		linescore: {
+			...game.linescore,
+			[side]: sideLine
+		},
+		stats: {
+			...game.stats,
+			[side]: stats
+		},
+		pitching: {
+			...game.pitching,
+			[defense]: pitching
+		}
+	};
+	const lastInning = game.inning >= 2;
+	const homeLeads = () => totalRuns(next, "home") > totalRuns(next, "away");
+	let halfEnded = false;
+	if (game.half === "bottom" && lastInning && homeLeads()) next = {
+		...next,
+		final: true
+	};
+	else if (outs >= 3) {
+		halfEnded = true;
+		const cleared = {
+			...next,
+			outs: 0,
+			balls: 0,
+			strikes: 0,
+			bases: EMPTY_BASES
+		};
+		if (game.half === "top") next = lastInning && homeLeads() ? {
+			...cleared,
+			final: true
+		} : {
+			...cleared,
+			half: "bottom",
+			linescore: {
+				...cleared.linescore,
+				home: [...cleared.linescore.home, 0]
+			}
+		};
+		else next = lastInning ? {
+			...cleared,
+			final: true
+		} : {
+			...cleared,
+			inning: game.inning + 1,
+			half: "top",
+			linescore: {
+				...cleared.linescore,
+				away: [...cleared.linescore.away, 0]
+			}
+		};
+	}
+	return {
+		game: next,
+		event: {
+			outcome,
+			plateResult,
+			runs,
+			halfEnded,
+			gameEnded: next.final
+		}
+	};
+}
+//#endregion
+//#region src/games/zolaball/match/matchState.ts
+const ANNOUNCE_MS = 1600;
+const BOT_THINK_MS = [700, 1500];
+const BOT_WINDUP_MS = [300, 800];
+const USER_WINDUP_MS = 250;
+const MITT_DELAY_MS = 40;
+const RESULT_MS = 1100;
+/** 타구가 떨어진 뒤 결과를 더 보여주는 시간 */
+const AFTER_LANDING_MS = 700;
+const PLATE_RESULT_MS = 1600;
+const HOMERUN_MS = 2400;
+const FINAL_MS = 2200;
+function controllerOf(config, side) {
+	return side === config.userSide ? "user" : config.opponent ?? "bot";
+}
+function pitcherOf(state) {
+	return controllerOf(state.config, fieldingSide(state.game.half));
+}
+function batterOf(state) {
+	return controllerOf(state.config, battingSide(state.game.half));
+}
+function isUserBatting(state) {
+	return controllerOf(state.config, battingSide(state.game.half)) === "user";
+}
+function isUserPitching(state) {
+	return controllerOf(state.config, fieldingSide(state.game.half)) === "user";
+}
+function createMatch(config, now, seed) {
+	return {
+		config,
+		game: createGame(),
+		phase: {
+			kind: "announce",
+			until: now + ANNOUNCE_MS
+		},
+		now,
+		seed,
+		swingAt: null,
+		recentTypes: [],
+		pitchCount: 0,
+		pendingPitch: null,
+		sounds: [],
+		soundSeq: 0,
+		inputs: []
+	};
+}
+function withSounds(state, ...names) {
+	if (names.length === 0) return state;
+	let seq = state.soundSeq;
+	const added = names.map((name) => ({
+		id: ++seq,
+		name
+	}));
+	return {
+		...state,
+		sounds: [...state.sounds, ...added].slice(-8),
+		soundSeq: seq
+	};
+}
+function between(random, [min, max]) {
+	return min + random * (max - min);
+}
+function startChoosing(state, now) {
+	const rng = createRng(state.seed);
+	const botPitchAt = now + between(rng.next(), BOT_THINK_MS);
+	const next = {
+		...state,
+		seed: rng.seed(),
+		phase: {
+			kind: "choosing",
+			startedAt: now,
+			selection: EMPTY_SELECTION,
+			botPitchAt
+		}
+	};
+	const pending = state.pendingPitch;
+	if (pending && pending.n === state.pitchCount && pitcherOf(state) === "remote") return throwPitch(next, pending.call, pending.windupMs);
+	return next;
+}
+function throwPitch(state, call, windupMs) {
+	const rng = createRng(state.seed);
+	const windup = windupMs ?? (isUserPitching(state) ? USER_WINDUP_MS : between(rng.next(), BOT_WINDUP_MS));
+	const pitch = createPitch(call, state.now + windup);
+	const { balls, strikes } = state.game;
+	const botSwing = batterOf(state) === "bot" ? botDecideSwing(state.config.difficulty, call, {
+		balls,
+		strikes
+	}, state.recentTypes, rng) : null;
+	return {
+		...state,
+		seed: rng.seed(),
+		recentTypes: [...state.recentTypes, call.type].slice(-3),
+		pitchCount: state.pitchCount + 1,
+		pendingPitch: null,
+		phase: {
+			kind: "pitching",
+			pitch,
+			botSwing,
+			swing: null,
+			released: false,
+			caught: false,
+			remoteOutcome: null
+		}
+	};
+}
+function outcomeOf(pitch, swing) {
+	if (!swing) return pitch.isBall ? "ball" : "calledStrike";
+	return swing.result === "miss" ? "swingingStrike" : swing.result;
+}
+function resultDuration(event) {
+	if (event.gameEnded) return FINAL_MS;
+	if (event.plateResult === "homerun") return HOMERUN_MS;
+	if (event.plateResult) return PLATE_RESULT_MS;
+	return RESULT_MS;
+}
+/** forced: 친구(타자)가 보낸 판정 */
+function resolvePitch(state, contactAt, forced) {
+	if (state.phase.kind !== "pitching") return state;
+	const { pitch, swing } = state.phase;
+	const outcome = forced ?? outcomeOf(pitch, swing);
+	const { game, event } = applyPitch(state.game, outcome);
+	const userDiffMs = swing && isUserBatting(state) ? swing.at - pitch.arriveAt : null;
+	const inputs = isUserBatting(state) ? [...state.inputs, { diff: userDiffMs }] : state.inputs;
+	const rng = createRng(state.seed);
+	const batted = contactAt !== null && (outcome === "foul" || outcome === "out" || outcome === "single" || outcome === "double" || outcome === "homerun") ? createBattedBall(outcome, {
+		x: 0,
+		y: pitch.plateHeight
+	}, contactAt, rng) : null;
+	const until = Math.max(state.now + resultDuration(event), batted ? battedBallEndAt(batted) + AFTER_LANDING_MS : 0);
+	const sounds = [];
+	if (forced && outcome !== "ball" && outcome !== "calledStrike") sounds.push("swing");
+	if (contactAt !== null) sounds.push(outcome === "foul" ? "foul" : outcome === "homerun" || outcome === "double" ? "crack" : "hit");
+	else if (forced) sounds.push("mitt");
+	if (event.plateResult === "homerun") sounds.push("fly", "cheer");
+	if (event.plateResult === "strikeout") sounds.push("strikeout");
+	if (event.plateResult === "walk") sounds.push("walk");
+	if (event.gameEnded) sounds.push("gameEnd");
+	return withSounds({
+		...state,
+		game,
+		inputs,
+		seed: rng.seed(),
+		swingAt: forced && outcome !== "ball" && outcome !== "calledStrike" ? pitch.arriveAt - 60 : state.swingAt,
+		phase: {
+			kind: "result",
+			until,
+			event,
+			pitch,
+			userDiffMs,
+			batted,
+			outcome,
+			contact: contactAt !== null
+		}
+	}, ...sounds);
+}
+function tick(state) {
+	const { phase, now } = state;
+	switch (phase.kind) {
+		case "announce": return now >= phase.until ? startChoosing(state, now) : state;
+		case "choosing": {
+			if (pitcherOf(state) === "remote") return state;
+			if (isUserPitching(state)) {
+				if (now < phase.startedAt + 5e3) return state;
+				const rng = createRng(state.seed);
+				const call = completeSelection(phase.selection, rng);
+				return throwPitch({
+					...state,
+					seed: rng.seed(),
+					inputs: [...state.inputs, { sel: phase.selection }]
+				}, call);
+			}
+			if (now < phase.botPitchAt) return state;
+			const rng = createRng(state.seed);
+			const { balls, strikes } = state.game;
+			const call = botChoosePitch(state.config.difficulty, {
+				balls,
+				strikes
+			}, state.recentTypes, rng);
+			return throwPitch({
+				...state,
+				seed: rng.seed()
+			}, call);
+		}
+		case "pitching": {
+			const { pitch, botSwing } = phase;
+			let next = state;
+			let p = phase;
+			if (!p.released && now >= pitch.releaseAt) {
+				p = {
+					...p,
+					released: true
+				};
+				next = withSounds({
+					...next,
+					phase: p
+				}, "pitch");
+			}
+			if (batterOf(state) === "remote") {
+				const r = p.remoteOutcome;
+				if (!r || now < pitch.arriveAt) return next;
+				return resolvePitch(next, r.contact ? pitch.arriveAt : null, r.outcome);
+			}
+			if (botSwing?.swing && !p.swing && now >= pitch.arriveAt + botSwing.diffMs) {
+				const at = pitch.arriveAt + botSwing.diffMs;
+				const result = judgeSwing({
+					diffMs: botSwing.diffMs,
+					difficulty: "normal",
+					pitchIsBall: pitch.isBall
+				});
+				p = {
+					...p,
+					swing: {
+						at,
+						result
+					}
+				};
+				next = withSounds({
+					...next,
+					phase: p,
+					swingAt: at
+				}, "swing");
+			}
+			const contact = p.swing !== null && p.swing.result !== "miss";
+			if (contact && now >= pitch.arriveAt) return resolvePitch(next, pitch.arriveAt);
+			if (!contact && !p.caught && now >= pitch.arriveAt + MITT_DELAY_MS) {
+				p = {
+					...p,
+					caught: true
+				};
+				next = withSounds({
+					...next,
+					phase: p
+				}, "mitt");
+			}
+			if (!contact && now >= pitchEndAt(pitch)) return resolvePitch(next, null);
+			return next;
+		}
+		case "result":
+			if (now < phase.until) return state;
+			if (state.game.final) return {
+				...state,
+				phase: { kind: "final" }
+			};
+			if (phase.event.halfEnded) return {
+				...state,
+				phase: {
+					kind: "announce",
+					until: now + ANNOUNCE_MS
+				}
+			};
+			return startChoosing(state, now);
+		case "final": return state;
+	}
+}
+function select(state, change) {
+	const { phase } = state;
+	if (phase.kind !== "choosing" || !isUserPitching(state)) return state;
+	const selection = {
+		...phase.selection,
+		...change
+	};
+	if (!isSelectionComplete(selection)) return {
+		...state,
+		phase: {
+			...phase,
+			selection
+		}
+	};
+	const rng = createRng(state.seed);
+	return throwPitch({
+		...state,
+		seed: rng.seed(),
+		inputs: [...state.inputs, { sel: selection }]
+	}, completeSelection(selection, rng));
+}
+function remotePitch(state, pitch) {
+	if (pitcherOf(state) !== "remote" || pitch.n !== state.pitchCount) return state;
+	if (state.phase.kind === "choosing") return throwPitch(state, pitch.call, pitch.windupMs);
+	return {
+		...state,
+		pendingPitch: pitch
+	};
+}
+function remoteOutcome(state, n, outcome, contact) {
+	const { phase } = state;
+	if (phase.kind !== "pitching" || batterOf(state) !== "remote" || n !== state.pitchCount - 1) return state;
+	return {
+		...state,
+		phase: {
+			...phase,
+			remoteOutcome: {
+				outcome,
+				contact
+			}
+		}
+	};
+}
+function swing(state, at) {
+	if (!isUserBatting(state) || state.phase.kind === "final") return state;
+	if (state.swingAt !== null && at < state.swingAt + 280) return state;
+	const next = withSounds({
+		...state,
+		swingAt: at
+	}, "swing");
+	const { phase } = state;
+	if (phase.kind !== "pitching" || phase.swing || at < phase.pitch.releaseAt) return next;
+	const result = judgeSwing({
+		diffMs: at - phase.pitch.arriveAt,
+		difficulty: state.config.difficulty,
+		pitchIsBall: phase.pitch.isBall
+	});
+	return {
+		...next,
+		phase: {
+			...phase,
+			swing: {
+				at,
+				result
+			}
+		}
+	};
+}
+function matchReducer(state, action) {
+	switch (action.type) {
+		case "tick": return tick({
+			...state,
+			now: action.now
+		});
+		case "selectKey": return select(state, { key: action.key });
+		case "selectHeight": return select(state, { height: action.height });
+		case "swing": return swing(state, action.at);
+		case "remotePitch": return remotePitch(state, {
+			n: action.n,
+			call: action.call,
+			windupMs: action.windupMs
+		});
+		case "remoteOutcome": return remoteOutcome(state, action.n, action.outcome, action.contact);
+	}
+}
+function summarize(state) {
+	const { userSide } = state.config;
+	const botSide = userSide === "away" ? "home" : "away";
+	const userRuns = totalRuns(state.game, userSide);
+	const botRuns = totalRuns(state.game, botSide);
+	return {
+		config: state.config,
+		mode: state.config.opponent === "remote" ? "pvp" : "bot",
+		outcome: userRuns > botRuns ? "win" : userRuns < botRuns ? "lose" : "draw",
+		userRuns,
+		botRuns,
+		linescore: state.game.linescore,
+		userStats: state.game.stats[userSide],
+		userPitching: state.game.pitching[userSide],
+		inputs: state.inputs
+	};
+}
+//#endregion
+//#region src/games/zolaball/ranking/row.ts
+function toGameRow(summary, nickname, id) {
+	return {
+		id,
+		nickname: nickname.trim().slice(0, 10) || "익명",
+		difficulty: summary.config.difficulty,
+		outcome: summary.outcome,
+		at_bats: summary.userStats.atBats,
+		hits: summary.userStats.hits,
+		homeruns: summary.userStats.homeruns,
+		rbi: summary.userStats.rbi,
+		outs_pitched: summary.userPitching.outs,
+		runs_allowed: summary.userPitching.runsAllowed
+	};
+}
+/** 랭킹에 올릴 봇 경기의 선공·후공: 서버 입장권 시드로 정한다 (서버가 다시 돌릴 때 같게) */
+const userSideForSeed = (seed) => seed % 2 === 0 ? "away" : "home";
+//#endregion
+//#region src/server/games/zolaball.ts
+const STEP_MS = 10;
+/** 한 경기 최대 길이 (넘으면 이상한 기록) */
+const MAX_MS = 24e5;
+const isNum = (x) => typeof x === "number" && Number.isFinite(x);
+function readInputs(x) {
+	if (!Array.isArray(x) || x.length > 400) return null;
+	const out = [];
+	for (const i of x) if (i && typeof i === "object" && "sel" in i) {
+		const sel = i.sel;
+		const key = sel?.key ?? null;
+		const height = sel?.height ?? null;
+		if (key !== null && !PITCH_KEYS.includes(key) || height !== null && height !== "high" && height !== "low") return null;
+		out.push({ sel: {
+			key,
+			height
+		} });
+	} else if (i && typeof i === "object" && "diff" in i) {
+		if (i.diff !== null && (!isNum(i.diff) || Math.abs(i.diff) > 5e3)) return null;
+		out.push({ diff: i.diff });
+	} else return null;
+	return out;
+}
+function replayZolaball(seed, difficulty, inputsIn) {
+	if (difficulty !== "normal" && difficulty !== "hard") return null;
+	const inputs = readInputs(inputsIn);
+	if (!inputs) return null;
+	let s = createMatch({
+		difficulty,
+		userSide: userSideForSeed(seed)
+	}, 0, seed);
+	let t = 0;
+	/** 이번 투구에 고른 것을 이미 넣었는지 (덜 골랐으면 시간 초과를 기다림) */
+	let selectedFor = -1;
+	while (s.phase.kind !== "final") {
+		if (t > MAX_MS) return null;
+		const next = inputs[s.inputs.length];
+		const { phase } = s;
+		if (phase.kind === "choosing" && isUserPitching(s) && selectedFor !== s.pitchCount) {
+			if (!next || !("sel" in next)) return null;
+			selectedFor = s.pitchCount;
+			if (next.sel.key !== null) s = matchReducer(s, {
+				type: "selectKey",
+				key: next.sel.key
+			});
+			if (next.sel.height !== null && s.phase.kind === "choosing") s = matchReducer(s, {
+				type: "selectHeight",
+				height: next.sel.height
+			});
+			continue;
+		}
+		if (phase.kind === "pitching" && isUserBatting(s) && !phase.swing) {
+			if (!next || !("diff" in next)) return null;
+			if (next.diff !== null) {
+				const at = phase.pitch.arriveAt + next.diff;
+				if (at < phase.pitch.releaseAt) return null;
+				if (t + STEP_MS >= at) {
+					t = Math.max(t, at);
+					s = matchReducer({
+						...s,
+						now: t
+					}, {
+						type: "swing",
+						at
+					});
+					if (s.phase.kind === "pitching" && !s.phase.swing) return null;
+					continue;
+				}
+			}
+		}
+		t += STEP_MS;
+		s = matchReducer(s, {
+			type: "tick",
+			now: t
+		});
+	}
+	if (JSON.stringify(s.inputs) !== JSON.stringify(inputs)) return null;
+	return summarize(s);
 }
 //#endregion
 //#region src/server/http.ts
@@ -1641,6 +2612,18 @@ async function submitApi(req) {
 		return res === "ok" ? json(200, {
 			ok: true,
 			points: r.points
+		}) : res === "duplicate" ? json(409, { error: "duplicate" }) : json(500, { error: "db" });
+	}
+	if (body.game === "zolaball") {
+		const sum = replayZolaball(ticket.seed, data.difficulty, data.inputs);
+		if (!sum) return json(400, { error: "replay-mismatch" });
+		const res = await insertRow(secret, "zolaball_games", {
+			...toGameRow(sum, nickname, ticket.id),
+			player_id: uid
+		});
+		return res === "ok" ? json(200, {
+			ok: true,
+			outcome: sum.outcome
 		}) : res === "duplicate" ? json(409, { error: "duplicate" }) : json(500, { error: "db" });
 	}
 	return json(400, { error: "bad-request" });

@@ -4,7 +4,7 @@ import { issueTicket } from './ticket'
 
 // POST /api/ticket {game} → 서버가 정한 시드가 든 판 입장권
 
-export const VERIFIED_GAMES = ['fight', 'archery', 'batting'] as const
+export const VERIFIED_GAMES = ['fight', 'archery', 'batting', 'zolaball'] as const
 
 export async function ticketApi(req: Request): Promise<Response> {
   if (!fromOurSite(req)) return json(403, { error: 'forbidden' })

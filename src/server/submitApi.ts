@@ -3,6 +3,8 @@ import { supabaseSecret } from './env'
 import { replayArchery } from './games/archery'
 import { replayBatting } from './games/batting'
 import { replayFight } from './games/fight'
+import { replayZolaball } from './games/zolaball'
+import { toGameRow as zolaballRow } from '../games/zolaball/ranking/row'
 import { fromOurSite, json, readJson, userIdOf } from './http'
 import { checkTicket } from './ticket'
 
@@ -44,6 +46,12 @@ export async function submitApi(req: Request): Promise<Response> {
     if (!r) return json(400, { error: 'replay-mismatch' })
     const res = await insertRow(secret, 'batting_games', { id: ticket.id, player_id: uid, nickname, difficulty: r.difficulty, hand: r.hand, points: r.points, homeruns: r.homeruns, hits: r.hits })
     return res === 'ok' ? json(200, { ok: true, points: r.points }) : res === 'duplicate' ? json(409, { error: 'duplicate' }) : json(500, { error: 'db' })
+  }
+  if (body.game === 'zolaball') {
+    const sum = replayZolaball(ticket.seed, data.difficulty, data.inputs)
+    if (!sum) return json(400, { error: 'replay-mismatch' })
+    const res = await insertRow(secret, 'zolaball_games', { ...zolaballRow(sum, nickname, ticket.id), player_id: uid })
+    return res === 'ok' ? json(200, { ok: true, outcome: sum.outcome }) : res === 'duplicate' ? json(409, { error: 'duplicate' }) : json(500, { error: 'db' })
   }
   return json(400, { error: 'bad-request' })
 }

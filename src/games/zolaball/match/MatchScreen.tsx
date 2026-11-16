@@ -35,6 +35,8 @@ import { TimerBar } from './TimerBar'
 
 type Props = {
   config: MatchConfig
+  /** 서버 입장권의 시드 (랭킹 확인용). 없으면 아무 시드 */
+  seed?: number
   /** 친구 대전이면 방과 상대 이름 */
   pvp?: { room: Room<BaseballMsg>; peerName: string; peerAvatar?: string }
   onFinish: (summary: MatchSummary) => void
@@ -101,9 +103,9 @@ function Banner({ state }: { state: MatchState }) {
   return null
 }
 
-export function MatchScreen({ config, pvp, onFinish, onQuit }: Props) {
+export function MatchScreen({ config, seed, pvp, onFinish, onQuit }: Props) {
   const [state, dispatch] = useReducer(matchReducer, undefined, () =>
-    createMatch(config, performance.now(), randomSeed()),
+    createMatch(config, performance.now(), seed ?? randomSeed()),
   )
   const [peerGone, setPeerGone] = useState(false)
   // 3D 야구장 (WebGL이 안 되는 기기는 예전 2D 그림)

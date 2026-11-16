@@ -41,6 +41,12 @@ export type MatchConfig = {
   opponent?: 'bot' | 'remote'
 }
 
+/**
+ * 내 입력 기록 (랭킹 올릴 때 서버가 이걸로 경기를 다시 돌려 확인 — src/server/games/zolaball.ts).
+ * 내가 투수면 던질 때 고른 것(못 고른 칸은 null = 시간 초과로 무작위), 타자면 휘두른 시각 − 도착 시각(안 휘두르면 null)
+ */
+export type MatchInput = { sel: PitchSelection } | { diff: number | null }
+
 /** 친구가 보낸 투구 (내 쪽이 아직 받을 준비가 안 됐으면 맡아 둔다) */
 type RemotePitch = { n: number; call: PitchCall; windupMs: number }
 
@@ -96,6 +102,7 @@ export type MatchState = {
   /** 재생할 효과음. id가 커지는 순서로 쌓이고 최근 것만 남긴다. */
   sounds: { id: number; name: SoundName }[]
   soundSeq: number
+  inputs: MatchInput[]
 }
 
 export type MatchAction =
@@ -153,6 +160,7 @@ export function createMatch(config: MatchConfig, now: number, seed: number): Mat
     pendingPitch: null,
     sounds: [],
     soundSeq: 0,
+    inputs: [],
   }
 }
 
@@ -221,6 +229,7 @@ function resolvePitch(state: MatchState, contactAt: number | null, forced?: Pitc
   const outcome = forced ?? outcomeOf(pitch, swing)
   const { game, event } = applyPitch(state.game, outcome)
   const userDiffMs = swing && isUserBatting(state) ? swing.at - pitch.arriveAt : null
+  const inputs: MatchInput[] = isUserBatting(state) ? [...state.inputs, { diff: userDiffMs }] : state.inputs
 
   const rng = createRng(state.seed)
   const batted =
@@ -246,6 +255,7 @@ function resolvePitch(state: MatchState, contactAt: number | null, forced?: Pitc
     {
       ...state,
       game,
+      inputs,
       seed: rng.seed(),
       // 친구 타자가 휘둘렀으면 휘두르는 모습도 보여준다
       swingAt: forced && outcome !== 'ball' && outcome !== 'calledStrike' ? pitch.arriveAt - 60 : state.swingAt,
@@ -269,7 +279,7 @@ function tick(state: MatchState): MatchState {
         // 시간 초과: 고르지 않은 항목은 무작위
         const rng = createRng(state.seed)
         const call = completeSelection(phase.selection, rng)
-        return throwPitch({ ...state, seed: rng.seed() }, call)
+        return throwPitch({ ...state, seed: rng.seed(), inputs: [...state.inputs, { sel: phase.selection }] }, call)
       }
       if (now < phase.botPitchAt) return state
       const rng = createRng(state.seed)
@@ -332,7 +342,7 @@ function select(state: MatchState, change: Partial<PitchSelection>): MatchState 
   const selection = { ...phase.selection, ...change }
   if (!isSelectionComplete(selection)) return { ...state, phase: { ...phase, selection } }
   const rng = createRng(state.seed)
-  return throwPitch({ ...state, seed: rng.seed() }, completeSelection(selection, rng))
+  return throwPitch({ ...state, seed: rng.seed(), inputs: [...state.inputs, { sel: selection }] }, completeSelection(selection, rng))
 }
 
 function remotePitch(state: MatchState, pitch: RemotePitch): MatchState {
@@ -391,6 +401,7 @@ export type MatchSummary = {
   linescore: GameState['linescore']
   userStats: GameState['stats'][Side]
   userPitching: GameState['pitching'][Side]
+  inputs: MatchInput[]
 }
 
 export function summarize(state: MatchState): MatchSummary {
@@ -407,5 +418,6 @@ export function summarize(state: MatchState): MatchSummary {
     linescore: state.game.linescore,
     userStats: state.game.stats[userSide],
     userPitching: state.game.pitching[userSide],
+    inputs: state.inputs,
   }
 }

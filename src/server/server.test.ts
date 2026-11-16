@@ -133,3 +133,41 @@ describe('배팅 다시 치기', () => {
     expect(replayBatting(1, 'normal', 'right', Array(10).fill({ point: { col: 1, row: 1 }, offsetMs: 99999 }))).toBeNull()
   })
 })
+
+import { createMatch as createBall, matchReducer as ballReducer, summarize as summarizeBall, isUserBatting as userBats, isUserPitching as userPitches } from '../games/zolaball/match/matchState'
+import { userSideForSeed } from '../games/zolaball/ranking/row'
+import { replayZolaball } from './games/zolaball'
+
+function playBall(seed: number, pickSeed: number) {
+  const rng = createRng(pickSeed)
+  const difficulty = pickSeed % 2 ? 'hard' : 'normal'
+  let s = createBall({ difficulty, userSide: userSideForSeed(seed) }, 333.3, seed)
+  let t = 333.3
+  while (s.phase.kind !== 'final') {
+    t += 16.7
+    const r = rng.next()
+    if (s.phase.kind === 'choosing' && userPitches(s)) {
+      if (r < 0.01) s = ballReducer(s, { type: 'selectKey', key: (1 + Math.floor(rng.next() * 4)) as 1 })
+      else if (r < 0.02) s = ballReducer(s, { type: 'selectHeight', height: rng.next() < 0.5 ? 'high' : 'low' })
+    }
+    if (s.phase.kind === 'pitching' && userBats(s) && t > s.phase.pitch.arriveAt - 120 && r < 0.12) s = ballReducer(s, { type: 'swing', at: t - rng.next() * 8 })
+    s = ballReducer(s, { type: 'tick', now: t })
+  }
+  return { difficulty, sum: summarizeBall(s) }
+}
+
+describe('야구 다시 돌리기', () => {
+  it('화면에서 한 경기와 기록이 똑같다', () => {
+    for (let i = 0; i < 12; i++) {
+      const { difficulty, sum } = playBall(900 + i, i)
+      const r = replayZolaball(900 + i, difficulty, sum.inputs)
+      expect(r && { ...r, config: undefined }).toEqual({ ...sum, config: undefined })
+    }
+  })
+
+  it('지어낸 기록 거절', () => {
+    const { sum } = playBall(77, 2)
+    expect(replayZolaball(77, 'normal', sum.inputs.slice(0, 3))).toBeNull()
+    expect(replayZolaball(77, 'normal', [...sum.inputs, { diff: 0 }])).toBeNull()
+  })
+})

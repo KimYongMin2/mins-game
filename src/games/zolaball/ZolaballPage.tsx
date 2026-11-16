@@ -13,6 +13,8 @@ import type { MatchConfig, MatchSummary } from './match/matchState'
 import type { BaseballMsg } from './match/pvp'
 import { BattingPractice } from './practice/BattingPractice'
 import { type UploadStatus, flushPendingGames, submitGame } from './ranking/online'
+import { userSideForSeed } from './ranking/row'
+import { type Ticket, prefetchTicket, takeTicket } from '../../shared/online/verified'
 import { type ZolaballRecord, addMatch, loadRecord, saveRecord } from './records'
 import type { Side } from './rules/game'
 import type { Difficulty } from './rules/judge'
@@ -29,7 +31,7 @@ type Screen =
   | { kind: 'menu' }
   | { kind: 'practice' }
   | { kind: 'ranking'; difficulty: Difficulty }
-  | { kind: 'match'; config: MatchConfig; key: number }
+  | { kind: 'match'; config: MatchConfig; key: number; ticket: Ticket | null }
   | { kind: 'result'; summary: MatchSummary }
   | { kind: 'lobby' }
   /** 둘이 모였고 첫 경기를 기다리는 중 */
@@ -56,13 +58,15 @@ export function ZolaballPage() {
   useEffect(installAudioUnlock, [])
   // 지난번에 못 올린 기록이 있으면 다시 보낸다.
   useEffect(() => {
+    void prefetchTicket('zolaball')
     void flushPendingGames()
   }, [])
 
   function startMatch(difficulty: Difficulty) {
-    // 선공·후공은 매 경기 무작위
-    const userSide = Math.random() < 0.5 ? 'away' : 'home'
-    setScreen({ kind: 'match', config: { difficulty, userSide }, key: Date.now() })
+    // 선공·후공은 매 경기 무작위 — 서버 입장권이 있으면 그 시드로 (서버가 다시 돌릴 때 같게)
+    const ticket = takeTicket('zolaball')
+    const userSide = ticket ? userSideForSeed(ticket.seed) : Math.random() < 0.5 ? 'away' : 'home'
+    setScreen({ kind: 'match', config: { difficulty, userSide }, key: Date.now(), ticket })
   }
 
   function finishMatch(summary: MatchSummary) {
@@ -70,8 +74,14 @@ export function ZolaballPage() {
     saveRecord(next)
     setRecord(next)
     setScreen({ kind: 'result', summary })
+    // 서버 입장권 없이 한 경기(오프라인 등)는 랭킹에 안 올라감 — 서버가 다시 돌려 볼 수 없어서
+    const ticket = screen.kind === 'match' ? screen.ticket : null
+    if (!ticket) {
+      setUpload('rejected')
+      return
+    }
     setUpload('saving')
-    submitGame(summary, loadNickname() ?? '익명')
+    submitGame(summary, ticket, loadNickname() ?? '익명')
       .then(setUpload)
       .catch(() => setUpload('queued'))
   }
@@ -186,7 +196,7 @@ export function ZolaballPage() {
 
       {screen.kind === 'practice' && <BattingPractice />}
 
-      {screen.kind === 'match' && <MatchScreen key={screen.key} config={screen.config} onFinish={finishMatch} />}
+      {screen.kind === 'match' && <MatchScreen key={screen.key} config={screen.config} seed={screen.ticket?.seed} onFinish={finishMatch} />}
 
       {screen.kind === 'lobby' && (
         <PvpLobby<BaseballMsg> gameId="zolaball" nickname={loadNickname() ?? '익명'} onConnected={connected} onBack={toMenu} />

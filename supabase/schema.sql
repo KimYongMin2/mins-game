@@ -368,3 +368,5 @@ drop policy if exists "본인 기록 추가" on public.archery_games;
 revoke insert on public.archery_games from authenticated;
 drop policy if exists "본인 기록 추가" on public.batting_games;
 revoke insert on public.batting_games from authenticated;
+drop policy if exists "본인 기록 추가" on public.zolaball_games;
+revoke insert on public.zolaball_games from authenticated;
