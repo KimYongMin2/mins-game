@@ -4,6 +4,9 @@
 
 export type HubRole = 'host' | 'guest'
 
+/** 서버 심판이 보낸 메시지의 보낸 사람 */
+export const REFEREE_FROM = 'server'
+
 export type HubMember = {
   /** 접속 번호 (서버가 정함) */
   id: string
@@ -38,6 +41,8 @@ export type ClientMsg =
   | { t: 'ready'; room: string; ready: boolean }
   | { t: 'info'; room: string; info: string }
   | { t: 'move'; room: string; move: unknown }
+  /** 방장: 이 방 경기 심판을 서버가 맡아 달라 (setup = 사람·봇·팀 등, 씨앗값은 서버가 정함). 다시 하기도 이걸로 새로 */
+  | { t: 'referee'; room: string; game: string; setup: unknown }
   | { t: 'advertise'; list: string; info: Record<string, unknown> | null }
   | { t: 'watch'; list: string }
   | { t: 'unwatch'; list: string }

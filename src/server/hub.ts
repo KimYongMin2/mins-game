@@ -1,4 +1,4 @@
-import type { ClientMsg, HubMember, HubRole, JoinError, ServerMsg } from '../shared/online/hubProtocol'
+import { type ClientMsg, type HubMember, type HubRole, type JoinError, REFEREE_FROM, type ServerMsg } from '../shared/online/hubProtocol'
 
 // 게임 서버의 속: 방·사람 목록·비공개 코드 검사·방 목록·메시지 전달. 통신(WebSocket)은 모른다 — game-server/main.ts가 붙인다.
 // 보안 (2026-11-16 조작 막기 2단계):
@@ -10,7 +10,34 @@ import type { ClientMsg, HubMember, HubRole, JoinError, ServerMsg } from '../sha
 
 export type Conn = { send(text: string): void; close(code?: number): void }
 
+/** 서버 심판 (게임마다 하나, src/server/referees). 경기 규칙은 각 게임 코드를 그대로 돌린다 */
+export type Referee = {
+  /** 사람이 보낸 메시지 (from = 서버가 정한 접속 번호). 심판이 쓰는 메시지면 true (다른 사람에게 안 보냄), 아니면 false (예전처럼 전달) */
+  input(from: string, msg: unknown): boolean
+  tick(now: number): void
+  /** 사람이 방에서 빠짐 */
+  leave(key: string): void
+  /** 끝나서 그만 돌려도 되는지 */
+  finished(): boolean
+}
+
+export type RefereeContext = {
+  now: () => number
+  /** 지금 방 사람들 (접속 번호·방장 여부) */
+  members: () => { id: string; role: HubRole; nickname: string; avatar?: string }[]
+  /** 모두에게 */
+  broadcast(msg: unknown): void
+  /** 한 사람에게만 (각자 패 같은 비밀) */
+  sendTo(key: string, msg: unknown): void
+}
+
+export type RefereeFactory = (setup: unknown, ctx: RefereeContext) => Referee | null
+
 export type HubOptions = {
+  /** 서버 심판을 둘 수 있는 게임 */
+  referees?: Record<string, RefereeFactory>
+  /** 심판 박자 (ms) */
+  tickMs?: number
   /** 로그인 토큰 확인 → 사용자 ID (아니면 null) */
   verify: (token: string, apikey: string) => Promise<string | null>
   now?: () => number
@@ -56,6 +83,7 @@ type HubRoom = {
   pin: string | null
   capacity: number
   members: Map<string, Member>
+  referee: { game: string; ref: Referee; timer: ReturnType<typeof setInterval> } | null
 }
 
 const randomKey = (prefix: string) => `${prefix}-${Array.from(crypto.getRandomValues(new Uint8Array(6)), (b) => b.toString(36).padStart(2, '0')).join('')}`
@@ -148,6 +176,8 @@ export class Hub {
         return this.leave(s, m.room)
       case 'send':
         return this.relay(s, m.room, m.msg)
+      case 'referee':
+        return this.startReferee(s, m.room, m.game, m.setup)
       case 'ready':
         return this.setMeta(s, m.room, 'guest', (mem) => (mem.ready = m.ready === true))
       case 'info':
@@ -194,7 +224,7 @@ export class Hub {
       if (room && hostOf(room)) return fail('full')
       if (room) this.dropRoom(room)
       const capacity = Number.isInteger(m.capacity) ? Math.min(LIMIT.capacity, Math.max(2, m.capacity)) : 2
-      room = { topic, id, pin, capacity, members: new Map() }
+      room = { topic, id, pin, capacity, members: new Map(), referee: null }
       this.rooms.set(topic, room)
     } else {
       // 방장이 있고, 코드가 맞아야 (비공개 코드는 서버가 검사)
@@ -228,9 +258,51 @@ export class Hub {
   private relay(s: Session, topic: string, msg: unknown) {
     const at = this.memberOf(s, topic)
     if (!at) return
+    // 서버가 심판이면 입력은 심판에게만 (다른 사람에게 안 감 — 고른 것·비밀이 새지 않게)
+    if (at.room.referee?.ref.input(at.mem.key, msg)) return
     for (const other of at.room.members.values()) {
       if (other !== at.mem) other.session?.push({ t: 'msg', room: topic, from: at.mem.key, msg })
     }
+  }
+
+  private startReferee(s: Session, topic: string, game: unknown, setup: unknown) {
+    const at = this.memberOf(s, topic)
+    if (!at || at.mem.role !== 'host' || typeof game !== 'string' || JSON.stringify(setup ?? null).length > 8000) return
+    const factory = this.opts.referees?.[game]
+    if (!factory || !topic.startsWith(`${game}:`)) return
+    const room = at.room
+    this.stopReferee(room)
+    const ctx: RefereeContext = {
+      now: this.now,
+      members: () => [...room.members.values()].map((m) => ({ id: m.key, role: m.role, nickname: m.nickname, ...(m.avatar ? { avatar: m.avatar } : {}) })),
+      broadcast: (msg) => {
+        for (const m of room.members.values()) m.session?.push({ t: 'msg', room: topic, from: REFEREE_FROM, msg })
+      },
+      sendTo: (key, msg) => room.members.get(key)?.session?.push({ t: 'msg', room: topic, from: REFEREE_FROM, msg }),
+    }
+    let ref: Referee | null = null
+    try {
+      ref = factory(setup, ctx)
+    } catch (e) {
+      console.warn('[hub] 심판 만들기 실패', game, e)
+    }
+    if (!ref) return
+    const timer = setInterval(() => {
+      try {
+        ref.tick(this.now())
+        if (ref.finished()) this.stopReferee(room)
+      } catch (e) {
+        console.warn('[hub] 심판 오류', game, e)
+        this.stopReferee(room)
+      }
+    }, this.opts.tickMs ?? 50)
+    room.referee = { game, ref, timer }
+  }
+
+  private stopReferee(room: HubRoom) {
+    if (!room.referee) return
+    clearInterval(room.referee.timer)
+    room.referee = null
   }
 
   private setMeta(s: Session, topic: string, role: HubRole, change: (m: Member) => void) {
@@ -319,12 +391,15 @@ export class Hub {
     if (mem.grace) clearTimeout(mem.grace)
     room.members.delete(mem.key)
     mem.session?.rooms.delete(room.topic)
+    room.referee?.ref.leave(mem.key)
     if (mem.role === 'host') {
       for (const [list, entries] of this.lists) if (entries.has(room.topic)) this.removeAdvert(list, room.topic)
       if (mem.session) for (const [list, t] of mem.session.adverts) if (t === room.topic) mem.session.adverts.delete(list)
     }
-    if (room.members.size === 0) this.rooms.delete(room.topic)
-    else this.pushMembers(room)
+    if (room.members.size === 0) {
+      this.stopReferee(room)
+      this.rooms.delete(room.topic)
+    } else this.pushMembers(room)
   }
 
   private dropRoom(room: HubRoom) {

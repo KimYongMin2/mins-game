@@ -3549,6 +3549,10 @@ require_sender();
 require_websocket();
 var import_websocket_server = /* @__PURE__ */ __toESM(require_websocket_server(), 1);
 //#endregion
+//#region src/shared/online/hubProtocol.ts
+/** 서버 심판이 보낸 메시지의 보낸 사람 */
+const REFEREE_FROM = "server";
+//#endregion
 //#region src/server/hub.ts
 const LIMIT = {
 	/** 메시지 한 개 최대 글자 수 */
@@ -3565,7 +3569,7 @@ const ID_RE = /^[A-Z0-9]{4,12}$/;
 const PIN_RE = /^\d{4}$/;
 const GAME_RE = /^[a-z0-9-]{2,24}$/;
 const LIST_RE = /^[a-z0-9-]{2,40}$/;
-const clean = (v, max) => typeof v === "string" ? [...v.replace(/[\u0000-\u001f\u007f]/g, "")].slice(0, max).join("") : "";
+const clean$1 = (v, max) => typeof v === "string" ? [...v.replace(/[\u0000-\u001f\u007f]/g, "")].slice(0, max).join("") : "";
 const randomKey = (prefix) => `${prefix}-${Array.from(crypto.getRandomValues(/* @__PURE__ */ new Uint8Array(6)), (b) => b.toString(36).padStart(2, "0")).join("")}`;
 var Session = class {
 	uid = null;
@@ -3650,8 +3654,9 @@ var Hub = class {
 			case "join": return this.join(s, m);
 			case "leave": return this.leave(s, m.room);
 			case "send": return this.relay(s, m.room, m.msg);
+			case "referee": return this.startReferee(s, m.room, m.game, m.setup);
 			case "ready": return this.setMeta(s, m.room, "guest", (mem) => mem.ready = m.ready === true);
-			case "info": return this.setMeta(s, m.room, "host", (mem) => mem.info = clean(m.info, 40) || void 0);
+			case "info": return this.setMeta(s, m.room, "host", (mem) => mem.info = clean$1(m.info, 40) || void 0);
 			case "move": return this.move(s, m.room, m.move);
 			case "advertise": return this.advertise(s, m.list, m.info);
 			case "watch": return this.watch(s, m.list);
@@ -3699,7 +3704,8 @@ var Hub = class {
 				id,
 				pin,
 				capacity: Number.isInteger(m.capacity) ? Math.min(LIMIT.capacity, Math.max(2, m.capacity)) : 2,
-				members: /* @__PURE__ */ new Map()
+				members: /* @__PURE__ */ new Map(),
+				referee: null
 			};
 			this.rooms.set(topic, room);
 		} else {
@@ -3711,8 +3717,8 @@ var Hub = class {
 			resume: randomKey("r"),
 			session: s,
 			role: m.role,
-			nickname: clean(m.nickname, 20).trim() || "익명",
-			avatar: clean(m.avatar, 48) || void 0,
+			nickname: clean$1(m.nickname, 20).trim() || "익명",
+			avatar: clean$1(m.avatar, 48) || void 0,
 			joinedAt: this.now(),
 			grace: null
 		};
@@ -3740,12 +3746,70 @@ var Hub = class {
 	relay(s, topic, msg) {
 		const at = this.memberOf(s, topic);
 		if (!at) return;
+		if (at.room.referee?.ref.input(at.mem.key, msg)) return;
 		for (const other of at.room.members.values()) if (other !== at.mem) other.session?.push({
 			t: "msg",
 			room: topic,
 			from: at.mem.key,
 			msg
 		});
+	}
+	startReferee(s, topic, game, setup) {
+		const at = this.memberOf(s, topic);
+		if (!at || at.mem.role !== "host" || typeof game !== "string" || JSON.stringify(setup ?? null).length > 8e3) return;
+		const factory = this.opts.referees?.[game];
+		if (!factory || !topic.startsWith(`${game}:`)) return;
+		const room = at.room;
+		this.stopReferee(room);
+		const ctx = {
+			now: this.now,
+			members: () => [...room.members.values()].map((m) => ({
+				id: m.key,
+				role: m.role,
+				nickname: m.nickname,
+				...m.avatar ? { avatar: m.avatar } : {}
+			})),
+			broadcast: (msg) => {
+				for (const m of room.members.values()) m.session?.push({
+					t: "msg",
+					room: topic,
+					from: REFEREE_FROM,
+					msg
+				});
+			},
+			sendTo: (key, msg) => room.members.get(key)?.session?.push({
+				t: "msg",
+				room: topic,
+				from: REFEREE_FROM,
+				msg
+			})
+		};
+		let ref = null;
+		try {
+			ref = factory(setup, ctx);
+		} catch (e) {
+			console.warn("[hub] 심판 만들기 실패", game, e);
+		}
+		if (!ref) return;
+		const timer = setInterval(() => {
+			try {
+				ref.tick(this.now());
+				if (ref.finished()) this.stopReferee(room);
+			} catch (e) {
+				console.warn("[hub] 심판 오류", game, e);
+				this.stopReferee(room);
+			}
+		}, this.opts.tickMs ?? 50);
+		room.referee = {
+			game,
+			ref,
+			timer
+		};
+	}
+	stopReferee(room) {
+		if (!room.referee) return;
+		clearInterval(room.referee.timer);
+		room.referee = null;
 	}
 	setMeta(s, topic, role, change) {
 		const at = this.memberOf(s, topic);
@@ -3839,14 +3903,17 @@ var Hub = class {
 		if (mem.grace) clearTimeout(mem.grace);
 		room.members.delete(mem.key);
 		mem.session?.rooms.delete(room.topic);
+		room.referee?.ref.leave(mem.key);
 		if (mem.role === "host") {
 			for (const [list, entries] of this.lists) if (entries.has(room.topic)) this.removeAdvert(list, room.topic);
 			if (mem.session) {
 				for (const [list, t] of mem.session.adverts) if (t === room.topic) mem.session.adverts.delete(list);
 			}
 		}
-		if (room.members.size === 0) this.rooms.delete(room.topic);
-		else this.pushMembers(room);
+		if (room.members.size === 0) {
+			this.stopReferee(room);
+			this.rooms.delete(room.topic);
+		} else this.pushMembers(room);
 	}
 	dropRoom(room) {
 		for (const mem of [...room.members.values()]) this.removeMember(room, mem);
@@ -3870,6 +3937,523 @@ var Hub = class {
 		s.rooms.clear();
 	}
 };
+//#endregion
+//#region src/shared/random.ts
+function createRng(seed) {
+	let s = seed >>> 0;
+	return {
+		next() {
+			s = s + 1831565813 >>> 0;
+			let t = s;
+			t = Math.imul(t ^ t >>> 15, t | 1);
+			t ^= t + Math.imul(t ^ t >>> 7, t | 61);
+			return ((t ^ t >>> 14) >>> 0) / 4294967296;
+		},
+		seed: () => s
+	};
+}
+function chance(rng, p) {
+	return rng.next() < p;
+}
+function pickOne(rng, values) {
+	return values[Math.floor(rng.next() * values.length)];
+}
+//#endregion
+//#region src/shared/team/teams.ts
+/** 살아 있는 사람이 모두 한 팀이면 그 팀, 아니면 null (아무도 없으면 null) */
+function lastTeam(alive, teams) {
+	let found = null;
+	for (let i = 0; i < alive.length; i++) {
+		if (!alive[i]) continue;
+		if (found === null) found = teams[i];
+		else if (found !== teams[i]) return null;
+	}
+	return found;
+}
+/** 같은 팀인지 (팀전이 아니면 늘 false) */
+const sameTeam = (teams, a, b) => !!teams && a !== b && teams[a] === teams[b];
+//#endregion
+//#region src/games/roulette/constants.ts
+/** 시작 전 안내 */
+const INTRO_MS = 1500;
+/** 한 차례 시간. 넘기면 골라 둔 사람(없으면 아무나)을 쏜다 */
+const TURN_MS = 15e3;
+/** 방아쇠: 철컥 뒤 SUSPENSE_MS에 '틱' 또는 '탕' */
+const SUSPENSE_MS = 1100;
+const BANG_SHOW_MS = 2400;
+/** 경기가 끝난 뒤 결과 화면으로 넘어가기까지 */
+const DONE_MS = 2500;
+/** 봇: 누구를 쏠지 고르기까지, 고른 뒤 당기기까지 */
+const BOT_AIM_MS = [700, 1600];
+const BOT_PULL_MS = [500, 1100];
+//#endregion
+//#region src/games/roulette/bot/rouletteBot.ts
+function chooseTarget(rng, me, alive, pulls) {
+	const others = alive.filter((i) => i !== me);
+	if (others.length === 0) return me;
+	const risk = 1 / (6 - pulls);
+	return chance(rng, risk <= 1 / 6 ? .45 : risk <= 1 / 5 ? .2 : risk < 1 ? .05 : 0) ? me : pickOne(rng, others);
+}
+//#endregion
+//#region src/games/roulette/play/engine.ts
+const aliveIndexes = (s) => s.alive.flatMap((a, i) => a ? [i] : []);
+const within = (rng, [min, max]) => min + rng.next() * (max - min);
+/** 자리 순서로 from 다음 살아 있는 사람 */
+function nextAlive(alive, from) {
+	for (let k = 1; k <= alive.length; k++) {
+		const i = (from + k) % alive.length;
+		if (alive[i]) return i;
+	}
+	return from;
+}
+/** player가 target을 쏠 수 있는지 (살아 있고, 같은 팀 공격을 껐으면 같은 팀이 아님 — 나는 늘 됨) */
+function canTarget(s, player, target) {
+	return !!s.alive[target] && (s.friendlyFire || !sameTeam(s.teams, player, target));
+}
+/** 봇이 고르는 사람들: 같은 팀 공격이 켜져 있어도 같은 팀은 빼고 (나는 됨) */
+const botTargetsOf = (s, player) => aliveIndexes(s).filter((i) => !sameTeam(s.teams, player, i));
+/** 끝났는지: 한 명 남음, 팀전이면 한 팀만 남음 */
+function isOver(s) {
+	return aliveIndexes(s).length <= 1 || !!s.teams && lastTeam(s.alive, s.teams) !== null;
+}
+/** 이긴 팀 (팀전이고 끝났을 때) */
+function winnerTeam(s) {
+	return s.teams ? lastTeam(s.alive, s.teams) : null;
+}
+function reload(s) {
+	const rng = createRng(s.seed);
+	const chamber = 1 + Math.floor(rng.next() * 6);
+	return {
+		...s,
+		seed: rng.seed(),
+		chamber,
+		pulls: 0
+	};
+}
+function createEngine(opts) {
+	const rng = createRng(opts.seed);
+	const turn = Math.floor(rng.next() * opts.players.length);
+	return reload({
+		now: opts.now,
+		seed: rng.seed(),
+		players: opts.players,
+		teams: opts.teams ?? null,
+		friendlyFire: !!opts.friendlyFire,
+		alive: opts.players.map(() => true),
+		out: [],
+		kills: opts.players.map(() => 0),
+		turn,
+		aimAt: null,
+		chamber: 1,
+		pulls: 0,
+		bot: null,
+		phase: {
+			kind: "intro",
+			until: opts.now + INTRO_MS
+		}
+	});
+}
+/** turn 사람 차례 시작 (봇이면 언제 고르고 당길지 정해 둔다) */
+function startTurn(s, turn) {
+	let next = {
+		...s,
+		turn,
+		aimAt: null,
+		bot: null,
+		phase: {
+			kind: "aim",
+			until: s.now + TURN_MS
+		}
+	};
+	if (s.players[turn].kind === "bot") {
+		const rng = createRng(s.seed);
+		const target = chooseTarget(rng, turn, botTargetsOf(s, turn), s.pulls);
+		const aimAt = s.now + within(rng, BOT_AIM_MS);
+		next = {
+			...next,
+			seed: rng.seed(),
+			bot: {
+				aimAt,
+				pullAt: aimAt + within(rng, BOT_PULL_MS),
+				target
+			}
+		};
+	}
+	return next;
+}
+function aim(s, player, target) {
+	if (s.phase.kind !== "aim" || player !== s.turn || !canTarget(s, player, target)) return s;
+	return {
+		...s,
+		aimAt: target
+	};
+}
+function pull(s, player, target = s.aimAt) {
+	if (s.phase.kind !== "aim" || player !== s.turn || target === null || !canTarget(s, player, target)) return s;
+	const pulls = s.pulls + 1;
+	const bang = pulls >= s.chamber;
+	const fire = {
+		shooter: player,
+		target,
+		bang
+	};
+	return {
+		...s,
+		aimAt: target,
+		pulls,
+		bot: null,
+		phase: {
+			kind: "fire",
+			fire,
+			until: s.now + SUSPENSE_MS + (bang ? BANG_SHOW_MS : 900)
+		}
+	};
+}
+function afterFire(s) {
+	if (s.phase.kind !== "fire") return s;
+	const { shooter, target, bang } = s.phase.fire;
+	if (!bang) return startTurn(s, s.alive[target] ? target : nextAlive(s.alive, target));
+	const next = {
+		...s,
+		alive: s.alive.map((a, i) => a && i !== target),
+		out: [...s.out, target],
+		kills: s.kills.map((k, i) => i === shooter && shooter !== target ? k + 1 : k)
+	};
+	if (isOver(next)) return {
+		...next,
+		aimAt: null,
+		phase: {
+			kind: "done",
+			until: s.now + DONE_MS
+		}
+	};
+	const turn = next.alive[shooter] ? shooter : nextAlive(next.alive, shooter);
+	return startTurn(reload(next), turn);
+}
+function timeout(s) {
+	const rng = createRng(s.seed);
+	const alive = aliveIndexes(s).filter((i) => canTarget(s, s.turn, i));
+	const target = s.aimAt ?? alive[Math.floor(rng.next() * alive.length)];
+	return pull({
+		...s,
+		seed: rng.seed()
+	}, s.turn, target);
+}
+function bots(s) {
+	const b = s.bot;
+	if (!b) return s;
+	let next = s;
+	if (s.now >= b.aimAt && s.aimAt !== b.target) next = aim(next, s.turn, b.target);
+	if (s.now >= b.pullAt) next = pull(next, s.turn, b.target);
+	return next;
+}
+function drop(s, player) {
+	if (!s.alive[player] || s.phase.kind === "done") return s;
+	const next = {
+		...s,
+		alive: s.alive.map((a, i) => a && i !== player),
+		out: [...s.out, player]
+	};
+	if (isOver(next)) return {
+		...next,
+		aimAt: null,
+		phase: {
+			kind: "done",
+			until: s.now + DONE_MS
+		}
+	};
+	if (s.phase.kind === "aim") {
+		if (s.turn === player) return startTurn(next, nextAlive(next.alive, player));
+		if (s.aimAt === player) return {
+			...next,
+			aimAt: null
+		};
+	}
+	return next;
+}
+function tick(s) {
+	const { phase, now } = s;
+	switch (phase.kind) {
+		case "intro": return now >= phase.until ? startTurn(s, s.turn) : s;
+		case "aim": {
+			const b = bots(s);
+			if (b.phase.kind !== "aim") return b;
+			return now >= phase.until ? timeout(b) : b;
+		}
+		case "fire": return now >= phase.until ? afterFire(s) : s;
+		case "done": return s;
+	}
+}
+function engineReducer(state, action) {
+	switch (action.type) {
+		case "tick": return tick({
+			...state,
+			now: action.now
+		});
+		case "aim": return aim(state, action.player, action.target);
+		case "pull": return pull(state, action.player, action.target ?? state.aimAt);
+		case "drop": return drop(state, action.player);
+	}
+}
+/** 사람별 등수 (1 = 우승). 늦게 탈락할수록 앞. 끝나기 전이면 남은 사람은 모두 1 */
+function ranksOf(s) {
+	const ranks = s.players.map(() => 1);
+	const left = aliveIndexes(s).length;
+	[...s.out].reverse().forEach((i, k) => ranks[i] = left + 1 + k);
+	return ranks;
+}
+//#endregion
+//#region src/games/roulette/play/view.ts
+/** 심판 상태 → 화면 */
+function toView(s) {
+	const { phase, now } = s;
+	return {
+		players: s.players.map(({ id, name, avatar }) => ({
+			id,
+			name,
+			avatar
+		})),
+		teams: s.teams,
+		friendlyFire: s.friendlyFire,
+		winTeam: s.phase.kind === "done" ? winnerTeam(s) : null,
+		alive: s.alive,
+		kills: s.kills,
+		turn: s.turn,
+		aimAt: s.aimAt,
+		pulls: s.pulls,
+		phase: phase.kind,
+		leftMs: Math.max(0, phase.until - now),
+		fire: phase.kind === "fire" ? phase.fire : null,
+		ranks: ranksOf(s)
+	};
+}
+/** 친구에게 바로 알려야 할 만큼 바뀌었는지 (그 밖엔 1초마다 보냄) */
+function viewChanged(a, b) {
+	if (!a) return true;
+	return a.phase !== b.phase || a.turn !== b.turn || a.aimAt !== b.aimAt || a.pulls !== b.pulls || a.alive.some((x, i) => x !== b.alive[i]);
+}
+//#endregion
+//#region src/shared/art3d/animalKinds.ts
+/** 고르지 않은 사람·봇은 아무도 안 고른 동물을 이 순서로 받는다 */
+const ANIMALS = [
+	"bear",
+	"cat",
+	"fox",
+	"rabbit",
+	"panda",
+	"dog",
+	"pig",
+	"frog",
+	"tiger",
+	"lion",
+	"eagle",
+	"seagull",
+	"penguin",
+	"dino",
+	"wolf",
+	"elephant"
+];
+/** 모르는 값(옛 저장값·남이 보낸 이상한 값)은 버린다 */
+function asAnimal(x) {
+	return typeof x === "string" && ANIMALS.includes(x) ? x : void 0;
+}
+const HATS = [
+	"none",
+	"cap",
+	"crown",
+	"party",
+	"beanie",
+	"tophat"
+];
+const GLASSES = [
+	"none",
+	"round",
+	"sun",
+	"star"
+];
+const NECKS = [
+	"none",
+	"bow",
+	"scarf",
+	"tie"
+];
+const FURS = [
+	"base",
+	"light",
+	"dark"
+];
+const OUTFITS = ["shirt", "uniform"];
+const TINTS = [
+	"red",
+	"orange",
+	"yellow",
+	"green",
+	"sky",
+	"blue",
+	"navy",
+	"purple",
+	"pink",
+	"burgundy",
+	"black"
+];
+/** 등번호 0~99 */
+const clampNumber = (n) => {
+	const x = Math.floor(Number(n));
+	return Number.isFinite(x) ? Math.min(99, Math.max(0, x)) : 7;
+};
+const pick = (list, x, fallback) => typeof x === "string" && list.includes(x) ? x : fallback;
+/** 방으로 보낼 짧은 글자: '동물.모자.안경.목.털.옷.색.번호' */
+const encodeLook = (l) => [
+	l.animal,
+	l.hat,
+	l.glasses,
+	l.neck,
+	l.fur,
+	l.outfit,
+	l.tint,
+	l.number
+].join(".");
+/** 받은 글자·저장값 → 캐릭터 (모르는 값은 버리거나 '없음') */
+function decodeLook(x) {
+	if (typeof x !== "string" || x.length > 48) return void 0;
+	const [a, hat, glasses, neck, fur, outfit, tint, number] = x.split(".");
+	const animal = asAnimal(a);
+	if (!animal) return void 0;
+	return {
+		animal,
+		hat: pick(HATS, hat, "none"),
+		glasses: pick(GLASSES, glasses, "none"),
+		neck: pick(NECKS, neck, "none"),
+		fur: pick(FURS, fur, "base"),
+		outfit: pick(OUTFITS, outfit, "shirt"),
+		tint: pick(TINTS, tint, "red"),
+		number: number === void 0 ? 7 : clampNumber(number)
+	};
+}
+//#endregion
+//#region src/server/referees/common.ts
+const clean = (v, max) => typeof v === "string" ? [...v.replace(/[\u0000-\u001f\u007f]/g, "")].slice(0, max).join("").trim() : "";
+function readLook(x) {
+	if (!x || typeof x !== "object") return void 0;
+	try {
+		return decodeLook(encodeLook(x));
+	} catch {
+		return;
+	}
+}
+/** 사람은 방에 있는 사람만 한 번씩, 봇은 'bot0'~'bot15'. 사람 이름은 서버가 아는 닉네임으로 */
+function readPlayers(x, ctx, min, max) {
+	if (!Array.isArray(x) || x.length < min || x.length > max) return null;
+	const members = new Map(ctx.members().map((m) => [m.id, m]));
+	const seen = /* @__PURE__ */ new Set();
+	const out = [];
+	for (const p of x) {
+		if (!p || typeof p !== "object" || typeof p.id !== "string" || seen.has(p.id)) return null;
+		seen.add(p.id);
+		const avatar = readLook(p.avatar);
+		const member = members.get(p.id);
+		if (member) out.push({
+			id: p.id,
+			name: member.nickname,
+			kind: "remote",
+			avatar
+		});
+		else if (/^bot\d{1,2}$/.test(p.id)) out.push({
+			id: p.id,
+			name: clean(p.name, 20) || "봇",
+			kind: "bot",
+			avatar
+		});
+		else return null;
+	}
+	if (!out.some((p) => members.get(p.id)?.role === "host")) return null;
+	return out;
+}
+/** 팀: 없으면 null(개인전), 모양이 틀리면 undefined */
+function readTeams(x, n) {
+	if (x === null || x === void 0) return null;
+	if (!Array.isArray(x) || x.length !== n || !x.every((t) => t === 0 || t === 1)) return void 0;
+	return x;
+}
+const serverSeed = () => crypto.getRandomValues(/* @__PURE__ */ new Uint32Array(1))[0];
+//#endregion
+//#region src/server/referees/roulette.ts
+const HEARTBEAT_MS = 1e3;
+/** 끝나고 이만큼 더 화면을 보낸 뒤 심판을 내린다 */
+const LINGER_MS = 3e3;
+function rouletteReferee(setup, ctx) {
+	const o = setup ?? {};
+	const players = readPlayers(o.players, ctx, 2, 8);
+	if (!players) return null;
+	const teams = readTeams(o.teams, players.length);
+	if (teams === void 0) return null;
+	let s = createEngine({
+		now: ctx.now(),
+		seed: serverSeed(),
+		players,
+		teams,
+		friendlyFire: o.friendlyFire === true
+	});
+	let sent = {
+		view: null,
+		at: 0
+	};
+	let doneAt = null;
+	const indexOf = (id) => s.players.findIndex((p) => p.id === id && p.kind === "remote");
+	const flush = (force = false) => {
+		const view = toView(s);
+		if (force || viewChanged(sent.view, view) || s.now - sent.at >= HEARTBEAT_MS) {
+			ctx.broadcast({
+				t: "view",
+				v: view
+			});
+			sent = {
+				view,
+				at: s.now
+			};
+		}
+	};
+	flush(true);
+	return {
+		input(from, msg) {
+			const m = msg;
+			if (m?.t !== "aim" && m?.t !== "pull") return false;
+			const player = indexOf(from);
+			if (player < 0 || typeof m.target !== "number" || !Number.isInteger(m.target)) return true;
+			s = engineReducer(s, m.t === "aim" ? {
+				type: "aim",
+				player,
+				target: m.target
+			} : {
+				type: "pull",
+				player,
+				target: m.target
+			});
+			flush();
+			return true;
+		},
+		tick(now) {
+			s = engineReducer(s, {
+				type: "tick",
+				now
+			});
+			if (s.phase.kind === "done" && doneAt === null) doneAt = now;
+			flush();
+		},
+		leave(key) {
+			const player = indexOf(key);
+			if (player >= 0) s = engineReducer(s, {
+				type: "drop",
+				player
+			});
+			flush();
+		},
+		finished: () => doneAt !== null && s.now - doneAt > LINGER_MS
+	};
+}
+//#endregion
+//#region src/server/referees/index.ts
+const REFEREES = { roulette: rouletteReferee };
 //#endregion
 //#region game-server/main.ts
 const PORT = Number(process.env.PORT ?? 8090);
@@ -3899,7 +4483,8 @@ async function verify(token, apikey) {
 }
 const hub = new Hub({
 	verify,
-	graceMs: 15e3
+	graceMs: 15e3,
+	referees: REFEREES
 });
 const ALLOWED_ORIGIN = /^https:\/\/mins-game[a-z0-9-]*\.vercel\.app$|^http:\/\/localhost:\d+$/;
 const http = createServer((req, res) => {

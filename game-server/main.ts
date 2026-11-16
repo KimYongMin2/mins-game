@@ -1,6 +1,7 @@
 import { createServer } from 'node:http'
 import { WebSocketServer } from 'ws'
 import { Hub } from '../src/server/hub'
+import { REFEREES } from '../src/server/referees'
 
 // 민스서버(AWS Lightsail)에서 도는 게임 서버. Caddy가 https(wss://game.3-39-97-59.sslip.io)를 받아 여기(8090)로 넘긴다.
 // 속은 src/server/hub.ts — 여기는 WebSocket만 붙인다. `npm run build:game`으로 game-server/server.js 한 파일로 묶어 커밋하고,
@@ -27,7 +28,7 @@ async function verify(token: string, apikey: string): Promise<string | null> {
   }
 }
 
-const hub = new Hub({ verify, graceMs: 15_000 })
+const hub = new Hub({ verify, graceMs: 15_000, referees: REFEREES })
 const ALLOWED_ORIGIN = /^https:\/\/mins-game[a-z0-9-]*\.vercel\.app$|^http:\/\/localhost:\d+$/
 
 const http = createServer((req, res) => {

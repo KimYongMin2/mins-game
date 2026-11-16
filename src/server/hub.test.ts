@@ -134,3 +134,38 @@ describe('게임 서버', () => {
     expect(g.last('msg')?.msg).toBe('ok')
   })
 })
+
+describe('서버 심판 자리', () => {
+  it('방장만 심판을 세우고, 입력은 심판에게만, 심판 메시지는 from=server', async () => {
+    const seen: [string, unknown][] = []
+    const hub = new Hub({
+      verify,
+      tickMs: 5,
+      referees: {
+        bomb: (_setup, ctx) => {
+          ctx.broadcast({ t: 'view', n: 1 })
+          return { input: (from, msg) => (seen.push([from, msg]), (msg as { t: string }).t === 'aim'), tick: () => {}, leave: () => {}, finished: () => false }
+        },
+      },
+    })
+    const h = client(hub)
+    const g = client(hub)
+    await h.hello()
+    await g.hello()
+    await h.send(join('host', 'ABCD'))
+    await g.send(join('guest', 'ABCD'))
+    const room = h.last('joined')!.room
+    await g.send({ t: 'referee', room, game: 'bomb', setup: {} })
+    expect(g.last('msg')).toBeUndefined()
+    await h.send({ t: 'referee', room, game: 'bomb', setup: {} })
+    expect(g.last('msg')).toEqual({ t: 'msg', room, from: 'server', msg: { t: 'view', n: 1 } })
+    const before = h.got.length
+    await g.send({ t: 'send', room, msg: { t: 'aim' } })
+    expect(seen.at(-1)).toEqual([g.last('joined')!.key, { t: 'aim' }])
+    expect(h.got.length).toBe(before)
+    await g.send({ t: 'send', room, msg: { t: 'other' } })
+    expect(h.last('msg')?.msg).toEqual({ t: 'other' })
+    await h.send({ t: 'leave', room })
+    await g.send({ t: 'leave', room })
+  })
+})

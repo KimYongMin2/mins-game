@@ -129,6 +129,11 @@ export interface Room<M> {
   sendMove(move: RoomMove): void
   /** 친구: 방장이 보낸 '여기로 옮겨' (방장이 보낸 것만) */
   onMove(fn: (move: RoomMove) => void): () => void
+  /**
+   * 방장: 경기 심판을 우리 게임 서버에 맡긴다 (조작 막기 3단계 — 비밀은 서버만 앎). 서버 심판 메시지는 from이 REFEREE_FROM.
+   * 우리 게임 서버로 연 방에만 있다 (없으면 예전처럼 방장 폰이 심판)
+   */
+  startReferee?(game: string, setup: unknown): void
   leave(): void
 }
 
@@ -286,6 +291,7 @@ async function openHub<M>(gameId: string, code: string, meta: Meta, { capacity =
       conn.info(info)
     },
     sendMove: (move) => meta.role === 'host' && conn.move(move),
+    startReferee: (game, setup) => meta.role === 'host' && conn.referee(game, setup),
     onMove(fn) {
       moveFns.add(fn)
       return () => moveFns.delete(fn)

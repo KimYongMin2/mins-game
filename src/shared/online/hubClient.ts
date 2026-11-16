@@ -173,6 +173,7 @@ class HubClient {
       ready: (ready: boolean) => this.raw({ t: 'ready', room: topic(), ready }),
       info: (info: string) => this.raw({ t: 'info', room: topic(), info }),
       move: (move: unknown) => this.raw({ t: 'move', room: topic(), move }),
+      referee: (game: string, setup: unknown) => this.raw({ t: 'referee', room: topic(), game, setup }),
       leave: () => {
         const t = topic()
         this.raw({ t: 'leave', room: t })
