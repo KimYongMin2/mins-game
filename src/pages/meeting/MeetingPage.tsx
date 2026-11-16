@@ -168,7 +168,7 @@ function MeetingRoom({ room, name, pin, nickname, voice, settings, onSettings, o
   const [blocked, setBlocked] = useState(false)
   const [asking, setAsking] = useState(false)
   /** 통화 상태 (바뀔 때마다 새로 받아 그린다) */
-  const [call, setCall] = useState<{ peers: CallPeer[]; mic: boolean }>({ peers: [], mic: true })
+  const [call, setCall] = useState<{ peers: CallPeer[]; mic: boolean; strangers: number }>({ peers: [], mic: true, strangers: 0 })
   const meshRef = useRef<SfuCall | null>(null)
   const [micVolume, setMicVolume] = useState(() => voice?.volume ?? loadVolume(MIC_VOLUME_KEY, MIC_VOLUME))
   const [speaker] = useState(() => {
@@ -190,7 +190,7 @@ function MeetingRoom({ room, name, pin, nickname, voice, settings, onSettings, o
     const mesh: SfuCall = new SfuCall({
       url: SFU_URL ?? '',
       getToken: () => sfuToken(`meeting-${room.code}`, room.myId, nickname),
-      onChange: () => setCall({ peers: mesh.peers(), mic: mesh.mic }),
+      onChange: () => setCall({ peers: mesh.peers(), mic: mesh.mic, strangers: mesh.strangers() }),
     })
     meshRef.current = mesh
     mesh.setTrack(voiceRef.current?.track ?? null)
@@ -291,6 +291,12 @@ function MeetingRoom({ room, name, pin, nickname, voice, settings, onSettings, o
           · {count}/{CAPACITY}명
         </span>
       </div>
+
+      {call.strangers > 0 && (
+        <p className="meet__warn" role="alert">
+          목록에 없는 사람 {call.strangers}명이 듣고 있어요. 모르는 사람이면 방을 나가 새 방(비공개)을 만드세요
+        </p>
+      )}
 
       <ul className="meet__people">
         <Person name={nickname} note="(나)" stream={myStream} micOn={micOn} status={null} />

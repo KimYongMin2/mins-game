@@ -363,3 +363,15 @@
 .button--primary .meet-voice__now {
   color: rgba(255, 255, 255, 0.85);
 }
+
+/* 음성 서버엔 있는데 사람 목록엔 없는 사람 (몰래 듣기 경고) */
+.meet__warn {
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  border: 2px solid #e8473f;
+  border-radius: 2px;
+  background: color-mix(in srgb, #e8473f 12%, transparent);
+  color: var(--ink);
+  font-weight: 700;
+  font-size: 14px;
+}

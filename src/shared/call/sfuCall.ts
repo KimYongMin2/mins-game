@@ -3,11 +3,15 @@ import type { CallPeer } from './voiceMesh'
 
 // 음성 통화를 우리 음성 서버(LiveKit, AWS Lightsail)로 (사용자 요청 2026-11-16 — 기기끼리 잇는 방식은 막힌 망에서 안 이어져서 서버를 삼).
 // 모두 서버 하나에 붙고 서버가 소리를 나눠 준다. 막힌 망은 서버 안 TURN이 받아 준다.
-// 방(Room)·게임은 모른다: 사람 목록(접속 번호)은 setMembers로, 입장권은 getToken으로 받는다. LiveKit 참가자 이름(identity) = 방 접속 번호.
+// 방(Room)·게임은 모른다: 사람 목록(접속 번호)은 setMembers로, 입장권은 getToken으로 받는다.
+// LiveKit 참가자 이름(identity) = '방 접속 번호.사용자 ID 앞 8자'(입장권 서버가 붙임) → 점 앞이 접속 번호.
 // 화면 쪽은 VoiceMesh와 같은 모양(peers·mic·setTrack·setMicOn·setMembers·refresh·close)으로 쓴다.
 
 /** 음성 최대 비트레이트 (한 사람 말소리 1시간 약 10MB) */
 const VOICE_BITRATE = 24_000
+
+/** 참가자 이름에서 방 접속 번호 */
+export const memberIdOf = (identity: string) => identity.split('.')[0]
 
 type Options = {
   url: string
@@ -33,16 +37,16 @@ export class SfuCall {
     const change = () => this.opts.onChange()
     this.lk
       .on(RoomEvent.TrackSubscribed, (t: RemoteTrack, _pub, p: RemoteParticipant) => {
-        if (t.kind === Track.Kind.Audio) this.streams.set(p.identity, new MediaStream([t.mediaStreamTrack]))
+        if (t.kind === Track.Kind.Audio) this.streams.set(memberIdOf(p.identity), new MediaStream([t.mediaStreamTrack]))
         change()
       })
       .on(RoomEvent.TrackUnsubscribed, (t: RemoteTrack, _pub, p: RemoteParticipant) => {
-        if (t.kind === Track.Kind.Audio) this.streams.delete(p.identity)
+        if (t.kind === Track.Kind.Audio) this.streams.delete(memberIdOf(p.identity))
         change()
       })
       .on(RoomEvent.ParticipantConnected, change)
       .on(RoomEvent.ParticipantDisconnected, (p: RemoteParticipant) => {
-        this.streams.delete(p.identity)
+        this.streams.delete(memberIdOf(p.identity))
         change()
       })
       .on(RoomEvent.TrackMuted, change)
@@ -86,7 +90,7 @@ export class SfuCall {
 
   peers(): CallPeer[] {
     return this.members.map((id) => {
-      const p = this.lk.remoteParticipants.get(id)
+      const p = [...this.lk.remoteParticipants.values()].find((x) => memberIdOf(x.identity) === id)
       const pub = p?.getTrackPublication(Track.Source.Microphone)
       return {
         id,
@@ -95,6 +99,21 @@ export class SfuCall {
         stream: this.streams.get(id) ?? null,
       }
     })
+  }
+
+  /**
+   * 음성 서버엔 붙어 있는데 방 사람 목록엔 없는 사람 수 (보안: 방 코드를 알고 목록에 안 보이게 몰래 듣는 사람을 화면에 드러냄).
+   * 같은 접속 번호로 둘이 붙어 있어도 하나는 여기로 센다
+   */
+  strangers(): number {
+    const seen = new Set<string>()
+    let n = 0
+    for (const p of this.lk.remoteParticipants.values()) {
+      const id = memberIdOf(p.identity)
+      if (!this.members.includes(id) || seen.has(id)) n++
+      seen.add(id)
+    }
+    return n
   }
 
   get mic(): boolean {
