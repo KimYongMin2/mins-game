@@ -49,7 +49,12 @@ export const alive = (s: EngineState) => s.players.flatMap((_, i) => (s.left[i] 
 
 export function createEngine(opts: { now: number; seed: number; players: Player[] }): EngineState {
   const rng = createRng(opts.seed)
-  const starters = WORDS.filter((w) => [...w].length >= 2 && [...w].length <= 3)
+  // 첫 낱말: 이어 갈 낱말이 많은 글자로 끝나는 것만 (처음에 '펭귄'이 나와 '귄'으로 시작할 말이 없었음)
+  const starters = WORDS.filter((w) => {
+    if ([...w].length < 2 || [...w].length > 3) return false
+    const heads = initialVariants([...w].at(-1)!)
+    return WORDS.filter((x) => x !== w && heads.includes([...x][0])).length >= 2
+  })
   const first = starters[Math.floor(rng.next() * starters.length)]
   // 순서는 자리 섞어서 (첫 사람 무작위)
   const order = opts.players.map((_, i) => i)

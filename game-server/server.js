@@ -9160,7 +9160,11 @@ function addLog(s, kind, player, text) {
 const alive = (s) => s.players.flatMap((_, i) => s.left[i] || s.out.includes(i) ? [] : [i]);
 function createEngine$1(opts) {
 	const rng = createRng(opts.seed);
-	const starters = WORDS.filter((w) => [...w].length >= 2 && [...w].length <= 3);
+	const starters = WORDS.filter((w) => {
+		if ([...w].length < 2 || [...w].length > 3) return false;
+		const heads = initialVariants([...w].at(-1));
+		return WORDS.filter((x) => x !== w && heads.includes([...x][0])).length >= 2;
+	});
 	const first = starters[Math.floor(rng.next() * starters.length)];
 	const order = opts.players.map((_, i) => i);
 	for (let i = order.length - 1; i > 0; i--) {
