@@ -69,20 +69,41 @@
 .dd-players__left { opacity: 0.45; text-decoration: line-through; }
 .dd-players__me { outline: 2px solid color-mix(in srgb, var(--brand) 60%, transparent); }
 
-.dd-board { position: relative; }
+/* 그림판 칸: 4:3, 폰 세로 화면에서 채팅이 안 밀리게 높이도 제한. 그림판과 도형 미리 보기 판을 겹침 */
+.dd-board {
+  position: relative;
+  width: min(100%, calc(52dvh * 4 / 3));
+  aspect-ratio: 4 / 3;
+  margin: 0 auto;
+}
 .dd-canvas {
+  position: absolute;
+  inset: 0;
   display: block;
   width: 100%;
-  aspect-ratio: 4 / 3;
-  /* 폰 세로 화면에서 채팅이 안 밀리게 높이도 제한 */
-  max-height: 52dvh;
-  object-fit: contain;
+  height: 100%;
   background: #fff;
   border: 3px solid #1c1748;
   border-radius: 2px;
   touch-action: none;
+  box-sizing: border-box;
 }
 .dd-canvas--drawing { cursor: crosshair; border-color: var(--brand); }
+.dd-canvas--preview { background: transparent; border-color: transparent; pointer-events: none; }
+
+.dd-tools__kinds { display: flex; flex-wrap: wrap; gap: 4px; }
+.dd-tool {
+  min-height: 36px;
+  padding: 0 10px;
+  border: 2px solid var(--hair);
+  border-radius: 2px;
+  background: var(--card);
+  color: var(--ink);
+  font-weight: 700;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+.dd-tool--on { border-color: var(--brand); background: color-mix(in srgb, var(--brand) 22%, var(--card)); }
 
 .dd-choose {
   position: absolute;
@@ -102,8 +123,8 @@
 .dd-tools__colors,
 .dd-tools__row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 .dd-swatch {
-  width: 32px;
-  height: 32px;
+  width: 28px;
+  height: 28px;
   border: 2px solid var(--hair-strong, rgba(0, 0, 0, 0.2));
   border-radius: 2px;
   padding: 0;

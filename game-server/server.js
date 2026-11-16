@@ -5651,6 +5651,8 @@ function ranksOf$3(s) {
 //#region src/games/doodle/play/ink.ts
 /** 한 판에 쌓는 점 수 제한 (너무 크면 받는 폰이 느려짐) */
 const MAX_POINTS = 4e4;
+/** 한 판 채우기 횟수 제한 (다시 그릴 때마다 채우기를 다시 해서) */
+const MAX_FILLS = 60;
 function applyOps(strokes, ops) {
 	let out = strokes;
 	for (const o of ops) if (o.op === "x") out = [];
@@ -5659,10 +5661,11 @@ function applyOps(strokes, ops) {
 		id: o.id,
 		c: o.c,
 		w: o.w,
-		p: o.p
+		p: o.p,
+		...o.k && o.k !== "p" ? { k: o.k } : {}
 	}];
 	else if (o.op === "a") {
-		const i = out.findIndex((s) => s.id === o.id);
+		const i = out.findIndex((s) => s.id === o.id && (s.k ?? "p") === "p");
 		if (i >= 0) out = out.map((s, k) => k === i ? {
 			...s,
 			p: [...s.p, ...o.p]
@@ -5671,6 +5674,14 @@ function applyOps(strokes, ops) {
 	return out;
 }
 const pointCount = (strokes) => strokes.reduce((n, s) => n + s.p.length / 2, 0);
+/** 종류마다 점 개수: 도형은 정확히 두 점, 채우기는 한 점 */
+const POINTS_OF = {
+	p: (n) => n >= 2,
+	l: (n) => n === 4,
+	r: (n) => n === 4,
+	e: (n) => n === 4,
+	f: (n) => n === 2
+};
 /** 받은 묶음 검사 (그리는 사람이 보낸 것만 쓰지만 모양도 확인). 이상하면 null */
 function readOps(x) {
 	if (!Array.isArray(x) || x.length > 200) return null;
@@ -5679,14 +5690,18 @@ function readOps(x) {
 	for (const o of x) {
 		if (!o || typeof o !== "object") return null;
 		if (o.op === "x" || o.op === "u") out.push({ op: o.op });
-		else if (o.op === "s" && Number.isInteger(o.id) && typeof o.c === "string" && /^#[0-9a-f]{6}$/.test(o.c) && typeof o.w === "number" && o.w > 0 && o.w <= 40 && pts(o.p)) out.push({
-			op: "s",
-			id: o.id,
-			c: o.c,
-			w: o.w,
-			p: o.p
-		});
-		else if (o.op === "a" && Number.isInteger(o.id) && pts(o.p)) out.push({
+		else if (o.op === "s" && Number.isInteger(o.id) && typeof o.c === "string" && /^#[0-9a-f]{6}$/.test(o.c) && typeof o.w === "number" && o.w > 0 && o.w <= 40 && pts(o.p)) {
+			const k = o.k ?? "p";
+			if (!(k in POINTS_OF) || !POINTS_OF[k](o.p.length)) return null;
+			out.push({
+				op: "s",
+				id: o.id,
+				c: o.c,
+				w: o.w,
+				p: o.p,
+				...k !== "p" ? { k } : {}
+			});
+		} else if (o.op === "a" && Number.isInteger(o.id) && pts(o.p)) out.push({
 			op: "a",
 			id: o.id,
 			p: o.p
@@ -5695,7 +5710,7 @@ function readOps(x) {
 	}
 	return out;
 }
-const tooBig = (strokes) => pointCount(strokes) > MAX_POINTS;
+const tooBig = (strokes) => pointCount(strokes) > MAX_POINTS || strokes.filter((s) => s.k === "f").length > MAX_FILLS;
 //#endregion
 //#region src/games/doodle/play/view.ts
 function viewFor(s, viewerId) {
