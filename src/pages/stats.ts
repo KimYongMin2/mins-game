@@ -5,6 +5,7 @@ import { loadRecord as armwrestle } from '../games/armwrestle/records'
 import { loadRecord as artillery } from '../games/artillery/records'
 import { loadRecord as batting } from '../games/batting/records'
 import { loadRecord as bomb } from '../games/bomb/records'
+import { loadRecord as doodle } from '../games/doodle/records'
 import { loadRecord as fight } from '../games/fight/records'
 import { loadRecord as memory } from '../games/memory/records'
 import { loadRecord as numbaseball } from '../games/numbaseball/records'
@@ -67,6 +68,11 @@ export function loadStats(): GameStat[] {
     safe('bomb', () => {
       const r = bomb()
       return group('bomb', r.bot, r.pvp)
+    }),
+    // 그림 맞히기: 친구 대전만 (최고 점수도)
+    safe('doodle', () => {
+      const r = doodle()
+      return { id: 'doodle', played: r.games, bot: null, pvp: r.games ? `${tally(r)} · 최고 ${r.best}점` : null }
     }),
     safe('nunchi', () => {
       const r = nunchi()
