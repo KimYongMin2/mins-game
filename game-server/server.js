@@ -4019,6 +4019,671 @@ function pickWeighted(rng, weights) {
 	return entries[entries.length - 1][0];
 }
 //#endregion
+//#region src/games/armwrestle/constants.ts
+/** 한 판 최대 시간. 끝나면 더 넘긴 쪽이 이김 */
+const ROUND_MS = 15e3;
+/** 판 시작 전 3·2·1 */
+const COUNTDOWN_MS$4 = 2400;
+/** 판 결과 보여주기 */
+const ROUND_END_MS = 1800;
+/** 경기가 끝난 뒤 결과 화면으로 넘어가기까지 */
+const DONE_MS$12 = 1800;
+/** 연타전: 한 번 누를 때 넘어가는 양 */
+const TAP_PUSH = .05;
+/** 봇 연타 속도(초당) */
+const BOT_TAP_RATE = {
+	normal: 5.5,
+	hard: 7.5
+};
+//#endregion
+//#region src/games/armwrestle/bot/armBot.ts
+/** 다음 연타까지 걸리는 시간 (평균 속도에서 ±30% 흔듦) */
+function botTapGap(rng, difficulty) {
+	return 1e3 / BOT_TAP_RATE[difficulty] * (.7 + rng.next() * .6);
+}
+const GRADE_WEIGHTS = {
+	normal: {
+		perfect: 10,
+		great: 30,
+		good: 35,
+		miss: 25
+	},
+	hard: {
+		perfect: 30,
+		great: 40,
+		good: 25,
+		miss: 5
+	}
+};
+function botGrade(rng, difficulty) {
+	return pickWeighted(rng, GRADE_WEIGHTS[difficulty]);
+}
+//#endregion
+//#region src/games/armwrestle/rules/timing.ts
+/** 과녁 한가운데에서 떨어진 정도(게이지 끝까지 = 1) 이내면 그 판정. 위에서부터 (처음 0.08/0.2/0.4는 너무 쉬워 반쯤으로 좁힘) */
+const GRADES = [
+	{
+		grade: "perfect",
+		within: .04,
+		push: .16
+	},
+	{
+		grade: "great",
+		within: .1,
+		push: .1
+	},
+	{
+		grade: "good",
+		within: .22,
+		push: .05
+	}
+];
+function pushOf(grade) {
+	return GRADES.find((g) => g.grade === grade)?.push ?? 0;
+}
+/** 당기기를 시작한 뒤 elapsed ms에서 몇 번째 지나감인지, 막대 위치(−1~1) */
+function markerAt(elapsed) {
+	const t = Math.max(0, elapsed);
+	const pass = Math.floor(t / 750);
+	const u = t % 750 / 750;
+	return {
+		pass,
+		x: pass % 2 === 0 ? -1 + 2 * u : 1 - 2 * u
+	};
+}
+/** 과녁 한가운데가 놓일 수 있는 범위 (−0.6 ~ 0.6) */
+const ZONE_RANGE = .6;
+/** zoneSeed로 정해지는 n번째 과녁(이번 판에서 n번 누른 뒤)의 위치. 같은 시드·번호면 늘 같다 */
+function zoneCenter(zoneSeed, n) {
+	return (createRng(zoneSeed + Math.imul(n + 1, 2654435769) >>> 0).next() * 2 - 1) * ZONE_RANGE;
+}
+/** 과녁이 center에 있을 때 elapsed에 누른 판정 */
+function gradeAt(elapsed, center) {
+	const { pass, x } = markerAt(elapsed);
+	const off = Math.abs(x - center);
+	return {
+		pass,
+		grade: GRADES.find((g) => off <= g.within)?.grade ?? "miss"
+	};
+}
+//#endregion
+//#region src/games/armwrestle/play/matchState.ts
+const COUNT_STEP_MS = COUNTDOWN_MS$4 / 3;
+function withSounds$2(state, ...names) {
+	let seq = state.soundSeq;
+	const added = names.map((name) => ({
+		id: ++seq,
+		name
+	}));
+	return {
+		...state,
+		sounds: [...state.sounds, ...added].slice(-12),
+		soundSeq: seq
+	};
+}
+function countdown$2(state) {
+	return withSounds$2({
+		...state,
+		phase: {
+			kind: "countdown",
+			until: state.now + COUNTDOWN_MS$4,
+			shown: 3
+		}
+	}, "count");
+}
+function createMatch$2(opts) {
+	return countdown$2({
+		now: opts.now,
+		seed: opts.seed,
+		event: opts.event,
+		difficulty: opts.difficulty,
+		controllers: opts.controllers ?? ["user", "bot"],
+		follow: opts.follow ?? false,
+		round: 1,
+		wins: [0, 0],
+		pos: 0,
+		shownPos: 0,
+		phase: {
+			kind: "countdown",
+			until: 0,
+			shown: 3
+		},
+		taps: [0, 0],
+		zoneSeed: 0,
+		shots: 0,
+		pressed: [-1, -1],
+		lastGrade: [null, null],
+		perfects: [0, 0],
+		botNextAt: 0,
+		sounds: [],
+		soundSeq: 0
+	});
+}
+const set = (pair, side, value) => side === 0 ? [value, pair[1]] : [pair[0], value];
+/** 위치를 옮기고, 끝까지 넘어가면 판을 끝낸다. side 쪽으로 amount만큼 */
+function push(state, side, amount) {
+	if (state.follow || state.phase.kind !== "pull" || amount <= 0) return state;
+	const pos = Math.max(-1, Math.min(1, state.pos + (side === 0 ? amount : -amount)));
+	const next = {
+		...state,
+		pos
+	};
+	if (pos >= 1) return endRound(next, 0);
+	if (pos <= -1) return endRound(next, 1);
+	return next;
+}
+function endRound(state, winner) {
+	const wins = winner === null ? state.wins : set(state.wins, winner, state.wins[winner] + 1);
+	const userSide = state.controllers.indexOf("user");
+	return withSounds$2({
+		...state,
+		wins,
+		phase: {
+			kind: "roundEnd",
+			winner,
+			until: state.now + ROUND_END_MS
+		}
+	}, winner === null ? "miss" : winner === userSide ? "roundWin" : "roundLose");
+}
+function afterRound(state) {
+	const champ = state.wins.findIndex((w) => w >= 2);
+	if (champ >= 0) {
+		const winner = champ;
+		const userSide = state.controllers.indexOf("user");
+		return withSounds$2({
+			...state,
+			phase: {
+				kind: "done",
+				winner,
+				until: state.now + DONE_MS$12
+			}
+		}, winner === userSide ? "win" : "lose");
+	}
+	return countdown$2({
+		...state,
+		round: state.round + 1,
+		pos: 0
+	});
+}
+/** 이번 판 과녁 시드를 새로 뽑는다 */
+function newZones(state) {
+	const rng = createRng(state.seed);
+	const zoneSeed = Math.floor(rng.next() * 2 ** 32);
+	return {
+		...state,
+		seed: rng.seed(),
+		zoneSeed,
+		shots: 0
+	};
+}
+function startPull(state) {
+	return withSounds$2({
+		...newZones(state),
+		pressed: [-1, -1],
+		lastGrade: [null, null],
+		botNextAt: state.now + 250,
+		phase: {
+			kind: "pull",
+			start: state.now,
+			until: state.now + ROUND_MS
+		}
+	}, "go");
+}
+/** 봇: 연타전은 정해진 간격으로 누르고, 타이밍전은 지나갈 때마다 가운데쯤 한 번 */
+function botAct(state) {
+	const { phase } = state;
+	if (phase.kind !== "pull") return state;
+	let s = state;
+	state.controllers.forEach((c, i) => {
+		if (c !== "bot" || s.phase.kind !== "pull") return;
+		const side = i;
+		const rng = createRng(s.seed);
+		if (s.event === "mash") while (s.phase.kind === "pull" && s.now >= s.botNextAt) {
+			const at = s.botNextAt;
+			s = push({
+				...s,
+				taps: set(s.taps, side, s.taps[side] + 1),
+				botNextAt: at + botTapGap(rng, s.difficulty)
+			}, side, TAP_PUSH);
+		}
+		else {
+			const pass = Math.floor((s.now - phase.start - 375) / 750);
+			if (pass > s.pressed[side]) {
+				const grade = botGrade(rng, s.difficulty);
+				s = applyGrade(s, side, pass, grade);
+			}
+		}
+		s = {
+			...s,
+			seed: rng.seed()
+		};
+	});
+	return s;
+}
+function applyGrade(state, side, pass, grade) {
+	const next = {
+		...state,
+		pressed: set(state.pressed, side, pass),
+		lastGrade: set(state.lastGrade, side, {
+			grade,
+			at: state.now
+		}),
+		perfects: grade === "perfect" ? set(state.perfects, side, state.perfects[side] + 1) : state.perfects
+	};
+	return push(side === state.controllers.indexOf("user") ? withSounds$2(next, grade) : next, side, pushOf(grade));
+}
+function tick$13(state) {
+	if (state.follow) {
+		const shownPos = state.shownPos + (state.pos - state.shownPos) * .3;
+		return {
+			...state,
+			shownPos: Math.abs(state.pos - shownPos) < .002 ? state.pos : shownPos
+		};
+	}
+	const next = advance$1(state);
+	return next.shownPos === next.pos ? next : {
+		...next,
+		shownPos: next.pos
+	};
+}
+function advance$1(state) {
+	const { phase, now } = state;
+	switch (phase.kind) {
+		case "countdown": {
+			if (now >= phase.until) return startPull(state);
+			const shown = Math.ceil((phase.until - now) / COUNT_STEP_MS);
+			return shown < phase.shown ? withSounds$2({
+				...state,
+				phase: {
+					...phase,
+					shown
+				}
+			}, "count") : state;
+		}
+		case "pull": {
+			const s = botAct(state);
+			if (s.phase.kind === "pull" && now >= s.phase.until) return endRound(s, s.pos > 0 ? 0 : s.pos < 0 ? 1 : null);
+			return s;
+		}
+		case "roundEnd": return now >= phase.until ? afterRound(state) : state;
+		case "done": return state;
+	}
+}
+function tap(state) {
+	if (state.event !== "mash" || state.phase.kind !== "pull") return state;
+	return push(withSounds$2({
+		...state,
+		taps: set(state.taps, 0, state.taps[0] + 1)
+	}, "tap"), 0, TAP_PUSH);
+}
+function press$1(state, at) {
+	const { phase } = state;
+	if (state.event !== "timing" || phase.kind !== "pull") return state;
+	const { pass, grade } = gradeAt(at - phase.start, zoneOf(state));
+	if (pass <= state.pressed[0]) return state;
+	return applyGrade({
+		...state,
+		shots: state.shots + 1
+	}, 0, pass, grade);
+}
+/** 타이밍전: 지금 내 과녁 위치 (−0.6 ~ 0.6) */
+function zoneOf(state) {
+	return zoneCenter(state.zoneSeed, state.shots);
+}
+function remoteTaps(state, total, side = 1) {
+	const added = total - state.taps[side];
+	if (added <= 0 || state.controllers[side] !== "remote") return state;
+	return push({
+		...state,
+		taps: set(state.taps, side, total)
+	}, side, added * TAP_PUSH);
+}
+function remotePress(state, pass, grade, side = 1) {
+	if (state.controllers[side] !== "remote" || state.phase.kind !== "pull" || pass <= state.pressed[side]) return state;
+	return applyGrade(state, side, pass, grade);
+}
+/** 친구: 방장 상태를 받아 따라간다. 단계가 바뀌면 그에 맞는 소리 */
+function sync(state, s) {
+	if (!state.follow || state.phase.kind === "done") return state;
+	const { now } = state;
+	const prev = state.phase;
+	const changed = prev.kind !== s.phase || state.round !== s.round;
+	let phase;
+	switch (s.phase) {
+		case "countdown": {
+			const shown = Math.max(1, Math.ceil(s.left / COUNT_STEP_MS));
+			phase = {
+				kind: "countdown",
+				until: now + s.left,
+				shown
+			};
+			break;
+		}
+		case "pull": {
+			const until = now + s.left;
+			phase = {
+				kind: "pull",
+				start: prev.kind === "pull" && !changed ? prev.start : until - ROUND_MS,
+				until
+			};
+			break;
+		}
+		case "roundEnd":
+			phase = {
+				kind: "roundEnd",
+				winner: s.winner,
+				until: now + s.left
+			};
+			break;
+		case "done": phase = {
+			kind: "done",
+			winner: s.winner ?? 0,
+			until: now + s.left
+		};
+	}
+	let next = {
+		...state,
+		round: s.round,
+		wins: s.wins,
+		pos: s.pos,
+		phase
+	};
+	if (s.foeGrade && s.foeGrade.pass > state.pressed[1]) next = {
+		...next,
+		pressed: set(next.pressed, 1, s.foeGrade.pass),
+		lastGrade: set(next.lastGrade, 1, {
+			grade: s.foeGrade.grade,
+			at: now
+		})
+	};
+	if (changed && s.phase === "pull") next = {
+		...newZones(next),
+		pressed: [-1, -1],
+		lastGrade: [null, null]
+	};
+	if (!changed) {
+		if (phase.kind === "countdown" && prev.kind === "countdown" && phase.shown < prev.shown) return withSounds$2(next, "count");
+		return next;
+	}
+	switch (s.phase) {
+		case "countdown": return withSounds$2(next, "count");
+		case "pull": return withSounds$2(next, "go");
+		case "roundEnd": return withSounds$2(next, s.winner === null ? "miss" : s.winner === 0 ? "roundWin" : "roundLose");
+		case "done": return withSounds$2(next, s.winner === 0 ? "win" : "lose");
+	}
+}
+function matchReducer$2(state, action) {
+	switch (action.type) {
+		case "tick": return tick$13({
+			...state,
+			now: action.now
+		});
+		case "tap": return tap(state);
+		case "press": return press$1(state, action.at);
+		case "remoteTaps": return remoteTaps(state, action.total, action.side);
+		case "remotePress": return remotePress(state, action.pass, action.grade, action.side);
+		case "sync": return sync(state, action.sync);
+	}
+}
+/** 지금 단계가 끝나기까지 남은 시간 */
+function phaseLeft(state) {
+	return Math.max(0, state.phase.until - state.now);
+}
+//#endregion
+//#region src/games/armwrestle/play/pvp.ts
+/** 방장: 지금 상태를 친구에게 보낼 메시지 */
+function hostSync(state) {
+	const { phase } = state;
+	const winner = phase.kind === "roundEnd" || phase.kind === "done" ? phase.winner : null;
+	const g = state.lastGrade[0];
+	return {
+		t: "sync",
+		round: state.round,
+		wins: state.wins,
+		pos: state.pos,
+		phase: phase.kind,
+		left: phaseLeft(state),
+		winner: winner === null ? null : winner === 0 ? "host" : "guest",
+		hostGrade: g && state.pressed[0] >= 0 ? {
+			pass: state.pressed[0],
+			grade: g.grade
+		} : null
+	};
+}
+/** 방장: 단계나 판이 바뀌었으면 바로 보낸다 (그 밖엔 0.1초마다) */
+function phaseChanged(prev, next) {
+	return prev.phase.kind !== next.phase.kind || prev.round !== next.round;
+}
+/** 서버 심판: 받는 사람에게 보낼 상태 (친구에겐 예전 방장 상태 그대로, 방장에겐 상대 = 친구 판정) */
+function serverSync(state, to) {
+	const msg = hostSync(state);
+	if (to === "guest" || msg.t !== "sync") return msg;
+	const g = state.lastGrade[1];
+	return {
+		...msg,
+		hostGrade: g && state.pressed[1] >= 0 ? {
+			pass: state.pressed[1],
+			grade: g.grade
+		} : null
+	};
+}
+//#endregion
+//#region src/shared/art3d/animalKinds.ts
+/** 고르지 않은 사람·봇은 아무도 안 고른 동물을 이 순서로 받는다 */
+const ANIMALS = [
+	"bear",
+	"cat",
+	"fox",
+	"rabbit",
+	"panda",
+	"dog",
+	"pig",
+	"frog",
+	"tiger",
+	"lion",
+	"eagle",
+	"seagull",
+	"penguin",
+	"dino",
+	"wolf",
+	"elephant"
+];
+/** 모르는 값(옛 저장값·남이 보낸 이상한 값)은 버린다 */
+function asAnimal(x) {
+	return typeof x === "string" && ANIMALS.includes(x) ? x : void 0;
+}
+const HATS = [
+	"none",
+	"cap",
+	"crown",
+	"party",
+	"beanie",
+	"tophat"
+];
+const GLASSES = [
+	"none",
+	"round",
+	"sun",
+	"star"
+];
+const NECKS = [
+	"none",
+	"bow",
+	"scarf",
+	"tie"
+];
+const FURS = [
+	"base",
+	"light",
+	"dark"
+];
+const OUTFITS = ["shirt", "uniform"];
+const TINTS = [
+	"red",
+	"orange",
+	"yellow",
+	"green",
+	"sky",
+	"blue",
+	"navy",
+	"purple",
+	"pink",
+	"burgundy",
+	"black"
+];
+/** 등번호 0~99 */
+const clampNumber = (n) => {
+	const x = Math.floor(Number(n));
+	return Number.isFinite(x) ? Math.min(99, Math.max(0, x)) : 7;
+};
+const pick$3 = (list, x, fallback) => typeof x === "string" && list.includes(x) ? x : fallback;
+/** 방으로 보낼 짧은 글자: '동물.모자.안경.목.털.옷.색.번호' */
+const encodeLook = (l) => [
+	l.animal,
+	l.hat,
+	l.glasses,
+	l.neck,
+	l.fur,
+	l.outfit,
+	l.tint,
+	l.number
+].join(".");
+/** 받은 글자·저장값 → 캐릭터 (모르는 값은 버리거나 '없음') */
+function decodeLook(x) {
+	if (typeof x !== "string" || x.length > 48) return void 0;
+	const [a, hat, glasses, neck, fur, outfit, tint, number] = x.split(".");
+	const animal = asAnimal(a);
+	if (!animal) return void 0;
+	return {
+		animal,
+		hat: pick$3(HATS, hat, "none"),
+		glasses: pick$3(GLASSES, glasses, "none"),
+		neck: pick$3(NECKS, neck, "none"),
+		fur: pick$3(FURS, fur, "base"),
+		outfit: pick$3(OUTFITS, outfit, "shirt"),
+		tint: pick$3(TINTS, tint, "red"),
+		number: number === void 0 ? 7 : clampNumber(number)
+	};
+}
+//#endregion
+//#region src/server/referees/common.ts
+const clean = (v, max) => typeof v === "string" ? [...v.replace(/[\u0000-\u001f\u007f]/g, "")].slice(0, max).join("").trim() : "";
+function readLook(x) {
+	if (!x || typeof x !== "object") return void 0;
+	try {
+		return decodeLook(encodeLook(x));
+	} catch {
+		return;
+	}
+}
+/** 사람은 방에 있는 사람만 한 번씩, 봇은 'bot0'~'bot15'. 사람 이름은 서버가 아는 닉네임으로 */
+function readPlayers(x, ctx, min, max) {
+	if (!Array.isArray(x) || x.length < min || x.length > max) return null;
+	const members = new Map(ctx.members().map((m) => [m.id, m]));
+	const seen = /* @__PURE__ */ new Set();
+	const out = [];
+	for (const p of x) {
+		if (!p || typeof p !== "object" || typeof p.id !== "string" || seen.has(p.id)) return null;
+		seen.add(p.id);
+		const avatar = readLook(p.avatar);
+		const member = members.get(p.id);
+		if (member) out.push({
+			id: p.id,
+			name: member.nickname,
+			kind: "remote",
+			avatar
+		});
+		else if (/^bot\d{1,2}$/.test(p.id)) out.push({
+			id: p.id,
+			name: clean(p.name, 20) || "봇",
+			kind: "bot",
+			avatar
+		});
+		else return null;
+	}
+	if (!out.some((p) => members.get(p.id)?.role === "host")) return null;
+	return out;
+}
+/** 팀: 없으면 null(개인전), 모양이 틀리면 undefined */
+function readTeams(x, n) {
+	if (x === null || x === void 0) return null;
+	if (!Array.isArray(x) || x.length !== n || !x.every((t) => t === 0 || t === 1)) return void 0;
+	return x;
+}
+const serverSeed = () => crypto.getRandomValues(/* @__PURE__ */ new Uint32Array(1))[0];
+//#endregion
+//#region src/server/referees/armwrestle.ts
+const EVENTS = ["mash", "timing"];
+const GRADE_NAMES = [
+	"perfect",
+	"great",
+	"good",
+	"miss"
+];
+const SYNC_MS = 100;
+function armwrestleReferee(setup, ctx) {
+	const o = setup ?? {};
+	const members = ctx.members();
+	const host = members.find((m) => m.role === "host");
+	const guest = members.find((m) => m.role === "guest");
+	if (!host || !guest || !EVENTS.includes(o.event)) return null;
+	let s = createMatch$2({
+		now: ctx.now(),
+		seed: serverSeed(),
+		event: o.event,
+		difficulty: "normal",
+		controllers: ["remote", "remote"]
+	});
+	let sentAt = -Infinity;
+	let doneAt = null;
+	const send = () => {
+		ctx.sendTo(host.id, serverSync(s, "host"));
+		ctx.sendTo(guest.id, serverSync(s, "guest"));
+		sentAt = s.now;
+	};
+	const step = (next) => {
+		const prev = s;
+		s = next;
+		if (phaseChanged(prev, s) || s.now - sentAt >= SYNC_MS) send();
+		if (doneAt === null && s.phase.kind === "done") doneAt = s.now;
+	};
+	send();
+	return {
+		input(from, msg) {
+			const m = msg ?? {};
+			if (m.t === "sync") return true;
+			if (m.t !== "taps" && m.t !== "press") return false;
+			const side = from === host.id ? 0 : from === guest.id ? 1 : null;
+			if (side === null) return true;
+			const now = ctx.now();
+			const ticked = matchReducer$2(s, {
+				type: "tick",
+				now: Math.max(now, s.now)
+			});
+			if (m.t === "taps" && Number.isInteger(m.total) && m.total >= 0 && m.total < 1e5) step(matchReducer$2(ticked, {
+				type: "remoteTaps",
+				total: m.total,
+				side
+			}));
+			else if (m.t === "press" && Number.isInteger(m.pass) && GRADE_NAMES.includes(m.grade)) step(matchReducer$2(ticked, {
+				type: "remotePress",
+				pass: m.pass,
+				grade: m.grade,
+				side
+			}));
+			return true;
+		},
+		tick(now) {
+			step(matchReducer$2(s, {
+				type: "tick",
+				now: Math.max(now, s.now)
+			}));
+		},
+		leave() {},
+		finished: () => doneAt !== null && s.now - doneAt > 4e3
+	};
+}
+//#endregion
 //#region src/shared/team/teams.ts
 /** 살아 있는 사람이 모두 한 팀이면 그 팀, 아니면 null (아무도 없으면 null) */
 function lastTeam(alive, teams) {
@@ -4620,150 +5285,6 @@ function viewChanged$6(a, b) {
 	const tb = b.tanks[b.turn];
 	return ta.x !== tb.x || ta.angle !== tb.angle || ta.power !== tb.power;
 }
-//#endregion
-//#region src/shared/art3d/animalKinds.ts
-/** 고르지 않은 사람·봇은 아무도 안 고른 동물을 이 순서로 받는다 */
-const ANIMALS = [
-	"bear",
-	"cat",
-	"fox",
-	"rabbit",
-	"panda",
-	"dog",
-	"pig",
-	"frog",
-	"tiger",
-	"lion",
-	"eagle",
-	"seagull",
-	"penguin",
-	"dino",
-	"wolf",
-	"elephant"
-];
-/** 모르는 값(옛 저장값·남이 보낸 이상한 값)은 버린다 */
-function asAnimal(x) {
-	return typeof x === "string" && ANIMALS.includes(x) ? x : void 0;
-}
-const HATS = [
-	"none",
-	"cap",
-	"crown",
-	"party",
-	"beanie",
-	"tophat"
-];
-const GLASSES = [
-	"none",
-	"round",
-	"sun",
-	"star"
-];
-const NECKS = [
-	"none",
-	"bow",
-	"scarf",
-	"tie"
-];
-const FURS = [
-	"base",
-	"light",
-	"dark"
-];
-const OUTFITS = ["shirt", "uniform"];
-const TINTS = [
-	"red",
-	"orange",
-	"yellow",
-	"green",
-	"sky",
-	"blue",
-	"navy",
-	"purple",
-	"pink",
-	"burgundy",
-	"black"
-];
-/** 등번호 0~99 */
-const clampNumber = (n) => {
-	const x = Math.floor(Number(n));
-	return Number.isFinite(x) ? Math.min(99, Math.max(0, x)) : 7;
-};
-const pick$3 = (list, x, fallback) => typeof x === "string" && list.includes(x) ? x : fallback;
-/** 방으로 보낼 짧은 글자: '동물.모자.안경.목.털.옷.색.번호' */
-const encodeLook = (l) => [
-	l.animal,
-	l.hat,
-	l.glasses,
-	l.neck,
-	l.fur,
-	l.outfit,
-	l.tint,
-	l.number
-].join(".");
-/** 받은 글자·저장값 → 캐릭터 (모르는 값은 버리거나 '없음') */
-function decodeLook(x) {
-	if (typeof x !== "string" || x.length > 48) return void 0;
-	const [a, hat, glasses, neck, fur, outfit, tint, number] = x.split(".");
-	const animal = asAnimal(a);
-	if (!animal) return void 0;
-	return {
-		animal,
-		hat: pick$3(HATS, hat, "none"),
-		glasses: pick$3(GLASSES, glasses, "none"),
-		neck: pick$3(NECKS, neck, "none"),
-		fur: pick$3(FURS, fur, "base"),
-		outfit: pick$3(OUTFITS, outfit, "shirt"),
-		tint: pick$3(TINTS, tint, "red"),
-		number: number === void 0 ? 7 : clampNumber(number)
-	};
-}
-//#endregion
-//#region src/server/referees/common.ts
-const clean = (v, max) => typeof v === "string" ? [...v.replace(/[\u0000-\u001f\u007f]/g, "")].slice(0, max).join("").trim() : "";
-function readLook(x) {
-	if (!x || typeof x !== "object") return void 0;
-	try {
-		return decodeLook(encodeLook(x));
-	} catch {
-		return;
-	}
-}
-/** 사람은 방에 있는 사람만 한 번씩, 봇은 'bot0'~'bot15'. 사람 이름은 서버가 아는 닉네임으로 */
-function readPlayers(x, ctx, min, max) {
-	if (!Array.isArray(x) || x.length < min || x.length > max) return null;
-	const members = new Map(ctx.members().map((m) => [m.id, m]));
-	const seen = /* @__PURE__ */ new Set();
-	const out = [];
-	for (const p of x) {
-		if (!p || typeof p !== "object" || typeof p.id !== "string" || seen.has(p.id)) return null;
-		seen.add(p.id);
-		const avatar = readLook(p.avatar);
-		const member = members.get(p.id);
-		if (member) out.push({
-			id: p.id,
-			name: member.nickname,
-			kind: "remote",
-			avatar
-		});
-		else if (/^bot\d{1,2}$/.test(p.id)) out.push({
-			id: p.id,
-			name: clean(p.name, 20) || "봇",
-			kind: "bot",
-			avatar
-		});
-		else return null;
-	}
-	if (!out.some((p) => members.get(p.id)?.role === "host")) return null;
-	return out;
-}
-/** 팀: 없으면 null(개인전), 모양이 틀리면 undefined */
-function readTeams(x, n) {
-	if (x === null || x === void 0) return null;
-	if (!Array.isArray(x) || x.length !== n || !x.every((t) => t === 0 || t === 1)) return void 0;
-	return x;
-}
-const serverSeed = () => crypto.getRandomValues(/* @__PURE__ */ new Uint32Array(1))[0];
 //#endregion
 //#region src/server/referees/hostEngine.ts
 const HEARTBEAT_MS = 1e3;
@@ -10078,7 +10599,8 @@ const REFEREES = {
 	omok: omokReferee,
 	doodle: doodleReferee,
 	chosung: chosungReferee,
-	wordchain: wordchainReferee
+	wordchain: wordchainReferee,
+	armwrestle: armwrestleReferee
 };
 //#endregion
 //#region game-server/main.ts

@@ -1,4 +1,5 @@
 import type { RefereeFactory } from '../hub'
+import { armwrestleReferee } from './armwrestle'
 import { artilleryReferee } from './artillery'
 import { bombReferee } from './bomb'
 import { chosungReferee } from './chosung'
@@ -30,4 +31,5 @@ export const REFEREES: Record<string, RefereeFactory> = {
   doodle: doodleReferee,
   chosung: chosungReferee,
   wordchain: wordchainReferee,
+  armwrestle: armwrestleReferee,
 }

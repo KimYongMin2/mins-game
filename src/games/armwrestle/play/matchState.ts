@@ -82,10 +82,10 @@ export type MatchAction =
   | { type: 'tap' }
   /** 타이밍전: 내가 누름. at = 입력 시각 (event.timeStamp) */
   | { type: 'press'; at: number }
-  /** 방장: 친구가 지금까지 누른 총 횟수 */
-  | { type: 'remoteTaps'; total: number }
+  /** 방장: 친구가 지금까지 누른 총 횟수 (side = 누구 것, 기본 친구 1 — 서버 심판은 방장 0도) */
+  | { type: 'remoteTaps'; total: number; side?: Side }
   /** 방장: 친구의 타이밍 판정 */
-  | { type: 'remotePress'; pass: number; grade: Grade }
+  | { type: 'remotePress'; pass: number; grade: Grade; side?: Side }
   /** 친구: 방장이 보낸 상태 (내 쪽 기준으로 바꾼 것) */
   | { type: 'sync'; sync: Sync }
 
@@ -283,17 +283,17 @@ export function zoneOf(state: MatchState): number {
   return zoneCenter(state.zoneSeed, state.shots)
 }
 
-function remoteTaps(state: MatchState, total: number): MatchState {
-  const added = total - state.taps[1]
-  if (added <= 0 || state.controllers[1] !== 'remote') return state
-  const next = { ...state, taps: set(state.taps, 1, total) }
+function remoteTaps(state: MatchState, total: number, side: Side = 1): MatchState {
+  const added = total - state.taps[side]
+  if (added <= 0 || state.controllers[side] !== 'remote') return state
+  const next = { ...state, taps: set(state.taps, side, total) }
   // 판 사이에 누른 것은 세기만 한다
-  return push(next, 1, added * TAP_PUSH)
+  return push(next, side, added * TAP_PUSH)
 }
 
-function remotePress(state: MatchState, pass: number, grade: Grade): MatchState {
-  if (state.controllers[1] !== 'remote' || state.phase.kind !== 'pull' || pass <= state.pressed[1]) return state
-  return applyGrade(state, 1, pass, grade)
+function remotePress(state: MatchState, pass: number, grade: Grade, side: Side = 1): MatchState {
+  if (state.controllers[side] !== 'remote' || state.phase.kind !== 'pull' || pass <= state.pressed[side]) return state
+  return applyGrade(state, side, pass, grade)
 }
 
 /** 친구: 방장 상태를 받아 따라간다. 단계가 바뀌면 그에 맞는 소리 */
@@ -353,9 +353,9 @@ export function matchReducer(state: MatchState, action: MatchAction): MatchState
     case 'press':
       return press(state, action.at)
     case 'remoteTaps':
-      return remoteTaps(state, action.total)
+      return remoteTaps(state, action.total, action.side)
     case 'remotePress':
-      return remotePress(state, action.pass, action.grade)
+      return remotePress(state, action.pass, action.grade, action.side)
     case 'sync':
       return sync(state, action.sync)
   }

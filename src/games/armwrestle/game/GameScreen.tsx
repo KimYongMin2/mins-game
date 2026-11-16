@@ -1,4 +1,5 @@
 import { Suspense, lazy, useEffect, useReducer, useRef, useState } from 'react'
+import { REFEREE_FROM } from '../../../shared/online/hubProtocol'
 import { type Look, opponentLook, plainLook } from '../../../shared/art3d/animalKinds'
 import { canWebGL } from '../../../shared/art3d/webgl'
 import { loadLook } from '../../../shared/storage/avatar'
@@ -19,7 +20,7 @@ function armLooks(peerAvatar?: string): readonly [Look, Look] {
   return [mine, opponentLook(mine.animal, peerAvatar, 3)]
 }
 import { type MatchState, type MatchSummary, createMatch, matchReducer, phaseLeft, summarizeMatch, zoneOf } from '../play/matchState'
-import { type ArmMsg, guestActionOf, guestPressOut, hostActionOf, hostSync, phaseChanged } from '../play/pvp'
+import { type ArmMsg, guestActionOf, guestPressOut, hostActionOf, hostSync, phaseChanged, selfActionOf } from '../play/pvp'
 import { type InputKind, inputKindOf, loadLatency } from '../input/latency'
 import { GRADES, GRADE_LABEL, markerAt } from '../rules/timing'
 import { playSound } from '../sounds'
@@ -105,6 +106,8 @@ function Gauge({ state }: { state: MatchState }) {
 export function GameScreen({ event, difficulty, pvp, onFinish, onQuit }: Props) {
   const [use3D] = useState(canWebGL)
   const [looks] = useState(() => armLooks(pvp?.peerAvatar))
+  // 우리 게임 서버가 심판이면 방장도 친구처럼 상태를 받고 누른 것만 보낸다 (사용자 요청 2026-11-16)
+  const [server] = useState(() => !!pvp?.room.hasReferee?.('armwrestle'))
   const [state, dispatch] = useReducer(matchReducer, undefined, () =>
     createMatch({
       now: performance.now(),
@@ -112,7 +115,7 @@ export function GameScreen({ event, difficulty, pvp, onFinish, onQuit }: Props) 
       event,
       difficulty,
       controllers: ['user', pvp ? 'remote' : 'bot'],
-      follow: pvp?.room.role === 'guest',
+      follow: pvp?.room.role === 'guest' || server,
     }),
   )
   const done = state.phase.kind === 'done'
@@ -123,8 +126,9 @@ export function GameScreen({ event, difficulty, pvp, onFinish, onQuit }: Props) 
   useEffect(() => {
     if (!pvp) return
     const { room } = pvp
-    const toAction = room.role === 'host' ? hostActionOf : guestActionOf
-    const offMsg = room.onMessage((msg) => {
+    const toAction = server ? (room.role === 'host' ? selfActionOf : guestActionOf) : room.role === 'host' ? hostActionOf : guestActionOf
+    const offMsg = room.onMessage((msg, from) => {
+      if (server && from !== REFEREE_FROM) return
       const action = toAction(msg)
       if (action) dispatch(action)
     })
@@ -135,7 +139,7 @@ export function GameScreen({ event, difficulty, pvp, onFinish, onQuit }: Props) 
       offMsg()
       offPeer()
     }
-  }, [pvp])
+  }, [pvp, server])
 
   // 친구 대전: 방장은 0.1초마다 상태를, 친구는 누른 횟수가 바뀌었으면 보낸다
   useEffect(() => {
@@ -143,14 +147,14 @@ export function GameScreen({ event, difficulty, pvp, onFinish, onQuit }: Props) 
     let sentTaps = 0
     const id = setInterval(() => {
       const s = stateRef.current
-      if (pvp.room.role === 'host') pvp.room.send(hostSync(s))
+      if (pvp.room.role === 'host' && !server) pvp.room.send(hostSync(s))
       else if (s.taps[0] !== sentTaps) {
         sentTaps = s.taps[0]
         pvp.room.send({ t: 'taps', total: sentTaps })
       }
     }, SYNC_MS)
     return () => clearInterval(id)
-  }, [pvp])
+  }, [pvp, server])
 
   // 친구 대전: 방장은 단계가 바뀌면 바로, 친구는 타이밍 판정을 바로 보낸다
   const sentRef = useRef(state)
@@ -158,13 +162,13 @@ export function GameScreen({ event, difficulty, pvp, onFinish, onQuit }: Props) 
     if (!pvp) return
     const prev = sentRef.current
     sentRef.current = state
-    if (pvp.room.role === 'host') {
+    if (pvp.room.role === 'host' && !server) {
       if (phaseChanged(prev, state)) pvp.room.send(hostSync(state))
     } else {
       const msg = guestPressOut(prev, state)
       if (msg) pvp.room.send(msg)
     }
-  }, [pvp, state])
+  }, [pvp, state, server])
 
   const playedRef = useRef(0)
   useEffect(() => {

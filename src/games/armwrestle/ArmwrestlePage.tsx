@@ -119,7 +119,8 @@ export function ArmwrestlePage() {
 
   function connected(room: Room<ArmMsg>, peer: Peer) {
     // 되도록 기기끼리 직접 (WebRTC). 친구가 누른 게 방장에게 빨리 가야 공평해서
-    setPvp({ room: withDirectLink(room), peer })
+    // 우리 게임 서버가 심판이면 서버를 거침 (직접 연결 안 씀)
+    setPvp({ room: room.hasReferee?.('armwrestle') ? room : withDirectLink(room), peer })
     setPeerGone(false)
     goRef.current = false
     listeningRef.current = false
@@ -130,6 +131,8 @@ export function ArmwrestlePage() {
   function startPvp(room: Room<ArmMsg>) {
     goRef.current = false
     const { event } = recordRef.current
+    // 우리 게임 서버가 있으면 위치·시간·판을 서버가 (시작 메시지보다 먼저)
+    if (room.hasReferee?.('armwrestle')) room.startReferee?.('armwrestle', { event })
     room.send({ t: 'start', event })
     setScreen({ kind: 'pvp-game', key: Date.now(), event })
   }

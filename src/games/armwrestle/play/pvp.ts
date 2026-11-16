@@ -67,6 +67,25 @@ export function guestActionOf(msg: ArmMsg): MatchAction | null {
   }
 }
 
+/**
+ * 서버 심판(우리 게임 서버)일 때 방장 쪽: 서버가 보낸 상태를 그대로(방장 = 0, 뒤집지 않음). hostGrade 자리엔 서버가 친구 판정을 넣어 보냄
+ */
+export function selfActionOf(msg: ArmMsg): MatchAction | null {
+  if (msg.t !== 'sync') return null
+  return {
+    type: 'sync',
+    sync: { round: msg.round, wins: [msg.wins[0], msg.wins[1]], pos: msg.pos, phase: msg.phase, left: msg.left, winner: msg.winner === null ? null : msg.winner === 'host' ? 0 : 1, foeGrade: msg.hostGrade },
+  }
+}
+
+/** 서버 심판: 받는 사람에게 보낼 상태 (친구에겐 예전 방장 상태 그대로, 방장에겐 상대 = 친구 판정) */
+export function serverSync(state: MatchState, to: 'host' | 'guest'): ArmMsg {
+  const msg = hostSync(state)
+  if (to === 'guest' || msg.t !== 'sync') return msg
+  const g = state.lastGrade[1]
+  return { ...msg, hostGrade: g && state.pressed[1] >= 0 ? { pass: state.pressed[1], grade: g.grade } : null }
+}
+
 /** 방장: 친구 메시지 → 내 경기에 넣을 액션 */
 export function hostActionOf(msg: ArmMsg): MatchAction | null {
   if (msg.t === 'taps') return { type: 'remoteTaps', total: msg.total }

@@ -308,3 +308,45 @@ describe('다 같이 그리기 서버 심판', () => {
     expect(g.drawings!.filter((d) => d.length === 1)).toHaveLength(2)
   })
 })
+
+import { createMatch as createArm, matchReducer as armReducer, type MatchState as ArmState } from '../../games/armwrestle/play/matchState'
+import { guestActionOf as armGuest, selfActionOf as armSelf, type ArmMsg } from '../../games/armwrestle/play/pvp'
+import { armwrestleReferee } from './armwrestle'
+
+describe('팔씨름 서버 심판', () => {
+  it('연타전: 많이 누른 쪽이 이기고 두 폰이 같은 결과', () => {
+    const f = fakeCtx([{ id: 'H', role: 'host' }, { id: 'G', role: 'guest' }])
+    const inbox: Record<string, ArmMsg[]> = { H: [], G: [] }
+    f.ctx.sendTo = (k, m) => inbox[k].push(m as ArmMsg)
+    const ref = armwrestleReferee({ event: 'mash' }, f.ctx)!
+    expect(armwrestleReferee({ event: 'boxing' }, f.ctx)).toBeNull()
+    let h: ArmState = createArm({ now: f.now, seed: 1, event: 'mash', difficulty: 'normal', controllers: ['user', 'remote'], follow: true })
+    let g: ArmState = createArm({ now: f.now, seed: 2, event: 'mash', difficulty: 'normal', controllers: ['user', 'remote'], follow: true })
+    let hostTaps = 0
+    let guestTaps = 0
+    for (let i = 0; i < 2000 && (h.phase.kind !== 'done' || g.phase.kind !== 'done'); i++) {
+      f.advance(50)
+      ref.tick(f.now)
+      // 방장이 친구보다 두 배 빨리 누름 (폰이 보낸 sync는 서버가 버림)
+      hostTaps += 2
+      guestTaps += 1
+      ref.input('H', { t: 'taps', total: hostTaps })
+      ref.input('G', { t: 'taps', total: guestTaps })
+      expect(ref.input('G', { t: 'sync', pos: 1 })).toBe(true)
+      for (const m of inbox.H.splice(0)) {
+        const a = armSelf(m)
+        if (a) h = armReducer(h, a)
+      }
+      for (const m of inbox.G.splice(0)) {
+        const a = armGuest(m)
+        if (a) g = armReducer(g, a)
+      }
+      h = armReducer(h, { type: 'tick', now: f.now })
+      g = armReducer(g, { type: 'tick', now: f.now })
+    }
+    expect(h.phase.kind).toBe('done')
+    expect(g.phase.kind).toBe('done')
+    expect(h.phase.kind === 'done' && h.phase.winner).toBe(0)
+    expect(g.phase.kind === 'done' && g.phase.winner).toBe(1)
+  })
+})
