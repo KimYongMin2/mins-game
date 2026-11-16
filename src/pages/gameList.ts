@@ -18,6 +18,8 @@ export type GameEntry = {
   howto: readonly string[]
   /** 봇이 없는 친구 대전 게임 (그림 맞히기) — 메인의 [혼자 연습]·[봇이랑 연습]을 안 보임 */
   noBots?: boolean
+  /** 봇 대신 혼자 하기가 있는 게임 (초성 퀴즈) — 게임 창 연습 버튼 이름 */
+  practiceLabel?: string
 }
 
 export const GAMES: GameEntry[] = [
@@ -105,6 +107,19 @@ export const GAMES: GameEntry[] = [
     noBots: true,
     colors: ['#fbbf24', '#db2777'],
     howto: ['그릴 차례: 제시어 2개 중 하나를 골라 60초 동안 그려요 (색·굵기·지우개·되돌리기)', '맞힐 차례: 채팅으로 정답 입력, 마지막 20초엔 보기 4개 (한 번만, 점수 절반)', '빨리 맞힐수록 점수가 높고, 그린 사람도 맞힌 사람 1명당 3점', '모두 한 번씩(3명 이하면 두 번) 그리면 총점 1등이 우승'],
+  },
+  {
+    id: 'chosung',
+    title: '초성 퀴즈',
+    description: 'ㄱㄹ → 기린! 초성 보고 먼저 맞히기',
+    path: '/games/chosung',
+    ready: true,
+    play: 'pvp',
+    players: '2~8인',
+    icon: '🔤',
+    colors: ['#38bdf8', '#4338ca'],
+    practiceLabel: '혼자 하기',
+    howto: ['초성과 갈래(동물·음식…)를 보고 채팅으로 정답 입력', '한 문제 20초, 10초가 지나면 글자 하나 힌트 (그 뒤 점수 절반)', '친구 대전은 먼저 맞힐수록 10·7·5·3·2점, 10문제 총점 1등 우승', '혼자 하기로 최고 점수 도전도 돼요'],
   },
   {
     id: 'nunchi',

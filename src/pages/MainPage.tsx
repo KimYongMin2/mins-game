@@ -349,7 +349,7 @@ export function MainPage({ nickname }: { nickname: string }) {
                         // 봇이 없는 게임(그림 맞히기)은 연습 버튼 없음 (사용자 요청)
                         sheet.game.noBots ? undefined : (
                           <button type="button" className="button pvp-lobby__big arc-practice" onClick={() => go(sheet.game, sheet.game.path)}>
-                            봇이랑 연습
+                            {sheet.game.practiceLabel ?? '봇이랑 연습'}
                           </button>
                         )
                       }

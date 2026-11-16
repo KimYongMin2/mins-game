@@ -3995,7 +3995,7 @@ const BARREL = 7.5;
 const COUNTDOWN_MS$3 = 1500;
 const TURN_MS$2 = 2e4;
 const BOOM_MS$1 = 1600;
-const DONE_MS$9 = 2500;
+const DONE_MS$10 = 2500;
 /** 봇이 생각하는 시간 */
 const BOT_THINK_MS$1 = [1200, 2400];
 //#endregion
@@ -4316,7 +4316,7 @@ function startSpots(rng, n) {
 	}
 	return spots;
 }
-function createEngine$7(opts) {
+function createEngine$8(opts) {
 	const rng = createRng(opts.seed);
 	const { land, terrain } = makeLand(rng);
 	const tanks = startSpots(rng, opts.players.length).map((x) => ({
@@ -4464,12 +4464,12 @@ function afterBoom$1(s) {
 		...s,
 		phase: {
 			kind: "done",
-			until: s.now + DONE_MS$9
+			until: s.now + DONE_MS$10
 		}
 	};
 	return startTurn$2(s, nextAlive$1(s, s.turn));
 }
-function drop$8(s, player) {
+function drop$9(s, player) {
 	if (!s.tanks[player].alive || s.phase.kind === "done") return s;
 	const next = {
 		...s,
@@ -4484,13 +4484,13 @@ function drop$8(s, player) {
 		...next,
 		phase: {
 			kind: "done",
-			until: s.now + DONE_MS$9
+			until: s.now + DONE_MS$10
 		}
 	};
 	if (s.phase.kind === "aim" && s.turn === player) return startTurn$2(next, nextAlive$1(next, player));
 	return next;
 }
-function tick$10(s) {
+function tick$11(s) {
 	const { phase, now } = s;
 	switch (phase.kind) {
 		case "countdown": return now >= phase.until ? startTurn$2(s, s.turn) : s;
@@ -4510,9 +4510,9 @@ function tick$10(s) {
 		case "done": return s;
 	}
 }
-function engineReducer$7(state, action) {
+function engineReducer$8(state, action) {
 	switch (action.type) {
-		case "tick": return tick$10({
+		case "tick": return tick$11({
 			...state,
 			now: action.now
 		});
@@ -4520,11 +4520,11 @@ function engineReducer$7(state, action) {
 		case "fire":
 			if (state.phase.kind !== "aim" || action.player !== state.turn || !state.tanks[action.player].alive) return state;
 			return launch(setAim(state, action.player, action.x, action.angle, action.power));
-		case "drop": return drop$8(state, action.player);
+		case "drop": return drop$9(state, action.player);
 	}
 }
 /** 사람별 등수 (1 = 우승). 끝나기 전이면 남은 사람은 모두 1 */
-function ranksOf$4(s) {
+function ranksOf$5(s) {
 	const ranks = s.players.map(() => 1);
 	let next = aliveIndexes$4(s).length + 1;
 	for (const group of [...s.out].reverse()) {
@@ -4563,7 +4563,7 @@ function toView$6(s) {
 		shot: phase.kind === "flight" ? phase.shot : null,
 		boom: phase.kind === "boom" ? phase.boom : null,
 		kills: s.kills,
-		ranks: ranksOf$4(s)
+		ranks: ranksOf$5(s)
 	};
 }
 /** 친구에게 바로 알려야 할 만큼 바뀌었는지 (차례인 사람이 움직이거나 겨누는 것도) */
@@ -4797,7 +4797,7 @@ function artilleryReferee(setup, ctx) {
 	const teams = readTeams(o.teams, players.length);
 	if (teams === void 0) return null;
 	return hostEngineReferee(ctx, {
-		state: createEngine$7({
+		state: createEngine$8({
 			now: ctx.now(),
 			seed: serverSeed(),
 			players,
@@ -4805,7 +4805,7 @@ function artilleryReferee(setup, ctx) {
 			friendlyFire: o.friendlyFire === true,
 			level: "normal"
 		}),
-		reduce: engineReducer$7,
+		reduce: engineReducer$8,
 		tick: (now) => ({
 			type: "tick",
 			now
@@ -4844,13 +4844,13 @@ const COUNTDOWN_MS$2 = 2400;
 /** 펑! 보여주기 */
 const BOOM_MS = 2200;
 /** 경기가 끝난 뒤 결과 화면으로 넘어가기까지 */
-const DONE_MS$8 = 2500;
+const DONE_MS$9 = 2500;
 /** 봇이 폭탄을 받고 넘기기까지 */
 const BOT_HOLD_MS = [350, 1500];
 //#endregion
 //#region src/games/bomb/play/engine.ts
 const within$4 = (rng, [min, max]) => min + rng.next() * (max - min);
-function createEngine$6(opts) {
+function createEngine$7(opts) {
 	return countdown$1({
 		now: opts.now,
 		seed: opts.seed,
@@ -4933,7 +4933,7 @@ function afterBoom(state) {
 		...state,
 		phase: {
 			kind: "done",
-			until: state.now + DONE_MS$8
+			until: state.now + DONE_MS$9
 		}
 	};
 	return countdown$1({
@@ -5008,7 +5008,7 @@ function pass(state, from, to) {
 		passes: state.passes.map((n, i) => i === from ? n + 1 : n)
 	};
 }
-function drop$7(state, player) {
+function drop$8(state, player) {
 	if (!state.alive[player] || state.phase.kind === "done") return state;
 	let next = eliminate(state, player);
 	const left = aliveIndexes$3(next);
@@ -5017,7 +5017,7 @@ function drop$7(state, player) {
 		flight: null,
 		phase: {
 			kind: "done",
-			until: state.now + DONE_MS$8
+			until: state.now + DONE_MS$9
 		}
 	};
 	if (next.holder === player || next.flight?.to === player || next.flight?.from === player) {
@@ -5033,7 +5033,7 @@ function drop$7(state, player) {
 	}
 	return next;
 }
-function tick$9(state) {
+function tick$10(state) {
 	const { phase, now } = state;
 	switch (phase.kind) {
 		case "countdown": return now >= phase.until ? startPlay(state) : state;
@@ -5044,14 +5044,14 @@ function tick$9(state) {
 		case "done": return state;
 	}
 }
-function engineReducer$6(state, action) {
+function engineReducer$7(state, action) {
 	switch (action.type) {
-		case "tick": return tick$9({
+		case "tick": return tick$10({
 			...state,
 			now: action.now
 		});
 		case "pass": return pass(state, action.from, action.to);
-		case "drop": return drop$7(state, action.player);
+		case "drop": return drop$8(state, action.player);
 	}
 }
 /** 순위: 1등(끝까지 남은 사람)부터. 끝나기 전이면 남은 사람들은 순서 없이 앞에 */
@@ -5101,13 +5101,13 @@ function bombReferee(setup, ctx) {
 	const teams = readTeams(o.teams, players.length);
 	if (teams === void 0) return null;
 	return hostEngineReferee(ctx, {
-		state: createEngine$6({
+		state: createEngine$7({
 			now: ctx.now(),
 			seed: serverSeed(),
 			players,
 			teams
 		}),
-		reduce: engineReducer$6,
+		reduce: engineReducer$7,
 		tick: (now) => ({
 			type: "tick",
 			now
@@ -5136,36 +5136,7 @@ function bombReferee(setup, ctx) {
 	});
 }
 //#endregion
-//#region src/games/doodle/constants.ts
-/** 시작 안내 */
-const INTRO_MS$5 = 2e3;
-/** 그릴 사람이 제시어 2개 중 고르는 시간 (넘으면 무작위) */
-const CHOOSE_MS$1 = 6e3;
-/** 그리는 시간 */
-const DRAW_MS = 6e4;
-/** 정답 보여주기 */
-const REVEAL_MS$1 = 4e3;
-const DONE_MS$7 = 2500;
-/** 맞힌 순서대로 점수 (그 뒤는 1점) */
-const GUESS_POINTS = [
-	10,
-	8,
-	6,
-	5,
-	4,
-	3,
-	2
-];
-/** 보기로 맞히면 점수 절반 (올림) */
-const CHOICE_RATE = .5;
-/** 제시어 보여주기 */
-const VOTE_WORD_MS = 3e3;
-const VOTE_DRAW_MS = 6e4;
-const VOTE_PICK_MS = 15e3;
-/** 판 결과(누가 그렸는지·표) 보여주기 */
-const VOTE_RESULT_MS = 6e3;
-//#endregion
-//#region src/games/doodle/words.ts
+//#region src/shared/words/koWords.ts
 const WORD_GROUPS = {
 	동물: [
 		"기린",
@@ -5435,6 +5406,318 @@ function groupOf(word) {
 }
 /** 정답 비교: 띄어쓰기·대소문자 무시 */
 const normalizeGuess = (s) => s.replace(/\s+/g, "").toLowerCase();
+const CHOSUNG = [
+	"ㄱ",
+	"ㄲ",
+	"ㄴ",
+	"ㄷ",
+	"ㄸ",
+	"ㄹ",
+	"ㅁ",
+	"ㅂ",
+	"ㅃ",
+	"ㅅ",
+	"ㅆ",
+	"ㅇ",
+	"ㅈ",
+	"ㅉ",
+	"ㅊ",
+	"ㅋ",
+	"ㅌ",
+	"ㅍ",
+	"ㅎ"
+];
+const BASE = 44032;
+const END = 55203;
+const isSyllable = (ch) => {
+	const c = ch.charCodeAt(0);
+	return c >= BASE && c <= END;
+};
+/** 한 글자 → [초성, 중성, 종성] 번호 (한글 글자가 아니면 null) */
+function splitSyllable(ch) {
+	if (!isSyllable(ch)) return null;
+	const n = ch.charCodeAt(0) - BASE;
+	return [
+		Math.floor(n / 588),
+		Math.floor(n % 588 / 28),
+		n % 28
+	];
+}
+/** 낱말의 초성 ('기린' → 'ㄱㄹ'). 한글이 아닌 글자는 그대로 */
+const chosungOf = (word) => [...word].map((ch) => splitSyllable(ch) ? CHOSUNG[splitSyllable(ch)[0]] : ch).join("");
+//#endregion
+//#region src/games/chosung/constants.ts
+const INTRO_MS$6 = 2e3;
+/** 한 문제 */
+const ASK_MS = 2e4;
+const REVEAL_MS$2 = 2500;
+const DONE_MS$8 = 2e3;
+/** 맞힌 순서대로 (그 뒤 1점). 힌트가 나온 뒤에 맞히면 절반(올림) */
+const POINTS = [
+	10,
+	7,
+	5,
+	3,
+	2
+];
+//#endregion
+//#region src/games/chosung/play/engine.ts
+function shuffle$2(rng, xs) {
+	const a = [...xs];
+	for (let i = a.length - 1; i > 0; i--) {
+		const j = Math.floor(rng.next() * (i + 1));
+		[a[i], a[j]] = [a[j], a[i]];
+	}
+	return a;
+}
+/** 문제: 갈래를 골고루 섞어서, 두 글자 이상 */
+function pickQuestions(rng, n = 10) {
+	return shuffle$2(rng, Object.entries(WORD_GROUPS).flatMap(([group, ws]) => ws.filter((w) => [...w].length >= 2).map((word) => ({
+		word,
+		group
+	})))).slice(0, n).map((x) => ({
+		...x,
+		hintAt: Math.floor(rng.next() * [...x.word].length)
+	}));
+}
+function addLog$1(s, kind, player, text) {
+	const seq = s.logSeq + 1;
+	return {
+		...s,
+		logSeq: seq,
+		log: [...s.log, {
+			seq,
+			kind,
+			player,
+			text
+		}].slice(-30)
+	};
+}
+const activePlayers$1 = (s) => s.players.flatMap((_, i) => s.left[i] ? [] : [i]);
+function createEngine$6(opts) {
+	const rng = createRng(opts.seed);
+	return {
+		now: opts.now,
+		seed: rng.seed(),
+		players: opts.players,
+		left: opts.players.map(() => false),
+		scores: opts.players.map(() => 0),
+		questions: pickQuestions(rng),
+		q: -1,
+		phase: {
+			kind: "intro",
+			until: opts.now + INTRO_MS$6
+		},
+		log: [],
+		logSeq: 0
+	};
+}
+const hintShown = (s) => s.phase.kind === "ask" && s.now >= s.phase.start + 1e4;
+function ask(s) {
+	const q = s.q + 1;
+	if (q >= s.questions.length || activePlayers$1(s).length === 0) return {
+		...s,
+		phase: {
+			kind: "done",
+			until: s.now + DONE_MS$8
+		}
+	};
+	return {
+		...s,
+		q,
+		phase: {
+			kind: "ask",
+			start: s.now,
+			until: s.now + ASK_MS,
+			guessed: []
+		}
+	};
+}
+function reveal$3(s) {
+	if (s.phase.kind !== "ask") return s;
+	return addLog$1({
+		...s,
+		phase: {
+			kind: "reveal",
+			until: s.now + REVEAL_MS$2,
+			guessed: s.phase.guessed
+		}
+	}, "system", null, `정답: ${s.questions[s.q].word}`);
+}
+function canGuess$1(s, player) {
+	return s.phase.kind === "ask" && !s.left[player] && !s.phase.guessed.some((g) => g.player === player);
+}
+function guess$1(s, player, text) {
+	const p = s.phase;
+	if (!canGuess$1(s, player) || p.kind !== "ask") return s;
+	const clean = [...text.replace(/[\u0000-\u001f\u007f]/g, "").trim()].slice(0, 20).join("");
+	if (!clean) return s;
+	if (normalizeGuess(clean) !== normalizeGuess(s.questions[s.q].word)) return addLog$1(s, "chat", player, clean);
+	const hinted = hintShown(s);
+	const base = POINTS[p.guessed.length] ?? 1;
+	const points = hinted ? Math.ceil(base / 2) : base;
+	const guessed = [...p.guessed, {
+		player,
+		points,
+		hinted
+	}];
+	let next = addLog$1({
+		...s,
+		scores: s.scores.map((v, i) => i === player ? v + points : v),
+		phase: {
+			...p,
+			guessed
+		}
+	}, "correct", player, `${s.players[player].name}님 정답! +${points}`);
+	if (activePlayers$1(next).every((i) => guessed.some((g) => g.player === i))) next = reveal$3(next);
+	return next;
+}
+function drop$7(s, player) {
+	if (s.left[player] || s.phase.kind === "done") return s;
+	const next = addLog$1({
+		...s,
+		left: s.left.map((l, i) => l || i === player)
+	}, "system", null, `${s.players[player].name}님이 나갔어요`);
+	if (activePlayers$1(next).length === 0) return {
+		...next,
+		phase: {
+			kind: "done",
+			until: s.now + DONE_MS$8
+		}
+	};
+	const p = next.phase;
+	if (p.kind === "ask" && activePlayers$1(next).every((i) => p.guessed.some((g) => g.player === i))) return reveal$3(next);
+	return next;
+}
+function tick$9(s) {
+	const { phase, now } = s;
+	if (phase.kind === "done" || now < phase.until) return s;
+	if (phase.kind === "ask") return reveal$3(s);
+	return ask(s);
+}
+function engineReducer$6(s, a) {
+	switch (a.type) {
+		case "tick": return tick$9({
+			...s,
+			now: a.now
+		});
+		case "guess": return guess$1(s, a.player, a.text);
+		case "drop": return drop$7(s, a.player);
+	}
+}
+const ranksOf$4 = (s) => s.scores.map((v) => 1 + s.scores.filter((o) => o > v).length);
+//#endregion
+//#region src/games/chosung/play/view.ts
+function viewFor$1(s, viewerId) {
+	const me = s.players.findIndex((p) => p.id === viewerId);
+	const p = s.phase;
+	const cur = s.q >= 0 ? s.questions[s.q] : null;
+	const hint = hintShown(s);
+	const iGot = (p.kind === "ask" || p.kind === "reveal") && p.guessed.some((g) => g.player === me);
+	let clue = null;
+	if (cur && (p.kind === "ask" || p.kind === "reveal")) {
+		const cho = [...chosungOf(cur.word)];
+		const syl = [...cur.word];
+		clue = cho.map((c, i) => hint && i === cur.hintAt ? syl[i] : c).join("");
+	}
+	return {
+		players: s.players.map(({ id, name }) => ({
+			id,
+			name
+		})),
+		left: s.left,
+		scores: s.scores,
+		phase: p.kind,
+		leftMs: Math.max(0, p.until - s.now),
+		q: Math.max(0, s.q),
+		total: s.questions.length,
+		clue,
+		group: cur && (p.kind === "ask" || p.kind === "reveal") ? cur.group : null,
+		hint,
+		answer: cur && (p.kind === "reveal" || iGot) ? cur.word : null,
+		canGuess: canGuess$1(s, me),
+		guessed: p.kind === "ask" || p.kind === "reveal" ? p.guessed : [],
+		log: s.log.slice(-15),
+		ranks: ranksOf$4(s)
+	};
+}
+function changeKey$1(s) {
+	return [
+		s.phase.kind,
+		s.q,
+		s.logSeq,
+		s.left.join(),
+		hintShown(s)
+	].join("|");
+}
+//#endregion
+//#region src/server/referees/chosung.ts
+function chosungReferee(setup, ctx) {
+	const players = readPlayers((setup ?? {}).players, ctx, 2, 8);
+	if (!players || players.some((p) => p.kind === "bot")) return null;
+	return hostEngineReferee(ctx, {
+		state: createEngine$6({
+			now: ctx.now(),
+			seed: serverSeed(),
+			players
+		}),
+		reduce: engineReducer$6,
+		tick: (now) => ({
+			type: "tick",
+			now
+		}),
+		toView: (s) => s,
+		changed: (a, b) => !a || changeKey$1(a) !== changeKey$1(b),
+		viewFor: (_v, key, s) => viewFor$1(s, key),
+		input: (s, from, m) => {
+			if (m.t !== "guess") return void 0;
+			const player = s.players.findIndex((p) => p.id === from);
+			return player >= 0 && typeof m.text === "string" && m.text.length <= 60 ? {
+				type: "guess",
+				player,
+				text: m.text
+			} : null;
+		},
+		drop: (s, key) => {
+			const player = s.players.findIndex((p) => p.id === key);
+			return player >= 0 ? {
+				type: "drop",
+				player
+			} : null;
+		},
+		done: (s) => s.phase.kind === "done",
+		nowOf: (s) => s.now
+	});
+}
+//#endregion
+//#region src/games/doodle/constants.ts
+/** 시작 안내 */
+const INTRO_MS$5 = 2e3;
+/** 그릴 사람이 제시어 2개 중 고르는 시간 (넘으면 무작위) */
+const CHOOSE_MS$1 = 6e3;
+/** 그리는 시간 */
+const DRAW_MS = 6e4;
+/** 정답 보여주기 */
+const REVEAL_MS$1 = 4e3;
+const DONE_MS$7 = 2500;
+/** 맞힌 순서대로 점수 (그 뒤는 1점) */
+const GUESS_POINTS = [
+	10,
+	8,
+	6,
+	5,
+	4,
+	3,
+	2
+];
+/** 보기로 맞히면 점수 절반 (올림) */
+const CHOICE_RATE = .5;
+/** 제시어 보여주기 */
+const VOTE_WORD_MS = 3e3;
+const VOTE_DRAW_MS = 6e4;
+const VOTE_PICK_MS = 15e3;
+/** 판 결과(누가 그렸는지·표) 보여주기 */
+const VOTE_RESULT_MS = 6e3;
 //#endregion
 //#region src/games/doodle/play/engine.ts
 function shuffle$1(rng, xs) {
@@ -9368,7 +9651,8 @@ const REFEREES = {
 	memory: memoryReferee,
 	fight: fightReferee,
 	omok: omokReferee,
-	doodle: doodleReferee
+	doodle: doodleReferee,
+	chosung: chosungReferee
 };
 //#endregion
 //#region game-server/main.ts

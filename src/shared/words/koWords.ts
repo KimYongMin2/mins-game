@@ -1,4 +1,4 @@
-// 제시어: 그리기 쉬운 우리말 낱말 (직접 고름). 보기 4개는 되도록 같은 갈래에서 고른다.
+// 쉬운 우리말 낱말 (직접 고름, 상표 이름 없음) — 그림 맞히기 제시어·초성 퀴즈 문제가 같이 씀. 보기·힌트용 갈래.
 export const WORD_GROUPS: Record<string, readonly string[]> = {
   동물: ['기린', '코끼리', '고양이', '강아지', '토끼', '거북이', '사자', '호랑이', '펭귄', '돼지', '원숭이', '뱀', '개구리', '오리', '닭', '말', '소', '양', '곰', '판다', '여우', '늑대', '다람쥐', '고슴도치', '하마', '악어', '얼룩말', '낙타', '캥거루', '부엉이', '독수리', '앵무새', '참새', '박쥐', '쥐', '사슴', '물개', '고래', '상어', '문어', '오징어', '게', '새우', '달팽이', '나비', '벌', '개미', '거미', '무당벌레', '잠자리'],
   음식: ['사과', '바나나', '포도', '수박', '딸기', '복숭아', '귤', '파인애플', '체리', '레몬', '당근', '옥수수', '감자', '고구마', '브로콜리', '버섯', '김밥', '라면', '떡볶이', '피자', '햄버거', '치킨', '아이스크림', '케이크', '도넛', '빵', '우유', '계란', '치즈', '사탕', '초콜릿', '쿠키', '핫도그', '만두', '주먹밥', '팝콘', '솜사탕', '붕어빵', '호떡'],
@@ -19,3 +19,43 @@ export function groupOf(word: string): string | null {
 
 /** 정답 비교: 띄어쓰기·대소문자 무시 */
 export const normalizeGuess = (s: string) => s.replace(/\s+/g, '').toLowerCase()
+
+const CHOSUNG = ['ㄱ', 'ㄲ', 'ㄴ', 'ㄷ', 'ㄸ', 'ㄹ', 'ㅁ', 'ㅂ', 'ㅃ', 'ㅅ', 'ㅆ', 'ㅇ', 'ㅈ', 'ㅉ', 'ㅊ', 'ㅋ', 'ㅌ', 'ㅍ', 'ㅎ']
+const JUNG = ['ㅏ', 'ㅐ', 'ㅑ', 'ㅒ', 'ㅓ', 'ㅔ', 'ㅕ', 'ㅖ', 'ㅗ', 'ㅘ', 'ㅙ', 'ㅚ', 'ㅛ', 'ㅜ', 'ㅝ', 'ㅞ', 'ㅟ', 'ㅠ', 'ㅡ', 'ㅢ', 'ㅣ']
+const BASE = 0xac00
+const END = 0xd7a3
+
+export const isSyllable = (ch: string) => {
+  const c = ch.charCodeAt(0)
+  return c >= BASE && c <= END
+}
+
+/** 한 글자 → [초성, 중성, 종성] 번호 (한글 글자가 아니면 null) */
+export function splitSyllable(ch: string): [number, number, number] | null {
+  if (!isSyllable(ch)) return null
+  const n = ch.charCodeAt(0) - BASE
+  return [Math.floor(n / 588), Math.floor((n % 588) / 28), n % 28]
+}
+
+export const joinSyllable = (cho: number, jung: number, jong: number) => String.fromCharCode(BASE + cho * 588 + jung * 28 + jong)
+
+/** 낱말의 초성 ('기린' → 'ㄱㄹ'). 한글이 아닌 글자는 그대로 */
+export const chosungOf = (word: string) => [...word].map((ch) => (splitSyllable(ch) ? CHOSUNG[splitSyllable(ch)![0]] : ch)).join('')
+
+/**
+ * 두음법칙으로 바꿀 수 있는 첫 글자 (끝말잇기): 'ㄹ' → 'ㄴ'(라→나), 'ㄹ'·'ㄴ' + ㅑㅕㅖㅛㅠㅣ → 'ㅇ'(려→여, 녀→여).
+ * 원래 글자 포함해서 돌려준다
+ */
+export function initialVariants(ch: string): string[] {
+  const s = splitSyllable(ch)
+  if (!s) return [ch]
+  const [cho, jung, jong] = s
+  const out = [ch]
+  const yVowel = ['ㅑ', 'ㅕ', 'ㅖ', 'ㅛ', 'ㅠ', 'ㅣ'].includes(JUNG[jung])
+  const R = 5
+  const N = 2
+  const O = 11
+  if (cho === R) out.push(joinSyllable(yVowel ? O : N, jung, jong))
+  if (cho === N && yVowel) out.push(joinSyllable(O, jung, jong))
+  return out
+}

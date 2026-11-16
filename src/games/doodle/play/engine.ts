@@ -17,7 +17,7 @@ import {
   REVEAL_MS,
   TWICE_UNDER,
 } from '../constants'
-import { WORDS, WORD_GROUPS, groupOf, normalizeGuess } from '../words'
+import { WORDS, WORD_GROUPS, groupOf, normalizeGuess } from '../../../shared/words/koWords'
 import type { Look } from '../../../shared/art3d/animalKinds'
 
 export type Player = { id: string; name: string; avatar?: Look }
