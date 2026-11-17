@@ -17,11 +17,11 @@ import { IconCamera, IconCameraOff, IconGamepad, IconFlip, IconHeadphoneOff, Ico
 import { LAYOUTS, type Layout, ME, arrange, isLayout, screenId, screenOwner } from './layout'
 import { ANIMAL_EMOJI, decodeLook, encodeLook } from '../../shared/art3d/animalKinds'
 import { loadLook } from '../../shared/storage/avatar'
-import { CHAT_MAX, type ChatLine, type ChatSignal, type GameInvite, type MeetMsg, cleanChat, diffMembers, pushLine, readChat, readDeaf, readGame } from './chat'
+import { CHAT_MAX, type ChatLine, type ChatSignal, type GameInvite, type MeetMsg, cleanChat, diffMembers, historyOf, pushLine, readChat, readDeaf, readGame, readHistory } from './chat'
 import { MiniCall } from './MiniCall'
 import { pvpLink, switchTargets } from '../../shared/nav'
 import { playChat, playJoin, playLeave } from './sounds'
-import { type Joined, useMeetingCall } from './callState'
+import { type Joined, type RejoinInfo, saveRejoin, useMeetingCall } from './callState'
 import { useLocation, useNavigate } from 'react-router'
 import './meeting.css'
 
@@ -224,6 +224,9 @@ function SpeakWatch({ id, stream, onChange }: { id: string; stream: MediaStream 
 }
 
 type TileSize = 'normal' | 'big' | 'small'
+/** 한 화면에 영상 최대 (넓은 화면 · 폰) */
+const VIDEO_MAX_WIDE = 9
+const VIDEO_MAX_NARROW = 4
 /** 칸 크기별 얼굴 크기 (CSS .meet-tile--… .meet-tile__face와 같게) */
 const FACE_PX: Record<TileSize, number> = { normal: 64, big: 112, small: 40 }
 
@@ -247,10 +250,12 @@ type TileProps = {
   deaf?: boolean
   /** 화면 공유 칸 (영상은 늘 다 보이게, 얼굴 대신 '화면 준비 중') */
   screen?: boolean
+  /** 카메라는 켰는데 한 화면 영상 수가 넘쳐 얼굴로 보임 */
+  cameraResting?: boolean
 }
 
 /** 사람 한 칸 (디스코드·Meet처럼): 카메라를 켰으면 영상, 아니면 얼굴. 말하면 초록 테두리, 마이크 꺼짐·소리 크기·고정 표시. 누르면 그 사람 설정 */
-function Tile({ name, me, avatar, speaking, micOn, status, volume, video, localVideo, mirror, size, pinned, onOpen, extra, deaf, screen }: TileProps) {
+function Tile({ name, me, avatar, speaking, micOn, status, volume, video, localVideo, mirror, size, pinned, onOpen, extra, deaf, screen, cameraResting }: TileProps) {
   const fit = size === 'big' || screen ? 'contain' : 'cover'
   return (
     <li className={`meet-cell meet-cell--${size}`}>
@@ -273,6 +278,11 @@ function Tile({ name, me, avatar, speaking, micOn, status, volume, video, localV
         )}
         {status && <span className="meet-tile__status">{status}</span>}
         <span className="meet-tile__badges">
+          {cameraResting && (
+            <span className="meet-tile__badge" title="카메라 켜짐 · 누르면 크게 볼 수 있어요">
+              <IconCamera size={14} />
+            </span>
+          )}
           {pinned && (
             <span className="meet-tile__badge" title="크게 고정">
               <IconPin size={14} />
@@ -499,8 +509,10 @@ function MeetingRoom({ room, name, pin, nickname, voice, settings, onSettings, o
     sharing: string[]
     screens: Record<string, VideoSource | null>
     screenAudio: Record<string, MediaStream | null>
+    /** 접속 번호 → 계정 표시 (사람마다 소리 크기 기억) */
+    userKeys: Record<string, string | null>
   }
-  const [call, setCall] = useState<CallState>({ peers: [], mic: true, strangers: 0, videos: {}, sharing: [], screens: {}, screenAudio: {} })
+  const [call, setCall] = useState<CallState>({ peers: [], mic: true, strangers: 0, videos: {}, sharing: [], screens: {}, screenAudio: {}, userKeys: {} })
   // 누가 화면 공유를 새로 시작하면 바둑판이어도 잠깐 크게 보기로 (Meet처럼 — 보기를 직접 고르면 풂)
   const [autoFocus, setAutoFocus] = useState(false)
 
@@ -689,6 +701,11 @@ function MeetingRoom({ room, name, pin, nickname, voice, settings, onSettings, o
   })
   const [listenVolume, setListenVolume] = useState(speaker.level)
   const [personVolumes, setPersonVolumes] = useState(loadPersonVolumes)
+  /** 소리 크기를 기억하는 이름: 계정 표시가 있으면 그걸로 (닉네임은 겹칠 수 있음), 없으면 닉네임 */
+  const volumeKeyOf = (id: string, nickname: string) => {
+    const u = call.userKeys[id]
+    return u ? `u:${u}` : nickname
+  }
   const volumeOf = (who: string) => personVolumes[who] ?? PERSON_VOLUME.default
   const setPersonVolume = (who: string, v: number) => {
     const next = { ...personVolumes }
@@ -702,6 +719,10 @@ function MeetingRoom({ room, name, pin, nickname, voice, settings, onSettings, o
   const wide = useWide()
   const [tab, setTab] = useState<'people' | 'chat'>('people')
   const [lines, setLines] = useState<ChatLine[]>([])
+  const linesRef = useRef<ChatLine[]>([])
+  useEffect(() => {
+    linesRef.current = lines
+  }, [lines])
   const [unread, setUnread] = useState(0)
   const chatVisible = !mini && (wide || tab === 'chat')
   const chatVisibleRef = useRef(chatVisible)
@@ -718,6 +739,13 @@ function MeetingRoom({ room, name, pin, nickname, voice, settings, onSettings, o
     [],
   )
 
+  // 새로 고침 뒤 다시 들어올 수 있게 기록 (나가기는 callState.leave가 지움)
+  useEffect(() => {
+    const save = () => saveRejoin({ id: room.code.split('-')[0], name, pin, at: Date.now() })
+    save()
+    const t = setInterval(save, 60_000)
+    return () => clearInterval(t)
+  }, [room, name, pin])
   const voiceRef = useRef(voice)
   useEffect(() => {
     voiceRef.current = voice
@@ -729,9 +757,15 @@ function MeetingRoom({ room, name, pin, nickname, voice, settings, onSettings, o
 
   useEffect(() => {
     let sharingOrder: string[] = []
+    let gotHistory = false
     const mesh: SfuCall = new SfuCall({
       url: SFU_URL ?? '',
-      getToken: () => sfuToken(`meeting-${room.code}`, room.myId, nickname),
+      // 입장권은 우리 게임 서버가 '이 방 사람'인지 보고 준다 (예전 Vercel 입장권은 방 확인이 없어 비공개 방도 몰래 들어올 수 있었음)
+      getToken: async () => {
+        const token = room.sfuToken ? await room.sfuToken() : null
+        // 게임 서버가 아직 예전이면(업데이트되는 몇 분) 예전 입장권으로 — 서버 업데이트를 확인한 뒤 예전 입장권은 닫음
+        return token ?? sfuToken(`meeting-${room.code}`, room.myId, nickname)
+      },
       onChange: () => {
         const ps = mesh.peers()
         const now = ps.filter((p) => mesh.sharing(p.id)).map((p) => p.id)
@@ -746,6 +780,7 @@ function MeetingRoom({ room, name, pin, nickname, voice, settings, onSettings, o
           sharing: sharingOrder,
           screens: Object.fromEntries(sharingOrder.map((id) => [id, mesh.screenOf(id)])),
           screenAudio: Object.fromEntries(sharingOrder.map((id) => [id, mesh.screenAudioOf(id)])),
+          userKeys: Object.fromEntries(ps.map((p) => [p.id, mesh.userKeyOf(p.id)])),
         })
       },
     })
@@ -763,6 +798,7 @@ function MeetingRoom({ room, name, pin, nickname, voice, settings, onSettings, o
         if (joined.length && !deafRef.current) playJoin()
       }
       if (joined.length && deafRef.current) room.send({ t: 'deaf', from: room.myId, on: true })
+
       for (const m of left) addLine({ kind: 'leave', name: m.nickname, text: '' })
       if (left.length && !deafRef.current) playLeave()
       if (left.length) setDeafPeers((prev) => new Set([...prev].filter((id) => ms.some((m) => m.id === id))))
@@ -775,6 +811,19 @@ function MeetingRoom({ room, name, pin, nickname, voice, settings, onSettings, o
       const id = from ?? (msg as ChatSignal).from
       const who = membersRef.current.find((m) => m.id === id)
       if (!who) return
+      // 방장: 늦게 들어온 사람이 지난 채팅을 달라고 하면 (채팅 기록은 서버에 없어서 방장 화면에 있는 걸 보냄)
+      if ((msg as { t?: unknown }).t === 'historyAsk') {
+        const past = isHostRef.current ? historyOf(linesRef.current) : []
+        if (past.length) room.send({ t: 'history', from: room.myId, to: who.id, lines: past })
+        return
+      }
+      // 지난 채팅 (방장이 보낸 것, 한 번만) — 지금 줄들 앞에 넣는다
+      const past = who.role === 'host' && !gotHistory ? readHistory(msg, room.myId, gameTitles()) : null
+      if (past) {
+        gotHistory = true
+        setLines((ls) => [...past.map((l) => ({ key: ++lineKey.current, kind: l.game ? ('game' as const) : ('chat' as const), name: l.name, text: l.text, at: l.at, ...(l.game ? { game: l.game } : {}) })), ...ls])
+        return
+      }
       const game = readGame(msg, gameTitles())
       if (game) {
         addLine({ kind: 'game', name: who.nickname, text: '', game })
@@ -798,7 +847,10 @@ function MeetingRoom({ room, name, pin, nickname, voice, settings, onSettings, o
       addLine({ kind: 'chat', name: who.nickname, text })
       if (!deafRef.current) playChat()
     })
+    // 새로 들어온 사람: 화면이 준비됐으니 방장에게 지난 채팅을 달라고 함 (방을 만든 사람은 안 함)
+    const ask = room.role === 'guest' ? setTimeout(() => room.send({ t: 'historyAsk', from: room.myId }), 800) : null
     return () => {
+      if (ask) clearTimeout(ask)
       offMembers()
       offMessage()
       mesh.close()
@@ -844,15 +896,22 @@ function MeetingRoom({ room, name, pin, nickname, voice, settings, onSettings, o
   const advertRef = useRef<ReturnType<typeof advertiseRoom<RoomInfo>> | null>(null)
   const [createdAt] = useState(() => Date.now())
   const infoRef = useRef<RoomInfo>({ id: room.code.split('-')[0], name, locked: !!pin, count, at: createdAt })
+  // 방장이 나가면 서버가 먼저 온 사람을 방장으로 바꾼다 → 그 사람이 목록에 다시 올림 (방이 계속 이어짐)
+  const [isHost, setIsHost] = useState(room.role === 'host')
+  const isHostRef = useRef(isHost)
+  useEffect(() => room.onRole?.((r) => {
+    isHostRef.current = r === 'host'
+    setIsHost(r === 'host')
+  }), [room])
   useEffect(() => {
-    if (room.role !== 'host') return
+    if (!isHost) return
     const advert = advertiseRoom(ROOM_ID, infoRef.current)
     advertRef.current = advert
     return () => {
       advert.stop()
       advertRef.current = null
     }
-  }, [room])
+  }, [isHost])
   useEffect(() => {
     infoRef.current = { ...infoRef.current, count }
     advertRef.current?.update(infoRef.current)
@@ -862,7 +921,8 @@ function MeetingRoom({ room, name, pin, nickname, voice, settings, onSettings, o
   const myStream = useMemo(() => (voice ? new MediaStream([voice.track]) : null), [voice])
   const peers = new Map(call.peers.map((p) => [p.id, p]))
   const onBlocked = useMemo(() => () => setBlocked(true), [])
-  const hostGone = room.role === 'guest' && !members.some((m) => m.role === 'host')
+  // 서버가 방장을 넘겨주지 못하는 예전 방식(Supabase)일 때만
+  const hostGone = !room.onRole && room.role === 'guest' && !members.some((m) => m.role === 'host')
   const effectLabel = VOICE_EFFECTS.find((e) => e.id === settings.effect)?.label
 
   async function allowMic() {
@@ -896,6 +956,10 @@ function MeetingRoom({ room, name, pin, nickname, voice, settings, onSettings, o
     setPinned(id)
     if (layout === 'grid') setLayout('focus')
   }
+  // 한 화면에 영상은 몇 개까지만 (폰이 버거우니까, 나머지는 얼굴 — 안 보이는 영상은 LiveKit이 안 받아서 데이터도 아낌)
+  const videoMax = wide ? VIDEO_MAX_WIDE : VIDEO_MAX_NARROW
+  const videoOrder = [main, pinned, ...speakingIds, active, ...rest].filter((x): x is string => !!x && x !== ME && !screenOwner(x) && cameraIds.has(x))
+  const videoShown = new Set([...new Set(videoOrder)].slice(0, videoMax))
   const tileFor = (id: string, size: TileSize) => {
     const owner = screenOwner(id)
     if (owner) {
@@ -954,8 +1018,9 @@ function MeetingRoom({ room, name, pin, nickname, voice, settings, onSettings, o
         speaking={speakingIds.has(id)}
         micOn={p?.micOn ?? true}
         status={p ? CONNECTION_TEXT[p.connection] : '연결 중…'}
-        volume={volumeOf(m.nickname)}
-        video={call.videos[id] ?? null}
+        volume={volumeOf(volumeKeyOf(id, m.nickname))}
+        video={videoShown.has(id) ? (call.videos[id] ?? null) : null}
+        cameraResting={cameraIds.has(id) && !videoShown.has(id)}
         size={size}
         pinned={pinned === id}
         deaf={deafPeers.has(id)}
@@ -1038,12 +1103,12 @@ function MeetingRoom({ room, name, pin, nickname, voice, settings, onSettings, o
       })}
       {[...peers.entries()].map(([id, p]) => {
         const who = members.find((m) => m.id === id)
-        return p.stream && <PeerAudio key={id} stream={p.stream} speaker={speaker} volume={who ? volumeOf(who.nickname) : PERSON_VOLUME.default} />
+        return p.stream && <PeerAudio key={id} stream={p.stream} speaker={speaker} volume={who ? volumeOf(volumeKeyOf(id, who.nickname)) : PERSON_VOLUME.default} />
       })}
       {sharingIds.map((id) => {
         const st = call.screenAudio[id]
         const who = members.find((m) => m.id === id)
-        return st && <PeerAudio key={screenId(id)} stream={st} speaker={speaker} volume={who ? volumeOf(who.nickname) : PERSON_VOLUME.default} />
+        return st && <PeerAudio key={screenId(id)} stream={st} speaker={speaker} volume={who ? volumeOf(volumeKeyOf(id, who.nickname)) : PERSON_VOLUME.default} />
       })}
     </div>
   )
@@ -1209,14 +1274,14 @@ function MeetingRoom({ room, name, pin, nickname, voice, settings, onSettings, o
       )}
       {sheet?.kind === 'person' && (
         <Sheet label={`${sheet.name}님 소리`} onClose={closeSheet}>
-          <VolumeSlider label="소리 크기" value={volumeOf(sheet.name)} max={PERSON_VOLUME.max} onChange={(v) => setPersonVolume(sheet.name, v)} />
+          <VolumeSlider label="소리 크기" value={volumeOf(volumeKeyOf(sheet.id, sheet.name))} max={PERSON_VOLUME.max} onChange={(v) => setPersonVolume(volumeKeyOf(sheet.id, sheet.name), v)} />
           <button
             type="button"
-            className={`button${volumeOf(sheet.name) === 0 ? ' button--primary' : ''}`}
-            aria-pressed={volumeOf(sheet.name) === 0}
-            onClick={() => setPersonVolume(sheet.name, volumeOf(sheet.name) === 0 ? PERSON_VOLUME.default : 0)}
+            className={`button${volumeOf(volumeKeyOf(sheet.id, sheet.name)) === 0 ? ' button--primary' : ''}`}
+            aria-pressed={volumeOf(volumeKeyOf(sheet.id, sheet.name)) === 0}
+            onClick={() => setPersonVolume(volumeKeyOf(sheet.id, sheet.name), volumeOf(volumeKeyOf(sheet.id, sheet.name)) === 0 ? PERSON_VOLUME.default : 0)}
           >
-            {volumeOf(sheet.name) === 0 ? '이 사람 소리 다시 듣기' : '이 사람 소리 끄기'}
+            {volumeOf(volumeKeyOf(sheet.id, sheet.name)) === 0 ? '이 사람 소리 다시 듣기' : '이 사람 소리 끄기'}
           </button>
           <button
             type="button"
@@ -1569,4 +1634,31 @@ export function MeetingCallHost() {
       mini={location.pathname !== '/meeting'}
     />
   )
+}
+
+/**
+ * 새로 고침 뒤 원래 회의방에 다시 들어가기 (callState가 부름). 친구로 들어가 보고, 방이 없어졌으면(혼자 있던 방) 같은 번호로 다시 만든다.
+ * 마이크는 전에 허락했으면 묻지 않고 받는다. 소리는 브라우저가 막으면 [소리 켜기]
+ */
+export async function rejoinMeeting(info: RejoinInfo, call: { joined: Joined | null; start: (j: Joined) => void; settings: VoiceSettings | null }) {
+  if (call.joined) return
+  const nickname = loadNickname() ?? '나'
+  const code = channelCode(info.id, info.pin)
+  levelContext()
+  const voice = await getMic()
+  voice?.apply(call.settings ?? DEFAULT_VOICE_SETTINGS)
+  try {
+    let room: Room<MeetMsg>
+    try {
+      room = await joinRoom<MeetMsg>(ROOM_ID, code, nickname, { capacity: CAPACITY, ...myAvatar() })
+    } catch (e) {
+      if (!(e instanceof RoomError) || e.reason !== 'not-found') throw e
+      room = await createRoom<MeetMsg>(ROOM_ID, nickname, { capacity: CAPACITY, code, ...myAvatar() })
+    }
+    call.start({ room, voice, name: info.name, pin: info.pin })
+  } catch (e) {
+    console.warn('[meeting] 다시 들어가기 실패', e)
+    voice?.stop()
+    saveRejoin(null)
+  }
 }

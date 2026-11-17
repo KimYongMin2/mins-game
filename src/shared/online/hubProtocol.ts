@@ -46,6 +46,8 @@ export type ClientMsg =
   | { t: 'advertise'; list: string; info: Record<string, unknown> | null }
   | { t: 'watch'; list: string }
   | { t: 'unwatch'; list: string }
+  /** 회의방 음성·화상 서버(LiveKit) 입장권 — 그 방에 실제로 들어와 있는 사람에게만 (2026-11-17, 예전엔 Vercel이 방 확인 없이 줬음) */
+  | { t: 'sfu'; ref: number; room: string }
   | { t: 'ping' }
 
 /** 서버 → 브라우저 */
@@ -59,4 +61,5 @@ export type ServerMsg =
   | { t: 'msg'; room: string; from: string; msg: unknown }
   | { t: 'move'; room: string; from: string; move: unknown }
   | { t: 'rooms'; list: string; rooms: Record<string, unknown>[] }
+  | { t: 'sfu'; ref: number; token: string | null }
   | { t: 'pong' }

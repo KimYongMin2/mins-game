@@ -20,6 +20,8 @@ class HubClient {
   private ready: Promise<void> | null = null
   private refSeq = 0
   private waiting = new Map<number, { resolve: (r: { room: string; key: string; resume: string }) => void; reject: (e: JoinError) => void }>()
+  /** 회의방 입장권 기다리는 중 */
+  private sfuWaiting = new Map<number, (token: string | null) => void>()
   private rooms = new Map<string, JoinedRoom>()
   private lists = new Map<string, Set<(rooms: Record<string, unknown>[]) => void>>()
   private adverts = new Map<string, Record<string, unknown>>()
@@ -140,6 +142,10 @@ class HubClient {
         return this.rooms.get(m.room)?.handlers.onMove(m.from, m.move)
       case 'rooms':
         for (const fn of this.lists.get(m.list) ?? []) fn(m.rooms)
+        return
+      case 'sfu':
+        this.sfuWaiting.get(m.ref)?.(typeof m.token === 'string' ? m.token : null)
+        return this.sfuWaiting.delete(m.ref)
     }
   }
 
@@ -177,12 +183,27 @@ class HubClient {
       info: (info: string) => this.raw({ t: 'info', room: topic(), info }),
       move: (move: unknown) => this.raw({ t: 'move', room: topic(), move }),
       referee: (game: string, setup: unknown) => this.raw({ t: 'referee', room: topic(), game, setup }),
+      /** 회의방 음성·화상 입장권 (서버가 이 방 사람인지 보고 줌, 못 받으면 null) */
+      sfu: () => this.sfu(topic()),
       leave: () => {
         const t = topic()
         this.raw({ t: 'leave', room: t })
         this.rooms.delete(t)
       },
     }
+  }
+
+  private async sfu(room: string): Promise<string | null> {
+    await this.connect()
+    const ref = ++this.refSeq
+    return new Promise((resolve) => {
+      const t = setTimeout(() => {
+        this.sfuWaiting.delete(ref)
+        resolve(null)
+      }, 4000)
+      this.sfuWaiting.set(ref, (token) => (clearTimeout(t), resolve(token)))
+      this.raw({ t: 'sfu', ref, room })
+    })
   }
 
   advertise(list: string, info: Record<string, unknown> | null) {

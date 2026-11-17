@@ -7,6 +7,9 @@ import { type ClientMsg, type HubMember, type HubRole, type JoinError, REFEREE_F
 // - 비공개 방은 방장이 만들 때의 코드와 맞아야 들어온다 (예전엔 채널 이름에 붙이기만 해서 서버가 검사 안 함)
 // - 방 목록은 그 방의 방장만 올릴 수 있다 → 가짜 방 못 올림
 // - 메시지 크기·초당 개수·방 수를 제한한다 → 메시지 폭탄 막기
+// - 익명 계정은 얼마든지 새로 만들 수 있어서 IP 주소별로도 센다 (접속 수·틀린 방 코드, 2026-11-17)
+// - 회의방 음성·화상 입장권은 그 방에 들어와 있는 사람에게만 준다 (비공개 코드를 서버가 검사한 뒤라 몰래 듣기 막힘)
+// - 회의방은 방장이 나가면 남은 사람 중 먼저 온 사람이 방장 (디스코드처럼 방이 이어짐)
 
 export type Conn = { send(text: string): void; close(code?: number): void }
 
@@ -45,6 +48,8 @@ export type HubOptions = {
   now?: () => number
   /** 끊긴 사람 자리를 이만큼 들고 있는다 (폰을 잠깐 다른 앱에 보냈다 와도 그대로) */
   graceMs?: number
+  /** 회의방 음성·화상 입장권 만들기 (LiveKit 방 이름, 참가자 이름, 보이는 이름). 없으면 입장권 안 줌 */
+  sfuToken?: (room: string, identity: string, name: string) => Promise<string>
 }
 
 const LIMIT = {
@@ -62,7 +67,16 @@ const LIMIT = {
   /** 틀린 방 코드를 이만큼 넣으면 잠깐 막음 (비공개 코드 숫자 4자리를 다 넣어 보는 것 막기) */
   badJoins: 8,
   badJoinWindowMs: 5 * 60_000,
+  /** 한 IP에서 동시에 열 수 있는 접속 (집·학교 와이파이에서 여럿이 같이 해도 넉넉히) */
+  connPerIp: 40,
+  /** 한 IP에서 틀린 방 코드 (계정을 바꿔 가며 다 넣어 보는 것 막기) */
+  badJoinsPerIp: 24,
 }
+
+/** 방장이 나가면 남은 사람에게 방장을 넘기는 방 (회의방) */
+const HOST_TRANSFER = new Set(['meeting'])
+/** 음성·화상 입장권을 주는 방 */
+const SFU_GAMES = new Set(['meeting'])
 
 /** 이만큼 메시지가 없으면 '지금 하는 중'으로 안 침 (서버 업데이트를 미룰지 볼 때) */
 const ACTIVE_MS = 15 * 60_000
@@ -104,6 +118,8 @@ const randomKey = (prefix: string) => `${prefix}-${Array.from(crypto.getRandomVa
 
 class Session {
   uid: string | null = null
+  /** 접속한 IP (Caddy가 넘겨준 것) */
+  ip = ''
   /** 이 접속이 들어가 있는 방 topic → 내 접속 번호 */
   rooms = new Map<string, string>()
   watches = new Set<string>()
@@ -134,7 +150,10 @@ export class Hub {
 
   /** 계정별: 열린 접속 수, 틀린 방 코드 기록 */
   private conns = new Map<string, number>()
+  /** 'u:계정' 또는 'i:IP' → 틀린 방 코드 시각들 */
   private badJoins = new Map<string, number[]>()
+  /** IP별 열린 접속 수 */
+  private ipConns = new Map<string, number>()
 
   constructor(opts: HubOptions) {
     this.opts = opts
@@ -148,10 +167,20 @@ export class Hub {
     for (const [uid, ts] of this.badJoins) if (ts.every((t) => now - t > LIMIT.badJoinWindowMs)) this.badJoins.delete(uid)
   }
 
-  /** 새 접속. 받은 글자는 receive, 끊기면 close */
-  open(conn: Conn) {
+  /** 새 접속 (ip = 접속한 곳). 받은 글자는 receive, 끊기면 close. IP 접속이 너무 많으면 바로 끊음 */
+  open(conn: Conn, ip = '') {
     const s = new Session(conn)
     s.lastRefill = this.now()
+    s.ip = ip
+    if (ip) {
+      const n = this.ipConns.get(ip) ?? 0
+      if (n >= LIMIT.connPerIp) {
+        s.push({ t: 'error', reason: 'too-many' })
+        conn.close(4002)
+        return { receive: () => {}, close: () => {} }
+      }
+      this.ipConns.set(ip, n + 1)
+    }
     return {
       receive: (text: string) => void this.receive(s, text),
       close: () => this.closeSession(s),
@@ -224,6 +253,8 @@ export class Hub {
         return this.watch(s, m.list)
       case 'unwatch':
         return this.unwatch(s, m.list)
+      case 'sfu':
+        return this.sfu(s, m.ref, m.room)
     }
   }
 
@@ -231,10 +262,13 @@ export class Hub {
     const fail = (reason: JoinError) => s.push({ t: 'join-error', ref: m.ref, reason })
     // 틀린 코드를 너무 많이 넣었으면 잠깐은 맞는 코드여도 '방 없음' (다 넣어 보기 막기)
     const now = this.now()
-    const bad = (this.badJoins.get(s.uid!) ?? []).filter((t) => now - t < LIMIT.badJoinWindowMs)
-    if (m.role === 'guest' && bad.length >= LIMIT.badJoins) return fail('not-found')
+    const recent = (k: string) => (this.badJoins.get(k) ?? []).filter((t) => now - t < LIMIT.badJoinWindowMs)
+    const bad = recent(`u:${s.uid}`)
+    const badIp = s.ip ? recent(`i:${s.ip}`) : []
+    if (m.role === 'guest' && (bad.length >= LIMIT.badJoins || badIp.length >= LIMIT.badJoinsPerIp)) return fail('not-found')
     const failJoin = () => {
-      this.badJoins.set(s.uid!, [...bad, now])
+      this.badJoins.set(`u:${s.uid}`, [...bad, now])
+      if (s.ip) this.badJoins.set(`i:${s.ip}`, [...badIp, now])
       return fail('not-found')
     }
     if (typeof m.game !== 'string' || !GAME_RE.test(m.game) || typeof m.code !== 'string') return fail('not-found')
@@ -248,7 +282,8 @@ export class Hub {
 
     // 끊겼다 다시 붙음: 예전 자리를 되찾는다
     if (room && typeof m.resume === 'string') {
-      const mem = [...room.members.values()].find((x) => x.resume === m.resume && x.role === m.role)
+      // 되찾기 표(resume)는 그 사람만 아는 무작위 글자라 그것만 맞으면 됨 (회의방에서 방장을 넘겨받았으면 역할이 바뀌어 있음)
+      const mem = [...room.members.values()].find((x) => x.resume === m.resume)
       if (mem) {
         if (mem.session && mem.session !== s) mem.session.rooms.delete(topic)
         if (mem.grace) clearTimeout(mem.grace)
@@ -296,6 +331,23 @@ export class Hub {
     const room = key ? this.rooms.get(topic) : undefined
     const mem = key ? room?.members.get(key) : undefined
     return room && mem ? { room, mem } : null
+  }
+
+  /** 회의방 음성·화상 입장권: 그 방 사람에게만, LiveKit 방 이름은 방 번호(+비공개 코드) — 코드를 몰라 못 들어온 사람은 못 받음 */
+  private async sfu(s: Session, ref: unknown, topic: unknown) {
+    if (typeof ref !== 'number') return
+    const at = this.memberOf(s, topic)
+    const game = typeof topic === 'string' ? topic.split(':')[0] : ''
+    if (!at || !SFU_GAMES.has(game) || !this.opts.sfuToken) return s.push({ t: 'sfu', ref, token: null })
+    const room = `${game}-${at.room.id}${at.room.pin ? `-${at.room.pin}` : ''}`
+    // 참가자 이름 = '접속 번호.계정 앞 8자' (같은 이름이 들어오면 LiveKit이 먼저 사람을 내보내서, 남의 번호로는 못 받게)
+    const identity = `${at.mem.key}.${(s.uid ?? '').replace(/-/g, '').slice(0, 8)}`
+    try {
+      s.push({ t: 'sfu', ref, token: await this.opts.sfuToken(room, identity, at.mem.nickname) })
+    } catch (e) {
+      console.warn('[hub] 입장권 실패', e)
+      s.push({ t: 'sfu', ref, token: null })
+    }
   }
 
   private relay(s: Session, topic: string, msg: unknown) {
@@ -441,6 +493,9 @@ export class Hub {
     if (mem.role === 'host') {
       for (const [list, entries] of this.lists) if (entries.has(room.topic)) this.removeAdvert(list, room.topic)
       if (mem.session) for (const [list, t] of mem.session.adverts) if (t === room.topic) mem.session.adverts.delete(list)
+      // 회의방: 남은 사람 중 먼저 온 사람이 방장 (그 사람 화면이 목록에 다시 올림)
+      const next = HOST_TRANSFER.has(room.topic.split(':')[0]) ? [...room.members.values()].sort((a, b) => a.joinedAt - b.joinedAt)[0] : undefined
+      if (next) next.role = 'host'
     }
     if (room.members.size === 0) {
       this.stopReferee(room)
@@ -459,6 +514,12 @@ export class Hub {
   }
 
   private closeSession(s: Session) {
+    if (s.ip) {
+      const n = (this.ipConns.get(s.ip) ?? 1) - 1
+      if (n <= 0) this.ipConns.delete(s.ip)
+      else this.ipConns.set(s.ip, n)
+      s.ip = ''
+    }
     if (s.uid) {
       const n = (this.conns.get(s.uid) ?? 1) - 1
       if (n <= 0) this.conns.delete(s.uid)

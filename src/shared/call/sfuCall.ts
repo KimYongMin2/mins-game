@@ -179,6 +179,12 @@ export class SfuCall {
     return this.screenStreams.get(id) ?? null
   }
 
+  /** 그 사람의 계정 표시 (참가자 이름 점 뒤 — 입장권 서버가 붙인 계정 앞 8자). 사람마다 소리 크기를 기억할 때 (닉네임은 겹칠 수 있어서) */
+  userKeyOf(id: string): string | null {
+    for (const p of this.lk.remoteParticipants.values()) if (memberIdOf(p.identity) === id) return p.identity.split('.')[1] || null
+    return null
+  }
+
   /** 그 사람(방 접속 번호)의 카메라 영상. 안 켰거나 아직 못 받았으면 null */
   videoOf(id: string): VideoSource | null {
     for (const p of this.lk.remoteParticipants.values()) {

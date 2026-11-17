@@ -41,7 +41,7 @@ describe('오목 봇', () => {
     }
     console.log(`어려움 vs 일반: ${hardWins}/${games}승`)
     expect(hardWins).toBeGreaterThan(games * 0.7)
-  })
+  }, 60_000) // 봇끼리 여러 판이라 테스트를 한꺼번에 돌리면 5초를 넘길 때가 있음
 
   it('흑 금수 자리는 고르지 않는다', () => {
     // (7,7)이 쌍삼 자리. 다른 데 둘 데가 많으니 금수를 피해야 한다

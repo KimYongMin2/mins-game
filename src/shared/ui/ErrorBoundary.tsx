@@ -1,4 +1,5 @@
 import { Component, type ReactNode } from 'react'
+import { reportError } from '../report'
 
 // 화면을 그리다 오류가 나면 하얀 화면 대신 안내 + [새로 고침] (사용자 제보 2026-11-17 — 게임을 바꾸면 화면이 안 보임).
 // 대개는 새 버전이 배포된 뒤 예전 화면에서 다른 게임 코드를 받으려다 실패한 것 (main.tsx가 먼저 한 번 저절로 새로 고침).
@@ -15,6 +16,7 @@ export class ErrorBoundary extends Component<Props, State> {
 
   componentDidCatch(error: unknown) {
     console.warn('[화면 오류]', error)
+    reportError(error, 'render')
   }
 
   render() {

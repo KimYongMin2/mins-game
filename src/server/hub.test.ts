@@ -3,10 +3,10 @@ import type { ServerMsg } from '../shared/online/hubProtocol'
 import { Hub } from './hub'
 
 /** 가짜 접속: 서버가 보낸 걸 모아 둔다 */
-function client(hub: Hub) {
+function client(hub: Hub, ip = '') {
   const got: ServerMsg[] = []
   let closed = false
-  const c = hub.open({ send: (t) => got.push(JSON.parse(t)), close: () => void (closed = true) })
+  const c = hub.open({ send: (t) => got.push(JSON.parse(t)), close: () => void (closed = true) }, ip)
   const send = async (m: object) => {
     c.receive(JSON.stringify(m))
     await new Promise((r) => setTimeout(r, 0))
@@ -208,5 +208,78 @@ describe('막기 (2026-11-16)', () => {
     now += 3 * 60 * 60_000
     hub.sweep()
     expect(hub.stats().rooms).toBe(0)
+  })
+
+  it('회의방 입장권은 그 방에 들어온 사람에게만, 방 이름엔 비공개 코드까지', async () => {
+    const made: string[] = []
+    const hub = new Hub({ verify, sfuToken: async (room, identity, name) => (made.push(`${room}|${identity}|${name}`), 'TOKEN') })
+    const h = client(hub)
+    await h.hello()
+    await h.send({ ...join('host', 'MEET1-4321'), game: 'meeting' })
+    const topic = h.last('joined')!.room
+    await h.send({ t: 'sfu', ref: 7, room: topic })
+    expect(h.last('sfu')).toEqual({ t: 'sfu', ref: 7, token: 'TOKEN' })
+    expect(made[0]).toMatch(/^meeting-MEET1-4321\|host-[a-z0-9]+\.user1\|host$/)
+    // 방에 없는 사람은 못 받음
+    const x = client(hub)
+    await x.hello()
+    await x.send({ t: 'sfu', ref: 8, room: topic })
+    expect(x.last('sfu')).toEqual({ t: 'sfu', ref: 8, token: null })
+    // 게임 방은 안 줌
+    await h.send(join('host', 'GAME1'))
+    await h.send({ t: 'sfu', ref: 9, room: h.last('joined')!.room })
+    expect(h.last('sfu')?.token).toBeNull()
+  })
+
+  it('회의방은 방장이 나가면 먼저 온 사람이 방장, 게임 방은 그대로', async () => {
+    const hub = new Hub({ verify })
+    const h = client(hub)
+    const a = client(hub)
+    const b = client(hub)
+    for (const c of [h, a, b]) await c.hello()
+    await h.send({ ...join('host', 'MEET2'), game: 'meeting' })
+    await a.send({ ...join('guest', 'MEET2'), game: 'meeting' })
+    await b.send({ ...join('guest', 'MEET2'), game: 'meeting' })
+    const topic = h.last('joined')!.room
+    await h.send({ t: 'leave', room: topic })
+    const ms = b.last('members')!.members
+    expect(ms.find((m) => m.id === a.last('joined')!.key)?.role).toBe('host')
+    // 새 사람도 들어올 수 있음
+    const c = client(hub)
+    await c.hello()
+    await c.send({ ...join('guest', 'MEET2'), game: 'meeting' })
+    expect(c.last('joined')).toBeTruthy()
+    // 게임 방은 방장이 나가면 방장 없음
+    await h.send(join('host', 'GAME2'))
+    await a.send(join('guest', 'GAME2'))
+    await h.send({ t: 'leave', room: h.last('joined')!.room })
+    expect(a.last('members')!.members.every((m) => m.role === 'guest')).toBe(true)
+  })
+
+  it('IP별로도 셈: 접속 40개까지, 계정을 바꿔도 틀린 코드 24번이면 막힘', async () => {
+    const hub = new Hub({ verify: async (t) => t })
+    const h = client(hub, '9.9.9.9')
+    await h.send({ t: 'hello', token: 'host-user', apikey: 'k' })
+    await h.send(join('host', 'SAFE1-1111'))
+    const tries: ReturnType<typeof client>[] = []
+    for (let i = 0; i < 12; i++) {
+      const c = client(hub, '1.2.3.4')
+      await c.send({ t: 'hello', token: `u${i}`, apikey: 'k' })
+      await c.send(join('guest', `SAFE1-${String(2000 + i * 2)}`))
+      await c.send(join('guest', `SAFE1-${String(2001 + i * 2)}`))
+      tries.push(c)
+    }
+    const last = client(hub, '1.2.3.4')
+    await last.send({ t: 'hello', token: 'fresh', apikey: 'k' })
+    await last.send(join('guest', 'SAFE1-1111'))
+    expect(last.last('join-error')?.reason).toBe('not-found')
+    // 다른 IP는 괜찮음
+    const other = client(hub, '5.6.7.8')
+    await other.send({ t: 'hello', token: 'other', apikey: 'k' })
+    await other.send(join('guest', 'SAFE1-1111'))
+    expect(other.last('joined')).toBeTruthy()
+    // 접속 수
+    for (let i = 0; i < 40 - 13; i++) client(hub, '1.2.3.4')
+    expect(client(hub, '1.2.3.4').closed).toBe(true)
   })
 })

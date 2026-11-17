@@ -136,6 +136,10 @@ export interface Room<M> {
   startReferee?(game: string, setup: unknown): void
   /** 우리 게임 서버가 이 게임 심판을 맡을 수 있는지 (없거나 false면 예전처럼 방장 폰이 심판) */
   hasReferee?(game: string): boolean
+  /** 회의방: 음성·화상 서버 입장권 (우리 게임 서버가 이 방 사람인지 보고 줌). 우리 서버로 연 방에만 */
+  sfuToken?(): Promise<string | null>
+  /** 내 역할이 바뀜 (회의방은 방장이 나가면 먼저 온 사람이 방장이 됨). 우리 서버로 연 방에만 */
+  onRole?(fn: (role: RoomRole) => void): () => void
   /** 심판이 보낸 메시지인지: 서버 심판, 아니면 방장 (우리 서버면 서버가 붙인 보낸 사람으로 — 친구가 가짜 화면을 보내도 걸러짐) */
   fromJudge?(from?: string): boolean
   leave(): void
@@ -213,8 +217,15 @@ async function openHub<M>(gameId: string, code: string, meta: Meta, { capacity =
   let all: HubMember[] = []
   let advert: Advert<ListedRoom> | null = null
   let listed: ListedRoom | null = null
+  const roleFns = new Set<(role: RoomRole) => void>()
 
   function publish() {
+    // 서버가 정한 내 역할 (회의방은 방장이 나가면 바뀜)
+    const mine = all.find((m) => m.id === myKey)?.role
+    if (mine && mine !== meta.role) {
+      meta.role = mine
+      for (const fn of roleFns) fn(mine)
+    }
     const others = all.filter((m) => m.id !== myKey).sort((a, b) => (a.role === 'host' ? 0 : 1) - (b.role === 'host' ? 0 : 1) || a.joinedAt - b.joinedAt)
     const nextMembers: Member[] = others.map((o) => ({ id: o.id, nickname: o.nickname, role: o.role, ...(o.avatar ? { avatar: o.avatar } : {}), ...(o.ready ? { ready: true } : {}), ...(o.role === 'host' && o.info ? { info: o.info } : {}) }))
     const first = nextMembers[0]
@@ -265,11 +276,18 @@ async function openHub<M>(gameId: string, code: string, meta: Meta, { capacity =
   return {
     code,
     ...(listing ? { name: listing.name } : {}),
-    role: meta.role,
+    get role() {
+      return meta.role
+    },
     get myId() {
       return conn.key()
     },
     send: (msg) => conn.send(msg),
+    sfuToken: () => conn.sfu(),
+    onRole(fn) {
+      roleFns.add(fn)
+      return () => roleFns.delete(fn)
+    },
     onMessage(fn) {
       messageFns.add(fn)
       return () => messageFns.delete(fn)
