@@ -89,13 +89,20 @@ export function FishingPage() {
       keys.clear()
       apply()
     }
+    // 우클릭 메뉴를 막음 (메뉴가 뜨면 키·조이스틱을 뗀 신호를 놓쳐서 계속 눌린 채로 남았음)
+    const menu = (e: MouseEvent) => {
+      e.preventDefault()
+      blur()
+    }
     window.addEventListener('keydown', down)
     window.addEventListener('keyup', up)
     window.addEventListener('blur', blur)
+    window.addEventListener('contextmenu', menu)
     return () => {
       window.removeEventListener('keydown', down)
       window.removeEventListener('keyup', up)
       window.removeEventListener('blur', blur)
+      window.removeEventListener('contextmenu', menu)
     }
   }, [entered, world, act])
 
@@ -205,7 +212,7 @@ export function FishingPage() {
         disabled={room.action === 'none'}
         onPointerDown={(e) => {
           e.preventDefault()
-          act()
+          if (e.button === 0) act()
         }}
       >
         {ACTION_LABEL[room.action]}

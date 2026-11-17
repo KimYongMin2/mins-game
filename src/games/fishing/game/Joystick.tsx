@@ -25,7 +25,8 @@ export function Joystick({ out }: { out: { x: number; y: number } }) {
     <div
       className="fs-joy"
       onPointerDown={(e) => {
-        if (pid.current !== null) return
+        // 우클릭·가운데 버튼은 무시 (우클릭 메뉴가 뜨면 손 뗀 신호가 안 와서 계속 밀린 채로 남았음)
+        if (e.button !== 0 || pid.current !== null) return
         pid.current = e.pointerId
         e.currentTarget.setPointerCapture(e.pointerId)
         const r = e.currentTarget.getBoundingClientRect()
@@ -38,6 +39,8 @@ export function Joystick({ out }: { out: { x: number; y: number } }) {
       }}
       onPointerUp={(e) => e.pointerId === pid.current && end()}
       onPointerCancel={(e) => e.pointerId === pid.current && end()}
+      onLostPointerCapture={(e) => e.pointerId === pid.current && end()}
+      onContextMenu={(e) => e.preventDefault()}
       aria-label="조이스틱 (눌러서 밀면 걸어요)"
       role="application"
     >
