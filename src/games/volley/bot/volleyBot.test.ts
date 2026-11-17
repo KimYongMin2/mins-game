@@ -40,5 +40,5 @@ describe('봇', () => {
       if (s.phase.kind === 'done') winners.add(s.phase.winner)
     }
     expect(winners.size).toBe(2)
-  }, 60_000)
+  }, 300_000) // 봇끼리 12판을 끝까지 — 컴퓨터가 바쁘면 1분을 넘김
 })
