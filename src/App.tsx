@@ -29,6 +29,7 @@ const TilesPage = lazy(() => import('./games/tiles/TilesPage').then((m) => ({ de
 const VolleyPage = lazy(() => import('./games/volley/VolleyPage').then((m) => ({ default: m.VolleyPage })))
 const YutPage = lazy(() => import('./games/yut/YutPage').then((m) => ({ default: m.YutPage })))
 const ZolaballPage = lazy(() => import('./games/zolaball/ZolaballPage').then((m) => ({ default: m.ZolaballPage })))
+const FishingPage = lazy(() => import('./games/fishing/FishingPage').then((m) => ({ default: m.FishingPage })))
 const MeetingPage = lazy(() => import('./pages/meeting/MeetingPage').then((m) => ({ default: m.MeetingPage })))
 const MeetingCallHost = lazy(() => import('./pages/meeting/MeetingPage').then((m) => ({ default: m.MeetingCallHost })))
 
@@ -154,6 +155,10 @@ function App() {
         <Route
           path="/games/artillery"
           element={nickname ? <ArtilleryPage /> : <ToNickname />}
+        />
+        <Route
+          path="/games/fishing"
+          element={nickname ? <FishingPage /> : <ToNickname />}
         />
         <Route
           path="/meeting"

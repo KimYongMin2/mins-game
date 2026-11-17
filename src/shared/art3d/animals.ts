@@ -8,8 +8,8 @@ import { type AnimalKind, type Fur, type Look, TINT_HEX } from './animalKinds'
 export { ANIMALS, ANIMAL_NAMES, type AnimalKind, type Look, plainLook } from './animalKinds'
 
 export type Mood = 'calm' | 'happy' | 'scared' | 'ko'
-/** idle 가만히 · hold 두 손으로 머리 위에 듦 · scared 덜덜 · ko 쓰러짐 · cheer 만세 · raise 한 손 번쩍(외치기) */
-export type Pose = 'idle' | 'hold' | 'scared' | 'ko' | 'cheer' | 'raise' | 'aim'
+/** idle 가만히 · hold 두 손으로 머리 위에 듦 · scared 덜덜 · ko 쓰러짐 · cheer 만세 · raise 한 손 번쩍(외치기) · walk 걷기(낚시터) · fish 두 손으로 낚싯대를 앞으로 */
+export type Pose = 'idle' | 'hold' | 'scared' | 'ko' | 'cheer' | 'raise' | 'aim' | 'walk' | 'fish'
 
 type Palette = { fur: string; light: string; ear: string; nose: string }
 
@@ -153,16 +153,22 @@ export function makeAnimal(lookIn: Look, shirt: string, opts: { team?: boolean }
   // 반바지 + 다리 + 운동화 (게임에선 탁자에 가려지지만 쓰러지거나 미리 보기에서 보임)
   const shorts = mesh(new THREE.CylinderGeometry(0.43, 0.41, 0.26, 24), pantsM, 0, 0.66, 0)
   bodyG.add(shorts)
+  // 다리는 엉덩이(높이 0.55)를 축으로 돌 수 있게 묶음 (걷기)
+  const legs: THREE.Group[] = []
   for (const s of [-1, 1]) {
+    const hip = new THREE.Group()
+    hip.position.set(s * 0.19, 0.55, 0)
     // 새는 부리 색 다리
     const legM = kind === 'eagle' || kind === 'seagull' || kind === 'penguin' ? noseM : furM
-    bodyG.add(mesh(new THREE.CapsuleGeometry(0.13, 0.22, 6, 12), legM, s * 0.19, 0.34, 0))
-    const shoe = mesh(new THREE.SphereGeometry(0.17, 16, 12), shoeM, s * 0.19, 0.1, 0.06)
+    hip.add(mesh(new THREE.CapsuleGeometry(0.13, 0.22, 6, 12), legM, 0, 0.34 - 0.55, 0))
+    const shoe = mesh(new THREE.SphereGeometry(0.17, 16, 12), shoeM, 0, 0.1 - 0.55, 0.06)
     shoe.scale.set(0.95, 0.55, 1.35)
-    const sole = mesh(new THREE.CylinderGeometry(0.16, 0.16, 0.04, 16), soleM, s * 0.19, 0.03, 0.06)
+    const sole = mesh(new THREE.CylinderGeometry(0.16, 0.16, 0.04, 16), soleM, 0, 0.03 - 0.55, 0.06)
     sole.scale.set(1, 1, 1.35)
-    const lace = mesh(new THREE.BoxGeometry(0.12, 0.02, 0.06), soleM, s * 0.19, 0.17, 0.16)
-    bodyG.add(shoe, sole, lace)
+    const lace = mesh(new THREE.BoxGeometry(0.12, 0.02, 0.06), soleM, 0, 0.17 - 0.55, 0.16)
+    hip.add(shoe, sole, lace)
+    bodyG.add(hip)
+    legs.push(hip)
   }
 
   // 꼬리 (동물마다)
@@ -785,7 +791,23 @@ export function makeAnimal(lookIn: Look, shirt: string, opts: { team?: boolean }
         az = 2.6 + Math.sin(t * 9) * 0.25
         bob = Math.abs(Math.sin(t * 6)) * 0.18
         break
+      case 'walk':
+        // 팔은 다리와 반대로 흔들기, 걸음마다 살짝 통통
+        ax = Math.sin(t * 9) * 0.55
+        az = 0.15
+        bob = Math.abs(Math.sin(t * 9)) * 0.05
+        break
+      case 'fish':
+        // 두 손으로 낚싯대를 앞으로 (게임이 손 앞에 낚싯대를 붙임)
+        ax = -1.05
+        az = 0.28
+        bob = Math.sin(t * 1.6) * 0.01
+        break
     }
+    // 다리: 걸을 땐 앞뒤로, 아니면 제자리
+    const step = pose === 'walk' ? Math.sin(t * 9) * 0.6 : 0
+    legs[0].rotation.x = ease(legs[0].rotation.x, step, 0.35)
+    legs[1].rotation.x = ease(legs[1].rotation.x, -step, 0.35)
     // 가만히 서 있을 땐 팔도 살짝 흔들림
     if (pose === 'idle') ax += Math.sin(t * 2.2 + seed) * 0.06
     if (pose === 'scared') sink = -0.06
@@ -794,7 +816,7 @@ export function makeAnimal(lookIn: Look, shirt: string, opts: { team?: boolean }
     if (raise) bob = Math.abs(Math.sin(t * 5)) * 0.06
     const aim = pose === 'aim'
     armL.rotation.x = ease(armL.rotation.x, aim ? -1.5 : ax)
-    armR.rotation.x = ease(armR.rotation.x, raise ? -0.2 : aim ? -1.3 : ax)
+    armR.rotation.x = ease(armR.rotation.x, raise ? -0.2 : aim ? -1.3 : pose === 'walk' ? -ax : ax)
     armL.rotation.z = ease(armL.rotation.z, aim ? 0.3 : -az)
     armR.rotation.z = ease(armR.rotation.z, raise ? 2.85 : aim ? -0.85 : az)
     bodyG.rotation.x = ease(bodyG.rotation.x, lean, 0.12)

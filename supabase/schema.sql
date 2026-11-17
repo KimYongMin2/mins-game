@@ -370,3 +370,15 @@ drop policy if exists "본인 기록 추가" on public.batting_games;
 revoke insert on public.batting_games from authenticated;
 drop policy if exists "본인 기록 추가" on public.zolaball_games;
 revoke insert on public.zolaball_games from authenticated;
+
+-- ─────────────────────────────────────────────────────────────
+-- 낚시터 도감·어항 (2026-11-17). 한 사람(익명 계정) 한 줄, 내용은 data(jsonb): { dex, bag, tank }.
+-- 게임 서버만 비밀 키로 읽고 쓴다 (잡힌 물고기는 서버가 정하니까 브라우저가 직접 못 넣게 — 정책 없음 = 막힘).
+create table if not exists public.fishing_profiles (
+  user_id uuid primary key,
+  nickname text not null default '',
+  data jsonb not null default '{}'::jsonb,
+  updated_at timestamptz not null default now()
+);
+alter table public.fishing_profiles enable row level security;
+revoke all on public.fishing_profiles from anon, authenticated;

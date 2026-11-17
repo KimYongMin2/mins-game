@@ -5,6 +5,7 @@ import { bombReferee } from './bomb'
 import { chosungReferee } from './chosung'
 import { doodleReferee } from './doodle'
 import { fightReferee } from './fight'
+import { fishingRefereeFactory } from './fishing'
 import { memoryReferee } from './memory'
 import { nunchiReferee } from './nunchi'
 import { omokReferee } from './omok'
@@ -34,4 +35,5 @@ export const REFEREES: Record<string, RefereeFactory> = {
   wordchain: wordchainReferee,
   armwrestle: armwrestleReferee,
   volley: volleyReferee,
+  fishing: fishingRefereeFactory,
 }

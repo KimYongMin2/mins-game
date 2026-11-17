@@ -29,7 +29,7 @@ export type Referee = {
 export type RefereeContext = {
   now: () => number
   /** 지금 방 사람들 (접속 번호·방장 여부) */
-  members: () => { id: string; role: HubRole; nickname: string; avatar?: string }[]
+  members: () => { id: string; role: HubRole; nickname: string; avatar?: string; /** 계정 (서버가 확인한 것 — 낚시 도감처럼 사람마다 저장할 때) */ uid?: string }[]
   /** 모두에게 */
   broadcast(msg: unknown): void
   /** 한 사람에게만 (각자 패 같은 비밀) */
@@ -74,7 +74,7 @@ const LIMIT = {
 }
 
 /** 방장이 나가면 남은 사람에게 방장을 넘기는 방 (회의방) */
-const HOST_TRANSFER = new Set(['meeting'])
+const HOST_TRANSFER = new Set(['meeting', 'fishing'])
 /** 음성·화상 입장권을 주는 방 */
 const SFU_GAMES = new Set(['meeting'])
 
@@ -92,6 +92,8 @@ const clean = (v: unknown, max: number) => (typeof v === 'string' ? [...v.replac
 
 type Member = {
   key: string
+  /** 계정 (로그인 확인한 것) */
+  uid: string
   resume: string
   session: Session | null
   role: HubRole
@@ -311,6 +313,7 @@ export class Hub {
     const mem: Member = {
       key: randomKey(m.role),
       resume: randomKey('r'),
+      uid: s.uid ?? '',
       session: s,
       role: m.role,
       nickname: clean(m.nickname, 20).trim() || '익명',
@@ -370,7 +373,7 @@ export class Hub {
     this.stopReferee(room)
     const ctx: RefereeContext = {
       now: this.now,
-      members: () => [...room.members.values()].map((m) => ({ id: m.key, role: m.role, nickname: m.nickname, ...(m.avatar ? { avatar: m.avatar } : {}) })),
+      members: () => [...room.members.values()].map((m) => ({ id: m.key, role: m.role, nickname: m.nickname, ...(m.avatar ? { avatar: m.avatar } : {}), ...(m.uid ? { uid: m.uid } : {}) })),
       broadcast: (msg) => {
         for (const m of room.members.values()) m.session?.push({ t: 'msg', room: topic, from: REFEREE_FROM, msg })
       },

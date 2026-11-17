@@ -7761,7 +7761,7 @@ const LIMIT = {
 	badJoinsPerIp: 24
 };
 /** 방장이 나가면 남은 사람에게 방장을 넘기는 방 (회의방) */
-const HOST_TRANSFER = /* @__PURE__ */ new Set(["meeting"]);
+const HOST_TRANSFER = /* @__PURE__ */ new Set(["meeting", "fishing"]);
 /** 음성·화상 입장권을 주는 방 */
 const SFU_GAMES = /* @__PURE__ */ new Set(["meeting"]);
 /** 이만큼 메시지가 없으면 '지금 하는 중'으로 안 침 (서버 업데이트를 미룰지 볼 때) */
@@ -7772,7 +7772,7 @@ const ID_RE = /^[A-Z0-9]{4,12}$/;
 const PIN_RE = /^\d{4}$/;
 const GAME_RE = /^[a-z0-9-]{2,24}$/;
 const LIST_RE = /^[a-z0-9-]{2,40}$/;
-const clean$1 = (v, max) => typeof v === "string" ? [...v.replace(/[\u0000-\u001f\u007f]/g, "")].slice(0, max).join("") : "";
+const clean$2 = (v, max) => typeof v === "string" ? [...v.replace(/[\u0000-\u001f\u007f]/g, "")].slice(0, max).join("") : "";
 const randomKey = (prefix) => `${prefix}-${Array.from(crypto.getRandomValues(/* @__PURE__ */ new Uint8Array(6)), (b) => b.toString(36).padStart(2, "0")).join("")}`;
 var Session = class {
 	uid = null;
@@ -7904,7 +7904,7 @@ var Hub = class {
 			case "send": return this.relay(s, m.room, m.msg);
 			case "referee": return this.startReferee(s, m.room, m.game, m.setup);
 			case "ready": return this.setMeta(s, m.room, "guest", (mem) => mem.ready = m.ready === true);
-			case "info": return this.setMeta(s, m.room, "host", (mem) => mem.info = clean$1(m.info, 40) || void 0);
+			case "info": return this.setMeta(s, m.room, "host", (mem) => mem.info = clean$2(m.info, 40) || void 0);
 			case "move": return this.move(s, m.room, m.move);
 			case "advertise": return this.advertise(s, m.list, m.info);
 			case "watch": return this.watch(s, m.list);
@@ -7975,10 +7975,11 @@ var Hub = class {
 		const mem = {
 			key: randomKey(m.role),
 			resume: randomKey("r"),
+			uid: s.uid ?? "",
 			session: s,
 			role: m.role,
-			nickname: clean$1(m.nickname, 20).trim() || "익명",
-			avatar: clean$1(m.avatar, 48) || void 0,
+			nickname: clean$2(m.nickname, 20).trim() || "익명",
+			avatar: clean$2(m.avatar, 48) || void 0,
 			joinedAt: this.now(),
 			grace: null
 		};
@@ -8056,7 +8057,8 @@ var Hub = class {
 				id: m.key,
 				role: m.role,
 				nickname: m.nickname,
-				...m.avatar ? { avatar: m.avatar } : {}
+				...m.avatar ? { avatar: m.avatar } : {},
+				...m.uid ? { uid: m.uid } : {}
 			})),
 			broadcast: (msg) => {
 				for (const m of room.members.values()) m.session?.push({
@@ -8821,7 +8823,7 @@ function decodeLook(x) {
 }
 //#endregion
 //#region src/server/referees/common.ts
-const clean = (v, max) => typeof v === "string" ? [...v.replace(/[\u0000-\u001f\u007f]/g, "")].slice(0, max).join("").trim() : "";
+const clean$1 = (v, max) => typeof v === "string" ? [...v.replace(/[\u0000-\u001f\u007f]/g, "")].slice(0, max).join("").trim() : "";
 function readLook(x) {
 	if (!x || typeof x !== "object") return void 0;
 	try {
@@ -8849,7 +8851,7 @@ function readPlayers(x, ctx, min, max) {
 		});
 		else if (/^bot\d{1,2}$/.test(p.id)) out.push({
 			id: p.id,
-			name: clean(p.name, 20) || "봇",
+			name: clean$1(p.name, 20) || "봇",
 			kind: "bot",
 			avatar
 		});
@@ -11626,6 +11628,940 @@ function fightReferee(_setup, ctx) {
 		finished: () => doneAt !== null && s.now - doneAt > 5e3
 	};
 }
+//#endregion
+//#region src/games/fishing/play/fish.ts
+const FISH = [
+	{
+		id: "crucian",
+		name: "붕어",
+		rarity: "common",
+		zone: "fresh",
+		min: 10,
+		max: 30
+	},
+	{
+		id: "carp",
+		name: "잉어",
+		rarity: "common",
+		zone: "fresh",
+		min: 30,
+		max: 80
+	},
+	{
+		id: "mackerel",
+		name: "고등어",
+		rarity: "common",
+		zone: "sea",
+		min: 20,
+		max: 45
+	},
+	{
+		id: "seabass",
+		name: "농어",
+		rarity: "common",
+		zone: "sea",
+		min: 30,
+		max: 90
+	},
+	{
+		id: "flounder",
+		name: "가자미",
+		rarity: "common",
+		zone: "sea",
+		min: 20,
+		max: 40
+	},
+	{
+		id: "crab",
+		name: "꽃게",
+		rarity: "common",
+		zone: "sea",
+		min: 15,
+		max: 25
+	},
+	{
+		id: "squid",
+		name: "오징어",
+		rarity: "common",
+		zone: "sea",
+		min: 20,
+		max: 40
+	},
+	{
+		id: "jelly",
+		name: "해파리",
+		rarity: "common",
+		zone: "sea",
+		min: 10,
+		max: 40
+	},
+	{
+		id: "redbream",
+		name: "참돔",
+		rarity: "normal",
+		zone: "sea",
+		min: 25,
+		max: 70
+	},
+	{
+		id: "halibut",
+		name: "광어",
+		rarity: "normal",
+		zone: "sea",
+		min: 30,
+		max: 80
+	},
+	{
+		id: "salmon",
+		name: "연어",
+		rarity: "normal",
+		zone: "fresh",
+		min: 50,
+		max: 90
+	},
+	{
+		id: "cutlass",
+		name: "갈치",
+		rarity: "normal",
+		zone: "sea",
+		min: 60,
+		max: 120
+	},
+	{
+		id: "puffer",
+		name: "복어",
+		rarity: "normal",
+		zone: "sea",
+		min: 15,
+		max: 40
+	},
+	{
+		id: "crayfish",
+		name: "가재",
+		rarity: "normal",
+		zone: "fresh",
+		min: 8,
+		max: 15
+	},
+	{
+		id: "octopus",
+		name: "문어",
+		rarity: "normal",
+		zone: "sea",
+		min: 30,
+		max: 100
+	},
+	{
+		id: "eel",
+		name: "장어",
+		rarity: "rare",
+		zone: "fresh",
+		min: 40,
+		max: 100
+	},
+	{
+		id: "ray",
+		name: "가오리",
+		rarity: "rare",
+		zone: "sea",
+		min: 50,
+		max: 150
+	},
+	{
+		id: "seahorse",
+		name: "해마",
+		rarity: "rare",
+		zone: "sea",
+		min: 5,
+		max: 20
+	},
+	{
+		id: "angler",
+		name: "아귀",
+		rarity: "rare",
+		zone: "sea",
+		min: 30,
+		max: 100
+	},
+	{
+		id: "tuna",
+		name: "참치",
+		rarity: "rare",
+		zone: "sea",
+		min: 80,
+		max: 250
+	},
+	{
+		id: "shark",
+		name: "상어",
+		rarity: "epic",
+		zone: "sea",
+		min: 150,
+		max: 400
+	},
+	{
+		id: "marlin",
+		name: "청새치",
+		rarity: "epic",
+		zone: "sea",
+		min: 150,
+		max: 350
+	},
+	{
+		id: "sunfish",
+		name: "개복치",
+		rarity: "epic",
+		zone: "sea",
+		min: 100,
+		max: 300
+	},
+	{
+		id: "coelacanth",
+		name: "실러캔스",
+		rarity: "legend",
+		zone: "sea",
+		min: 100,
+		max: 200
+	},
+	{
+		id: "sturgeon",
+		name: "철갑상어",
+		rarity: "legend",
+		zone: "fresh",
+		min: 100,
+		max: 300
+	},
+	{
+		id: "boot",
+		name: "장화",
+		rarity: "junk",
+		zone: "both",
+		min: 0,
+		max: 0
+	},
+	{
+		id: "can",
+		name: "깡통",
+		rarity: "junk",
+		zone: "both",
+		min: 0,
+		max: 0
+	},
+	{
+		id: "kelp",
+		name: "미역",
+		rarity: "junk",
+		zone: "both",
+		min: 0,
+		max: 0
+	}
+];
+const fishById = (id) => FISH.find((f) => f.id === id);
+FISH.filter((f) => f.rarity !== "junk");
+const RARITY = {
+	common: {
+		name: "흔함",
+		color: "#c9c4f0",
+		weight: 52
+	},
+	normal: {
+		name: "보통",
+		color: "#6fdc9a",
+		weight: 27
+	},
+	rare: {
+		name: "희귀",
+		color: "#5be0f0",
+		weight: 10
+	},
+	epic: {
+		name: "영웅",
+		color: "#c79bff",
+		weight: 3
+	},
+	legend: {
+		name: "전설",
+		color: "#ffd23f",
+		weight: .6
+	},
+	junk: {
+		name: "꽝",
+		color: "#8f8ab8",
+		weight: 7.4
+	}
+};
+const IRO = [
+	{
+		id: "silver",
+		name: "은빛",
+		odds: 3,
+		color: "#e6ebf5"
+	},
+	{
+		id: "sakura",
+		name: "벚꽃",
+		odds: 1,
+		color: "#ffb3cf"
+	},
+	{
+		id: "gold",
+		name: "금빛",
+		odds: 1,
+		color: "#ffd23f"
+	},
+	{
+		id: "neon",
+		name: "형광",
+		odds: .5,
+		color: "#7dff9a"
+	},
+	{
+		id: "obsidian",
+		name: "흑요석",
+		odds: .5,
+		color: "#b9a3ff"
+	},
+	{
+		id: "ghost",
+		name: "유령",
+		odds: .3,
+		color: "#d6f6ff"
+	},
+	{
+		id: "rainbow",
+		name: "무지개",
+		odds: .1,
+		color: "#ff9adf"
+	}
+];
+/** 잡힌 것 정하기 (rand = 0~1 난수, 서버 것): 등급 → 그 물가에 사는 그 등급 물고기 중 하나 → 크기 → 이로치 */
+function rollCatch(rand, zone) {
+	const total = Object.values(RARITY).reduce((a, r) => a + r.weight, 0);
+	let pick = rand() * total;
+	let rarity = "common";
+	for (const [k, r] of Object.entries(RARITY)) {
+		pick -= r.weight;
+		if (pick < 0) {
+			rarity = k;
+			break;
+		}
+	}
+	let pool = FISH.filter((f) => f.rarity === rarity && (f.zone === zone || f.zone === "both"));
+	const order = [
+		"legend",
+		"epic",
+		"rare",
+		"normal",
+		"common"
+	];
+	for (let i = order.indexOf(rarity); pool.length === 0 && i >= 0 && i < order.length - 1; i++) pool = FISH.filter((f) => f.rarity === order[i + 1] && f.zone === zone);
+	if (pool.length === 0) pool = FISH.filter((f) => f.rarity === "common" && f.zone === zone);
+	const fish = pool[Math.floor(rand() * pool.length)];
+	if (fish.rarity === "junk") return {
+		fish: fish.id,
+		iro: null,
+		size: 0
+	};
+	const size = Math.round((fish.min + (fish.max - fish.min) * Math.pow(rand(), 1.6)) * 10) / 10;
+	let r = rand() * 100;
+	let iro = null;
+	for (const x of IRO) {
+		r -= x.odds;
+		if (r < 0) {
+			iro = x.id;
+			break;
+		}
+	}
+	return {
+		fish: fish.id,
+		iro,
+		size
+	};
+}
+/** 자랑할 만한지: 희귀 이상이거나 이로치 */
+const isBig = (c) => !!c.iro || [
+	"rare",
+	"epic",
+	"legend"
+].includes(fishById(c.fish)?.rarity ?? "");
+//#endregion
+//#region src/games/fishing/play/map.ts
+const BOUNDS = {
+	minX: -28,
+	maxX: 28,
+	minZ: -18,
+	maxZ: 16
+};
+const shoreZ = (x) => -6 + Math.sin(x * .25) * 1;
+const PIER = {
+	minX: -15,
+	maxX: -12,
+	minZ: -17
+};
+const POND = {
+	x: 19,
+	z: 6,
+	r: 4.5
+};
+const STREAM = {
+	ax: 24,
+	az: -18,
+	bx: 21,
+	bz: 2,
+	half: 1.3
+};
+/** 물가에서 이만큼 안이면 던질 수 있음 */
+const CAST_REACH = 3.2;
+/** 썬베드: 바닷가 물가를 따라 4개(바다 쪽을 봄) + 연못가 1개 */
+const BEDS = [...[
+	-7,
+	-3,
+	1,
+	5
+].map((x) => ({
+	x,
+	z: shoreZ(x) + 2.4,
+	r: Math.PI
+})), {
+	x: 13.4,
+	z: 9.5,
+	r: Math.atan2(POND.x - 13.4, POND.z - 9.5)
+}];
+const onPier = (x, z) => x >= PIER.minX && x <= PIER.maxX && z >= PIER.minZ && z <= shoreZ(x) + .5;
+function streamDist(x, z) {
+	const { ax, az, bx, bz } = STREAM;
+	const dx = bx - ax, dz = bz - az;
+	const t = Math.max(0, Math.min(1, ((x - ax) * dx + (z - az) * dz) / (dx * dx + dz * dz)));
+	return Math.hypot(x - (ax + dx * t), z - (az + dz * t));
+}
+/** 이 자리 물 (바다·민물), 땅이면 null */
+function waterAt(x, z) {
+	if (Math.hypot(x - POND.x, z - POND.z) < POND.r || streamDist(x, z) < STREAM.half) return "fresh";
+	if (x < 12 && z < shoreZ(x) && !onPier(x, z)) return "sea";
+	if (z < BOUNDS.minZ) return "sea";
+	return null;
+}
+/** 걸을 수 있는 곳 (맵 안 + 물이 아님 — 부두 위는 됨) */
+function walkable(x, z) {
+	if (x < BOUNDS.minX || x > BOUNDS.maxX || z > BOUNDS.maxZ) return false;
+	if (onPier(x, z)) return true;
+	if (z < BOUNDS.minZ) return false;
+	return waterAt(x, z) === null;
+}
+/**
+* 던질 곳 (r = 바라보는 방향, 앞이 (sin r, cos r)). 바라보는 쪽부터 양옆으로 넓혀 가며 가까운 물을 찾고,
+* 찌는 물가에서 조금 더 안쪽에 떨어진다. 물이 없으면 null
+*/
+function castTarget(x, z, r, reach = CAST_REACH) {
+	for (let k = 0; k <= 8; k++) for (const side of k === 0 ? [0] : [1, -1]) {
+		const a = r + side * k * (Math.PI / 16);
+		const dx = Math.sin(a), dz = Math.cos(a);
+		for (let s = .3; s <= reach; s += .15) {
+			const zone = waterAt(x + dx * s, z + dz * s);
+			if (!zone) continue;
+			let far = s;
+			for (let e = s; e <= s + 3; e += .25) if (waterAt(x + dx * e, z + dz * e) === zone) far = e;
+			const d = Math.min(far, s + 2.2);
+			return {
+				zone,
+				bob: [round(x + dx * d), round(z + dz * d)],
+				r: a
+			};
+		}
+	}
+	return null;
+}
+/** 가장 가까운 썬베드 (거리 안이면) */
+function nearBed(x, z) {
+	let best = null;
+	let bestD = 2;
+	BEDS.forEach((b, i) => {
+		const d = Math.hypot(b.x - x, b.z - z);
+		if (d < bestD) {
+			bestD = d;
+			best = i;
+		}
+	});
+	return best;
+}
+const round = (v) => Math.round(v * 100) / 100;
+//#endregion
+//#region src/games/fishing/play/protocol.ts
+/** 입질까지 (ms) */
+const BITE_MIN_MS = 7e3;
+/** 입질 뒤 이만큼 안에 눌러야 잡힘 */
+const BITE_WINDOW_MS = 5e3;
+//#endregion
+//#region src/server/env.ts
+const env$1 = globalThis.process?.env ?? {};
+const SUPABASE_URL$1 = "https://fxekefrjsmnmcuoaynfa.supabase.co";
+/** Supabase 비밀 키 (sb_secret_… 또는 예전 service_role). Vercel 환경 변수에만 */
+const supabaseSecret = () => env$1.SUPABASE_SECRET_KEY;
+//#endregion
+//#region src/server/fishingStore.ts
+const cache$1 = /* @__PURE__ */ new Map();
+const dirty = /* @__PURE__ */ new Set();
+const loading = /* @__PURE__ */ new Map();
+const empty = () => ({
+	dex: {},
+	bag: [],
+	tank: []
+});
+const savingOn = () => !!supabaseSecret();
+function headers(secret) {
+	return secret.startsWith("sb_secret_") ? { apikey: secret } : {
+		apikey: secret,
+		authorization: `Bearer ${secret}`
+	};
+}
+/** 읽은 값 검사 (모양이 틀리면 빈 것으로) */
+function clean(x) {
+	if (!x || typeof x !== "object") return empty();
+	const p = x;
+	return {
+		dex: p.dex && typeof p.dex === "object" ? p.dex : {},
+		bag: Array.isArray(p.bag) ? p.bag.slice(-200) : [],
+		tank: Array.isArray(p.tank) ? p.tank.filter((k) => typeof k === "string").slice(0, 10) : []
+	};
+}
+function loadProfile(uid) {
+	const hit = cache$1.get(uid);
+	if (hit) return Promise.resolve(hit.profile);
+	const going = loading.get(uid);
+	if (going) return going;
+	const secret = supabaseSecret();
+	const p = (async () => {
+		let profile = empty();
+		if (secret) try {
+			const res = await fetch(`${SUPABASE_URL$1}/rest/v1/fishing_profiles?select=data&user_id=eq.${encodeURIComponent(uid)}`, { headers: headers(secret) });
+			if (res.ok) profile = clean((await res.json())[0]?.data);
+			else console.warn("[fishing] 읽기 실패", res.status, (await res.text()).slice(0, 160));
+		} catch (e) {
+			console.warn("[fishing] 읽기 실패", e);
+		}
+		const hitNow = cache$1.get(uid);
+		if (hitNow) return hitNow.profile;
+		cache$1.set(uid, {
+			profile,
+			nickname: ""
+		});
+		return profile;
+	})().finally(() => loading.delete(uid));
+	loading.set(uid, p);
+	return p;
+}
+/** 바꾼 뒤 부름 (몇 초 모아서 씀) */
+function markDirty(uid, nickname) {
+	const hit = cache$1.get(uid);
+	if (!hit) return;
+	hit.nickname = nickname;
+	dirty.add(uid);
+}
+async function flush() {
+	const secret = supabaseSecret();
+	if (!secret || dirty.size === 0) return dirty.clear();
+	const rows = [...dirty].map((uid) => ({
+		user_id: uid,
+		nickname: cache$1.get(uid).nickname.slice(0, 20),
+		data: cache$1.get(uid).profile,
+		updated_at: (/* @__PURE__ */ new Date()).toISOString()
+	}));
+	dirty.clear();
+	try {
+		const res = await fetch(`${SUPABASE_URL$1}/rest/v1/fishing_profiles?on_conflict=user_id`, {
+			method: "POST",
+			headers: {
+				...headers(secret),
+				"content-type": "application/json",
+				prefer: "resolution=merge-duplicates,return=minimal"
+			},
+			body: JSON.stringify(rows)
+		});
+		if (!res.ok) {
+			console.warn("[fishing] 쓰기 실패", res.status, (await res.text()).slice(0, 200));
+			for (const r of rows) dirty.add(r.user_id);
+		}
+	} catch (e) {
+		console.warn("[fishing] 쓰기 실패", e);
+		for (const r of rows) dirty.add(r.user_id);
+	}
+}
+let timer = null;
+/** 3초마다 모아서 쓰기 (게임 서버가 켜질 때 한 번) */
+function startFlushing() {
+	timer ??= setInterval(() => void flush(), 3e3);
+}
+//#endregion
+//#region src/server/referees/fishing.ts
+const BAG_MAX = 150;
+/** 위치는 모아서 0.1초마다 */
+const POS_MS = 100;
+const rand = () => crypto.getRandomValues(/* @__PURE__ */ new Uint32Array(1))[0] / 2 ** 32;
+const num = (v, lo, hi) => typeof v === "number" && Number.isFinite(v) && v >= lo && v <= hi;
+const cleanText = (v) => typeof v === "string" ? [...v.replace(/[\u0000-\u001f\u007f]/g, " ").trim()].slice(0, 60).join("") : "";
+const r2 = (v) => Math.round(v * 100) / 100;
+const pub = (p) => ({
+	id: p.id,
+	name: p.name,
+	...p.avatar ? { avatar: p.avatar } : {},
+	x: p.x,
+	z: p.z,
+	r: p.r,
+	bed: p.bed,
+	fishing: p.fishing,
+	bob: p.bob
+});
+/** 가방에 넣기: 자랑할 만한 것은 남기고 흔한 것부터 버림 */
+function addToBag(bag, item) {
+	const next = [...bag, item];
+	if (next.length <= BAG_MAX) return next;
+	const recent = new Set(next.slice(-40).map((x) => x.k));
+	const idx = next.findIndex((x) => !recent.has(x.k) && !isBig({
+		fish: x.f,
+		iro: x.i,
+		size: x.s
+	}));
+	next.splice(idx >= 0 ? idx : 0, 1);
+	return next;
+}
+/** 도감에 넣기. 최고 기록이면 true */
+function addToDex(p, c) {
+	const def = fishById(c.fish);
+	if (!def || def.rarity === "junk") return false;
+	const e = p.dex[c.fish] ?? {
+		n: 0,
+		best: 0,
+		iros: []
+	};
+	const best = c.size > e.best;
+	p.dex[c.fish] = {
+		n: e.n + 1,
+		best: Math.max(e.best, c.size),
+		iros: c.iro && !e.iros.includes(c.iro) ? [...e.iros, c.iro] : e.iros
+	};
+	return best;
+}
+function fishingReferee(_setup, ctx) {
+	startFlushing();
+	const players = /* @__PURE__ */ new Map();
+	const posDirty = /* @__PURE__ */ new Set();
+	let lastPos = 0;
+	const send = (to, m) => ctx.sendTo(to, m);
+	const all = (m) => ctx.broadcast(m);
+	const nameOf = (key) => ctx.members().find((m) => m.id === key)?.nickname ?? "익명";
+	function join(key) {
+		const mem = ctx.members().find((m) => m.id === key);
+		if (!mem) return;
+		let p = players.get(key);
+		if (!p) {
+			const a = rand() * Math.PI * 2;
+			p = {
+				id: key,
+				name: mem.nickname,
+				...mem.avatar ? { avatar: mem.avatar } : {},
+				x: r2(Math.cos(a) * 2.5),
+				z: r2(5 + Math.sin(a) * 1.5),
+				r: Math.PI,
+				bed: null,
+				fishing: "none",
+				bob: null,
+				uid: mem.uid ?? null,
+				castAt: 0,
+				biteAt: 0,
+				biteUntil: 0,
+				zone: null,
+				lastMv: ctx.now(),
+				lastChat: 0
+			};
+			players.set(key, p);
+			all({
+				t: "st",
+				p: pub(p)
+			});
+		}
+		send(key, {
+			t: "init",
+			you: key,
+			players: [...players.values()].map(pub),
+			saving: savingOn()
+		});
+		if (p.uid) loadProfile(p.uid).then((profile) => players.has(key) && send(key, {
+			t: "profile",
+			profile
+		}));
+	}
+	function stopFishing(p) {
+		if (p.fishing === "none") return false;
+		p.fishing = "none";
+		p.bob = null;
+		p.zone = null;
+		return true;
+	}
+	function move(p, m) {
+		if (!num(m.x, BOUNDS.minX - 1, BOUNDS.maxX + 1) || !num(m.z, BOUNDS.minZ - 1, BOUNDS.maxZ + 1) || !num(m.r, -100, 100)) return;
+		const now = ctx.now();
+		const dt = Math.min(2, (now - p.lastMv) / 1e3);
+		p.lastMv = now;
+		let { x, z } = m;
+		const far = Math.hypot(x - p.x, z - p.z);
+		const allow = 5 * dt * 1.6 + .6;
+		if (far > allow) {
+			x = p.x + (x - p.x) / far * allow;
+			z = p.z + (z - p.z) / far * allow;
+		}
+		if (!walkable(x, z)) return send(p.id, {
+			t: "st",
+			p: pub(p)
+		});
+		const moved = Math.hypot(x - p.x, z - p.z) > .05;
+		p.x = r2(x);
+		p.z = r2(z);
+		p.r = r2(m.r);
+		if (moved && (p.bed !== null || p.fishing !== "none")) {
+			p.bed = null;
+			stopFishing(p);
+			all({
+				t: "st",
+				p: pub(p)
+			});
+		}
+		posDirty.add(p.id);
+	}
+	function cast(p) {
+		if (p.fishing !== "none") return;
+		const bed = p.bed !== null ? BEDS[p.bed] : null;
+		const t = bed ? castTarget(bed.x, bed.z, bed.r) : castTarget(p.x, p.z, p.r);
+		if (!t) return send(p.id, {
+			t: "st",
+			p: pub(p)
+		});
+		const now = ctx.now();
+		p.fishing = "cast";
+		p.bob = t.bob;
+		p.zone = t.zone;
+		if (!bed) p.r = r2(t.r);
+		p.castAt = now;
+		p.biteAt = now + BITE_MIN_MS + rand() * 9e3;
+		all({
+			t: "st",
+			p: pub(p)
+		});
+	}
+	function reel(p) {
+		if (p.fishing === "cast") {
+			stopFishing(p);
+			return all({
+				t: "st",
+				p: pub(p)
+			});
+		}
+		if (p.fishing !== "bite" || !p.zone) return;
+		const c = rollCatch(rand, p.zone);
+		stopFishing(p);
+		const item = {
+			k: crypto.randomUUID().slice(0, 12),
+			f: c.fish,
+			i: c.iro,
+			s: c.size,
+			at: Date.now()
+		};
+		let best = false;
+		if (p.uid) {
+			const uid = p.uid;
+			loadProfile(uid).then((profile) => {
+				best = addToDex(profile, c);
+				profile.bag = addToBag(profile.bag, item);
+				markDirty(uid, p.name);
+				all({
+					t: "catch",
+					id: p.id,
+					name: p.name,
+					c,
+					big: isBig(c),
+					best
+				});
+				if (players.has(p.id)) send(p.id, {
+					t: "profile",
+					profile
+				});
+				all({
+					t: "st",
+					p: pub(p)
+				});
+			});
+		} else {
+			all({
+				t: "catch",
+				id: p.id,
+				name: p.name,
+				c,
+				big: isBig(c),
+				best
+			});
+			all({
+				t: "st",
+				p: pub(p)
+			});
+		}
+	}
+	function lie(p, i) {
+		if (typeof i !== "number" || !Number.isInteger(i) || !BEDS[i]) return;
+		if (nearBed(p.x, p.z) !== i || [...players.values()].some((o) => o !== p && o.bed === i)) return send(p.id, {
+			t: "st",
+			p: pub(p)
+		});
+		stopFishing(p);
+		p.bed = i;
+		p.x = BEDS[i].x;
+		p.z = BEDS[i].z;
+		p.r = r2(BEDS[i].r);
+		all({
+			t: "st",
+			p: pub(p)
+		});
+	}
+	function chat(p, text) {
+		const t = cleanText(text);
+		const now = ctx.now();
+		if (!t || now - p.lastChat < 600) return;
+		p.lastChat = now;
+		all({
+			t: "chat",
+			id: p.id,
+			name: p.name,
+			text: t
+		});
+	}
+	async function setTank(p, keys) {
+		if (!p.uid || !Array.isArray(keys)) return;
+		const uid = p.uid;
+		const profile = await loadProfile(uid);
+		const have = new Set(profile.bag.map((x) => x.k));
+		profile.tank = [...new Set(keys.filter((k) => typeof k === "string" && have.has(k)))].slice(0, 10);
+		markDirty(uid, p.name);
+		send(p.id, {
+			t: "profile",
+			profile
+		});
+	}
+	async function look(p, who) {
+		const target = typeof who === "string" ? players.get(who) : void 0;
+		if (!target?.uid) return send(p.id, {
+			t: "tank",
+			who: typeof who === "string" ? who : "",
+			name: target?.name ?? "",
+			items: []
+		});
+		const profile = await loadProfile(target.uid);
+		const byKey = new Map(profile.bag.map((x) => [x.k, x]));
+		send(p.id, {
+			t: "tank",
+			who: target.id,
+			name: target.name,
+			items: profile.tank.map((k) => byKey.get(k)).filter((x) => !!x)
+		});
+	}
+	async function brag(p, key) {
+		if (!p.uid || typeof key !== "string") return;
+		const now = ctx.now();
+		if (now - p.lastChat < 1500) return;
+		p.lastChat = now;
+		const item = (await loadProfile(p.uid)).bag.find((x) => x.k === key);
+		if (item) all({
+			t: "brag",
+			id: p.id,
+			name: p.name,
+			item
+		});
+	}
+	return {
+		tickMs: 100,
+		input(from, raw) {
+			const m = raw;
+			if (!m || typeof m !== "object") return true;
+			if (m.t === "hi") {
+				join(from);
+				return true;
+			}
+			const p = players.get(from);
+			if (!p) return true;
+			if (p.name !== nameOf(from)) p.name = nameOf(from);
+			switch (m.t) {
+				case "mv":
+					move(p, m);
+					break;
+				case "cast":
+					cast(p);
+					break;
+				case "reel":
+					reel(p);
+					break;
+				case "bed":
+					lie(p, m.i);
+					break;
+				case "chat":
+					chat(p, m.text);
+					break;
+				case "tank":
+					setTank(p, m.keys);
+					break;
+				case "look":
+					look(p, m.who);
+					break;
+				case "brag": brag(p, m.key);
+			}
+			return true;
+		},
+		tick(now) {
+			for (const p of players.values()) if (p.fishing === "cast" && now >= p.biteAt) {
+				p.fishing = "bite";
+				p.biteUntil = now + BITE_WINDOW_MS;
+				all({
+					t: "bite",
+					id: p.id
+				});
+				all({
+					t: "st",
+					p: pub(p)
+				});
+			} else if (p.fishing === "bite" && now > p.biteUntil) {
+				stopFishing(p);
+				all({
+					t: "escape",
+					id: p.id
+				});
+				all({
+					t: "st",
+					p: pub(p)
+				});
+			}
+			if (posDirty.size && now - lastPos >= POS_MS) {
+				lastPos = now;
+				all({
+					t: "pos",
+					l: [...posDirty].flatMap((id) => {
+						const p = players.get(id);
+						return p ? [[
+							p.id,
+							p.x,
+							p.z,
+							p.r
+						]] : [];
+					})
+				});
+				posDirty.clear();
+			}
+		},
+		leave(key) {
+			if (players.delete(key)) all({
+				t: "gone",
+				id: key
+			});
+		},
+		finished: () => false
+	};
+}
+const fishingRefereeFactory = (setup, ctx) => fishingReferee(setup, ctx);
 //#endregion
 //#region src/games/memory/bot/memoryBot.ts
 /** 열 수 있는 카드 중 기억에 없는 것을 우선, 없으면 아무거나 */
@@ -15261,7 +16197,8 @@ const REFEREES = {
 	chosung: chosungReferee,
 	wordchain: wordchainReferee,
 	armwrestle: armwrestleReferee,
-	volley: volleyReferee
+	volley: volleyReferee,
+	fishing: fishingRefereeFactory
 };
 //#endregion
 //#region game-server/main.ts

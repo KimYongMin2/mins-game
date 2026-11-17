@@ -14,7 +14,8 @@ export function PlayerDots({ players }: { players: string }) {
   return (
     <span className="dots" aria-label={`${label}이 해요`}>
       <span className="dots__row" aria-hidden>
-        {Array.from({ length: max }, (_, i) => (
+        {/* 점은 8개까지만 (낚시터 16명은 글자로) */}
+        {Array.from({ length: Math.min(max, 8) }, (_, i) => (
           <i key={i} className={i < min ? 'dots__on' : 'dots__off'} />
         ))}
       </span>
