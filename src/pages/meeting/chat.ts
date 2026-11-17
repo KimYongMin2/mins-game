@@ -11,7 +11,24 @@ export const CHAT_KEEP = 200
 export type ChatSignal = { t: 'chat'; from: string; text: string }
 /** 듣기 끔/켬 (다른 사람 칸에 표시) */
 export type DeafSignal = { t: 'deaf'; from: string; on: boolean }
-export type MeetMsg = CallSignal | ChatSignal | DeafSignal
+/** 같이 게임하기: 누가 게임 방을 만들었다는 알림 (채팅에 [들어가기] 카드) */
+export type GameInvite = { path: string; title: string; id: string; name: string; pin: string | null }
+export type GameSignal = { t: 'game'; from: string } & GameInvite
+export type MeetMsg = CallSignal | ChatSignal | DeafSignal | GameSignal
+
+/**
+ * 받은 방 메시지가 게임 초대면 그 내용 (누구나 보낼 수 있어서 검사).
+ * 주소는 우리 게임 목록(paths → 이름)에 있는 것만, 방 번호·코드는 게임 방 모양만
+ */
+export function readGame(msg: unknown, games: Record<string, string>): GameInvite | null {
+  if (!msg || typeof msg !== 'object' || (msg as { t?: unknown }).t !== 'game') return null
+  const m = msg as Record<string, unknown>
+  if (typeof m.path !== 'string' || !(m.path in games)) return null
+  if (typeof m.id !== 'string' || !/^[A-Z0-9]{4,12}$/.test(m.id)) return null
+  const pin = typeof m.pin === 'string' && /^\d{4}$/.test(m.pin) ? m.pin : null
+  const name = cleanChat(m.name)?.slice(0, 20) ?? '방'
+  return { path: m.path, title: games[m.path], id: m.id, name, pin }
+}
 
 /** 받은 방 메시지가 듣기 끔/켬이면 그 값 */
 export function readDeaf(msg: unknown): boolean | null {
@@ -21,7 +38,7 @@ export function readDeaf(msg: unknown): boolean | null {
 }
 
 /** 채팅 한 줄. kind 'join'·'leave'는 들어옴·나감 알림 줄 */
-export type ChatLine = { key: number; kind: 'chat' | 'join' | 'leave'; name: string; text: string; mine?: boolean; at: number }
+export type ChatLine = { key: number; kind: 'chat' | 'join' | 'leave' | 'game'; name: string; text: string; mine?: boolean; at: number; game?: GameInvite }
 
 /** 보이지 않는 제어 문자를 지우고 앞뒤 공백을 자르고 길이를 줄인다. 비면 null */
 export function cleanChat(text: unknown): string | null {

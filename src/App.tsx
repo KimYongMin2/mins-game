@@ -6,6 +6,7 @@ import { loadNickname } from './shared/storage/nickname'
 import { setSwitchTargets } from './shared/nav'
 import { GAMES } from './pages/gameList'
 import { playerRange } from './pages/PlayerDots'
+import { MeetingCallProvider, useMeetingCall } from './pages/meeting/callState'
 
 // 게임·회의방 화면은 들어갈 때 받는다 (사용자 요청 — 처음에 16개 게임을 한꺼번에 받아 첫 화면이 느렸음)
 const ArcheryPage = lazy(() => import('./games/archery/ArcheryPage').then((m) => ({ default: m.ArcheryPage })))
@@ -28,6 +29,18 @@ const VolleyPage = lazy(() => import('./games/volley/VolleyPage').then((m) => ({
 const YutPage = lazy(() => import('./games/yut/YutPage').then((m) => ({ default: m.YutPage })))
 const ZolaballPage = lazy(() => import('./games/zolaball/ZolaballPage').then((m) => ({ default: m.ZolaballPage })))
 const MeetingPage = lazy(() => import('./pages/meeting/MeetingPage').then((m) => ({ default: m.MeetingPage })))
+const MeetingCallHost = lazy(() => import('./pages/meeting/MeetingPage').then((m) => ({ default: m.MeetingCallHost })))
+
+/** 회의방에 들어가 있으면 화면 어디서든 통화 화면(회의방 전체 화면 또는 떠 있는 작은 창)을 띄운다 — 통화한 채로 게임하기 */
+function CallHost() {
+  const { joined } = useMeetingCall()
+  if (!joined) return null
+  return (
+    <Suspense fallback={null}>
+      <MeetingCallHost />
+    </Suspense>
+  )
+}
 
 // 대기실 '게임 바꾸기'에서 고를 수 있는 게임 (친구 대전 되는 게임만, shared는 게임 목록을 몰라서 여기서 넣어 줌)
 setSwitchTargets(
@@ -47,6 +60,7 @@ function App() {
   const [nickname, setNickname] = useState(loadNickname)
 
   return (
+    <MeetingCallProvider>
     <BrowserRouter>
       <Suspense fallback={<div className="page-loading" role="status">불러오는 중…</div>}>
       <Routes>
@@ -140,7 +154,9 @@ function App() {
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
       </Suspense>
+      <CallHost />
     </BrowserRouter>
+    </MeetingCallProvider>
   )
 }
 

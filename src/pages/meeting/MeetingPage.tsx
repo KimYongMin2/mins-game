@@ -13,12 +13,16 @@ import { loadNickname } from '../../shared/storage/nickname'
 import { VoiceSettingsDialog } from './VoicePanel'
 import { VOICE_EFFECTS } from '../../shared/call/voiceFx'
 import { AvatarFace } from '../../shared/ui/AvatarFace'
-import { IconCamera, IconCameraOff, IconFlip, IconHeadphoneOff, IconHeadphones, IconLayout, IconMessage, IconMore, IconScreenShare, IconMic, IconMicOff, IconPhoneOff, IconPin, IconSend, IconSliders, IconVolume, IconVolumeOff, IconWave } from '../../shared/ui/icons'
+import { IconCamera, IconCameraOff, IconGamepad, IconFlip, IconHeadphoneOff, IconHeadphones, IconLayout, IconMessage, IconMore, IconScreenShare, IconMic, IconMicOff, IconPhoneOff, IconPin, IconSend, IconSliders, IconVolume, IconVolumeOff, IconWave } from '../../shared/ui/icons'
 import { LAYOUTS, type Layout, ME, arrange, isLayout, screenId, screenOwner } from './layout'
 import { ANIMAL_EMOJI, decodeLook, encodeLook } from '../../shared/art3d/animalKinds'
 import { loadLook } from '../../shared/storage/avatar'
-import { CHAT_MAX, type ChatLine, type ChatSignal, type MeetMsg, cleanChat, diffMembers, pushLine, readChat, readDeaf } from './chat'
+import { CHAT_MAX, type ChatLine, type ChatSignal, type GameInvite, type MeetMsg, cleanChat, diffMembers, pushLine, readChat, readDeaf, readGame } from './chat'
+import { MiniCall } from './MiniCall'
+import { pvpLink, switchTargets } from '../../shared/nav'
 import { playChat, playJoin, playLeave } from './sounds'
+import { type Joined, useMeetingCall } from './callState'
+import { useLocation, useNavigate } from 'react-router'
 import './meeting.css'
 
 // 회의방: 열린 방 목록에서 골라 들어가 음성 통화. 방장이 방을 만들 때 이름과 전체 공개/비공개(코드)를 정한다.
@@ -56,9 +60,7 @@ function readRoomInfo(x: Record<string, unknown>): RoomInfo | null {
 }
 
 /** 들어간 방: 이름과, 비공개면 코드 (화면에 보여 줌) */
-type Joined = { room: Room<MeetMsg>; voice: VoiceChanger | null; name: string; pin: string | null }
-
-type View = { kind: 'list'; error?: string } | { kind: 'create' } | { kind: 'busy'; text: string } | ({ kind: 'room' } & Joined)
+type View = { kind: 'list'; error?: string } | { kind: 'create' } | { kind: 'busy'; text: string }
 
 const ERROR_TEXT: Record<RoomError['reason'], string> = {
   'not-found': '방이 없어졌어요',
@@ -315,7 +317,7 @@ function Sheet({ label, onClose, children }: { label: string; onClose: () => voi
 const timeText = (at: number) => new Date(at).toLocaleTimeString('ko-KR', { hour: 'numeric', minute: '2-digit' })
 
 /** 채팅 칸: 위로 쌓이는 줄 + 아래 입력. 맨 아래를 보고 있으면 새 줄이 올 때 따라 내려간다 */
-function ChatPanel({ lines, onSend }: { lines: ChatLine[]; onSend: (text: string) => void }) {
+function ChatPanel({ lines, onSend, onJoinGame }: { lines: ChatLine[]; onSend: (text: string) => void; onJoinGame: (g: GameInvite) => void }) {
   const [text, setText] = useState('')
   const listRef = useRef<HTMLOListElement>(null)
   const stickRef = useRef(true)
@@ -343,7 +345,20 @@ function ChatPanel({ lines, onSend }: { lines: ChatLine[]; onSend: (text: string
       >
         {lines.length === 0 && <li className="meet-chat__empty">아직 채팅이 없어요. 말하기 어려우면 여기에 써 주세요</li>}
         {lines.map((l) =>
-          l.kind === 'chat' ? (
+          l.kind === 'game' && l.game ? (
+            <li key={l.key} className="meet-chat__game">
+              <span>
+                <IconGamepad size={16} /> <b>{l.name}</b>님이 <b>{l.game.title}</b> 방을 만들었어요
+              </span>
+              {l.mine ? (
+                <small>내가 만든 방 · {timeText(l.at)}</small>
+              ) : (
+                <button type="button" className="button button--primary button--small" onClick={() => onJoinGame(l.game!)}>
+                  들어가기
+                </button>
+              )}
+            </li>
+          ) : l.kind === 'chat' ? (
             <li key={l.key} className={`meet-chat__line${l.mine ? ' meet-chat__line--mine' : ''}`}>
               <span className="meet-chat__who">
                 <b>{l.name}</b>
@@ -405,6 +420,8 @@ function useWide(): boolean {
 const SETTLE_MS = 1500
 
 type RoomProps = Joined & {
+  /** 회의방 밖(메인·게임)이면 떠 있는 작은 통화 창으로 */
+  mini: boolean
   nickname: string
   /** 목소리 효과 (방 목록에서 고른 걸 이어서) */
   settings: VoiceSettings
@@ -414,7 +431,7 @@ type RoomProps = Joined & {
   onLeave: () => void
 }
 
-type SheetKind = { kind: 'voice' } | { kind: 'volume' } | { kind: 'layout' } | { kind: 'more' } | { kind: 'person'; id: string; name: string }
+type SheetKind = { kind: 'voice' } | { kind: 'volume' } | { kind: 'layout' } | { kind: 'more' } | { kind: 'games' } | { kind: 'person'; id: string; name: string }
 
 /** 보기 방식·카메라 끈 사람 숨기기는 기기에 기억 */
 const LAYOUT_KEY = 'meeting-layout'
@@ -451,7 +468,16 @@ async function getCamera(facing: Facing): Promise<MediaStreamTrack | null> {
 }
 
 /** 방을 닫고 마이크를 끄는 건 부르는 쪽(MeetingPage)이 한다 */
-function MeetingRoom({ room, name, pin, nickname, voice, settings, onSettings, onVoice, onLeave }: RoomProps) {
+/** 같이 게임하기로 고를 수 있는 게임 (친구 대전 되는 게임 — App이 넣어 둔 목록), 주소 → 이름 */
+const gameTitles = (): Record<string, string> => Object.fromEntries(switchTargets().map((g) => [g.path, g.title]))
+
+/** 게임 방 번호 (게임 방 모양 — 영문 대문자·숫자 6자) */
+const gameRoomId = () => Array.from({ length: 6 }, () => 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'[Math.floor(Math.random() * 32)]).join('')
+
+function MeetingRoom({ room, name, pin, nickname, voice, settings, onSettings, onVoice, onLeave, mini }: RoomProps) {
+  const navigate = useNavigate()
+  /** 회의방 밖에서 받은 게임 초대 (작은 창에 [들어가기]) */
+  const [invite, setInvite] = useState<(GameInvite & { from: string }) | null>(null)
   const [sheet, setSheet] = useState<SheetKind | null>(null)
   // 목소리 설정 창: 열려 있는 동안 다른 사람에게 내 소리를 안 보낸다 (사용자 요청)
   const openVoice = (open: boolean) => {
@@ -589,6 +615,34 @@ function MeetingRoom({ room, name, pin, nickname, voice, settings, onSettings, o
     setScreen(sc)
   }
 
+  // 회의방 밖으로 나가면 카메라는 끈다 (내가 영상을 볼 일이 없어서 데이터만 씀). 화면 공유는 그대로 (내 게임 화면 보여 주기)
+  useEffect(() => {
+    if (!mini || !cameraRef.current) return
+    const t = cameraRef.current
+    setCamera(null)
+    t.stop()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mini])
+
+  /** 같이 게임하기: 게임 방을 정해 둔 번호로 만들고, 채팅에 [들어가기] 카드를 보낸 뒤 그 게임으로 */
+  function startGame(path: string) {
+    const title = gameTitles()[path]
+    if (!title) return
+    const id = gameRoomId()
+    const gamePin = pin ?? String(Math.floor(Math.random() * 10000)).padStart(4, '0')
+    const roomName = name.slice(0, 20)
+    room.send({ t: 'game', from: room.myId, path, title, id, name: roomName, pin: gamePin })
+    addLine({ kind: 'game', name: nickname, text: '', mine: true, game: { path, title, id, name: roomName, pin: gamePin } })
+    setSheet(null)
+    navigate(pvpLink(path, { kind: 'create', name: roomName, pin: gamePin, id }))
+  }
+
+  /** 받은 초대로 그 게임 방에 들어가기 */
+  function joinGame(g: GameInvite) {
+    setInvite(null)
+    navigate(pvpLink(g.path, { kind: 'join', room: { id: g.id, name: g.name }, pin: g.pin }))
+  }
+
   function toggleDeaf() {
     const on = !deafRef.current
     deafRef.current = on
@@ -649,7 +703,7 @@ function MeetingRoom({ room, name, pin, nickname, voice, settings, onSettings, o
   const [tab, setTab] = useState<'people' | 'chat'>('people')
   const [lines, setLines] = useState<ChatLine[]>([])
   const [unread, setUnread] = useState(0)
-  const chatVisible = wide || tab === 'chat'
+  const chatVisible = !mini && (wide || tab === 'chat')
   const chatVisibleRef = useRef(chatVisible)
   const lineKey = useRef(0)
   useEffect(() => {
@@ -721,6 +775,13 @@ function MeetingRoom({ room, name, pin, nickname, voice, settings, onSettings, o
       const id = from ?? (msg as ChatSignal).from
       const who = membersRef.current.find((m) => m.id === id)
       if (!who) return
+      const game = readGame(msg, gameTitles())
+      if (game) {
+        addLine({ kind: 'game', name: who.nickname, text: '', game })
+        setInvite({ ...game, from: who.nickname })
+        if (!deafRef.current) playJoin()
+        return
+      }
       const deaf = readDeaf(msg)
       if (deaf !== null) {
         setDeafPeers((prev) => {
@@ -762,7 +823,7 @@ function MeetingRoom({ room, name, pin, nickname, voice, settings, onSettings, o
         const raw = await rawMic()
         if (raw) await v.replaceRaw(raw)
       }
-      document.querySelectorAll<HTMLAudioElement>('.meet audio').forEach((a) => {
+      document.querySelectorAll<HTMLAudioElement>('.meet-audio audio').forEach((a) => {
         if (a.paused) void a.play().catch((e) => isBlocked(e) && !a.muted && setBlocked(true))
       })
       timers.splice(0).forEach(clearTimeout)
@@ -819,7 +880,7 @@ function MeetingRoom({ room, name, pin, nickname, voice, settings, onSettings, o
   function unblock() {
     setBlocked(false)
     levelContext()
-    document.querySelectorAll<HTMLAudioElement>('.meet audio').forEach((a) => void a.play().catch((e) => isBlocked(e) && !a.muted && setBlocked(true)))
+    document.querySelectorAll<HTMLAudioElement>('.meet-audio audio').forEach((a) => void a.play().catch((e) => isBlocked(e) && !a.muted && setBlocked(true)))
   }
 
   // 칸 늘어놓기 (보기 방식대로)
@@ -906,6 +967,10 @@ function MeetingRoom({ room, name, pin, nickname, voice, settings, onSettings, o
   /** 넓은 화면은 조작 줄에, 좁은 화면은 [더보기] 창에 */
   const moreButtons = (
     <>
+      <button type="button" className="meet-controls__btn meet-controls__btn--game" onClick={() => setSheet({ kind: 'games' })}>
+        <IconGamepad size={22} />
+        <span>같이 게임</span>
+      </button>
       {CAN_SHARE && (
         <button
           type="button"
@@ -963,7 +1028,58 @@ function MeetingRoom({ room, name, pin, nickname, voice, settings, onSettings, o
     </div>
   )
 
+  const hidden = (
+    <div className="meet-audio" hidden>
+      <Audio stream={speaker.stream} onBlocked={onBlocked} />
+      <SpeakWatch id={ME} stream={micOn ? myStream : null} onChange={onSpeaking} />
+      {members.map((m) => {
+        const p = peers.get(m.id)
+        return <SpeakWatch key={m.id} id={m.id} stream={p && p.micOn ? p.stream : null} onChange={onSpeaking} />
+      })}
+      {[...peers.entries()].map(([id, p]) => {
+        const who = members.find((m) => m.id === id)
+        return p.stream && <PeerAudio key={id} stream={p.stream} speaker={speaker} volume={who ? volumeOf(who.nickname) : PERSON_VOLUME.default} />
+      })}
+      {sharingIds.map((id) => {
+        const st = call.screenAudio[id]
+        const who = members.find((m) => m.id === id)
+        return st && <PeerAudio key={screenId(id)} stream={st} speaker={speaker} volume={who ? volumeOf(who.nickname) : PERSON_VOLUME.default} />
+      })}
+    </div>
+  )
+
+  if (mini)
+    return (
+      <>
+        {hidden}
+        <MiniCall
+          name={name}
+          faces={[
+            { id: ME, name: nickname, avatar: myAvatar().avatar, speaking: speakingIds.has(ME), me: true },
+            ...members.map((m) => ({ id: m.id, name: m.nickname, avatar: m.avatar, speaking: speakingIds.has(m.id) })),
+          ]}
+          micOn={micOn}
+          hasMic={!!voice}
+          deafened={deafened}
+          unread={unread}
+          blocked={blocked}
+          invite={invite}
+          onMic={() => toggleMic(!micOn)}
+          onDeaf={toggleDeaf}
+          onOpen={() => navigate('/meeting')}
+          onLeave={onLeave}
+          onUnblock={unblock}
+          onJoinGame={() => invite && joinGame(invite)}
+          onDismissInvite={() => setInvite(null)}
+        />
+      </>
+    )
+
   return (
+    <>
+    {hidden}
+    <main className="page arcade meet-page--room">
+    <MeetHeader />
     <section className="meet">
       <div className="meet-bar">
         <IconVolume size={20} className="meet-bar__icon" />
@@ -1007,25 +1123,9 @@ function MeetingRoom({ room, name, pin, nickname, voice, settings, onSettings, o
         {(wide || tab === 'people') && people}
         {/* 좁은 화면에서 사람 탭을 볼 때도 채팅 줄은 그대로 쌓이게 숨기기만 */}
         <div className="meet-body__chat" hidden={!chatVisible}>
-          <ChatPanel lines={lines} onSend={sendChat} />
+          <ChatPanel lines={lines} onSend={sendChat} onJoinGame={joinGame} />
         </div>
       </div>
-
-      <Audio stream={speaker.stream} onBlocked={onBlocked} />
-      <SpeakWatch id={ME} stream={micOn ? myStream : null} onChange={onSpeaking} />
-      {members.map((m) => {
-        const p = peers.get(m.id)
-        return <SpeakWatch key={m.id} id={m.id} stream={p && p.micOn ? p.stream : null} onChange={onSpeaking} />
-      })}
-      {[...peers.entries()].map(([id, p]) => {
-        const who = members.find((m) => m.id === id)
-        return p.stream && <PeerAudio key={id} stream={p.stream} speaker={speaker} volume={who ? volumeOf(who.nickname) : PERSON_VOLUME.default} />
-      })}
-      {sharingIds.map((id) => {
-        const st = call.screenAudio[id]
-        const who = members.find((m) => m.id === id)
-        return st && <PeerAudio key={screenId(id)} stream={st} speaker={speaker} volume={who ? volumeOf(who.nickname) : PERSON_VOLUME.default} />
-      })}
 
       <div className="meet-controls">
         {voice ? (
@@ -1132,6 +1232,27 @@ function MeetingRoom({ room, name, pin, nickname, voice, settings, onSettings, o
           <p className="meet-settings__hint">내 기기에서만 바뀌어요. 상대는 몰라요</p>
         </Sheet>
       )}
+      {sheet?.kind === 'games' && (
+        <Sheet label="같이 게임하기" onClose={closeSheet}>
+          <p className="meet-settings__hint">게임 방을 만들고 채팅에 [들어가기]를 보내요. 통화는 그대로 이어져요</p>
+          <ul className="meet-games">
+            {switchTargets().map((g) => {
+              const over = count > g.max
+              return (
+                <li key={g.id}>
+                  <button type="button" className="meet-games__item" onClick={() => startGame(g.path)}>
+                    <b>{g.title}</b>
+                    <small className={over ? 'meet-games__over' : ''}>
+                      {g.min === g.max ? `${g.max}명` : `${g.min}~${g.max}명`}
+                      {over && ' · 다 못 들어가요'}
+                    </small>
+                  </button>
+                </li>
+              )
+            })}
+          </ul>
+        </Sheet>
+      )}
       {sheet?.kind === 'layout' && (
         <Sheet label="보기 방식" onClose={closeSheet}>
           <div className="meet-layouts" role="radiogroup" aria-label="보기 방식">
@@ -1171,6 +1292,8 @@ function MeetingRoom({ room, name, pin, nickname, voice, settings, onSettings, o
         </Sheet>
       )}
     </section>
+    </main>
+    </>
   )
 }
 
@@ -1343,13 +1466,14 @@ function CreateForm({ nickname, onCreate, onBack }: { nickname: string; onCreate
 
 export function MeetingPage() {
   const nickname = loadNickname() ?? '나'
+  const call = useMeetingCall()
   const [view, setView] = useState<View>({ kind: 'list' })
-  const [settings, setSettings] = useState<VoiceSettings>(DEFAULT_VOICE_SETTINGS)
+  const settings = call.settings ?? DEFAULT_VOICE_SETTINGS
   const settingsRef = useRef(settings)
   useEffect(() => {
     settingsRef.current = settings
   })
-  // 들어가는 도중에 화면을 떠나면 다 열린 방·마이크를 바로 닫는다
+  // 들어가는 도중에 화면을 떠나면 다 열린 방·마이크를 바로 닫는다 (들어간 뒤엔 화면을 떠나도 통화는 이어짐)
   const mountedRef = useRef(true)
   useEffect(() => {
     mountedRef.current = true
@@ -1358,22 +1482,11 @@ export function MeetingPage() {
     }
   }, [])
 
-  // 나가거나 화면을 떠나면 마이크를 끄고 방을 닫는다
-  const viewRef = useRef(view)
-  useEffect(() => {
-    viewRef.current = view
-  })
-  useEffect(() => () => close(viewRef.current), [])
-
-  function close(v: View) {
-    if (v.kind !== 'room') return
-    v.voice?.stop()
-    v.room.leave()
-  }
-
   async function enter(name: string, pin: string | null, open: () => Promise<Room<MeetMsg>>, wrongPin: string) {
     // 누르는 순간에 소리 장치를 깨워 둔다 (폰은 사용자 동작 안에서만 됨)
     levelContext()
+    // 다른 회의방에 들어가 있으면 먼저 나온다
+    if (call.joined) call.leave()
     setView({ kind: 'busy', text: '마이크 확인 중…' })
     const voice = await getMic()
     voice?.apply(settingsRef.current)
@@ -1385,7 +1498,8 @@ export function MeetingPage() {
         voice?.stop()
         return
       }
-      setView({ kind: 'room', room, voice, name, pin })
+      setView({ kind: 'list' })
+      call.start({ room, voice, name, pin })
     } catch (e) {
       voice?.stop()
       if (!(e instanceof RoomError)) console.warn('[meeting] 접속 오류', e)
@@ -1404,37 +1518,55 @@ export function MeetingPage() {
     void enter(r.name, pin, () => joinRoom<MeetMsg>(ROOM_ID, code, nickname, { capacity: CAPACITY, ...myAvatar() }), pin ? '코드가 틀렸어요 (방이 없어졌을 수도 있어요)' : ERROR_TEXT['not-found'])
   }
 
-  return (
-    <main className={`page arcade${view.kind === 'room' ? ' meet-page--room' : ''}`}>
-      <header className="meet__header">
-        <HomeLink className="button button--small">
-          ← 목록
-        </HomeLink>
-        <h1 className="title">회의방</h1>
-      </header>
+  // 들어가 있으면 회의방 화면은 MeetingCallHost가 그린다 (화면을 떠나도 통화가 이어지게 App 바깥쪽에 있음)
+  if (call.joined) return null
 
-      {view.kind === 'room' ? (
-        <MeetingRoom
-          room={view.room}
-          name={view.name}
-          pin={view.pin}
-          nickname={nickname}
-          voice={view.voice}
-          settings={settings}
-          onSettings={setSettings}
-          onVoice={(voice) => setView({ ...view, voice })}
-          onLeave={() => {
-            close(view)
-            setView({ kind: 'list' })
-          }}
-        />
-      ) : view.kind === 'busy' ? (
+  return (
+    <main className="page arcade">
+      <MeetHeader />
+      {view.kind === 'busy' ? (
         <p className="pvp-lobby__status meet__busy">{view.text}</p>
       ) : view.kind === 'create' ? (
         <CreateForm nickname={nickname} onCreate={create} onBack={() => setView({ kind: 'list' })} />
       ) : (
-        <RoomList onJoin={join} onCreate={() => setView({ kind: 'create' })} error={view.error} settings={settings} onSettings={setSettings} />
+        <RoomList onJoin={join} onCreate={() => setView({ kind: 'create' })} error={view.error} settings={settings} onSettings={call.setSettings} />
       )}
     </main>
+  )
+}
+
+function MeetHeader() {
+  return (
+    <header className="meet__header">
+      <HomeLink className="button button--small">← 목록</HomeLink>
+      <h1 className="title">회의방</h1>
+    </header>
+  )
+}
+
+/**
+ * 들어간 회의방 (App이 화면 어디서든 띄움). /meeting이면 전체 화면, 다른 곳이면 떠 있는 작은 통화 창.
+ * 한 컴포넌트가 계속 살아 있어서 화면을 옮겨도 통화·채팅·사람 목록이 그대로다
+ */
+export function MeetingCallHost() {
+  const call = useMeetingCall()
+  const location = useLocation()
+  const nickname = loadNickname() ?? '나'
+  if (!call.joined) return null
+  const { room, voice, name, pin } = call.joined
+  return (
+    <MeetingRoom
+      key={room.code}
+      room={room}
+      name={name}
+      pin={pin}
+      nickname={nickname}
+      voice={voice}
+      settings={call.settings ?? DEFAULT_VOICE_SETTINGS}
+      onSettings={call.setSettings}
+      onVoice={call.setVoice}
+      onLeave={call.leave}
+      mini={location.pathname !== '/meeting'}
+    />
   )
 }

@@ -1003,3 +1003,301 @@
   min-height: 64px;
   font-size: 0.875rem;
 }
+
+/* ───── 같이 게임하기 (2026-11-17) ───── */
+.meet-controls__btn--game {
+  border-color: var(--brand);
+}
+
+:root[data-theme='light'] .meet-controls__btn--game {
+  border-color: var(--navy);
+}
+
+.meet-games {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+  max-height: 50dvh;
+  overflow-y: auto;
+}
+
+.meet-games__item {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  width: 100%;
+  min-height: 56px;
+  padding: 8px 12px;
+  border: 2px solid var(--edge);
+  border-radius: 2px;
+  background: var(--card);
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.meet-games__item:hover {
+  border-color: var(--brand);
+}
+
+.meet-games__item b {
+  font-weight: 800;
+}
+
+.meet-games__item small {
+  font-size: 0.75rem;
+  color: var(--ink-soft);
+}
+
+.meet-games__over {
+  color: var(--meet-red, #e8473f) !important;
+}
+
+.meet-chat__game {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 10px;
+  border: 2px solid var(--brand);
+  border-radius: 2px;
+  font-size: 0.875rem;
+}
+
+:root[data-theme='light'] .meet-chat__game {
+  border-color: var(--navy);
+}
+
+.meet-chat__game span {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.meet-chat__game small {
+  font-size: 0.75rem;
+  color: var(--ink-muted);
+}
+
+/* ───── 떠 있는 작은 통화 창 (회의방 밖 — 메인·게임 위, 테마와 상관없이 남색) ───── */
+.mini-call {
+  position: fixed;
+  z-index: 60;
+  width: 216px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 6px;
+  border: 2px solid #ffd23f;
+  border-radius: 2px;
+  background: rgba(28, 23, 72, 0.94);
+  box-shadow: 4px 4px 0 rgba(0, 0, 0, 0.35);
+  color: #f4f2ff;
+  font-family: 'IBM Plex Sans KR', 'Pretendard Variable', Pretendard, system-ui, sans-serif;
+  touch-action: none;
+}
+
+.mini-call button {
+  font: inherit;
+  color: inherit;
+}
+
+.mini-call__top {
+  display: flex;
+  gap: 4px;
+}
+
+.mini-call__title {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 6px;
+  border: 0;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.08);
+  font-size: 0.8125rem;
+  font-weight: 800;
+  cursor: grab;
+  touch-action: none;
+}
+
+.mini-call__title > span:not(.mini-call__badge) {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mini-call__fold {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  border: 0;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.08);
+  cursor: pointer;
+}
+
+.mini-call__faces {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px;
+  border: 0;
+  background: none;
+  cursor: pointer;
+}
+
+.mini-call__face {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.12);
+  font-size: 1.0625rem;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.mini-call__face--speaking {
+  box-shadow: 0 0 0 2px #3ddc84;
+}
+
+.mini-call__more {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #d2cef4;
+}
+
+.mini-call__controls {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
+}
+
+.mini-call__btn {
+  display: grid;
+  place-items: center;
+  height: 36px;
+  border: 2px solid #4a43a0;
+  border-radius: 2px;
+  background: #2a2468;
+  cursor: pointer;
+}
+
+.mini-call__btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.mini-call__btn--off {
+  border-color: #e8473f;
+  color: #ff8a82 !important;
+}
+
+.mini-call__btn--leave {
+  border-color: #e8473f;
+  background: #e8473f;
+  color: #fff !important;
+}
+
+.mini-call__badge {
+  min-width: 18px;
+  padding: 0 5px;
+  border-radius: 2px;
+  background: #e8473f;
+  color: #fff;
+  font-size: 0.6875rem;
+  font-weight: 800;
+  line-height: 18px;
+  text-align: center;
+}
+
+.mini-call__badge--inline {
+  flex: none;
+  margin-left: auto;
+}
+
+.mini-call__invite {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 6px;
+  border-radius: 2px;
+  background: rgba(255, 210, 63, 0.14);
+  font-size: 0.8125rem;
+  line-height: 1.35;
+}
+
+.mini-call__invite-row {
+  display: flex;
+  gap: 4px;
+}
+
+.mini-call__act {
+  flex: 1;
+  min-height: 32px;
+  padding: 4px 8px;
+  border: 2px solid #4a43a0;
+  border-radius: 2px;
+  background: #2a2468;
+  font-size: 0.8125rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.mini-call__act--primary {
+  border-color: #ffd23f;
+  background: #ffd23f;
+  color: #1c1748 !important;
+}
+
+/* 접힌 모습: 작은 네모 하나 (끌어서 옮기고, 누르면 펼침) */
+.mini-call--folded {
+  width: auto;
+  padding: 0;
+  border: 0;
+  background: none;
+  box-shadow: none;
+}
+
+.mini-call__dot {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  border: 2px solid #ffd23f;
+  border-radius: 2px;
+  background: rgba(28, 23, 72, 0.94);
+  box-shadow: 4px 4px 0 rgba(0, 0, 0, 0.35);
+  cursor: grab;
+  touch-action: none;
+}
+
+.mini-call__dot--speaking {
+  border-color: #3ddc84;
+  box-shadow: 0 0 0 2px #3ddc84, 4px 4px 0 rgba(0, 0, 0, 0.35);
+}
+
+.mini-call__dot .mini-call__badge {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+}
+
+@media (max-width: 480px) {
+  .mini-call {
+    width: 184px;
+  }
+}

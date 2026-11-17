@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { CHAT_KEEP, CHAT_MAX, cleanChat, diffMembers, pushLine, readChat } from './chat'
+import { CHAT_KEEP, CHAT_MAX, cleanChat, diffMembers, pushLine, readChat, readDeaf, readGame } from './chat'
 
 describe('회의방 채팅', () => {
   it('글자를 다듬고 빈 글은 버린다', () => {
@@ -28,5 +28,24 @@ describe('회의방 채팅', () => {
     const { joined, left } = diffMembers([{ id: 'a' }, { id: 'b' }], [{ id: 'b' }, { id: 'c' }])
     expect(joined.map((m) => m.id)).toEqual(['c'])
     expect(left.map((m) => m.id)).toEqual(['a'])
+  })
+
+  it('게임 초대는 우리 게임·방 모양만', () => {
+    const games = { '/games/bomb': '폭탄 돌리기' }
+    expect(readGame({ t: 'game', from: '1', path: '/games/bomb', id: 'AB12CD', name: '우리방', pin: '1234' }, games)).toEqual({
+      path: '/games/bomb',
+      title: '폭탄 돌리기',
+      id: 'AB12CD',
+      name: '우리방',
+      pin: '1234',
+    })
+    expect(readGame({ t: 'game', path: 'https://evil.example', id: 'AB12CD' }, games)).toBeNull()
+    expect(readGame({ t: 'game', path: '/games/bomb', id: 'ab;12' }, games)).toBeNull()
+    expect(readGame({ t: 'game', path: '/games/bomb', id: 'AB12', pin: 'x' }, games)?.pin).toBeNull()
+  })
+
+  it('듣기 끔 신호', () => {
+    expect(readDeaf({ t: 'deaf', from: '1', on: true })).toBe(true)
+    expect(readDeaf({ t: 'deaf', on: 'yes' })).toBeNull()
   })
 })
