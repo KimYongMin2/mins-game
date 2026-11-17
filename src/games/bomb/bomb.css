@@ -569,3 +569,9 @@
   --me-blue: #2563eb;
   color: var(--ink);
 }
+
+/* 멀미 줄이기: 화면 흔들림을 끄면 터질 때 판 전체가 흔들리지 않음 (shared/storage/motion) */
+:root[data-shake='off'] .bm-table--boom,
+:root[data-shake='off'] .bm3--boom {
+  animation: none;
+}

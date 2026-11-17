@@ -14,6 +14,7 @@ import { type Guest, INPUT_RESEND_MS, PING_MS, STATE_HZ, STATE_HZ_SERVER, type V
 import { type Input, NO_INPUT, type Side, type SimState, createSim, step } from '../play/sim'
 import type { GameSummary } from '../records'
 import { type SoundName, playSound } from '../sounds'
+import { shakeScale } from '../../../shared/storage/motion'
 
 // 경기 화면. 물리는 1초에 60스텝 고정(남는 시간은 모았다가 다음 프레임에), 그리는 건 화면 주사율대로.
 // - 봇: 이 기기에서 나(왼쪽) vs 봇
@@ -344,7 +345,7 @@ export function GameScreen(props: Props) {
   else if (view.phase.kind === 'done') banner = view.phase.winner === me ? { text: '승리!', cls: 'vb-banner--win' } : { text: '패배' }
   // 스파이크하면 화면이 잠깐 좌우로 흔들린다
   const spikeAge = view.lastHit?.kind === 'spike' ? view.tick - view.lastHit.tick : 99
-  const shake = spikeAge < 10 ? 0.14 * (1 - spikeAge / 10) * (spikeAge % 2 ? 1 : -1) : 0
+  const shake = spikeAge < 10 ? 0.14 * (1 - spikeAge / 10) * (spikeAge % 2 ? 1 : -1) * shakeScale() : 0
 
   return (
     <div className="vb-game">

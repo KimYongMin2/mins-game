@@ -3,6 +3,7 @@ import { BARREL, CRATER_R, GRAVITY, MAX_SPEED, PLAYER_COLORS, STEP, TANK_CY, WOR
 import { TEAM_COLORS } from '../../../shared/team/teams'
 import { type ScreenState, canAim, myIndex } from '../play/view'
 import { type LandTheme, type Terrain, type Vec, heightAt, muzzle, tankPose } from '../rules/physics'
+import { shakeScale } from '../../../shared/storage/motion'
 
 // 옆에서 본 전장 (SVG). 화면 좌표는 y가 아래로 커져서 WORLD_H - y로 뒤집어 그린다.
 // 만화풍: 굵은 외곽선, 색깔별 대포, 하늘·구름·풀 덮인 흙 언덕. 맞으면 폭발과 피해 숫자.
@@ -124,7 +125,7 @@ export function tankShown(screen: ScreenState, i: number, t: TankDraw): boolean 
 export function shakeOf(screen: ScreenState): number {
   const v = screen.view
   const elapsed = screen.now - screen.phaseStart
-  return v?.phase === 'boom' && v.boom?.at && elapsed < 400 ? Math.sin(elapsed / 18) * (1 - elapsed / 400) * 1.2 : 0
+  return v?.phase === 'boom' && v.boom?.at && elapsed < 400 ? Math.sin(elapsed / 18) * (1 - elapsed / 400) * 1.2 * shakeScale() : 0
 }
 
 export function Battlefield({ screen, riders = false }: Props) {

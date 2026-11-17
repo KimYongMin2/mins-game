@@ -8,6 +8,7 @@ import { TEAM_COLORS, sameTeam } from '../../../shared/team/teams'
 import { TeamDot } from '../../../shared/ui/TeamResult'
 import { CHAMBERS, SUSPENSE_MS } from '../constants'
 import { type ScreenState, fired, isMyTurn, myIndex } from '../play/view'
+import { shakeScale } from '../../../shared/storage/motion'
 
 // 3D 탁자: 동물 캐릭터들이 둘러서고 가운데 은색 리볼버가 겨눈 사람 쪽으로 돈다. 나는 항상 앞.
 // 당기면 총이 떨리고(철컥) → '찰칵'이면 겨눠진 사람이 움찔, '탕!'이면 총구 불꽃 + 쓰러짐. 내 차례면 캐릭터를 눌러 고른다.
@@ -193,7 +194,7 @@ export function Table3D({ screen, onPick }: Props) {
           ;(gun.flash.material as THREE.SpriteMaterial).opacity = 1 - bangT
         }
         gun.light.intensity = gun.flash.visible ? 30 * (1 - bangT) : 0
-        const shake = bangT >= 0 && bangT < 1 ? (1 - bangT) * 0.15 : 0
+        const shake = (bangT >= 0 && bangT < 1 ? (1 - bangT) * 0.15 : 0) * shakeScale()
         camera.position.set(room.camera.pos.x + (Math.random() - 0.5) * shake, room.camera.pos.y + (Math.random() - 0.5) * shake, room.camera.pos.z)
         camera.lookAt(room.camera.look)
 

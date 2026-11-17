@@ -5,6 +5,7 @@ import { type AnimalRig, makeAnimal } from '../../../shared/art3d/animals'
 import { createStage } from '../../../shared/art3d/stage'
 import { type TurnEvent, isHurt } from '../rules/turn'
 import type { FighterShow } from './FightView'
+import { shakeScale } from '../../../shared/storage/motion'
 
 // 3D 링 위의 두 동물 권투 선수 (사용자 요청 — 처음엔 2D 만화풍, field/FightView.tsx는 WebGL이 안 될 때 그대로 씀).
 // 왼쪽이 나(파랑), 오른쪽이 상대(빨강). 카메라는 링 옆 조금 위에서 비스듬히.
@@ -232,7 +233,7 @@ export function FightView3D(props: Props) {
         if (hits.length > 0) stage.kick(strong ? 1 : 0.55)
         else if (shows[0].event === 'clash') stage.kick(0.45)
       }
-      const amp = reveal !== null && hits.length > 0 && p < 0.3 ? (strong ? 0.12 : 0.06) * (1 - p / 0.3) : 0
+      const amp = (reveal !== null && hits.length > 0 && p < 0.3 ? (strong ? 0.12 : 0.06) * (1 - p / 0.3) : 0) * shakeScale()
       camera.position.set(camBase.x + Math.sin(p * 90) * amp, camBase.y + Math.cos(p * 70) * amp * 0.6, camBase.z)
       camera.lookAt(look)
 

@@ -8,6 +8,7 @@ import { TEAM_COLORS } from '../../../shared/team/teams'
 import { TeamDot } from '../../../shared/ui/TeamResult'
 import { neighborsOf } from '../play/engine'
 import { type ScreenState, canThrowNow, myIndex } from '../play/view'
+import { shakeScale } from '../../../shared/storage/motion'
 
 // 3D 탁자: 둥근 나무 탁자에 동물 캐릭터들이 둘러선다. 나는 항상 앞(카메라 쪽). 폭탄은 든 사람 손에, 던지면 포물선으로 날아가고
 // 터지면 번쩍 + 연기 + 화면 흔들림. 옆 사람을 누르면 던진다(내가 들고 있을 때). 이름표는 3D 위치를 화면에 옮긴 HTML.
@@ -209,7 +210,7 @@ export function Table3D({ screen, onPick }: Props) {
             m.scale.setScalar(0.6 + k * 1.6)
           })
           blast.smokeMat.opacity = 0.75 * (1 - k)
-          shake = (1 - k) * 0.18
+          shake = (1 - k) * 0.18 * shakeScale()
         }
         camera.position.set(camBase.x + (Math.random() - 0.5) * shake, camBase.y + (Math.random() - 0.5) * shake, camBase.z)
         camera.lookAt(look)

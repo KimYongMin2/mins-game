@@ -1,6 +1,7 @@
 import { TOON_OUTLINE, TOON_SKIN, starPath } from '../../../shared/art/shapes'
 import { Bone as ToonBone } from '../../../shared/art/toon'
 import { type Stance, type TurnEvent, isHurt } from '../rules/turn'
+import { shakeScale } from '../../../shared/storage/motion'
 
 // 옆에서 본 두 격투가가 링 위에서 마주 선다. 왼쪽이 나(파랑), 오른쪽이 상대(빨강).
 // 처음엔 흰 바탕 선화 졸라맨이었는데 만화풍(굵은 외곽선, 머리띠, 글러브)으로 바꿈.
@@ -300,7 +301,7 @@ export function FightView({ fighters, reveal, now, names }: Props) {
   // 누가 맞으면 화면이 잠깐 흔들린다 (강타·뚫림은 더 세게)
   const hits = fighters.filter((f) => !f.hidden && f.event && isHurt(f.event))
   const strong = hits.some((f) => f.event !== 'hurt')
-  const amp = reveal !== null && hits.length > 0 && p < 0.3 ? (strong ? 6 : 3) * (1 - p / 0.3) : 0
+  const amp = (reveal !== null && hits.length > 0 && p < 0.3 ? (strong ? 6 : 3) * (1 - p / 0.3) : 0) * shakeScale()
   const shake = { x: Math.sin(p * 90) * amp, y: Math.cos(p * 70) * amp * 0.6 }
 
   return (

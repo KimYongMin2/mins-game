@@ -1,5 +1,6 @@
 import * as THREE from 'three'
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js'
+import { screenShakeOn } from '../storage/motion'
 
 // 3D 화면 공통: 렌더러·장면·카메라·조명을 만들고, 담는 칸 크기에 맞춰 늘고 준다. 게임 규칙은 모른다.
 // 2026-11-13 '더 사실적이고 역동적이게'(사용자 요청): 방 반사 빛(환경광)으로 재질이 살고, 카메라가 손으로 든 것처럼 아주 살짝 흔들리며,
@@ -57,7 +58,9 @@ function softDot(): THREE.CanvasTexture {
 
 export function createStage(host: HTMLElement, opts: { background: string; fov?: number; /** 손카메라 흔들림 크기 (기본 0.02, 정확히 눌러야 하는 게임은 0) */ sway?: number }): Stage {
   const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'low-power' })
-  renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1))
+  // 화질 배율: 처음엔 최대 2배, 그리는 게 느리면(초당 45장 아래) 저절로 1.5 → 1로 낮춤 — 화면이 뚝뚝 끊기면 멀미가 더 나서 (2026-11-17)
+  let pixelRatio = Math.min(2, window.devicePixelRatio || 1)
+  renderer.setPixelRatio(pixelRatio)
   renderer.shadowMap.enabled = true
   renderer.shadowMap.type = THREE.PCFSoftShadowMap
   renderer.outputColorSpace = THREE.SRGBColorSpace
@@ -111,7 +114,7 @@ export function createStage(host: HTMLElement, opts: { background: string; fov?:
   }
 
   // 카메라 연출 + 알갱이
-  const sway = opts.sway ?? 0.02
+  const swayBase = opts.sway ?? 0.02
   let kickAt = -1
   let kickAmp = 0
   const KICK_MS = 380
@@ -120,6 +123,8 @@ export function createStage(host: HTMLElement, opts: { background: string; fov?:
   let lastT = performance.now()
 
   function kick(strength = 1) {
+    // 멀미 줄이기: 화면 흔들림을 끄면 카메라 당김·흔들림 없음 (불꽃 burst는 그대로)
+    if (!screenShakeOn()) return
     const now = performance.now()
     // 이미 흔들리는 중이면 더 센 쪽으로
     const left = kickAt >= 0 ? Math.max(0, 1 - (now - kickAt) / KICK_MS) * kickAmp : 0
@@ -151,10 +156,27 @@ export function createStage(host: HTMLElement, opts: { background: string; fov?:
   }
 
   const camOff = new THREE.Vector3()
+  let slowFrames = 0
+  let countedFrames = 0
   function render() {
     const now = performance.now()
-    const dt = Math.min(0.05, (now - lastT) / 1000)
+    const gap = now - lastT
+    const dt = Math.min(0.05, gap / 1000)
     lastT = now
+    // 2초쯤(120장)마다 느린 장면 비율을 보고 화질 낮추기 (화면을 떠났다 돌아온 긴 틈은 안 셈)
+    if (gap < 200) {
+      countedFrames++
+      if (gap > 22) slowFrames++
+      if (countedFrames >= 120) {
+        if (slowFrames > 40 && pixelRatio > 1) {
+          pixelRatio = Math.max(1, pixelRatio - 0.5)
+          renderer.setPixelRatio(pixelRatio)
+          renderer.setSize(w, h, false)
+        }
+        countedFrames = 0
+        slowFrames = 0
+      }
+    }
     // 알갱이 움직이기
     for (let i = bursts.length - 1; i >= 0; i--) {
       const b = bursts[i]
@@ -181,6 +203,7 @@ export function createStage(host: HTMLElement, opts: { background: string; fov?:
     }
     // 손카메라 살랑임 + 부딪힘 흔들림·당김 (그린 뒤 되돌림)
     const t = now / 1000
+    const sway = screenShakeOn() ? swayBase : 0
     camOff.set(Math.sin(t * 0.53) * sway, Math.sin(t * 0.37 + 1) * sway * 0.6, 0)
     const k = kickAt >= 0 ? Math.max(0, 1 - (now - kickAt) / KICK_MS) : 0
     const baseFov = camera.fov

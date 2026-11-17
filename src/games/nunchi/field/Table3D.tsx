@@ -9,6 +9,7 @@ import { TeamDot } from '../../../shared/ui/TeamResult'
 import type { OutReason } from '../play/engine'
 import { type ScreenState, myIndex } from '../play/view'
 import { HAND_LABEL } from './Table'
+import { shakeScale } from '../../../shared/storage/motion'
 
 // 3D 탁자: 동물 캐릭터들이 둘러서고, 외치면 한 손 번쩍 + 머리 위에 숫자, 겹치면 '겹침!'과 함께 쓰러진다.
 // 결승 가위바위보는 머리 위 말풍선으로 고른 손을 보여준다. 나는 항상 앞(카메라 쪽).
@@ -103,7 +104,7 @@ export function Table3D({ screen }: { screen: ScreenState }) {
           rig.update(t + i, pose, mood)
         })
 
-        const shake = clashAt >= 0 && s.now - clashAt < 400 ? (1 - (s.now - clashAt) / 400) * 0.12 : 0
+        const shake = (clashAt >= 0 && s.now - clashAt < 400 ? (1 - (s.now - clashAt) / 400) * 0.12 : 0) * shakeScale()
         camera.position.set(room.camera.pos.x + (Math.random() - 0.5) * shake, room.camera.pos.y + (Math.random() - 0.5) * shake, room.camera.pos.z)
         camera.lookAt(room.camera.look)
 

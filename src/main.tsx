@@ -3,10 +3,12 @@ import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App.tsx'
 import { applyTheme, loadTheme } from './shared/storage/theme'
+import { applyScreenShake } from './shared/storage/motion'
 import { installErrorReport, reportError } from './shared/report'
 
 // 화면 테마(밝게/어둡게)를 그리기 전에 건다
 applyTheme(loadTheme())
+applyScreenShake()
 installErrorReport()
 
 // 새 버전이 배포되면 예전 화면이 받으려던 게임 코드 파일이 없어져서, 게임을 바꾸거나 들어갈 때 하얀 화면이 됐다(사용자 제보 2026-11-17).
