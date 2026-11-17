@@ -1,0 +1,50 @@
+logging:
+  logs:
+    default:
+      level: INFO
+storage:
+  "module": "file_system"
+  "root": "/data"
+apps:
+  tls:
+    certificates:
+      automate:
+        - livekit.3-39-97-59.sslip.io
+        - turn.3-39-97-59.sslip.io
+        - game.3-39-97-59.sslip.io
+  layer4:
+    servers:
+      main:
+        listen: [":443"]
+        routes:
+          - match:
+            - tls:
+                sni:
+                  - "turn.3-39-97-59.sslip.io"
+            handle:
+              - handler: tls
+              - handler: proxy
+                upstreams:
+                  - dial: ["172.26.2.162:5349"]
+          - match:
+              - tls:
+                  sni:
+                    - "livekit.3-39-97-59.sslip.io"
+            handle:
+              - handler: tls
+                connection_policies:
+                  - alpn: ["http/1.1"]
+              - handler: proxy
+                upstreams:
+                  - dial: ["localhost:7880"]
+          - match:
+              - tls:
+                  sni:
+                    - "game.3-39-97-59.sslip.io"
+            handle:
+              - handler: tls
+                connection_policies:
+                  - alpn: ["http/1.1"]
+              - handler: proxy
+                upstreams:
+                  - dial: ["localhost:8090"]

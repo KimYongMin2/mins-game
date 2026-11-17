@@ -1,0 +1,1 @@
+*/5 * * * * $HOME/update-game.sh >> $HOME/update-game.log 2>&1

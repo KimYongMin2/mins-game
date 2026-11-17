@@ -5,7 +5,7 @@ import { LISTEN_VOLUME, PERSON_VOLUME, Speaker } from '../../shared/call/speaker
 import { DEFAULT_VOICE_SETTINGS, MIC_VOLUME, VoiceChanger, type VoiceSettings } from '../../shared/call/voiceFx'
 import type { CallPeer } from '../../shared/call/voiceMesh'
 import { SfuCall, type VideoSource } from '../../shared/call/sfuCall'
-import { SFU_URL, sfuToken } from '../../shared/call/sfuToken'
+import { SFU_URL } from '../../shared/call/sfuToken'
 import { type Member, type Room, RoomError, createRoom, joinRoom, makeRoomCode } from '../../shared/online/room'
 import { advertiseRoom, cleanId, cleanList, cleanName, isInt, watchRooms } from '../../shared/online/roomList'
 import { readLocal, writeLocal } from '../../shared/storage/local'
@@ -30,7 +30,7 @@ import './meeting.css'
 // 방 목록·사람 목록은 게임과 같은 방(Supabase Realtime), 소리는 우리 음성 서버(LiveKit, 2026-11-16부터 — 기기끼리 직접은 막힌 망에서 안 돼서).
 // 들어갈 때 마이크를 허락받는다. 거절하면 듣기만 (나중에 다시 허락할 수 있음).
 
-/** 정원 (나 포함). 음성 서버가 나눠 줘서 늘림 (api/livekit-token.ts의 CAPACITY와 같게) */
+/** 정원 (나 포함). 음성 서버가 나눠 줘서 늘림 (game-server/main.ts의 MEET_CAPACITY와 같게 — 입장권에 들어감) */
 const CAPACITY = 16
 const ROOM_ID = 'meeting'
 /** 비공개 방 코드 자리 수 (숫자) */
@@ -761,10 +761,11 @@ function MeetingRoom({ room, name, pin, nickname, voice, settings, onSettings, o
     const mesh: SfuCall = new SfuCall({
       url: SFU_URL ?? '',
       // 입장권은 우리 게임 서버가 '이 방 사람'인지 보고 준다 (예전 Vercel 입장권은 방 확인이 없어 비공개 방도 몰래 들어올 수 있었음)
+      // 입장권은 우리 게임 서버가 '이 방 사람'인지 보고 준다 (비공개 코드도 서버가 검사한 뒤)
       getToken: async () => {
         const token = room.sfuToken ? await room.sfuToken() : null
-        // 게임 서버가 아직 예전이면(업데이트되는 몇 분) 예전 입장권으로 — 서버 업데이트를 확인한 뒤 예전 입장권은 닫음
-        return token ?? sfuToken(`meeting-${room.code}`, room.myId, nickname)
+        if (!token) throw new Error('입장권을 못 받음')
+        return token
       },
       onChange: () => {
         const ps = mesh.peers()

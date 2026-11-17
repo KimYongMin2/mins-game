@@ -1,0 +1,23 @@
+port: 7880
+bind_addresses:
+    - ""
+rtc:
+    tcp_port: 7881
+    port_range_start: 50000
+    port_range_end: 60000
+    use_external_ip: true
+    enable_loopback_candidate: false
+redis:
+    address: localhost:6379
+turn:
+    enabled: true
+    domain: turn.3-39-97-59.sslip.io
+    tls_port: 5349
+    udp_port: 3478
+    external_tls: true
+keys:
+  # 진짜 키는 서버에만 (game-server/.env의 LIVEKIT_API_KEY·LIVEKIT_API_SECRET과 같은 값)
+  API_KEY_HERE: API_SECRET_HERE
+limit:
+  bytes_per_sec: 2500000
+  num_tracks: 0
