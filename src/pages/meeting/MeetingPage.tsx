@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { HomeLink } from '../../shared/ui/HomeLink'
 import { levelContext, watchLevel } from '../../shared/call/level'
-import { LISTEN_VOLUME, Speaker } from '../../shared/call/speaker'
+import { LISTEN_VOLUME, PERSON_VOLUME, Speaker } from '../../shared/call/speaker'
 import { DEFAULT_VOICE_SETTINGS, MIC_VOLUME, VoiceChanger, type VoiceSettings } from '../../shared/call/voiceFx'
-import type { CallPeer, CallSignal } from '../../shared/call/voiceMesh'
+import type { CallPeer } from '../../shared/call/voiceMesh'
 import { SfuCall } from '../../shared/call/sfuCall'
 import { SFU_URL, sfuToken } from '../../shared/call/sfuToken'
 import { type Member, type Room, RoomError, createRoom, joinRoom, makeRoomCode } from '../../shared/online/room'
@@ -12,6 +12,12 @@ import { readLocal, writeLocal } from '../../shared/storage/local'
 import { loadNickname } from '../../shared/storage/nickname'
 import { VoiceSettingsDialog } from './VoicePanel'
 import { VOICE_EFFECTS } from '../../shared/call/voiceFx'
+import { AvatarFace } from '../../shared/ui/AvatarFace'
+import { IconMessage, IconMic, IconMicOff, IconPhoneOff, IconSend, IconSliders, IconVolume, IconVolumeOff, IconWave } from '../../shared/ui/icons'
+import { ANIMAL_EMOJI, decodeLook, encodeLook } from '../../shared/art3d/animalKinds'
+import { loadLook } from '../../shared/storage/avatar'
+import { CHAT_MAX, type ChatLine, type ChatSignal, type MeetMsg, cleanChat, diffMembers, pushLine, readChat } from './chat'
+import { playChat, playJoin, playLeave } from './sounds'
 import './meeting.css'
 
 // 회의방: 열린 방 목록에서 골라 들어가 음성 통화. 방장이 방을 만들 때 이름과 전체 공개/비공개(코드)를 정한다.
@@ -49,7 +55,7 @@ function readRoomInfo(x: Record<string, unknown>): RoomInfo | null {
 }
 
 /** 들어간 방: 이름과, 비공개면 코드 (화면에 보여 줌) */
-type Joined = { room: Room<CallSignal>; voice: VoiceChanger | null; name: string; pin: string | null }
+type Joined = { room: Room<MeetMsg>; voice: VoiceChanger | null; name: string; pin: string | null }
 
 type View = { kind: 'list'; error?: string } | { kind: 'create' } | { kind: 'busy'; text: string } | ({ kind: 'room' } & Joined)
 
@@ -61,6 +67,12 @@ const ERROR_TEXT: Record<RoomError['reason'], string> = {
 
 /** 방 채널 코드: 비공개면 코드를 붙여서, 코드가 틀리면 다른(빈) 채널이 된다 */
 const channelCode = (id: string, pin: string | null) => (pin ? `${id}-${pin}` : id)
+
+/** 방 사람 목록으로 알리는 내 캐릭터 (사람 칸 얼굴) */
+function myAvatar(): { avatar?: string } {
+  const look = loadLook()
+  return look ? { avatar: encodeLook(look) } : {}
+}
 
 const randomPin = () => String(Math.floor(Math.random() * 10 ** PIN_LENGTH)).padStart(PIN_LENGTH, '0')
 
@@ -106,9 +118,22 @@ function Audio({ stream, muted, onBlocked }: { stream: MediaStream; muted?: bool
   return <audio ref={ref} autoPlay playsInline muted={muted} />
 }
 
-/** 상대 한 사람 소리를 듣는 소리(Speaker)에 더한다. 크롬은 받은 소리를 audio에 걸어 둬야 Web Audio로 나와서 소리 끈 audio도 둔다 */
-function PeerAudio({ stream, speaker }: { stream: MediaStream; speaker: Speaker }) {
-  useEffect(() => speaker.add(stream), [stream, speaker])
+/** 상대 한 사람 소리를 듣는 소리(Speaker)에 더한다 (그 사람 크기 volume). 크롬은 받은 소리를 audio에 걸어 둬야 Web Audio로 나와서 소리 끈 audio도 둔다 */
+function PeerAudio({ stream, speaker, volume }: { stream: MediaStream; speaker: Speaker; volume: number }) {
+  const handle = useRef<ReturnType<Speaker['add']> | null>(null)
+  const volumeRef = useRef(volume)
+  useEffect(() => {
+    volumeRef.current = volume
+    handle.current?.setVolume(volume)
+  }, [volume])
+  useEffect(() => {
+    const h = speaker.add(stream, volumeRef.current)
+    handle.current = h
+    return () => {
+      h.remove()
+      handle.current = null
+    }
+  }, [stream, speaker])
   return <Audio stream={stream} muted />
 }
 
@@ -123,28 +148,185 @@ function VolumeSlider({ label, value, max, onChange }: { label: string; value: n
   )
 }
 
-function Person({ name, note, stream, micOn, status }: { name: string; note?: string; stream: MediaStream | null; micOn: boolean; status: string | null }) {
-  const speaking = useSpeaking(micOn ? stream : null)
-  return (
-    <li className={`meet-person${speaking ? ' meet-person--speaking' : ''}${status ? ' meet-person--waiting' : ''}`}>
-      <span className="meet-person__face" aria-hidden>
-        {name.slice(0, 1)}
-        {!micOn && <span className="meet-person__muted">🔇</span>}
-      </span>
-      <span className="meet-person__name">
-        {name}
-        {note && <span> {note}</span>}
-      </span>
-      <span className="meet-person__status">{status ?? (micOn ? (speaking ? '말하는 중' : '') : '마이크 꺼짐')}</span>
-    </li>
-  )
-}
-
 const CONNECTION_TEXT: Record<CallPeer['connection'], string | null> = {
   connecting: '연결 중…',
   connected: null,
   failed: '연결 안 됨',
 }
+
+/** 사람마다 소리 크기 (닉네임으로 기기에 기억 — 접속 번호는 들어올 때마다 바뀌어서) */
+const PERSON_VOLUME_KEY = 'meeting-person-volume'
+const PERSON_VOLUME_KEEP = 100
+
+function loadPersonVolumes(): Record<string, number> {
+  try {
+    const raw = JSON.parse(readLocal(PERSON_VOLUME_KEY) ?? '{}') as Record<string, unknown>
+    const out: Record<string, number> = {}
+    for (const [k, v] of Object.entries(raw)) if (typeof v === 'number' && Number.isFinite(v)) out[k] = Math.min(PERSON_VOLUME.max, Math.max(PERSON_VOLUME.min, v))
+    return out
+  } catch {
+    return {}
+  }
+}
+
+function savePersonVolumes(v: Record<string, number>) {
+  // 기본(100%)은 지우고, 너무 많아지면 오래된 것부터 버린다
+  const entries = Object.entries(v).filter(([, x]) => x !== PERSON_VOLUME.default)
+  writeLocal(PERSON_VOLUME_KEY, JSON.stringify(Object.fromEntries(entries.slice(-PERSON_VOLUME_KEEP))))
+}
+
+/** 사람 칸 얼굴: 나는 3D로 그린 얼굴, 다른 사람은 고른 동물 그림 글자 (없으면 이름 첫 글자) */
+function Face({ me, avatar, name }: { me?: boolean; avatar?: string; name: string }) {
+  if (me) return <AvatarFace look={loadLook()} size={64} />
+  const look = decodeLook(avatar)
+  return (
+    <span className="meet-tile__letter" aria-hidden>
+      {look ? ANIMAL_EMOJI[look.animal] : name.slice(0, 1)}
+    </span>
+  )
+}
+
+type TileProps = { name: string; me?: boolean; avatar?: string; stream: MediaStream | null; micOn: boolean; status: string | null; volume: number; onOpen: () => void }
+
+/** 사람 한 칸 (디스코드 음성 채널 칸처럼): 말하면 초록 테두리, 마이크 꺼짐·소리 크기 바꿈 표시. 누르면 소리 크기 */
+function Tile({ name, me, avatar, stream, micOn, status, volume, onOpen }: TileProps) {
+  const speaking = useSpeaking(micOn ? stream : null)
+  return (
+    <li>
+      <button
+        type="button"
+        className={`meet-tile${speaking ? ' meet-tile--speaking' : ''}${status ? ' meet-tile--waiting' : ''}`}
+        onClick={onOpen}
+        aria-label={`${name}${me ? ' (나)' : ''} 소리 크기`}
+      >
+        <span className="meet-tile__face">
+          <Face me={me} avatar={avatar} name={name} />
+        </span>
+        {status && <span className="meet-tile__status">{status}</span>}
+        {!me && volume !== PERSON_VOLUME.default && (
+          <span className="meet-tile__vol">{volume === 0 ? <IconVolumeOff size={14} /> : `${Math.round(volume * 100)}%`}</span>
+        )}
+        <span className="meet-tile__name">
+          {!micOn && <IconMicOff size={14} className="meet-tile__muted" />}
+          <span>{name}</span>
+          {me && <small>나</small>}
+        </span>
+      </button>
+    </li>
+  )
+}
+
+/** 아래에서 올라오는 작은 창 (Esc·바깥 누르면 닫힘) */
+function Sheet({ label, onClose, children }: { label: string; onClose: () => void; children: React.ReactNode }) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose()
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onClose])
+  return (
+    <div className="sheet" role="dialog" aria-modal="true" aria-label={label} onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div className="sheet__panel meet-settings">
+        <h2 className="meet-settings__title">{label}</h2>
+        {children}
+        <button type="button" className="button" onClick={onClose}>
+          닫기
+        </button>
+      </div>
+    </div>
+  )
+}
+
+const timeText = (at: number) => new Date(at).toLocaleTimeString('ko-KR', { hour: 'numeric', minute: '2-digit' })
+
+/** 채팅 칸: 위로 쌓이는 줄 + 아래 입력. 맨 아래를 보고 있으면 새 줄이 올 때 따라 내려간다 */
+function ChatPanel({ lines, onSend }: { lines: ChatLine[]; onSend: (text: string) => void }) {
+  const [text, setText] = useState('')
+  const listRef = useRef<HTMLOListElement>(null)
+  const stickRef = useRef(true)
+  useEffect(() => {
+    const el = listRef.current
+    if (el && stickRef.current) el.scrollTop = el.scrollHeight
+  }, [lines])
+  const send = () => {
+    const t = cleanChat(text)
+    if (!t) return
+    onSend(t)
+    setText('')
+    stickRef.current = true
+  }
+  return (
+    <div className="meet-chat">
+      <ol
+        ref={listRef}
+        className="meet-chat__lines"
+        aria-live="polite"
+        onScroll={(e) => {
+          const el = e.currentTarget
+          stickRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 40
+        }}
+      >
+        {lines.length === 0 && <li className="meet-chat__empty">아직 채팅이 없어요. 말하기 어려우면 여기에 써 주세요</li>}
+        {lines.map((l) =>
+          l.kind === 'chat' ? (
+            <li key={l.key} className={`meet-chat__line${l.mine ? ' meet-chat__line--mine' : ''}`}>
+              <span className="meet-chat__who">
+                <b>{l.name}</b>
+                <time>{timeText(l.at)}</time>
+              </span>
+              <span className="meet-chat__text">{l.text}</span>
+            </li>
+          ) : (
+            <li key={l.key} className={`meet-chat__notice meet-chat__notice--${l.kind}`}>
+              <b>{l.name}</b>님이 {l.kind === 'join' ? '들어왔어요' : '나갔어요'} · {timeText(l.at)}
+            </li>
+          ),
+        )}
+      </ol>
+      <form
+        className="meet-chat__form"
+        onSubmit={(e) => {
+          e.preventDefault()
+          send()
+        }}
+      >
+        <input
+          className="input meet-chat__input"
+          value={text}
+          onChange={(e) => setText(e.target.value.slice(0, CHAT_MAX))}
+          onKeyDown={(e) => {
+            // 한글 입력 중 Enter(글자 확정)로 두 번 보내지지 않게
+            if (e.key !== 'Enter' || e.nativeEvent.isComposing || e.keyCode === 229) return
+            e.preventDefault()
+            send()
+          }}
+          placeholder="메시지 보내기"
+          autoComplete="off"
+          enterKeyHint="send"
+          aria-label="채팅 메시지"
+        />
+        <button type="submit" className="button meet-chat__send" disabled={!cleanChat(text)} aria-label="보내기">
+          <IconSend size={18} />
+        </button>
+      </form>
+    </div>
+  )
+}
+
+/** 넓은 화면이면 사람 칸과 채팅을 나란히, 좁으면 탭 */
+const WIDE_QUERY = '(min-width: 900px)'
+function useWide(): boolean {
+  const [wide, setWide] = useState(() => window.matchMedia(WIDE_QUERY).matches)
+  useEffect(() => {
+    const mq = window.matchMedia(WIDE_QUERY)
+    const on = () => setWide(mq.matches)
+    mq.addEventListener('change', on)
+    return () => mq.removeEventListener('change', on)
+  }, [])
+  return wide
+}
+
+/** 들어온 직후엔 사람 목록이 차례로 채워져서 들어옴 알림을 안 낸다 */
+const SETTLE_MS = 1500
 
 type RoomProps = Joined & {
   nickname: string
@@ -156,15 +338,19 @@ type RoomProps = Joined & {
   onLeave: () => void
 }
 
+type SheetKind = { kind: 'voice' } | { kind: 'volume' } | { kind: 'person'; name: string }
+
 /** 방을 닫고 마이크를 끄는 건 부르는 쪽(MeetingPage)이 한다 */
 function MeetingRoom({ room, name, pin, nickname, voice, settings, onSettings, onVoice, onLeave }: RoomProps) {
+  const [sheet, setSheet] = useState<SheetKind | null>(null)
   // 목소리 설정 창: 열려 있는 동안 다른 사람에게 내 소리를 안 보낸다 (사용자 요청)
-  const [voiceOpen, setVoiceOpen] = useState(false)
   const openVoice = (open: boolean) => {
-    setVoiceOpen(open)
+    setSheet(open ? { kind: 'voice' } : null)
     voice?.setSending(!open)
   }
+  const closeSheet = useMemo(() => () => setSheet(null), [])
   const [members, setMembers] = useState<Member[]>([])
+  const membersRef = useRef<Member[]>([])
   const [blocked, setBlocked] = useState(false)
   const [asking, setAsking] = useState(false)
   /** 통화 상태 (바뀔 때마다 새로 받아 그린다) */
@@ -177,6 +363,36 @@ function MeetingRoom({ room, name, pin, nickname, voice, settings, onSettings, o
     return s
   })
   const [listenVolume, setListenVolume] = useState(speaker.level)
+  const [personVolumes, setPersonVolumes] = useState(loadPersonVolumes)
+  const volumeOf = (who: string) => personVolumes[who] ?? PERSON_VOLUME.default
+  const setPersonVolume = (who: string, v: number) => {
+    const next = { ...personVolumes }
+    delete next[who] // 다시 넣어 '최근'으로
+    next[who] = v
+    setPersonVolumes(next)
+    savePersonVolumes(next)
+  }
+
+  // 채팅 (좁은 화면은 사람 / 채팅 탭, 안 보는 동안 온 줄 수를 탭에 표시)
+  const wide = useWide()
+  const [tab, setTab] = useState<'people' | 'chat'>('people')
+  const [lines, setLines] = useState<ChatLine[]>([])
+  const [unread, setUnread] = useState(0)
+  const chatVisible = wide || tab === 'chat'
+  const chatVisibleRef = useRef(chatVisible)
+  const lineKey = useRef(0)
+  useEffect(() => {
+    chatVisibleRef.current = chatVisible
+    if (chatVisible) setUnread(0)
+  }, [chatVisible])
+  const addLine = useMemo(
+    () => (line: Omit<ChatLine, 'key' | 'at'>) => {
+      setLines((ls) => pushLine(ls, { ...line, key: ++lineKey.current, at: Date.now() }))
+      if (line.kind === 'chat' && !line.mine && !chatVisibleRef.current) setUnread((n) => n + 1)
+    },
+    [],
+  )
+
   const voiceRef = useRef(voice)
   useEffect(() => {
     voiceRef.current = voice
@@ -194,16 +410,43 @@ function MeetingRoom({ room, name, pin, nickname, voice, settings, onSettings, o
     })
     meshRef.current = mesh
     mesh.setTrack(voiceRef.current?.track ?? null)
+    const since = Date.now()
+    playJoin()
     const offMembers = room.onMembers((ms) => {
+      // 들어옴·나감: 알림음 + 채팅에 한 줄 (들어온 직후 목록이 채워지는 건 빼고)
+      const { joined, left } = diffMembers(membersRef.current, ms)
+      if (Date.now() - since > SETTLE_MS) {
+        for (const m of joined) addLine({ kind: 'join', name: m.nickname, text: '' })
+        if (joined.length) playJoin()
+      }
+      for (const m of left) addLine({ kind: 'leave', name: m.nickname, text: '' })
+      if (left.length) playLeave()
+      membersRef.current = ms
       setMembers(ms)
       mesh.setMembers(ms.map((m) => m.id))
     })
+    // 채팅: 게임 서버가 붙인 보낸 사람(from)을 믿고, 없으면(예전 방식) 메시지 안의 from. 사람 목록에 없는 사람 것은 버린다
+    const offMessage = room.onMessage((msg, from) => {
+      const text = readChat(msg)
+      if (!text) return
+      const id = from ?? (msg as ChatSignal).from
+      const who = membersRef.current.find((m) => m.id === id)
+      if (!who) return
+      addLine({ kind: 'chat', name: who.nickname, text })
+      playChat()
+    })
     return () => {
       offMembers()
+      offMessage()
       mesh.close()
       meshRef.current = null
     }
-  }, [room, nickname])
+  }, [room, nickname, addLine])
+
+  function sendChat(text: string) {
+    room.send({ t: 'chat', from: room.myId, text })
+    addLine({ kind: 'chat', name: nickname, text, mine: true })
+  }
 
   // 폰을 다른 앱으로 보냈다 돌아오면(또는 인터넷이 다시 붙으면) 끊긴 걸 다시 잇는다:
   // 소리 처리 깨우기 → 끝나 버린 마이크 다시 받기 → 멈춘 소리 다시 틀기 → 조금 뒤(서버 연결이 다시 붙을 틈) 끊긴 사람과 다시 잇기
@@ -257,6 +500,7 @@ function MeetingRoom({ room, name, pin, nickname, voice, settings, onSettings, o
   const peers = new Map(call.peers.map((p) => [p.id, p]))
   const onBlocked = useMemo(() => () => setBlocked(true), [])
   const hostGone = room.role === 'guest' && !members.some((m) => m.role === 'host')
+  const effectLabel = VOICE_EFFECTS.find((e) => e.id === settings.effect)?.label
 
   async function allowMic() {
     setAsking(true)
@@ -276,14 +520,46 @@ function MeetingRoom({ room, name, pin, nickname, voice, settings, onSettings, o
     document.querySelectorAll<HTMLAudioElement>('.meet audio').forEach((a) => void a.play().catch((e) => isBlocked(e) && !a.muted && setBlocked(true)))
   }
 
+  const people = (
+    <div className="meet-stage">
+      <ul className="meet-grid">
+        <Tile name={nickname} me stream={myStream} micOn={micOn} status={null} volume={PERSON_VOLUME.default} onOpen={() => setSheet({ kind: 'volume' })} />
+        {members.map((m) => {
+          const p = peers.get(m.id)
+          return (
+            <Tile
+              key={m.id}
+              name={m.nickname}
+              avatar={m.avatar}
+              stream={p?.stream ?? null}
+              micOn={p?.micOn ?? true}
+              status={p ? CONNECTION_TEXT[p.connection] : '연결 중…'}
+              volume={volumeOf(m.nickname)}
+              onOpen={() => setSheet({ kind: 'person', name: m.nickname })}
+            />
+          )
+        })}
+      </ul>
+      {members.length === 0 && (
+        <p className="meet__tip">{pin ? '친구들에게 방 이름과 코드를 알려 주세요' : '목록에서 이 방을 누르면 들어올 수 있어요'}</p>
+      )}
+      {[...peers.values()].some((p) => p.connection === 'failed') && (
+        <p className="meet__tip">'연결 안 됨'은 인터넷이 막혀 있어서예요 (휴대폰 데이터·회사·학교 와이파이). 와이파이를 바꿔 보세요</p>
+      )}
+      {hostGone && <p className="meet__tip">방을 만든 사람이 나가서 새로 들어올 수는 없어요</p>}
+      {!voice && <p className="meet__tip">마이크 없이 듣기만 하고 있어요</p>}
+    </div>
+  )
+
   return (
     <section className="meet">
-      <div className="meet__code">
-        <strong className="meet__name">{name}</strong>
-        <span>
+      <div className="meet-bar">
+        <IconVolume size={20} className="meet-bar__icon" />
+        <strong className="meet-bar__name">{name}</strong>
+        <span className="meet-bar__info">
           {pin ? (
             <>
-              🔒 비공개 · 코드 <b className="meet__pin">{pin}</b>
+              비공개 · 코드 <b className="meet__pin">{pin}</b>
             </>
           ) : (
             '전체 공개'
@@ -297,69 +573,78 @@ function MeetingRoom({ room, name, pin, nickname, voice, settings, onSettings, o
           목록에 없는 사람 {call.strangers}명이 듣고 있어요. 모르는 사람이면 방을 나가 새 방(비공개)을 만드세요
         </p>
       )}
+      {blocked && (
+        <button type="button" className="button button--primary meet__unblock" onClick={unblock}>
+          <IconVolume size={18} /> 소리 켜기
+        </button>
+      )}
 
-      <ul className="meet__people">
-        <Person name={nickname} note="(나)" stream={myStream} micOn={micOn} status={null} />
-        {members.map((m) => {
-          const p = peers.get(m.id)
-          return (
-            <Person
-              key={m.id}
-              name={m.nickname}
-              stream={p?.stream ?? null}
-              micOn={p?.micOn ?? true}
-              status={p ? CONNECTION_TEXT[p.connection] : '연결 중…'}
-            />
-          )
-        })}
-      </ul>
-      {members.length === 0 && (
-        <p className="meet__tip">{pin ? '친구들에게 방 이름과 코드를 알려 주세요' : '목록에서 이 방을 누르면 들어올 수 있어요'}</p>
+      {!wide && (
+        <div className="meet-tabs" role="tablist">
+          <button type="button" role="tab" aria-selected={tab === 'people'} className="meet-tabs__tab" onClick={() => setTab('people')}>
+            사람 {count}
+          </button>
+          <button type="button" role="tab" aria-selected={tab === 'chat'} className="meet-tabs__tab" onClick={() => setTab('chat')}>
+            <IconMessage size={16} /> 채팅
+            {unread > 0 && <span className="meet-tabs__badge">{unread > 99 ? '99+' : unread}</span>}
+          </button>
+        </div>
       )}
-      {[...peers.values()].some((p) => p.connection === 'failed') && (
-        <p className="meet__tip">'연결 안 됨'은 인터넷이 막혀 있어서예요 (휴대폰 데이터·회사·학교 와이파이). 와이파이를 바꿔 보세요</p>
-      )}
-      {hostGone && <p className="meet__tip">방을 만든 사람이 나가서 새로 들어올 수는 없어요</p>}
+
+      <div className={`meet-body${wide ? ' meet-body--wide' : ''}`}>
+        {(wide || tab === 'people') && people}
+        {/* 좁은 화면에서 사람 탭을 볼 때도 채팅 줄은 그대로 쌓이게 숨기기만 */}
+        <div className="meet-body__chat" hidden={!chatVisible}>
+          <ChatPanel lines={lines} onSend={sendChat} />
+        </div>
+      </div>
 
       <Audio stream={speaker.stream} onBlocked={onBlocked} />
-      {[...peers.values()].map((p) => p.stream && <PeerAudio key={p.id} stream={p.stream} speaker={speaker} />)}
+      {[...peers.entries()].map(([id, p]) => {
+        const who = members.find((m) => m.id === id)
+        return p.stream && <PeerAudio key={id} stream={p.stream} speaker={speaker} volume={who ? volumeOf(who.nickname) : PERSON_VOLUME.default} />
+      })}
 
-      <div className="meet__actions">
-        {blocked && (
-          <button type="button" className="button button--primary meet__big" onClick={unblock}>
-            🔊 소리 켜기
+      <div className="meet-controls">
+        {voice ? (
+          <button
+            type="button"
+            className={`meet-controls__btn${micOn ? '' : ' meet-controls__btn--off'}`}
+            aria-pressed={!micOn}
+            onClick={() => meshRef.current?.setMicOn(!micOn)}
+          >
+            {micOn ? <IconMic size={22} /> : <IconMicOff size={22} />}
+            <span>{micOn ? '마이크' : '마이크 꺼짐'}</span>
+          </button>
+        ) : (
+          <button type="button" className="meet-controls__btn meet-controls__btn--off" disabled={asking} onClick={allowMic}>
+            <IconMicOff size={22} />
+            <span>마이크 허락</span>
           </button>
         )}
-        {voice ? (
-          <>
-            <button
-              type="button"
-              className={`button meet__big${micOn ? ' button--primary' : ''}`}
-              aria-pressed={micOn}
-              onClick={() => meshRef.current?.setMicOn(!micOn)}
-            >
-              {micOn ? '🎤 마이크 끄기' : '🔇 마이크 켜기'}
-            </button>
-            {/* 목소리 변조: 설정 창에서 (다른 사람에겐 표시 안 함). 창이 열려 있는 동안 내 소리는 안 나감 */}
-            <button type="button" className="button meet__big" onClick={() => openVoice(true)}>
-              ⚙️ 목소리 설정 <span className="meet-voice__now">지금: {VOICE_EFFECTS.find((e) => e.id === settings.effect)?.label}</span>
-            </button>
-            {voiceOpen && (
-              <VoiceSettingsDialog inRoom settings={settings} onSave={onSettings} onClose={() => openVoice(false)} getRaw={async () => voice.rawTrack} />
-            )}
-          </>
-        ) : (
-          <>
-            <p className="meet__tip">마이크 없이 듣기만 하고 있어요</p>
-            <button type="button" className="button meet__big" disabled={asking} onClick={allowMic}>
-              🎤 마이크 허락하기
-            </button>
-          </>
+        {voice && (
+          <button type="button" className="meet-controls__btn" onClick={() => openVoice(true)}>
+            <IconWave size={22} />
+            <span>목소리 · {effectLabel}</span>
+          </button>
         )}
-        <div className="meet-voice">
-          <span className="meet-voice__label">소리 크기</span>
+        <button type="button" className="meet-controls__btn" onClick={() => setSheet({ kind: 'volume' })}>
+          <IconSliders size={22} />
+          <span>소리 크기</span>
+        </button>
+        <button type="button" className="meet-controls__btn meet-controls__btn--leave" onClick={onLeave}>
+          <IconPhoneOff size={22} />
+          <span>나가기</span>
+        </button>
+      </div>
+
+      {sheet?.kind === 'voice' && voice && (
+        <VoiceSettingsDialog inRoom settings={settings} onSave={onSettings} onClose={() => openVoice(false)} getRaw={async () => voice.rawTrack} />
+      )}
+      {sheet?.kind === 'volume' && (
+        <Sheet label="소리 크기" onClose={closeSheet}>
           <VolumeSlider
-            label="🔊 듣는 소리"
+            label="듣는 소리 (모두)"
             value={listenVolume}
             max={LISTEN_VOLUME.max}
             onChange={(v) => {
@@ -370,7 +655,7 @@ function MeetingRoom({ room, name, pin, nickname, voice, settings, onSettings, o
           />
           {voice && (
             <VolumeSlider
-              label="🎤 내 마이크"
+              label="내 마이크"
               value={micVolume}
               max={MIC_VOLUME.max}
               onChange={(v) => {
@@ -380,11 +665,23 @@ function MeetingRoom({ room, name, pin, nickname, voice, settings, onSettings, o
               }}
             />
           )}
-        </div>
-        <button type="button" className="button button--small" onClick={onLeave}>
-          나가기
-        </button>
-      </div>
+          <p className="meet-settings__hint">한 사람만 키우거나 줄이려면 그 사람 칸을 누르세요</p>
+        </Sheet>
+      )}
+      {sheet?.kind === 'person' && (
+        <Sheet label={`${sheet.name}님 소리`} onClose={closeSheet}>
+          <VolumeSlider label="소리 크기" value={volumeOf(sheet.name)} max={PERSON_VOLUME.max} onChange={(v) => setPersonVolume(sheet.name, v)} />
+          <button
+            type="button"
+            className={`button${volumeOf(sheet.name) === 0 ? ' button--primary' : ''}`}
+            aria-pressed={volumeOf(sheet.name) === 0}
+            onClick={() => setPersonVolume(sheet.name, volumeOf(sheet.name) === 0 ? PERSON_VOLUME.default : 0)}
+          >
+            {volumeOf(sheet.name) === 0 ? '이 사람 소리 다시 듣기' : '이 사람 소리 끄기'}
+          </button>
+          <p className="meet-settings__hint">내 기기에서만 바뀌어요. 상대는 몰라요</p>
+        </Sheet>
+      )}
     </section>
   )
 }
@@ -586,7 +883,7 @@ export function MeetingPage() {
     v.room.leave()
   }
 
-  async function enter(name: string, pin: string | null, open: () => Promise<Room<CallSignal>>, wrongPin: string) {
+  async function enter(name: string, pin: string | null, open: () => Promise<Room<MeetMsg>>, wrongPin: string) {
     // 누르는 순간에 소리 장치를 깨워 둔다 (폰은 사용자 동작 안에서만 됨)
     levelContext()
     setView({ kind: 'busy', text: '마이크 확인 중…' })
@@ -611,16 +908,16 @@ export function MeetingPage() {
 
   function create(name: string, pin: string | null) {
     const code = channelCode(makeRoomCode(), pin)
-    void enter(name, pin, () => createRoom<CallSignal>(ROOM_ID, nickname, { capacity: CAPACITY, code }), ERROR_TEXT['not-found'])
+    void enter(name, pin, () => createRoom<MeetMsg>(ROOM_ID, nickname, { capacity: CAPACITY, code, ...myAvatar() }), ERROR_TEXT['not-found'])
   }
 
   function join(r: RoomInfo, pin: string | null) {
     const code = channelCode(r.id, pin)
-    void enter(r.name, pin, () => joinRoom<CallSignal>(ROOM_ID, code, nickname, { capacity: CAPACITY }), pin ? '코드가 틀렸어요 (방이 없어졌을 수도 있어요)' : ERROR_TEXT['not-found'])
+    void enter(r.name, pin, () => joinRoom<MeetMsg>(ROOM_ID, code, nickname, { capacity: CAPACITY, ...myAvatar() }), pin ? '코드가 틀렸어요 (방이 없어졌을 수도 있어요)' : ERROR_TEXT['not-found'])
   }
 
   return (
-    <main className="page arcade">
+    <main className={`page arcade${view.kind === 'room' ? ' meet-page--room' : ''}`}>
       <header className="meet__header">
         <HomeLink className="button button--small">
           ← 목록

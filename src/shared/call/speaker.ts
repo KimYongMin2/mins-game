@@ -4,6 +4,8 @@
 
 /** 듣는 소리 크기 배율 (사용자가 고름) */
 export const LISTEN_VOLUME = { min: 0, max: 3, default: 1 }
+/** 사람마다 소리 크기 배율 (디스코드처럼 그 사람만 키우거나 줄이기) */
+export const PERSON_VOLUME = { min: 0, max: 2, default: 1 }
 /** 기본으로 조금 키워 듣는다 (끝에 리미터가 있어 찢어지지 않음) */
 const LISTEN_BOOST = 1.5
 
@@ -40,10 +42,20 @@ export class Speaker {
     this.gain.gain.setTargetAtTime(LISTEN_BOOST * this.volume, this.ctx.currentTime, 0.03)
   }
 
-  /** 한 사람 소리를 더한다. 빼는 함수를 돌려준다 */
-  add(stream: MediaStream): () => void {
+  /** 한 사람 소리를 더한다. 그 사람 크기(0~2배)를 바꾸는 함수와 빼는 함수를 돌려준다 */
+  add(stream: MediaStream, volume = PERSON_VOLUME.default): { setVolume: (v: number) => void; remove: () => void } {
     const source = this.ctx.createMediaStreamSource(stream)
-    source.connect(this.gain)
-    return () => source.disconnect()
+    const own = this.ctx.createGain()
+    const clamp = (v: number) => Math.min(PERSON_VOLUME.max, Math.max(PERSON_VOLUME.min, v))
+    own.gain.value = clamp(volume)
+    source.connect(own)
+    own.connect(this.gain)
+    return {
+      setVolume: (v) => own.gain.setTargetAtTime(clamp(v), this.ctx.currentTime, 0.03),
+      remove: () => {
+        source.disconnect()
+        own.disconnect()
+      },
+    }
   }
 }

@@ -19,129 +19,10 @@
   color: var(--ink-soft);
 }
 
-.meet {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-  max-width: 480px;
-  margin: 16px auto 0;
-}
-
-.meet__code {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 2px;
-  padding: 10px 14px;
-  border: 2px solid var(--line);
-  border-radius: 6px;
-  font-size: 0.875rem;
-  color: var(--ink-soft);
-  text-align: center;
-}
-
-.meet__people {
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
-  gap: 12px;
-}
-
-.meet-person {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-  text-align: center;
-  min-width: 0;
-}
-
-.meet-person__face {
-  position: relative;
-  display: grid;
-  place-items: center;
-  width: 64px;
-  height: 64px;
-  border: 3px solid var(--line);
-  border-radius: 50%;
-  background: #e7f0ff;
-  font-size: 1.625rem;
-  font-weight: 900;
-  transition: box-shadow 120ms ease;
-}
-
-/* 말하는 중: 초록 고리 */
-.meet-person--speaking .meet-person__face {
-  box-shadow: 0 0 0 4px #fff, 0 0 0 8px #2fb344;
-}
-
-.meet-person--waiting .meet-person__face {
-  opacity: 0.45;
-}
-
-.meet-person__muted {
-  position: absolute;
-  right: -6px;
-  bottom: -6px;
-  font-size: 1.125rem;
-  line-height: 1;
-  padding: 3px;
-  border: 2px solid var(--line);
-  border-radius: 50%;
-  background: #fff;
-}
-
-.meet-person__name {
-  max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-weight: 800;
-  font-size: 0.9375rem;
-}
-
-.meet-person__name span {
-  font-weight: 500;
-  color: var(--ink-soft);
-}
-
-.meet-person__status {
-  min-height: 1.3em;
-  font-size: 0.75rem;
-  color: var(--ink-soft);
-}
-
-.meet-person--speaking .meet-person__status {
-  color: #2b8a3e;
-  font-weight: 700;
-}
-
 .meet__tip {
   text-align: center;
   font-size: 0.875rem;
   color: var(--ink-soft);
-}
-
-.meet__actions {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 10px;
-}
-
-.meet__big {
-  width: 100%;
-  min-height: 60px;
-  font-size: 1.125rem;
-}
-
-.meet__name {
-  font-size: 1.25rem;
-  font-weight: 900;
-  color: var(--ink);
-  word-break: keep-all;
 }
 
 .meet__pin {
@@ -374,4 +255,444 @@
   color: var(--ink);
   font-weight: 700;
   font-size: 14px;
+}
+
+/* ───── 방 안 (디스코드 음성 채널처럼, 2026-11-17 사용자 요청): 위 채널 줄 → 사람 칸 + 채팅 → 아래 조작 줄 ───── */
+.page.meet-page--room {
+  max-width: 1160px;
+  padding-bottom: 0;
+}
+
+.meet {
+  --meet-tile: #15113a;
+  --meet-tile-hi: #241e5c;
+  --meet-green: #3ddc84;
+  --meet-red: #e8473f;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 12px;
+  /* 사람이 적어도 조작 줄은 화면 맨 아래에 (머리말 높이만큼 뺌) */
+  min-height: calc(100dvh - 88px);
+}
+
+:root[data-theme='light'] .meet {
+  --meet-tile: #1c1748;
+  --meet-tile-hi: #2c2570;
+}
+
+/* 채널 줄 */
+.meet-bar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  padding: 10px 14px;
+  border: 2px solid var(--edge);
+  border-radius: 2px;
+  background: var(--card);
+}
+
+.meet-bar__icon {
+  flex: none;
+  color: var(--ink-soft);
+}
+
+.meet-bar__name {
+  min-width: 0;
+  font-size: 1.125rem;
+  font-weight: 800;
+  word-break: keep-all;
+}
+
+.meet-bar__info {
+  margin-left: auto;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--ink-soft);
+}
+
+.meet__unblock {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 52px;
+}
+
+/* 좁은 화면: 사람 / 채팅 탭 */
+.meet-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  border-bottom: 2px solid var(--edge);
+}
+
+.meet-tabs__tab {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 44px;
+  margin-bottom: -2px;
+  border: 0;
+  border-bottom: 3px solid transparent;
+  background: none;
+  color: var(--ink-soft);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.meet-tabs__tab[aria-selected='true'] {
+  border-bottom-color: var(--brand);
+  color: var(--ink);
+}
+
+:root[data-theme='light'] .meet-tabs__tab[aria-selected='true'] {
+  border-bottom-color: var(--navy);
+}
+
+.meet-tabs__badge {
+  min-width: 20px;
+  padding: 1px 6px;
+  border-radius: 2px;
+  background: var(--meet-red);
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: 800;
+  line-height: 1.4;
+}
+
+/* 사람 칸 + 채팅 */
+.meet-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 0;
+}
+
+.meet-body--wide {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  align-items: stretch;
+}
+
+.meet-stage {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
+.meet-grid {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+@media (min-width: 560px) {
+  .meet-grid {
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 10px;
+  }
+}
+
+.meet-body--wide .meet-grid {
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+}
+
+.meet-tile {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  padding: 0;
+  border: 0;
+  border-radius: 2px;
+  background: var(--meet-tile);
+  color: #f4f2ff;
+  font: inherit;
+  cursor: pointer;
+  transition: box-shadow 100ms ease;
+}
+
+.meet-tile:hover {
+  background: var(--meet-tile-hi);
+}
+
+.meet-tile:focus-visible {
+  outline: 3px solid var(--brand);
+  outline-offset: 2px;
+}
+
+/* 말하는 중: 초록 테두리 (칸 안쪽) */
+.meet-tile--speaking {
+  box-shadow: inset 0 0 0 3px var(--meet-green);
+}
+
+.meet-tile--waiting .meet-tile__face {
+  opacity: 0.4;
+}
+
+.meet-tile__face {
+  display: grid;
+  place-items: center;
+  width: 64px;
+  height: 64px;
+  overflow: hidden;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.meet-tile--speaking .meet-tile__face {
+  outline: 2px solid var(--meet-green);
+  outline-offset: 3px;
+}
+
+.meet-tile__face .avatar-face {
+  width: 64px;
+  height: 64px;
+}
+
+.meet-tile__letter {
+  font-size: 2rem;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.meet-tile__name {
+  position: absolute;
+  left: 6px;
+  bottom: 6px;
+  max-width: calc(100% - 12px);
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 7px;
+  border-radius: 2px;
+  background: rgba(0, 0, 0, 0.55);
+  font-size: 0.8125rem;
+  font-weight: 700;
+}
+
+.meet-tile__name > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.meet-tile__name small {
+  flex: none;
+  padding: 0 4px;
+  border-radius: 2px;
+  background: var(--brand);
+  color: #1c1748;
+  font-size: 0.6875rem;
+  font-weight: 800;
+}
+
+.meet-tile__muted {
+  flex: none;
+  color: #ff8a82;
+}
+
+.meet-tile__status {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #d2cef4;
+}
+
+.meet-tile__vol {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 6px;
+  border-radius: 2px;
+  background: rgba(0, 0, 0, 0.55);
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+/* 채팅 */
+.meet-body__chat[hidden] {
+  display: none;
+}
+
+.meet-chat {
+  display: flex;
+  flex-direction: column;
+  height: calc(100dvh - 330px);
+  min-height: 300px;
+  border: 2px solid var(--edge);
+  border-radius: 2px;
+  background: var(--card);
+}
+
+.meet-body--wide .meet-chat {
+  height: calc(100dvh - 250px);
+  min-height: 380px;
+}
+
+.meet-chat__lines {
+  flex: 1;
+  min-height: 0;
+  margin: 0;
+  padding: 10px 12px;
+  list-style: none;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.meet-chat__empty {
+  margin: auto 0;
+  text-align: center;
+  font-size: 0.8125rem;
+  color: var(--ink-muted);
+}
+
+.meet-chat__line {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.meet-chat__who {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.meet-chat__who b {
+  font-size: 0.875rem;
+  font-weight: 800;
+}
+
+.meet-chat__line--mine .meet-chat__who b {
+  color: var(--me-blue);
+}
+
+.meet-chat__who time {
+  font-size: 0.6875rem;
+  color: var(--ink-muted);
+}
+
+.meet-chat__text {
+  font-size: 0.9375rem;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.meet-chat__notice {
+  font-size: 0.75rem;
+  color: var(--ink-muted);
+}
+
+.meet-chat__notice--join b {
+  color: #2fb344;
+}
+
+.meet-chat__notice--leave b {
+  color: var(--ink-soft);
+}
+
+.meet-chat__form {
+  display: flex;
+  gap: 6px;
+  padding: 8px;
+  border-top: 2px solid var(--edge);
+}
+
+.meet-chat__input {
+  flex: 1;
+  min-width: 0;
+  font-size: 16px; /* 아이폰이 입력할 때 화면을 키우지 않게 */
+}
+
+.meet-chat__send {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 48px;
+  padding: 0;
+}
+
+/* 아래 조작 줄 (화면 아래에 붙음) */
+.meet-controls {
+  position: sticky;
+  bottom: 0;
+  z-index: 5;
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  margin: auto -16px 0;
+  padding: 10px 16px calc(10px + env(safe-area-inset-bottom));
+  border-top: 2px solid var(--edge);
+  background: var(--bg);
+}
+
+.meet-controls__btn {
+  flex: 1 1 0;
+  max-width: 150px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-height: 60px;
+  padding: 6px 4px;
+  border: 2px solid var(--edge);
+  border-radius: 2px;
+  background: var(--card);
+  color: var(--ink);
+  font: inherit;
+  font-size: 0.75rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.meet-controls__btn span {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.meet-controls__btn:active:not(:disabled) {
+  transform: translateY(2px);
+}
+
+.meet-controls__btn--off {
+  border-color: var(--meet-red);
+  background: color-mix(in srgb, var(--meet-red) 18%, var(--card));
+  color: var(--meet-red);
+}
+
+:root:not([data-theme='light']) .meet-controls__btn--off {
+  color: #ff8a82;
+}
+
+.meet-controls__btn--leave {
+  border-color: var(--meet-red);
+  background: var(--meet-red);
+  color: #fff;
+}
+
+.meet-settings__hint {
+  margin: 0;
+  font-size: 0.8125rem;
+  color: var(--ink-soft);
 }
