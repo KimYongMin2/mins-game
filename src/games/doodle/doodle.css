@@ -225,3 +225,7 @@
 }
 .dd-gallery__foot .button { width: 100%; }
 .dd-gallery__mine { color: var(--ink-soft); }
+
+/* 정답이 들어간 글 (맞힌 사람·그린 사람에게만 보임) */
+.dd-chat__secret { opacity: 0.85; }
+.dd-chat__secret small { display: block; font-size: 0.6875rem; font-weight: 700; color: #22a861; }

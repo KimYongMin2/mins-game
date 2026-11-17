@@ -5981,10 +5981,6 @@ const WORD_GROUPS = {
 	]
 };
 const WORDS = Object.values(WORD_GROUPS).flat();
-function groupOf(word) {
-	for (const [g, ws] of Object.entries(WORD_GROUPS)) if (ws.includes(word)) return g;
-	return null;
-}
 /** 정답 비교: 띄어쓰기·대소문자 무시 */
 const normalizeGuess = (s) => s.replace(/\s+/g, "").toLowerCase();
 const CHOSUNG = [
@@ -6348,6 +6344,108 @@ const VOTE_PICK_MS = 15e3;
 /** 판 결과(누가 그렸는지·표) 보여주기 */
 const VOTE_RESULT_MS = 6e3;
 //#endregion
+//#region src/games/doodle/words.ts
+/** 맞히는 사람에게 갈래를 알려 주는 긴 제시어 (글자 수만으론 너무 어려워서) */
+const PHRASE_GROUPS = ["사자성어", "속담"];
+const DOODLE_GROUPS = {
+	...WORD_GROUPS,
+	사자성어: [
+		"일석이조",
+		"동문서답",
+		"금상첨화",
+		"다다익선",
+		"대기만성",
+		"설상가상",
+		"우왕좌왕",
+		"일편단심",
+		"작심삼일",
+		"천고마비",
+		"청출어람",
+		"유비무환",
+		"이심전심",
+		"전화위복",
+		"죽마고우",
+		"학수고대",
+		"호시탐탐",
+		"일취월장",
+		"자업자득",
+		"사면초가",
+		"어부지리",
+		"오리무중",
+		"용두사미",
+		"견원지간",
+		"동상이몽",
+		"마이동풍",
+		"백발백중",
+		"일거양득",
+		"고진감래",
+		"과유불급",
+		"십중팔구",
+		"십시일반",
+		"산전수전",
+		"칠전팔기",
+		"구사일생",
+		"막상막하",
+		"박장대소",
+		"대동소이",
+		"조삼모사",
+		"군계일학",
+		"새옹지마",
+		"형설지공"
+	],
+	속담: [
+		"가는 말이 고와야 오는 말이 곱다",
+		"고래 싸움에 새우 등 터진다",
+		"누워서 떡 먹기",
+		"닭 쫓던 개 지붕 쳐다본다",
+		"등잔 밑이 어둡다",
+		"발 없는 말이 천 리 간다",
+		"백지장도 맞들면 낫다",
+		"소 잃고 외양간 고친다",
+		"우물 안 개구리",
+		"원숭이도 나무에서 떨어진다",
+		"하늘의 별 따기",
+		"호랑이도 제 말 하면 온다",
+		"티끌 모아 태산",
+		"그림의 떡",
+		"금강산도 식후경",
+		"꿩 먹고 알 먹기",
+		"낮말은 새가 듣고 밤말은 쥐가 듣는다",
+		"도토리 키 재기",
+		"돌다리도 두들겨 보고 건너라",
+		"말 한마디로 천 냥 빚을 갚는다",
+		"벼는 익을수록 고개를 숙인다",
+		"빈 수레가 요란하다",
+		"세 살 버릇 여든까지 간다",
+		"수박 겉 핥기",
+		"식은 죽 먹기",
+		"쇠귀에 경 읽기",
+		"울며 겨자 먹기",
+		"사공이 많으면 배가 산으로 간다",
+		"개구리 올챙이 적 생각 못 한다",
+		"병 주고 약 준다",
+		"고양이 목에 방울 달기",
+		"까마귀 날자 배 떨어진다",
+		"물에 빠진 생쥐",
+		"바늘 도둑이 소도둑 된다",
+		"서당 개 삼 년이면 풍월을 읊는다",
+		"열 번 찍어 안 넘어가는 나무 없다",
+		"작은 고추가 더 맵다",
+		"친구 따라 강남 간다",
+		"하룻강아지 범 무서운 줄 모른다",
+		"꿈보다 해몽"
+	]
+};
+const DOODLE_WORDS = Object.values(DOODLE_GROUPS).flat();
+function doodleGroupOf(word) {
+	for (const [g, ws] of Object.entries(DOODLE_GROUPS)) if (ws.includes(word)) return g;
+	return null;
+}
+/** 맞히는 사람 화면의 모양: 글자는 ○, 띄어쓰기는 그대로 (예 '○○ ○○ ○○') */
+const wordShape = (word) => word.replace(/\S/g, "○");
+/** 띄어쓰기 뺀 글자 수 */
+const letterCount = (word) => [...word.replace(/\s/g, "")].length;
+//#endregion
 //#region src/games/doodle/play/engine.ts
 function shuffle$1(rng, xs) {
 	const a = [...xs];
@@ -6357,7 +6455,7 @@ function shuffle$1(rng, xs) {
 	}
 	return a;
 }
-function addLog$1(s, kind, player, text) {
+function addLog$1(s, kind, player, text, secret) {
 	const seq = s.logSeq + 1;
 	return {
 		...s,
@@ -6366,16 +6464,16 @@ function addLog$1(s, kind, player, text) {
 			seq,
 			kind,
 			player,
-			text
+			text,
+			...secret === void 0 ? {} : { secret }
 		}].slice(-40)
 	};
 }
 const activePlayers = (s) => s.players.flatMap((_, i) => s.left[i] ? [] : [i]);
 function createEngine$6(opts) {
 	const rng = createRng(opts.seed);
-	const n = opts.players.length;
 	const base = shuffle$1(rng, opts.players.map((_, i) => i));
-	const order = n <= 3 ? [...base, ...base] : base;
+	const order = Array.from({ length: 2 }, () => base).flat();
 	return {
 		now: opts.now,
 		seed: rng.seed(),
@@ -6400,10 +6498,10 @@ function nextTurn$2(s) {
 	while (turnNo < s.order.length && s.left[s.order[turnNo]]) turnNo++;
 	if (turnNo >= s.order.length) return finish$2(s);
 	const rng = createRng(s.seed);
-	const fresh = WORDS.filter((w) => !s.used.includes(w));
-	const pool = shuffle$1(rng, fresh.length >= 2 ? fresh : WORDS);
+	const fresh = DOODLE_WORDS.filter((w) => !s.used.includes(w));
+	const pool = shuffle$1(rng, fresh.length >= 2 ? fresh : DOODLE_WORDS);
 	const a = pool[0];
-	const b = pool.find((w) => groupOf(w) !== groupOf(a)) ?? pool[1];
+	const b = pool.find((w) => doodleGroupOf(w) !== doodleGroupOf(a)) ?? pool[1];
 	const drawer = s.order[turnNo];
 	return {
 		...s,
@@ -6419,9 +6517,9 @@ function nextTurn$2(s) {
 }
 /** 보기 4개: 정답 + 같은 갈래에서 3개 (모자라면 아무거나) */
 function choicesFor(rng, word) {
-	const group = groupOf(word);
-	const same = shuffle$1(rng, (group ? WORD_GROUPS[group] : WORDS).filter((w) => w !== word));
-	const others = shuffle$1(rng, WORDS.filter((w) => w !== word && !same.includes(w)));
+	const group = doodleGroupOf(word);
+	const same = shuffle$1(rng, (group ? DOODLE_GROUPS[group] : DOODLE_WORDS).filter((w) => w !== word));
+	const others = shuffle$1(rng, DOODLE_WORDS.filter((w) => w !== word && !same.includes(w)));
 	return shuffle$1(rng, [word, ...[...same, ...others].slice(0, 3)]);
 }
 function startDraw(s, index) {
@@ -6498,12 +6596,24 @@ function correct(s, player, viaChoice) {
 function canGuess(s, player) {
 	return s.phase.kind === "draw" && player !== s.phase.drawer && !s.left[player] && !s.phase.guessed.some((g) => g.player === player);
 }
+/**
+* 채팅을 칠 수 있는지 (사용자 요청 2026-11-17 — 정답을 맞힌 뒤에도 채팅).
+* 고르는 중·그리는 중인 그린 사람만 못 침 (제시어를 아니까). 맞힌 사람 글도 모두에게 보이고, 정답이 들어간 글만 못 맞힌 사람에게 숨김
+*/
+function canChat(s, player) {
+	if (s.left[player]) return false;
+	const p = s.phase;
+	return !((p.kind === "choose" || p.kind === "draw") && p.drawer === player);
+}
 function guess(s, player, text) {
-	if (!canGuess(s, player) || s.phase.kind !== "draw") return s;
+	if (!canChat(s, player)) return s;
 	const clean = [...text.replace(/[\u0000-\u001f\u007f]/g, "").trim()].slice(0, 30).join("");
 	if (!clean) return s;
-	if (normalizeGuess(clean) === normalizeGuess(s.phase.word)) return correct(s, player, false);
-	return addLog$1(s, "chat", player, clean);
+	if (canGuess(s, player) && s.phase.kind === "draw") {
+		if (normalizeGuess(clean) === normalizeGuess(s.phase.word)) return correct(s, player, false);
+		return addLog$1(s, "chat", player, clean);
+	}
+	return addLog$1(s, "chat", player, clean, s.phase.kind === "draw" && normalizeGuess(clean).includes(normalizeGuess(s.phase.word)) ? s.turnNo : void 0);
 }
 function pick$2(s, player, index) {
 	if (!canGuess(s, player) || s.phase.kind !== "draw" || !choicesOpen(s) || s.phase.choiceTried.includes(player)) return s;
@@ -6631,6 +6741,16 @@ function readOps(x) {
 const tooBig = (strokes) => pointCount(strokes) > MAX_POINTS || strokes.filter((s) => s.k === "f").length > MAX_FILLS;
 //#endregion
 //#region src/games/doodle/play/view.ts
+/** 정답이 들어간 글은 그 차례 그리는 동안엔 그린 사람·맞힌 사람·쓴 사람만 (정답 공개 뒤엔 모두) */
+function canSee(s, me, l) {
+	const p = s.phase;
+	if (l.secret === void 0 || p.kind !== "draw" || l.secret !== s.turnNo) return true;
+	return me === p.drawer || me === l.player || p.guessed.some((g) => g.player === me);
+}
+const phraseGroup = (word) => {
+	const g = doodleGroupOf(word);
+	return g && PHRASE_GROUPS.includes(g) ? g : null;
+};
 function viewFor(s, viewerId) {
 	const me = s.players.findIndex((p) => p.id === viewerId);
 	const p = s.phase;
@@ -6651,13 +6771,16 @@ function viewFor(s, viewerId) {
 		turns: s.order.length,
 		drawer,
 		word,
-		wordLength: p.kind === "draw" ? [...p.word].length : null,
+		wordLength: p.kind === "draw" ? letterCount(p.word) : null,
+		wordShape: p.kind === "draw" ? wordShape(p.word) : null,
+		wordGroup: p.kind === "draw" ? phraseGroup(p.word) : null,
 		options: p.kind === "choose" && drawer === me ? p.options : null,
 		choices: showChoices ? p.choices : null,
 		choiceTried: p.kind === "draw" && p.choiceTried.includes(me),
 		canGuess: canGuess(s, me),
+		canChat: canChat(s, me),
 		guessed: p.kind === "draw" || p.kind === "reveal" ? p.guessed : [],
-		log: s.log.slice(-20),
+		log: s.log.filter((l) => canSee(s, me, l)).slice(-20),
 		ranks: ranksOf$4(s)
 	};
 }
@@ -6709,7 +6832,7 @@ function nextRound(s) {
 		}
 	};
 	const rng = createRng(s.seed);
-	const pool = WORDS.filter((w) => !s.used.includes(w));
+	const pool = DOODLE_WORDS.filter((w) => !s.used.includes(w));
 	const word = pool[Math.floor(rng.next() * pool.length)];
 	return {
 		...s,

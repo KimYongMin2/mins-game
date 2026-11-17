@@ -1,5 +1,18 @@
 import type { Look } from '../../../shared/art3d/animalKinds'
-import { type EngineState, type Guess, type LogEntry, canGuess, choicesOpen, ranksOf } from './engine'
+import { type EngineState, type Guess, type LogEntry, canChat, canGuess, choicesOpen, ranksOf } from './engine'
+import { PHRASE_GROUPS, doodleGroupOf, letterCount, wordShape } from '../words'
+
+/** 정답이 들어간 글은 그 차례 그리는 동안엔 그린 사람·맞힌 사람·쓴 사람만 (정답 공개 뒤엔 모두) */
+function canSee(s: EngineState, me: number, l: LogEntry): boolean {
+  const p = s.phase
+  if (l.secret === undefined || p.kind !== 'draw' || l.secret !== s.turnNo) return true
+  return me === p.drawer || me === l.player || p.guessed.some((g) => g.player === me)
+}
+
+const phraseGroup = (word: string): string | null => {
+  const g = doodleGroupOf(word)
+  return g && (PHRASE_GROUPS as readonly string[]).includes(g) ? g : null
+}
 
 // 사람마다 다른 화면 (서버가 사람마다 따로 보냄): 제시어는 그리는 사람만, 정답 보여주기·끝에선 모두.
 // 시간은 '남은 ms'로 주고받는다.
@@ -18,6 +31,10 @@ export type DoodleView = {
   word: string | null
   /** 맞히는 사람에게: 글자 수 */
   wordLength: number | null
+  /** 맞히는 사람에게: 글자 모양 (글자 ○, 띄어쓰기 그대로) */
+  wordShape: string | null
+  /** 맞히는 사람에게: 사자성어·속담이면 그 갈래 (긴 제시어라 힌트) */
+  wordGroup: string | null
   /** 고르는 중이고 내가 그릴 사람일 때만: 제시어 2개 */
   options: [string, string] | null
   /** 보기 4개 (마지막 20초, 아직 못 맞힌 맞히는 사람만) */
@@ -26,6 +43,8 @@ export type DoodleView = {
   choiceTried: boolean
   /** 내가 지금 맞힐 수 있는지 */
   canGuess: boolean
+  /** 채팅을 칠 수 있는지 (맞힌 뒤에도) */
+  canChat: boolean
   guessed: Guess[]
   log: LogEntry[]
   ranks: number[]
@@ -47,13 +66,16 @@ export function viewFor(s: EngineState, viewerId: string): DoodleView {
     turns: s.order.length,
     drawer,
     word,
-    wordLength: p.kind === 'draw' ? [...p.word].length : null,
+    wordLength: p.kind === 'draw' ? letterCount(p.word) : null,
+    wordShape: p.kind === 'draw' ? wordShape(p.word) : null,
+    wordGroup: p.kind === 'draw' ? phraseGroup(p.word) : null,
     options: p.kind === 'choose' && drawer === me ? p.options : null,
     choices: showChoices ? p.choices : null,
     choiceTried: p.kind === 'draw' && p.choiceTried.includes(me),
     canGuess: canGuess(s, me),
+    canChat: canChat(s, me),
     guessed: p.kind === 'draw' || p.kind === 'reveal' ? p.guessed : [],
-    log: s.log.slice(-20),
+    log: s.log.filter((l) => canSee(s, me, l)).slice(-20),
     ranks: ranksOf(s),
   }
 }

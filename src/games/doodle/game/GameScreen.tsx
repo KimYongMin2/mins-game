@@ -123,7 +123,7 @@ export function GameScreen({ room, members, onFinish, onQuit }: Props) {
   function submit(e: React.FormEvent) {
     e.preventDefault()
     const t = text.trim()
-    if (!t || !view?.canGuess) return
+    if (!t || !view?.canChat) return
     room.send({ t: 'guess', text: t })
     setText('')
   }
@@ -133,7 +133,8 @@ export function GameScreen({ room, members, onFinish, onQuit }: Props) {
     if (!view) return '연결하는 중…'
     if (view.phase === 'intro') return '곧 시작해요'
     if (view.phase === 'choose') return view.options ? '그릴 제시어를 골라요' : `${nameOf(view.drawer)}님이 제시어를 고르는 중`
-    if (view.phase === 'draw') return view.word ? `제시어: ${view.word}` : `${'○'.repeat(view.wordLength ?? 0)} (${view.wordLength}글자)`
+    if (view.phase === 'draw')
+      return view.word ? `제시어: ${view.word}` : `${view.wordGroup ? `${view.wordGroup} · ` : ''}${view.wordShape ?? '○'.repeat(view.wordLength ?? 0)} (${view.wordLength}글자)`
     if (view.phase === 'reveal') return `정답: ${view.word}`
     return '끝!'
   })()
@@ -187,7 +188,8 @@ export function GameScreen({ room, members, onFinish, onQuit }: Props) {
       <div className="dd-chat">
         <ol className="dd-chat__log" aria-live="polite">
           {view?.log.map((l) => (
-            <li key={l.seq} className={`dd-chat__${l.kind}`}>
+            <li key={l.seq} className={`dd-chat__${l.kind}${l.secret !== undefined ? ' dd-chat__secret' : ''}`}>
+              {l.secret !== undefined && <small>정답 들어감 · 맞힌 사람만 보여요</small>}
               {l.kind === 'chat' && <b>{nameOf(l.player)}</b>} {l.text}
             </li>
           ))}
@@ -199,12 +201,12 @@ export function GameScreen({ room, members, onFinish, onQuit }: Props) {
               value={text}
               maxLength={CHAT_MAX}
               onChange={(e) => setText(e.target.value)}
-              placeholder={view?.canGuess ? '정답을 입력하세요' : view?.phase === 'draw' ? '맞혔어요! 기다려요' : '그림이 시작되면 맞혀요'}
-              disabled={!view?.canGuess}
+              placeholder={view?.canGuess ? '정답을 입력하세요' : view?.phase === 'draw' ? '채팅 (정답을 쓰면 못 맞힌 사람에겐 안 보여요)' : view?.canChat ? '채팅' : '제시어를 고르는 중이에요'}
+              disabled={!view?.canChat}
               enterKeyHint="send"
               autoComplete="off"
             />
-            <button type="submit" className="button button--primary" disabled={!view?.canGuess || !text.trim()}>
+            <button type="submit" className="button button--primary" disabled={!view?.canChat || !text.trim()}>
               보내기
             </button>
           </form>

@@ -8,7 +8,7 @@ type SwitchableRoom = Pick<Room<never>, 'code' | 'name' | 'sendMove' | 'onMove'>
 // 다음 판(다시 하기)도 매번 다시 준비. 준비 여부는 방 사람 목록(presence)으로 알린다 — 게임 규칙은 모른다.
 // 친구의 준비 버튼은 나타날 때·사라질 때(= 경기가 시작될 때) 준비를 끈다 → 다음 판엔 다시 눌러야 한다.
 
-type ReadyRoom = Pick<Room<never>, 'role' | 'setReady' | 'setInfo' | 'onPeer' | 'onMembers'>
+type ReadyRoom = Pick<Room<never>, 'role' | 'setReady' | 'setInfo' | 'onPeer' | 'onMembers'> & Partial<Pick<Room<never>, 'setPlaying'>>
 
 /** 방 안에서 방장이 바꾸는 모드 (예: 팔씨름 종목). 게임이 넘겨준다 — 규칙은 게임 쪽 */
 export type ModeSpec<V extends string | number = string | number> = { label: string; options: readonly { value: V; label: string }[]; value: V; onChange: (v: V) => void }
@@ -144,6 +144,13 @@ export function DuelReadyRoom({ room, me, peer, peerReady, onStart, mode, gameId
 /** 다시 하기 전 (결과 화면): 친구는 [준비], 방장은 누가 준비했는지. 방장의 [다시 하기]는 게임이 모두 준비했을 때만 켠다 */
 export function RematchReady({ room, waitText, allReady, mode, gameId, people = 2 }: { room: ReadyRoom & SwitchableRoom; waitText: string; allReady: boolean; mode?: ModeSpec; gameId?: string; people?: number }) {
   const hostInfo = useHostInfo(room)
+  // 게임이 끝나 결과 화면이면 방 목록의 '게임 중'을 풀어 다른 사람도 들어올 수 있게 (사용자 요청 2026-11-17),
+  // 다시 하기로 결과 화면이 사라지면 다시 '게임 중'. 들어온 사람은 다음 판(다시 하기)부터 같이 함
+  useEffect(() => {
+    if (room.role !== 'host' || !room.setPlaying) return
+    room.setPlaying(false)
+    return () => room.setPlaying?.(true)
+  }, [room])
   // 결과 화면에서도 게임 바꾸기 (사용자 요청) — 친구 쪽은 방장이 바꾸면 따라간다
   const sw = gameId ? <GameSwitch room={room} gameId={gameId} people={people} /> : null
   if (room.role === 'guest')

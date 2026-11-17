@@ -3,7 +3,7 @@
 // 그림 자체는 심판 밖(서버 심판 파일)에서 사람마다 모아 두고, 투표 단계에 섞은 순서로 보낸다.
 import { type Rng, createRng } from '../../../shared/random'
 import { DONE_MS, INTRO_MS, LOG_KEEP, VOTE_DRAW_MS, VOTE_PICK_MS, VOTE_POINTS, VOTE_RESULT_MS, VOTE_ROUNDS, VOTE_WORD_MS } from '../constants'
-import { WORDS } from '../../../shared/words/koWords'
+import { DOODLE_WORDS as WORDS } from '../words'
 import type { Player } from './engine'
 
 export type VotePhase =

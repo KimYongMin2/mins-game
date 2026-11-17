@@ -18,8 +18,8 @@ export const GUESS_POINTS = [10, 8, 6, 5, 4, 3, 2] as const
 export const CHOICE_RATE = 0.5
 /** 그린 사람: 맞힌 사람 1명당 */
 export const DRAWER_POINTS = 3
-/** 3명 이하면 한 사람이 두 번씩 그림 */
-export const TWICE_UNDER = 3
+/** 한 사람이 그리는 횟수 (두 바퀴) */
+export const DRAWS_EACH = 2
 /** 채팅 한 줄 최대 글자 */
 export const CHAT_MAX = 30
 /** 화면에 남기는 채팅 줄 수 */

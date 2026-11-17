@@ -5,6 +5,7 @@
 import { type Rng, createRng } from '../../../shared/random'
 import {
   CHAT_MAX,
+  DRAWS_EACH,
   CHOICE_RATE,
   CHOICES_AT_MS,
   CHOOSE_MS,
@@ -15,9 +16,9 @@ import {
   INTRO_MS,
   LOG_KEEP,
   REVEAL_MS,
-  TWICE_UNDER,
 } from '../constants'
-import { WORDS, WORD_GROUPS, groupOf, normalizeGuess } from '../../../shared/words/koWords'
+import { normalizeGuess } from '../../../shared/words/koWords'
+import { DOODLE_GROUPS as WORD_GROUPS, DOODLE_WORDS as WORDS, doodleGroupOf as groupOf } from '../words'
 import type { Look } from '../../../shared/art3d/animalKinds'
 
 export type Player = { id: string; name: string; avatar?: Look }
@@ -25,7 +26,8 @@ export type Player = { id: string; name: string; avatar?: Look }
 export type Guess = { player: number; points: number; viaChoice: boolean }
 
 /** 채팅 줄: chat = 틀린 답(모두에게 보임) · correct = 누가 맞힘 · system = 안내 */
-export type LogEntry = { seq: number; kind: 'chat' | 'correct' | 'system'; player: number | null; text: string }
+/** secret = 그 차례(turnNo) 정답이 들어간 글 — 그리는 동안엔 그린 사람·맞힌 사람에게만 보임 (정답이 새지 않게) */
+export type LogEntry = { seq: number; kind: 'chat' | 'correct' | 'system'; player: number | null; text: string; secret?: number }
 
 export type Phase =
   | { kind: 'intro'; until: number }
@@ -41,7 +43,7 @@ export type EngineState = {
   /** 나간 사람 */
   left: boolean[]
   scores: number[]
-  /** 그리는 순서 (사람 번호, 3명 이하면 두 바퀴) */
+  /** 그리는 순서 (사람 번호, 한 사람당 두 번 — 두 바퀴) */
   order: number[]
   /** 지금 몇 번째 차례 (order의 번호) */
   turnNo: number
@@ -72,18 +74,18 @@ function shuffle<T>(rng: Rng, xs: readonly T[]): T[] {
   return a
 }
 
-function addLog(s: EngineState, kind: LogEntry['kind'], player: number | null, text: string): EngineState {
+function addLog(s: EngineState, kind: LogEntry['kind'], player: number | null, text: string, secret?: number): EngineState {
   const seq = s.logSeq + 1
-  return { ...s, logSeq: seq, log: [...s.log, { seq, kind, player, text }].slice(-LOG_KEEP) }
+  return { ...s, logSeq: seq, log: [...s.log, { seq, kind, player, text, ...(secret === undefined ? {} : { secret }) }].slice(-LOG_KEEP) }
 }
 
 export const activePlayers = (s: EngineState) => s.players.flatMap((_, i) => (s.left[i] ? [] : [i]))
 
 export function createEngine(opts: { now: number; seed: number; players: Player[] }): EngineState {
   const rng = createRng(opts.seed)
-  const n = opts.players.length
   const base = shuffle(rng, opts.players.map((_, i) => i))
-  const order = n <= TWICE_UNDER ? [...base, ...base] : base
+  // 한 사람당 두 번씩 그림 (사용자 요청 2026-11-17 — 처음엔 3명 이하일 때만 두 바퀴)
+  const order = Array.from({ length: DRAWS_EACH }, () => base).flat()
   return {
     now: opts.now,
     seed: rng.seed(),
@@ -169,13 +171,28 @@ export function canGuess(s: EngineState, player: number): boolean {
   return s.phase.kind === 'draw' && player !== s.phase.drawer && !s.left[player] && !s.phase.guessed.some((g) => g.player === player)
 }
 
+/**
+ * 채팅을 칠 수 있는지 (사용자 요청 2026-11-17 — 정답을 맞힌 뒤에도 채팅).
+ * 고르는 중·그리는 중인 그린 사람만 못 침 (제시어를 아니까). 맞힌 사람 글도 모두에게 보이고, 정답이 들어간 글만 못 맞힌 사람에게 숨김
+ */
+export function canChat(s: EngineState, player: number): boolean {
+  if (s.left[player]) return false
+  const p = s.phase
+  return !((p.kind === 'choose' || p.kind === 'draw') && p.drawer === player)
+}
+
 function guess(s: EngineState, player: number, text: string): EngineState {
-  if (!canGuess(s, player) || s.phase.kind !== 'draw') return s
+  if (!canChat(s, player)) return s
   // eslint-disable-next-line no-control-regex -- 보이지 않는 제어 문자 지우기
   const clean = [...text.replace(/[\u0000-\u001f\u007f]/g, '').trim()].slice(0, CHAT_MAX).join('')
   if (!clean) return s
-  if (normalizeGuess(clean) === normalizeGuess(s.phase.word)) return correct(s, player, false)
-  return addLog(s, 'chat', player, clean)
+  if (canGuess(s, player) && s.phase.kind === 'draw') {
+    if (normalizeGuess(clean) === normalizeGuess(s.phase.word)) return correct(s, player, false)
+    return addLog(s, 'chat', player, clean)
+  }
+  // 이미 맞힌 사람의 채팅은 모두에게, 정답이 들어간 글만 못 맞힌 사람에겐 안 보임
+  const leaks = s.phase.kind === 'draw' && normalizeGuess(clean).includes(normalizeGuess(s.phase.word))
+  return addLog(s, 'chat', player, clean, leaks ? s.turnNo : undefined)
 }
 
 function pick(s: EngineState, player: number, index: number): EngineState {

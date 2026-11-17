@@ -77,6 +77,10 @@ export function GroupLobby<M>({ gameId, nickname, capacity, minPlayers, teams: c
     if (!room) return
     return room.onMembers(setMembers)
   }, [room])
+  // 대기실에 있는 동안은 '게임 중'이 아님 (결과 화면에서 대기실로 돌아왔을 때도 들어올 수 있게)
+  useEffect(() => {
+    if (room?.role === 'host') room.setPlaying(false)
+  }, [room])
 
   function connected(r: Room<M>, id: string, name: string, pin: string | null) {
     if (!mountedRef.current) {

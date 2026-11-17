@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest'
 import { createEngine, engineReducer, type EngineState } from './engine'
 import { viewFor } from './view'
 import { CHOICES_AT_MS, DRAWER_POINTS, GUESS_POINTS } from '../constants'
+import { DOODLE_WORDS, doodleGroupOf, letterCount, wordShape } from '../words'
+import { CHAT_MAX } from '../constants'
 
 const players = (n: number) => Array.from({ length: n }, (_, i) => ({ id: `p${i}`, name: `사람${i}` }))
 const at = (s: EngineState, now: number) => engineReducer(s, { type: 'tick', now })
@@ -13,9 +15,22 @@ function toDraw(s: EngineState): EngineState {
 }
 
 describe('그림 맞히기 심판', () => {
-  it('3명 이하는 두 바퀴, 4명부터 한 바퀴', () => {
-    expect(createEngine({ now: 0, seed: 1, players: players(3) }).order.length).toBe(6)
-    expect(createEngine({ now: 0, seed: 1, players: players(4) }).order.length).toBe(4)
+  it('몇 명이든 한 사람당 두 번씩 (두 바퀴, 같은 순서)', () => {
+    for (const n of [2, 3, 4, 8]) {
+      const { order } = createEngine({ now: 0, seed: 1, players: players(n) })
+      expect(order).toHaveLength(n * 2)
+      expect(order.slice(n)).toEqual(order.slice(0, n))
+      for (let i = 0; i < n; i++) expect(order.filter((x) => x === i)).toHaveLength(2)
+    }
+  })
+
+  it('사자성어·속담: 맞히는 사람에게 갈래와 띄어쓰기 모양, 띄어쓰기 없이 맞혀도 정답', () => {
+    expect(wordShape('누워서 떡 먹기')).toBe('○○○ ○ ○○')
+    expect(letterCount('누워서 떡 먹기')).toBe(6)
+    expect(doodleGroupOf('누워서 떡 먹기')).toBe('속담')
+    expect(doodleGroupOf('일석이조')).toBe('사자성어')
+    expect(DOODLE_WORDS.every((w) => [...w].length <= CHAT_MAX)).toBe(true)
+    expect(new Set(DOODLE_WORDS).size).toBe(DOODLE_WORDS.length)
   })
 
   it('제시어는 그리는 사람만 보고, 맞히면 순서대로 점수 + 그린 사람 점수', () => {
@@ -69,5 +84,25 @@ describe('그림 맞히기 심판', () => {
     if (d.phase.kind !== 'draw') throw new Error()
     d = engineReducer(d, { type: 'drop', player: d.phase.drawer })
     expect(d.phase.kind).toBe('reveal')
+  })
+
+  it('맞힌 뒤에도 채팅: 모두에게 보이고, 정답이 들어간 글만 못 맞힌 사람에게 숨김', () => {
+    let s = toDraw(createEngine({ now: 0, seed: 5, players: players(3) }))
+    if (s.phase.kind !== 'draw') throw new Error()
+    const { drawer, word } = s.phase
+    const [a, b] = [0, 1, 2].filter((i) => i !== drawer)
+    expect(viewFor(s, `p${drawer}`).canChat).toBe(false)
+    s = engineReducer(s, { type: 'guess', player: a, text: word })
+    expect(viewFor(s, `p${a}`).canChat).toBe(true)
+    s = engineReducer(s, { type: 'guess', player: a, text: '쉽네 ㅋㅋ' })
+    s = engineReducer(s, { type: 'guess', player: a, text: `답은 ${word}` })
+    const seenBy = (i: number) => viewFor(s, `p${i}`).log.map((l) => l.text)
+    expect(seenBy(b)).toContain('쉽네 ㅋㅋ')
+    expect(seenBy(b)).not.toContain(`답은 ${word}`)
+    expect(seenBy(drawer)).toContain(`답은 ${word}`)
+    expect(seenBy(a)).toContain(`답은 ${word}`)
+    // 정답 공개 뒤엔 모두
+    s = engineReducer(s, { type: 'tick', now: s.phase.kind === 'draw' ? s.phase.until : s.now })
+    expect(seenBy(b)).toContain(`답은 ${word}`)
   })
 })
