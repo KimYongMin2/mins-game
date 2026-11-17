@@ -6,7 +6,7 @@ export const INTRO_MS = 2000
 /** 그릴 사람이 제시어 2개 중 고르는 시간 (넘으면 무작위) */
 export const CHOOSE_MS = 6000
 /** 그리는 시간 */
-export const DRAW_MS = 60_000
+export const DRAW_MS = 120_000
 /** 정답 보여주기 */
 export const REVEAL_MS = 4000
 export const DONE_MS = 2500

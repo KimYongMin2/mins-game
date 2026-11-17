@@ -6325,7 +6325,7 @@ const INTRO_MS$6 = 2e3;
 /** 그릴 사람이 제시어 2개 중 고르는 시간 (넘으면 무작위) */
 const CHOOSE_MS$1 = 6e3;
 /** 그리는 시간 */
-const DRAW_MS = 6e4;
+const DRAW_MS = 12e4;
 /** 정답 보여주기 */
 const REVEAL_MS$1 = 4e3;
 const DONE_MS$8 = 2500;
