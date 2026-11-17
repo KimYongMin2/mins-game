@@ -177,8 +177,8 @@ function savePersonVolumes(v: Record<string, number>) {
 }
 
 /** 사람 칸 얼굴: 나는 3D로 그린 얼굴, 다른 사람은 고른 동물 그림 글자 (없으면 이름 첫 글자) */
-function Face({ me, avatar, name }: { me?: boolean; avatar?: string; name: string }) {
-  if (me) return <AvatarFace look={loadLook()} size={64} />
+function Face({ me, avatar, name, size }: { me?: boolean; avatar?: string; name: string; size: number }) {
+  if (me) return <AvatarFace look={loadLook()} size={size} />
   const look = decodeLook(avatar)
   return (
     <span className="meet-tile__letter" aria-hidden>
@@ -222,6 +222,8 @@ function SpeakWatch({ id, stream, onChange }: { id: string; stream: MediaStream 
 }
 
 type TileSize = 'normal' | 'big' | 'small'
+/** 칸 크기별 얼굴 크기 (CSS .meet-tile--… .meet-tile__face와 같게) */
+const FACE_PX: Record<TileSize, number> = { normal: 64, big: 112, small: 40 }
 
 type TileProps = {
   name: string
@@ -264,7 +266,7 @@ function Tile({ name, me, avatar, speaking, micOn, status, volume, video, localV
           <span className="meet-tile__status">화면 받는 중…</span>
         ) : (
           <span className="meet-tile__face">
-            <Face me={me} avatar={avatar} name={name} />
+            <Face me={me} avatar={avatar} name={name} size={FACE_PX[size]} />
           </span>
         )}
         {status && <span className="meet-tile__status">{status}</span>}
