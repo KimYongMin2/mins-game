@@ -15,6 +15,7 @@ export class Speaker {
   private ctx: AudioContext
   private gain: GainNode
   private volume = LISTEN_VOLUME.default
+  private deafened = false
 
   constructor(ctx: AudioContext) {
     this.ctx = ctx
@@ -39,7 +40,17 @@ export class Speaker {
 
   setVolume(v: number) {
     this.volume = Math.min(LISTEN_VOLUME.max, Math.max(LISTEN_VOLUME.min, v))
-    this.gain.gain.setTargetAtTime(LISTEN_BOOST * this.volume, this.ctx.currentTime, 0.03)
+    this.apply()
+  }
+
+  /** 듣기 끄기 (디스코드 헤드셋 버튼): 모든 사람 소리를 0으로, 풀면 원래 크기 */
+  setDeafened(on: boolean) {
+    this.deafened = on
+    this.apply()
+  }
+
+  private apply() {
+    this.gain.gain.setTargetAtTime(this.deafened ? 0 : LISTEN_BOOST * this.volume, this.ctx.currentTime, 0.03)
   }
 
   /** 한 사람 소리를 더한다. 그 사람 크기(0~2배)를 바꾸는 함수와 빼는 함수를 돌려준다 */

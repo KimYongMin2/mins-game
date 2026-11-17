@@ -1,4 +1,4 @@
-import { LocalAudioTrack, LocalVideoTrack, type RemoteParticipant, type RemoteTrack, Room as LkRoom, RoomEvent, Track, VideoPresets } from 'livekit-client'
+import { LocalAudioTrack, LocalVideoTrack, type RemoteParticipant, type RemoteTrack, type RemoteTrackPublication, Room as LkRoom, RoomEvent, ScreenSharePresets, Track, VideoPresets } from 'livekit-client'
 import type { CallPeer } from './voiceMesh'
 
 // 음성 통화를 우리 음성 서버(LiveKit, AWS Lightsail)로 (사용자 요청 2026-11-16 — 기기끼리 잇는 방식은 막힌 망에서 안 이어져서 서버를 삼).
@@ -16,6 +16,10 @@ const VOICE_BITRATE = 24_000
  */
 const CAMERA_ENCODING = VideoPresets.h360.encoding
 const CAMERA_LAYERS = [VideoPresets.h180]
+
+/** 화면 공유: 글자가 보이게 720p·초당 15장 (보는 칸이 작으면 360p·초당 3장 겹을 받음) */
+const SCREEN_ENCODING = ScreenSharePresets.h720fps15.encoding
+const SCREEN_LAYERS = [ScreenSharePresets.h360fps3]
 
 /** 화면에 붙이는 영상 (LiveKit 원격 영상 트랙 — attach하면 칸 크기를 보고 화질을 고른다) */
 export type VideoSource = { attach(el: HTMLMediaElement): HTMLMediaElement; detach(el: HTMLMediaElement): HTMLMediaElement }
@@ -37,6 +41,10 @@ export class SfuCall {
   private local: LocalAudioTrack | null = null
   private camera: MediaStreamTrack | null = null
   private localVideo: LocalVideoTrack | null = null
+  private screen: { video: MediaStreamTrack; audio: MediaStreamTrack | null } | null = null
+  private localScreen: { video: LocalVideoTrack; audio: LocalAudioTrack | null } | null = null
+  /** 화면 공유 소리 (그 사람 접속 번호 → 소리) */
+  private screenStreams = new Map<string, MediaStream>()
   private micOn = true
   private failed = false
   private closed = false
@@ -48,17 +56,19 @@ export class SfuCall {
     this.opts = opts
     const change = () => this.opts.onChange()
     this.lk
-      .on(RoomEvent.TrackSubscribed, (t: RemoteTrack, _pub, p: RemoteParticipant) => {
-        if (t.kind === Track.Kind.Audio) this.streams.set(memberIdOf(p.identity), new MediaStream([t.mediaStreamTrack]))
+      // 소리는 마이크와 화면 공유 소리를 따로 둔다 (같은 사람 것이라도 섞이면 마이크 소리를 덮어씀)
+      .on(RoomEvent.TrackSubscribed, (t: RemoteTrack, pub: RemoteTrackPublication, p: RemoteParticipant) => {
+        if (t.kind === Track.Kind.Audio) (pub.source === Track.Source.ScreenShareAudio ? this.screenStreams : this.streams).set(memberIdOf(p.identity), new MediaStream([t.mediaStreamTrack]))
         change()
       })
-      .on(RoomEvent.TrackUnsubscribed, (t: RemoteTrack, _pub, p: RemoteParticipant) => {
-        if (t.kind === Track.Kind.Audio) this.streams.delete(memberIdOf(p.identity))
+      .on(RoomEvent.TrackUnsubscribed, (t: RemoteTrack, pub: RemoteTrackPublication, p: RemoteParticipant) => {
+        if (t.kind === Track.Kind.Audio) (pub.source === Track.Source.ScreenShareAudio ? this.screenStreams : this.streams).delete(memberIdOf(p.identity))
         change()
       })
       .on(RoomEvent.ParticipantConnected, change)
       .on(RoomEvent.ParticipantDisconnected, (p: RemoteParticipant) => {
         this.streams.delete(memberIdOf(p.identity))
+        this.screenStreams.delete(memberIdOf(p.identity))
         change()
       })
       .on(RoomEvent.TrackPublished, change)
@@ -83,8 +93,10 @@ export class SfuCall {
         this.failed = false
         this.local = null
         this.localVideo = null
+        this.localScreen = null
         await this.publish()
         await this.publishCamera()
+        await this.publishScreen()
       } catch (e) {
         console.warn('[call] 음성 서버 연결 실패', e)
         this.failed = true
@@ -122,6 +134,49 @@ export class SfuCall {
       this.localVideo = null
     } else void this.publishCamera().catch((e) => console.warn('[call] 카메라 올리기 실패', e))
     this.opts.onChange()
+  }
+
+  private async publishScreen() {
+    if (!this.screen || this.localScreen || this.lk.state !== 'connected') return
+    const video = new LocalVideoTrack(this.screen.video, undefined, true)
+    const audio = this.screen.audio ? new LocalAudioTrack(this.screen.audio, undefined, true) : null
+    this.localScreen = { video, audio }
+    await this.lk.localParticipant.publishTrack(video, { source: Track.Source.ScreenShare, simulcast: true, videoEncoding: SCREEN_ENCODING, videoSimulcastLayers: SCREEN_LAYERS, degradationPreference: 'maintain-resolution' })
+    if (audio) await this.lk.localParticipant.publishTrack(audio, { source: Track.Source.ScreenShareAudio, audioPreset: { maxBitrate: 64_000 }, dtx: false, red: false })
+  }
+
+  /** 내 화면 공유 (영상 + 있으면 소리, null = 그만). 트랙을 끄는 건 부르는 쪽 */
+  setScreen(screen: { video: MediaStreamTrack; audio: MediaStreamTrack | null } | null) {
+    const old = this.localScreen
+    this.screen = screen
+    if (old) {
+      void this.lk.localParticipant.unpublishTrack(old.video, false)
+      if (old.audio) void this.lk.localParticipant.unpublishTrack(old.audio, false)
+      this.localScreen = null
+    }
+    if (screen) void this.publishScreen().catch((e) => console.warn('[call] 화면 공유 올리기 실패', e))
+    this.opts.onChange()
+  }
+
+  /** 그 사람의 화면 공유 영상 (안 하면 null) */
+  screenOf(id: string): VideoSource | null {
+    for (const p of this.lk.remoteParticipants.values()) {
+      if (memberIdOf(p.identity) !== id) continue
+      const pub = p.getTrackPublication(Track.Source.ScreenShare)
+      if (pub?.videoTrack && !pub.isMuted) return pub.videoTrack
+    }
+    return null
+  }
+
+  /** 그 사람이 화면 공유를 하고 있는지 (영상을 아직 못 받았어도) */
+  sharing(id: string): boolean {
+    for (const p of this.lk.remoteParticipants.values()) if (memberIdOf(p.identity) === id && p.getTrackPublication(Track.Source.ScreenShare)) return true
+    return false
+  }
+
+  /** 그 사람의 화면 공유 소리 */
+  screenAudioOf(id: string): MediaStream | null {
+    return this.screenStreams.get(id) ?? null
   }
 
   /** 그 사람(방 접속 번호)의 카메라 영상. 안 켰거나 아직 못 받았으면 null */

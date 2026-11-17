@@ -169,3 +169,37 @@ export const IconFlip = (p: P) => (
     <path d="m6 2 3 3-3 3" />
   </Svg>
 )
+
+export const IconHeadphones = (p: P) => (
+  <Svg {...p}>
+    <path d="M3 14h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-7a9 9 0 0 1 18 0v7a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3" />
+  </Svg>
+)
+
+export const IconHeadphoneOff = (p: P) => (
+  <Svg {...p}>
+    <path d="M21 14h-1.343" />
+    <path d="M9.128 3.47A9 9 0 0 1 21 12v3.343" />
+    <path d="m2 2 20 20" />
+    <path d="M20.414 20.414A2 2 0 0 1 19 21h-1a2 2 0 0 1-2-2v-3" />
+    <path d="M3 14h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-7a9 9 0 0 1 2.636-6.364" />
+  </Svg>
+)
+
+export const IconScreenShare = (p: P) => (
+  <Svg {...p}>
+    <path d="m9 10 3-3 3 3" />
+    <path d="M12 13V7" />
+    <rect width="20" height="14" x="2" y="3" rx="2" />
+    <path d="M12 17v4" />
+    <path d="M8 21h8" />
+  </Svg>
+)
+
+export const IconMore = (p: P) => (
+  <Svg {...p}>
+    <circle cx="12" cy="12" r="1" />
+    <circle cx="19" cy="12" r="1" />
+    <circle cx="5" cy="12" r="1" />
+  </Svg>
+)

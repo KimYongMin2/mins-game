@@ -9,7 +9,16 @@ export const CHAT_MAX = 300
 export const CHAT_KEEP = 200
 
 export type ChatSignal = { t: 'chat'; from: string; text: string }
-export type MeetMsg = CallSignal | ChatSignal
+/** 듣기 끔/켬 (다른 사람 칸에 표시) */
+export type DeafSignal = { t: 'deaf'; from: string; on: boolean }
+export type MeetMsg = CallSignal | ChatSignal | DeafSignal
+
+/** 받은 방 메시지가 듣기 끔/켬이면 그 값 */
+export function readDeaf(msg: unknown): boolean | null {
+  if (!msg || typeof msg !== 'object' || (msg as { t?: unknown }).t !== 'deaf') return null
+  const on = (msg as { on?: unknown }).on
+  return typeof on === 'boolean' ? on : null
+}
 
 /** 채팅 한 줄. kind 'join'·'leave'는 들어옴·나감 알림 줄 */
 export type ChatLine = { key: number; kind: 'chat' | 'join' | 'leave'; name: string; text: string; mine?: boolean; at: number }

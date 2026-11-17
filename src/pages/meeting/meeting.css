@@ -980,3 +980,26 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* 화면 공유 칸 (늘 다 보이게, 검은 바탕) · 폰 [더보기] 창 */
+.meet-tile--screen {
+  background: #000;
+}
+
+.meet-tile--screen .meet-tile__status {
+  inset: 0;
+  display: grid;
+  place-items: center;
+}
+
+.meet-more {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+}
+
+.meet-more .meet-controls__btn {
+  max-width: none;
+  min-height: 64px;
+  font-size: 0.875rem;
+}

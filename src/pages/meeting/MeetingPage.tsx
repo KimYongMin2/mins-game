@@ -13,11 +13,11 @@ import { loadNickname } from '../../shared/storage/nickname'
 import { VoiceSettingsDialog } from './VoicePanel'
 import { VOICE_EFFECTS } from '../../shared/call/voiceFx'
 import { AvatarFace } from '../../shared/ui/AvatarFace'
-import { IconCamera, IconCameraOff, IconFlip, IconLayout, IconMessage, IconMic, IconMicOff, IconPhoneOff, IconPin, IconSend, IconSliders, IconVolume, IconVolumeOff, IconWave } from '../../shared/ui/icons'
-import { LAYOUTS, type Layout, ME, arrange, isLayout } from './layout'
+import { IconCamera, IconCameraOff, IconFlip, IconHeadphoneOff, IconHeadphones, IconLayout, IconMessage, IconMore, IconScreenShare, IconMic, IconMicOff, IconPhoneOff, IconPin, IconSend, IconSliders, IconVolume, IconVolumeOff, IconWave } from '../../shared/ui/icons'
+import { LAYOUTS, type Layout, ME, arrange, isLayout, screenId, screenOwner } from './layout'
 import { ANIMAL_EMOJI, decodeLook, encodeLook } from '../../shared/art3d/animalKinds'
 import { loadLook } from '../../shared/storage/avatar'
-import { CHAT_MAX, type ChatLine, type ChatSignal, type MeetMsg, cleanChat, diffMembers, pushLine, readChat } from './chat'
+import { CHAT_MAX, type ChatLine, type ChatSignal, type MeetMsg, cleanChat, diffMembers, pushLine, readChat, readDeaf } from './chat'
 import { playChat, playJoin, playLeave } from './sounds'
 import './meeting.css'
 
@@ -239,16 +239,20 @@ type TileProps = {
   onOpen: () => void
   /** 칸 위에 겹치는 버튼 (내 칸의 카메라 전환) */
   extra?: React.ReactNode
+  /** 듣기를 끈 사람 */
+  deaf?: boolean
+  /** 화면 공유 칸 (영상은 늘 다 보이게, 얼굴 대신 '화면 준비 중') */
+  screen?: boolean
 }
 
 /** 사람 한 칸 (디스코드·Meet처럼): 카메라를 켰으면 영상, 아니면 얼굴. 말하면 초록 테두리, 마이크 꺼짐·소리 크기·고정 표시. 누르면 그 사람 설정 */
-function Tile({ name, me, avatar, speaking, micOn, status, volume, video, localVideo, mirror, size, pinned, onOpen, extra }: TileProps) {
-  const fit = size === 'big' ? 'contain' : 'cover'
+function Tile({ name, me, avatar, speaking, micOn, status, volume, video, localVideo, mirror, size, pinned, onOpen, extra, deaf, screen }: TileProps) {
+  const fit = size === 'big' || screen ? 'contain' : 'cover'
   return (
     <li className={`meet-cell meet-cell--${size}`}>
       <button
         type="button"
-        className={`meet-tile meet-tile--${size}${speaking ? ' meet-tile--speaking' : ''}${status ? ' meet-tile--waiting' : ''}${video || localVideo ? ' meet-tile--video' : ''}`}
+        className={`meet-tile meet-tile--${size}${screen ? ' meet-tile--screen' : ''}${speaking ? ' meet-tile--speaking' : ''}${status ? ' meet-tile--waiting' : ''}${video || localVideo ? ' meet-tile--video' : ''}`}
         onClick={onOpen}
         aria-label={`${name}${me ? ' (나)' : ''} 설정`}
       >
@@ -256,6 +260,8 @@ function Tile({ name, me, avatar, speaking, micOn, status, volume, video, localV
           <RemoteVideo source={video} fit={fit} />
         ) : localVideo ? (
           <LocalVideo track={localVideo} mirror={!!mirror} fit={fit} />
+        ) : screen ? (
+          <span className="meet-tile__status">화면 받는 중…</span>
         ) : (
           <span className="meet-tile__face">
             <Face me={me} avatar={avatar} name={name} />
@@ -268,12 +274,13 @@ function Tile({ name, me, avatar, speaking, micOn, status, volume, video, localV
               <IconPin size={14} />
             </span>
           )}
-          {!me && volume !== PERSON_VOLUME.default && (
+          {!me && !screen && volume !== PERSON_VOLUME.default && (
             <span className="meet-tile__badge">{volume === 0 ? <IconVolumeOff size={14} /> : `${Math.round(volume * 100)}%`}</span>
           )}
         </span>
         <span className="meet-tile__name">
-          {!micOn && <IconMicOff size={14} className="meet-tile__muted" />}
+          {screen ? <IconScreenShare size={14} /> : !micOn && <IconMicOff size={14} className="meet-tile__muted" />}
+          {deaf && <IconHeadphoneOff size={14} className="meet-tile__muted" />}
           <span>{name}</span>
           {me && <small>나</small>}
         </span>
@@ -405,13 +412,31 @@ type RoomProps = Joined & {
   onLeave: () => void
 }
 
-type SheetKind = { kind: 'voice' } | { kind: 'volume' } | { kind: 'layout' } | { kind: 'person'; id: string; name: string }
+type SheetKind = { kind: 'voice' } | { kind: 'volume' } | { kind: 'layout' } | { kind: 'more' } | { kind: 'person'; id: string; name: string }
 
 /** 보기 방식·카메라 끈 사람 숨기기는 기기에 기억 */
 const LAYOUT_KEY = 'meeting-layout'
 const HIDE_NO_CAMERA_KEY = 'meeting-hide-no-camera'
 
 type Facing = 'user' | 'environment'
+
+/** 화면 공유를 할 수 있는 브라우저인지 (폰 브라우저는 대부분 안 됨) */
+const CAN_SHARE = typeof navigator !== 'undefined' && typeof navigator.mediaDevices?.getDisplayMedia === 'function'
+
+type Screen = { video: MediaStreamTrack; audio: MediaStreamTrack | null }
+
+/** 화면(창·탭) 고르기. 탭 소리도 같이 (브라우저가 주면). 취소하면 null */
+async function getScreen(): Promise<Screen | null> {
+  try {
+    const stream = await navigator.mediaDevices.getDisplayMedia({ video: { frameRate: { ideal: 15, max: 15 } }, audio: true })
+    const video = stream.getVideoTracks()[0]
+    if (!video) return null
+    video.contentHint = 'detail' // 글자가 또렷하게 (움직임보다 선명함)
+    return { video, audio: stream.getAudioTracks()[0] ?? null }
+  } catch {
+    return null
+  }
+}
 
 /** 카메라 받기 (360p 정도면 충분 — 보내는 화질 상한도 360p). 거절하거나 없으면 null */
 async function getCamera(facing: Facing): Promise<MediaStreamTrack | null> {
@@ -437,7 +462,25 @@ function MeetingRoom({ room, name, pin, nickname, voice, settings, onSettings, o
   const [blocked, setBlocked] = useState(false)
   const [asking, setAsking] = useState(false)
   /** 통화 상태 (바뀔 때마다 새로 받아 그린다) */
-  const [call, setCall] = useState<{ peers: CallPeer[]; mic: boolean; strangers: number; videos: Record<string, VideoSource | null> }>({ peers: [], mic: true, strangers: 0, videos: {} })
+  type CallState = {
+    peers: CallPeer[]
+    mic: boolean
+    strangers: number
+    videos: Record<string, VideoSource | null>
+    /** 화면 공유 중인 사람 (먼저 시작한 순) */
+    sharing: string[]
+    screens: Record<string, VideoSource | null>
+    screenAudio: Record<string, MediaStream | null>
+  }
+  const [call, setCall] = useState<CallState>({ peers: [], mic: true, strangers: 0, videos: {}, sharing: [], screens: {}, screenAudio: {} })
+  // 누가 화면 공유를 새로 시작하면 바둑판이어도 잠깐 크게 보기로 (Meet처럼 — 보기를 직접 고르면 풂)
+  const [autoFocus, setAutoFocus] = useState(false)
+
+  // 듣기 끄기 (디스코드 헤드셋 버튼): 모든 소리 끄고 마이크도 끔, 풀면 마이크를 원래대로. 다른 사람 칸에 표시
+  const [deafened, setDeafened] = useState(false)
+  const deafRef = useRef(false)
+  const micBeforeDeaf = useRef(true)
+  const [deafPeers, setDeafPeers] = useState<Set<string>>(() => new Set())
 
   // 말하는 사람 (크게 보기는 마지막으로 말한 사람을 크게)
   const [speakingIds, setSpeakingIds] = useState<Set<string>>(() => new Set())
@@ -511,6 +554,60 @@ function MeetingRoom({ room, name, pin, nickname, voice, settings, onSettings, o
       .catch(() => {})
   }
 
+  // 화면 공유
+  const [screen, setScreenState] = useState<Screen | null>(null)
+  const screenRef = useRef<Screen | null>(null)
+  const setScreen = (sc: Screen | null) => {
+    screenRef.current = sc
+    setScreenState(sc)
+    meshRef.current?.setScreen(sc)
+  }
+  const stopScreen = () => {
+    const sc = screenRef.current
+    if (!sc) return
+    setScreen(null)
+    sc.video.stop()
+    sc.audio?.stop()
+  }
+  useEffect(
+    () => () => {
+      screenRef.current?.video.stop()
+      screenRef.current?.audio?.stop()
+    },
+    [],
+  )
+  async function toggleScreen() {
+    if (screenRef.current) return stopScreen()
+    const sc = await getScreen()
+    if (!sc) return
+    // 브라우저의 '공유 중지'를 누르면 끝남
+    sc.video.addEventListener('ended', () => {
+      if (screenRef.current === sc) stopScreen()
+    })
+    setScreen(sc)
+  }
+
+  function toggleDeaf() {
+    const on = !deafRef.current
+    deafRef.current = on
+    setDeafened(on)
+    speaker.setDeafened(on)
+    if (on) {
+      micBeforeDeaf.current = meshRef.current?.mic ?? true
+      meshRef.current?.setMicOn(false)
+    } else if (micBeforeDeaf.current) meshRef.current?.setMicOn(true)
+    room.send({ t: 'deaf', from: room.myId, on })
+  }
+
+  /** 마이크 버튼: 듣기를 꺼 둔 채로 누르면 듣기도 같이 켬 (디스코드처럼) */
+  function toggleMic(on: boolean) {
+    if (on && deafRef.current) {
+      micBeforeDeaf.current = true
+      return toggleDeaf()
+    }
+    meshRef.current?.setMicOn(on)
+  }
+
   /** 앞·뒤 카메라 바꾸기 (폰은 둘을 같이 못 여는 경우가 있어 먼저 끄고 연다) */
   async function flipCamera() {
     const old = cameraRef.current
@@ -575,17 +672,31 @@ function MeetingRoom({ room, name, pin, nickname, voice, settings, onSettings, o
   }, [voice, settings])
 
   useEffect(() => {
+    let sharingOrder: string[] = []
     const mesh: SfuCall = new SfuCall({
       url: SFU_URL ?? '',
       getToken: () => sfuToken(`meeting-${room.code}`, room.myId, nickname),
       onChange: () => {
         const ps = mesh.peers()
-        setCall({ peers: ps, mic: mesh.mic, strangers: mesh.strangers(), videos: Object.fromEntries(ps.map((p) => [p.id, mesh.videoOf(p.id)])) })
+        const now = ps.filter((p) => mesh.sharing(p.id)).map((p) => p.id)
+        const started = now.filter((id) => !sharingOrder.includes(id))
+        sharingOrder = [...sharingOrder.filter((id) => now.includes(id)), ...started]
+        if (started.length) setAutoFocus(true)
+        setCall({
+          peers: ps,
+          mic: mesh.mic,
+          strangers: mesh.strangers(),
+          videos: Object.fromEntries(ps.map((p) => [p.id, mesh.videoOf(p.id)])),
+          sharing: sharingOrder,
+          screens: Object.fromEntries(sharingOrder.map((id) => [id, mesh.screenOf(id)])),
+          screenAudio: Object.fromEntries(sharingOrder.map((id) => [id, mesh.screenAudioOf(id)])),
+        })
       },
     })
     meshRef.current = mesh
     mesh.setTrack(voiceRef.current?.track ?? null)
     mesh.setCamera(cameraRef.current)
+    mesh.setScreen(screenRef.current)
     const since = Date.now()
     playJoin()
     const offMembers = room.onMembers((ms) => {
@@ -593,23 +704,36 @@ function MeetingRoom({ room, name, pin, nickname, voice, settings, onSettings, o
       const { joined, left } = diffMembers(membersRef.current, ms)
       if (Date.now() - since > SETTLE_MS) {
         for (const m of joined) addLine({ kind: 'join', name: m.nickname, text: '' })
-        if (joined.length) playJoin()
+        if (joined.length && !deafRef.current) playJoin()
       }
+      if (joined.length && deafRef.current) room.send({ t: 'deaf', from: room.myId, on: true })
       for (const m of left) addLine({ kind: 'leave', name: m.nickname, text: '' })
-      if (left.length) playLeave()
+      if (left.length && !deafRef.current) playLeave()
+      if (left.length) setDeafPeers((prev) => new Set([...prev].filter((id) => ms.some((m) => m.id === id))))
       membersRef.current = ms
       setMembers(ms)
       mesh.setMembers(ms.map((m) => m.id))
     })
     // 채팅: 게임 서버가 붙인 보낸 사람(from)을 믿고, 없으면(예전 방식) 메시지 안의 from. 사람 목록에 없는 사람 것은 버린다
     const offMessage = room.onMessage((msg, from) => {
-      const text = readChat(msg)
-      if (!text) return
       const id = from ?? (msg as ChatSignal).from
       const who = membersRef.current.find((m) => m.id === id)
       if (!who) return
+      const deaf = readDeaf(msg)
+      if (deaf !== null) {
+        setDeafPeers((prev) => {
+          if (prev.has(who.id) === deaf) return prev
+          const next = new Set(prev)
+          if (deaf) next.add(who.id)
+          else next.delete(who.id)
+          return next
+        })
+        return
+      }
+      const text = readChat(msg)
+      if (!text) return
       addLine({ kind: 'chat', name: who.nickname, text })
-      playChat()
+      if (!deafRef.current) playChat()
     })
     return () => {
       offMembers()
@@ -699,9 +823,38 @@ function MeetingRoom({ room, name, pin, nickname, voice, settings, onSettings, o
   // 칸 늘어놓기 (보기 방식대로)
   const cameraIds = new Set<string>(members.filter((m) => call.videos[m.id]).map((m) => m.id))
   if (camera) cameraIds.add(ME)
-  const ids = [ME, ...members.map((m) => m.id)]
-  const { main, rest } = arrange({ layout, ids, camera: cameraIds, pinned, active, hideNoCamera })
+  const sharingIds = call.sharing.filter((id) => members.some((m) => m.id === id))
+  const ids = [ME, ...(screen ? [screenId(ME)] : []), ...members.flatMap((m) => (sharingIds.includes(m.id) ? [m.id, screenId(m.id)] : [m.id]))]
+  const screens = [...(screen ? [screenId(ME)] : []), ...sharingIds.map(screenId)]
+  const shownLayout: Layout = autoFocus && layout === 'grid' && sharingIds.length > 0 ? 'focus' : layout
+  const { main, rest } = arrange({ layout: shownLayout, ids, camera: cameraIds, pinned, active, hideNoCamera, screens })
+  const togglePin = (id: string) => {
+    if (pinned === id) return setPinned(null)
+    setPinned(id)
+    if (layout === 'grid') setLayout('focus')
+  }
   const tileFor = (id: string, size: TileSize) => {
+    const owner = screenOwner(id)
+    if (owner) {
+      const who = owner === ME ? nickname : members.find((m) => m.id === owner)?.nickname
+      if (!who) return null
+      return (
+        <Tile
+          key={id}
+          name={`${who}님의 화면`}
+          screen
+          speaking={false}
+          micOn
+          status={null}
+          volume={PERSON_VOLUME.default}
+          video={owner === ME ? null : (call.screens[owner] ?? null)}
+          localVideo={owner === ME ? screen?.video : null}
+          size={size}
+          pinned={pinned === id}
+          onOpen={() => togglePin(id)}
+        />
+      )
+    }
     if (id === ME)
       return (
         <Tile
@@ -716,6 +869,7 @@ function MeetingRoom({ room, name, pin, nickname, voice, settings, onSettings, o
           localVideo={camera}
           mirror={facing === 'user'}
           size={size}
+          deaf={deafened}
           onOpen={() => setSheet({ kind: 'volume' })}
           extra={
             camera && canFlip ? (
@@ -741,10 +895,45 @@ function MeetingRoom({ room, name, pin, nickname, voice, settings, onSettings, o
         video={call.videos[id] ?? null}
         size={size}
         pinned={pinned === id}
+        deaf={deafPeers.has(id)}
         onOpen={() => setSheet({ kind: 'person', id, name: m.nickname })}
       />
     )
   }
+
+  /** 넓은 화면은 조작 줄에, 좁은 화면은 [더보기] 창에 */
+  const moreButtons = (
+    <>
+      {CAN_SHARE && (
+        <button
+          type="button"
+          className={`meet-controls__btn${screen ? ' meet-controls__btn--on' : ''}`}
+          aria-pressed={!!screen}
+          onClick={() => {
+            closeSheet()
+            void toggleScreen()
+          }}
+        >
+          <IconScreenShare size={22} />
+          <span>{screen ? '공유 중지' : '화면 공유'}</span>
+        </button>
+      )}
+      {voice && (
+        <button type="button" className="meet-controls__btn" onClick={() => openVoice(true)} title={`목소리: ${effectLabel}`}>
+          <IconWave size={22} />
+          <span>목소리</span>
+        </button>
+      )}
+      <button type="button" className="meet-controls__btn" onClick={() => setSheet({ kind: 'layout' })}>
+        <IconLayout size={22} />
+        <span>보기</span>
+      </button>
+      <button type="button" className="meet-controls__btn" onClick={() => setSheet({ kind: 'volume' })}>
+        <IconSliders size={22} />
+        <span>소리</span>
+      </button>
+    </>
+  )
 
   const people = (
     <div className="meet-stage">
@@ -830,6 +1019,11 @@ function MeetingRoom({ room, name, pin, nickname, voice, settings, onSettings, o
         const who = members.find((m) => m.id === id)
         return p.stream && <PeerAudio key={id} stream={p.stream} speaker={speaker} volume={who ? volumeOf(who.nickname) : PERSON_VOLUME.default} />
       })}
+      {sharingIds.map((id) => {
+        const st = call.screenAudio[id]
+        const who = members.find((m) => m.id === id)
+        return st && <PeerAudio key={screenId(id)} stream={st} speaker={speaker} volume={who ? volumeOf(who.nickname) : PERSON_VOLUME.default} />
+      })}
 
       <div className="meet-controls">
         {voice ? (
@@ -837,7 +1031,7 @@ function MeetingRoom({ room, name, pin, nickname, voice, settings, onSettings, o
             type="button"
             className={`meet-controls__btn${micOn ? '' : ' meet-controls__btn--off'}`}
             aria-pressed={!micOn}
-            onClick={() => meshRef.current?.setMicOn(!micOn)}
+            onClick={() => toggleMic(!micOn)}
           >
             {micOn ? <IconMic size={22} /> : <IconMicOff size={22} />}
             <span>{micOn ? '마이크' : '꺼짐'}</span>
@@ -848,6 +1042,10 @@ function MeetingRoom({ room, name, pin, nickname, voice, settings, onSettings, o
             <span>마이크 허락</span>
           </button>
         )}
+        <button type="button" className={`meet-controls__btn${deafened ? ' meet-controls__btn--off' : ''}`} aria-pressed={deafened} onClick={toggleDeaf}>
+          {deafened ? <IconHeadphoneOff size={22} /> : <IconHeadphones size={22} />}
+          <span>{deafened ? '듣기 꺼짐' : '듣기'}</span>
+        </button>
         <button
           type="button"
           className={`meet-controls__btn${camera ? ' meet-controls__btn--on' : ''}`}
@@ -858,25 +1056,24 @@ function MeetingRoom({ room, name, pin, nickname, voice, settings, onSettings, o
           {camera ? <IconCamera size={22} /> : <IconCameraOff size={22} />}
           <span>카메라</span>
         </button>
-        {voice && (
-          <button type="button" className="meet-controls__btn" onClick={() => openVoice(true)} title={`목소리: ${effectLabel}`}>
-            <IconWave size={22} />
-            <span>목소리</span>
+        {wide ? (
+          moreButtons
+        ) : (
+          <button type="button" className={`meet-controls__btn${screen ? ' meet-controls__btn--on' : ''}`} onClick={() => setSheet({ kind: 'more' })}>
+            <IconMore size={22} />
+            <span>더보기</span>
           </button>
         )}
-        <button type="button" className="meet-controls__btn" onClick={() => setSheet({ kind: 'layout' })}>
-          <IconLayout size={22} />
-          <span>보기</span>
-        </button>
-        <button type="button" className="meet-controls__btn" onClick={() => setSheet({ kind: 'volume' })}>
-          <IconSliders size={22} />
-          <span>소리</span>
-        </button>
         <button type="button" className="meet-controls__btn meet-controls__btn--leave" onClick={onLeave}>
           <IconPhoneOff size={22} />
           <span>나가기</span>
         </button>
       </div>
+      {sheet?.kind === 'more' && (
+        <Sheet label="더보기" onClose={closeSheet}>
+          <div className="meet-more">{moreButtons}</div>
+        </Sheet>
+      )}
 
       {sheet?.kind === 'voice' && voice && (
         <VoiceSettingsDialog inRoom settings={settings} onSave={onSettings} onClose={() => openVoice(false)} getRaw={async () => voice.rawTrack} />
@@ -924,11 +1121,7 @@ function MeetingRoom({ room, name, pin, nickname, voice, settings, onSettings, o
             className={`button${pinned === sheet.id ? ' button--primary' : ''}`}
             aria-pressed={pinned === sheet.id}
             onClick={() => {
-              if (pinned === sheet.id) setPinned(null)
-              else {
-                setPinned(sheet.id)
-                if (layout === 'grid') setLayout('focus')
-              }
+              togglePin(sheet.id)
               closeSheet()
             }}
           >
@@ -941,7 +1134,10 @@ function MeetingRoom({ room, name, pin, nickname, voice, settings, onSettings, o
         <Sheet label="보기 방식" onClose={closeSheet}>
           <div className="meet-layouts" role="radiogroup" aria-label="보기 방식">
             {LAYOUTS.map((l) => (
-              <button key={l.id} type="button" role="radio" aria-checked={layout === l.id} className={`meet-layouts__option meet-layouts__option--${l.id}`} onClick={() => setLayout(l.id)}>
+              <button key={l.id} type="button" role="radio" aria-checked={shownLayout === l.id} className={`meet-layouts__option meet-layouts__option--${l.id}`} onClick={() => {
+                  setLayout(l.id)
+                  setAutoFocus(false)
+                }}>
                 <span className="meet-layouts__pic" aria-hidden>
                   <i />
                   <i />

@@ -1,6 +1,7 @@
 // 회의방 보기 방식 (Zoom·Google Meet처럼 사람마다 고름, 사용자 요청 2026-11-17).
 // 바둑판 = 모두 같은 크기 · 크게 보기 = 한 사람 크게 + 나머지 작은 줄 · 한 명만 = 한 사람만.
-// 크게 볼 사람: 고정한 사람 → 마지막으로 말한 사람 → 카메라 켠 사람 → 다른 사람 아무나 → 나.
+// 크게 볼 칸: 고정한 칸 → 화면 공유(가장 최근) → 마지막으로 말한 사람 → 카메라 켠 사람 → 다른 사람 아무나 → 나.
+// 화면 공유는 따로 한 칸('screen:접속 번호', 나는 'screen:me')으로 그 사람 칸 바로 뒤에 놓인다.
 
 export type Layout = 'grid' | 'focus' | 'spotlight'
 
@@ -15,6 +16,10 @@ export const isLayout = (x: unknown): x is Layout => x === 'grid' || x === 'focu
 /** 나를 가리키는 칸 번호 (다른 사람은 방 접속 번호) */
 export const ME = 'me'
 
+/** 화면 공유 칸 번호 */
+export const screenId = (owner: string) => `screen:${owner}`
+export const screenOwner = (id: string): string | null => (id.startsWith('screen:') ? id.slice(7) : null)
+
 export type Arrange = {
   layout: Layout
   /** 나 포함 모든 칸 (나 = ME, 맨 앞) */
@@ -26,15 +31,18 @@ export type Arrange = {
   active: string | null
   /** 카메라 끈 사람 숨기기 */
   hideNoCamera: boolean
+  /** 화면 공유 칸 (먼저 시작한 순, ids 안에도 있음) */
+  screens?: string[]
 }
 
 /** 큰 칸(main)과 나머지 칸(rest). 바둑판은 main 없음 */
-export function arrange({ layout, ids, camera, pinned, active, hideNoCamera }: Arrange): { main: string | null; rest: string[] } {
-  // 숨기기를 켜도 고정한 사람·나는 남긴다 (아무도 안 보이면 이상해서)
-  const shown = hideNoCamera ? ids.filter((id) => camera.has(id) || id === pinned || id === ME) : ids
+export function arrange({ layout, ids, camera, pinned, active, hideNoCamera, screens = [] }: Arrange): { main: string | null; rest: string[] } {
+  // 숨기기를 켜도 고정한 칸·나·화면 공유는 남긴다 (아무도 안 보이면 이상해서)
+  const shown = hideNoCamera ? ids.filter((id) => camera.has(id) || screens.includes(id) || id === pinned || id === ME) : ids
   if (layout === 'grid') return { main: null, rest: shown }
-  const others = ids.filter((id) => id !== ME)
-  const has = (id: string | null): id is string => !!id && ids.includes(id)
-  const main = has(pinned) ? pinned : has(active) ? active : (others.find((id) => camera.has(id)) ?? others[0] ?? ME)
+  const others = ids.filter((id) => id !== ME && !screens.includes(id))
+  const has = (id: string | null | undefined): id is string => !!id && ids.includes(id)
+  const screen = [...screens].reverse().find((id) => ids.includes(id))
+  const main = has(pinned) ? pinned : has(screen) ? screen : has(active) ? active : (others.find((id) => camera.has(id)) ?? others[0] ?? ME)
   return { main, rest: layout === 'spotlight' ? [] : shown.filter((id) => id !== main) }
 }

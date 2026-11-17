@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { ME, arrange } from './layout'
+import { ME, arrange, screenId, screenOwner } from './layout'
 
 const base = { ids: [ME, 'a', 'b', 'c'], camera: new Set<string>(), pinned: null, active: null, hideNoCamera: false }
 
@@ -25,5 +25,15 @@ describe('회의방 보기 방식', () => {
 
   it('카메라 끈 사람 숨기기 (나·고정한 사람은 남김)', () => {
     expect(arrange({ ...base, layout: 'grid', hideNoCamera: true, camera: new Set(['b']), pinned: 'c' }).rest).toEqual([ME, 'b', 'c'])
+  })
+
+  it('화면 공유를 크게 (고정이 먼저, 최근 공유가 먼저)', () => {
+    const ids = [ME, 'a', screenId('a'), 'b', screenId('b')]
+    const screens = [screenId('a'), screenId('b')]
+    expect(arrange({ ...base, ids, screens, layout: 'focus', active: 'a' }).main).toBe(screenId('b'))
+    expect(arrange({ ...base, ids, screens, layout: 'focus', pinned: 'a' }).main).toBe('a')
+    expect(arrange({ ...base, ids, screens, layout: 'grid', hideNoCamera: true }).rest).toEqual([ME, screenId('a'), screenId('b')])
+    expect(screenOwner(screenId('me'))).toBe('me')
+    expect(screenOwner('a')).toBeNull()
   })
 })
