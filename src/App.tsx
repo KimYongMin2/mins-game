@@ -7,6 +7,7 @@ import { setSwitchTargets } from './shared/nav'
 import { GAMES } from './pages/gameList'
 import { playerRange } from './pages/PlayerDots'
 import { MeetingCallProvider, useMeetingCall } from './pages/meeting/callState'
+import { ErrorBoundary } from './shared/ui/ErrorBoundary'
 
 // 게임·회의방 화면은 들어갈 때 받는다 (사용자 요청 — 처음에 16개 게임을 한꺼번에 받아 첫 화면이 느렸음)
 const ArcheryPage = lazy(() => import('./games/archery/ArcheryPage').then((m) => ({ default: m.ArcheryPage })))
@@ -50,6 +51,12 @@ setSwitchTargets(
   }),
 )
 
+/** 화면 오류 안내 (다른 주소로 가면 다시 그려 봄) */
+function PageErrors({ children }: { children: React.ReactNode }) {
+  const location = useLocation()
+  return <ErrorBoundary key={location.pathname}>{children}</ErrorBoundary>
+}
+
 /** 닉네임이 없으면 닉네임 화면으로. 정한 뒤 원래 주소(초대 링크의 ?mode=pvp&join=… 포함)로 돌아오게 들고 간다 */
 function ToNickname() {
   const location = useLocation()
@@ -62,6 +69,7 @@ function App() {
   return (
     <MeetingCallProvider>
     <BrowserRouter>
+      <PageErrors>
       <Suspense fallback={<div className="page-loading" role="status">불러오는 중…</div>}>
       <Routes>
         <Route
@@ -154,7 +162,10 @@ function App() {
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
       </Suspense>
-      <CallHost />
+      </PageErrors>
+      <ErrorBoundary>
+        <CallHost />
+      </ErrorBoundary>
     </BrowserRouter>
     </MeetingCallProvider>
   )
