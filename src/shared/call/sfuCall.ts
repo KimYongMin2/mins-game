@@ -1,4 +1,4 @@
-import { LocalAudioTrack, type RemoteParticipant, type RemoteTrack, Room as LkRoom, RoomEvent, Track } from 'livekit-client'
+import { LocalAudioTrack, LocalVideoTrack, type RemoteParticipant, type RemoteTrack, Room as LkRoom, RoomEvent, Track, VideoPresets } from 'livekit-client'
 import type { CallPeer } from './voiceMesh'
 
 // 음성 통화를 우리 음성 서버(LiveKit, AWS Lightsail)로 (사용자 요청 2026-11-16 — 기기끼리 잇는 방식은 막힌 망에서 안 이어져서 서버를 삼).
@@ -9,6 +9,16 @@ import type { CallPeer } from './voiceMesh'
 
 /** 음성 최대 비트레이트 (한 사람 말소리 1시간 약 10MB) */
 const VOICE_BITRATE = 24_000
+
+/**
+ * 화상 (사용자 요청 2026-11-17 — 회의방에 카메라). 큰 칸용 360p + 작은 칸용 180p 두 겹(simulcast)으로 올리고,
+ * 보는 쪽은 adaptiveStream이 칸 크기에 맞는 겹만 받는다 (작은 칸은 낮은 화질 → 서버 데이터 줄임)
+ */
+const CAMERA_ENCODING = VideoPresets.h360.encoding
+const CAMERA_LAYERS = [VideoPresets.h180]
+
+/** 화면에 붙이는 영상 (LiveKit 원격 영상 트랙 — attach하면 칸 크기를 보고 화질을 고른다) */
+export type VideoSource = { attach(el: HTMLMediaElement): HTMLMediaElement; detach(el: HTMLMediaElement): HTMLMediaElement }
 
 /** 참가자 이름에서 방 접속 번호 */
 export const memberIdOf = (identity: string) => identity.split('.')[0]
@@ -25,6 +35,8 @@ export class SfuCall {
   private members: string[] = []
   private track: MediaStreamTrack | null = null
   private local: LocalAudioTrack | null = null
+  private camera: MediaStreamTrack | null = null
+  private localVideo: LocalVideoTrack | null = null
   private micOn = true
   private failed = false
   private closed = false
@@ -49,6 +61,8 @@ export class SfuCall {
         this.streams.delete(memberIdOf(p.identity))
         change()
       })
+      .on(RoomEvent.TrackPublished, change)
+      .on(RoomEvent.TrackUnpublished, change)
       .on(RoomEvent.TrackMuted, change)
       .on(RoomEvent.TrackUnmuted, change)
       .on(RoomEvent.Reconnected, change)
@@ -68,7 +82,9 @@ export class SfuCall {
         if (this.closed) return void this.lk.disconnect(false)
         this.failed = false
         this.local = null
+        this.localVideo = null
         await this.publish()
+        await this.publishCamera()
       } catch (e) {
         console.warn('[call] 음성 서버 연결 실패', e)
         this.failed = true
@@ -86,6 +102,36 @@ export class SfuCall {
     this.local = local
     if (!this.micOn) await local.mute()
     await this.lk.localParticipant.publishTrack(local, { source: Track.Source.Microphone, audioPreset: { maxBitrate: VOICE_BITRATE }, dtx: true, red: true })
+  }
+
+  private async publishCamera() {
+    if (!this.camera || this.localVideo || this.lk.state !== 'connected') return
+    const video = new LocalVideoTrack(this.camera, undefined, true)
+    this.localVideo = video
+    await this.lk.localParticipant.publishTrack(video, { source: Track.Source.Camera, simulcast: true, videoEncoding: CAMERA_ENCODING, videoSimulcastLayers: CAMERA_LAYERS })
+  }
+
+  /** 내 카메라 (없으면 null = 끔). 켜는 중에 바꾸면(앞·뒤 카메라) 트랙만 갈아 끼운다. 카메라 트랙을 끄는 건 부르는 쪽 */
+  setCamera(track: MediaStreamTrack | null) {
+    if (track === this.camera) return
+    this.camera = track
+    const old = this.localVideo
+    if (old && track) void old.replaceTrack(track, true)
+    else if (old) {
+      void this.lk.localParticipant.unpublishTrack(old, false)
+      this.localVideo = null
+    } else void this.publishCamera().catch((e) => console.warn('[call] 카메라 올리기 실패', e))
+    this.opts.onChange()
+  }
+
+  /** 그 사람(방 접속 번호)의 카메라 영상. 안 켰거나 아직 못 받았으면 null */
+  videoOf(id: string): VideoSource | null {
+    for (const p of this.lk.remoteParticipants.values()) {
+      if (memberIdOf(p.identity) !== id) continue
+      const pub = p.getTrackPublication(Track.Source.Camera)
+      if (pub?.videoTrack && !pub.isMuted) return pub.videoTrack
+    }
+    return null
   }
 
   peers(): CallPeer[] {

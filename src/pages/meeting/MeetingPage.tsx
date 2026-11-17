@@ -1,10 +1,10 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { HomeLink } from '../../shared/ui/HomeLink'
 import { levelContext, watchLevel } from '../../shared/call/level'
 import { LISTEN_VOLUME, PERSON_VOLUME, Speaker } from '../../shared/call/speaker'
 import { DEFAULT_VOICE_SETTINGS, MIC_VOLUME, VoiceChanger, type VoiceSettings } from '../../shared/call/voiceFx'
 import type { CallPeer } from '../../shared/call/voiceMesh'
-import { SfuCall } from '../../shared/call/sfuCall'
+import { SfuCall, type VideoSource } from '../../shared/call/sfuCall'
 import { SFU_URL, sfuToken } from '../../shared/call/sfuToken'
 import { type Member, type Room, RoomError, createRoom, joinRoom, makeRoomCode } from '../../shared/online/room'
 import { advertiseRoom, cleanId, cleanList, cleanName, isInt, watchRooms } from '../../shared/online/roomList'
@@ -13,7 +13,8 @@ import { loadNickname } from '../../shared/storage/nickname'
 import { VoiceSettingsDialog } from './VoicePanel'
 import { VOICE_EFFECTS } from '../../shared/call/voiceFx'
 import { AvatarFace } from '../../shared/ui/AvatarFace'
-import { IconMessage, IconMic, IconMicOff, IconPhoneOff, IconSend, IconSliders, IconVolume, IconVolumeOff, IconWave } from '../../shared/ui/icons'
+import { IconCamera, IconCameraOff, IconFlip, IconLayout, IconMessage, IconMic, IconMicOff, IconPhoneOff, IconPin, IconSend, IconSliders, IconVolume, IconVolumeOff, IconWave } from '../../shared/ui/icons'
+import { LAYOUTS, type Layout, ME, arrange, isLayout } from './layout'
 import { ANIMAL_EMOJI, decodeLook, encodeLook } from '../../shared/art3d/animalKinds'
 import { loadLook } from '../../shared/storage/avatar'
 import { CHAT_MAX, type ChatLine, type ChatSignal, type MeetMsg, cleanChat, diffMembers, pushLine, readChat } from './chat'
@@ -186,32 +187,98 @@ function Face({ me, avatar, name }: { me?: boolean; avatar?: string; name: strin
   )
 }
 
-type TileProps = { name: string; me?: boolean; avatar?: string; stream: MediaStream | null; micOn: boolean; status: string | null; volume: number; onOpen: () => void }
+/** 원격 카메라 영상. LiveKit에 붙여서(attach) 칸 크기에 맞는 화질만 받는다 */
+function RemoteVideo({ source, fit }: { source: VideoSource; fit: 'cover' | 'contain' }) {
+  const ref = useRef<HTMLVideoElement>(null)
+  useEffect(() => {
+    const el = ref.current
+    if (!el) return
+    source.attach(el)
+    return () => void source.detach(el)
+  }, [source])
+  return <video ref={ref} className={`meet-video meet-video--${fit}`} autoPlay playsInline muted />
+}
 
-/** 사람 한 칸 (디스코드 음성 채널 칸처럼): 말하면 초록 테두리, 마이크 꺼짐·소리 크기 바꿈 표시. 누르면 소리 크기 */
-function Tile({ name, me, avatar, stream, micOn, status, volume, onOpen }: TileProps) {
-  const speaking = useSpeaking(micOn ? stream : null)
+/** 내 카메라 미리 보기 (앞 카메라는 거울처럼 뒤집어 보여 줌 — 보내는 영상은 그대로) */
+function LocalVideo({ track, mirror, fit }: { track: MediaStreamTrack; mirror: boolean; fit: 'cover' | 'contain' }) {
+  const ref = useRef<HTMLVideoElement>(null)
+  useEffect(() => {
+    const el = ref.current
+    if (!el) return
+    el.srcObject = new MediaStream([track])
+    void el.play().catch(() => {})
+  }, [track])
+  return <video ref={ref} className={`meet-video meet-video--${fit}${mirror ? ' meet-video--mirror' : ''}`} autoPlay playsInline muted />
+}
+
+/** 말하는 중인지 재서 알려 준다 (칸이 안 보이는 '한 명만' 보기에서도 말한 사람을 알아야 해서 칸과 따로) */
+function SpeakWatch({ id, stream, onChange }: { id: string; stream: MediaStream | null; onChange: (id: string, on: boolean) => void }) {
+  const speaking = useSpeaking(stream)
+  useEffect(() => {
+    onChange(id, speaking)
+  }, [id, speaking, onChange])
+  useEffect(() => () => onChange(id, false), [id, onChange])
+  return null
+}
+
+type TileSize = 'normal' | 'big' | 'small'
+
+type TileProps = {
+  name: string
+  me?: boolean
+  avatar?: string
+  speaking: boolean
+  micOn: boolean
+  status: string | null
+  volume: number
+  video: VideoSource | null
+  localVideo?: MediaStreamTrack | null
+  mirror?: boolean
+  size: TileSize
+  pinned?: boolean
+  onOpen: () => void
+  /** 칸 위에 겹치는 버튼 (내 칸의 카메라 전환) */
+  extra?: React.ReactNode
+}
+
+/** 사람 한 칸 (디스코드·Meet처럼): 카메라를 켰으면 영상, 아니면 얼굴. 말하면 초록 테두리, 마이크 꺼짐·소리 크기·고정 표시. 누르면 그 사람 설정 */
+function Tile({ name, me, avatar, speaking, micOn, status, volume, video, localVideo, mirror, size, pinned, onOpen, extra }: TileProps) {
+  const fit = size === 'big' ? 'contain' : 'cover'
   return (
-    <li>
+    <li className={`meet-cell meet-cell--${size}`}>
       <button
         type="button"
-        className={`meet-tile${speaking ? ' meet-tile--speaking' : ''}${status ? ' meet-tile--waiting' : ''}`}
+        className={`meet-tile meet-tile--${size}${speaking ? ' meet-tile--speaking' : ''}${status ? ' meet-tile--waiting' : ''}${video || localVideo ? ' meet-tile--video' : ''}`}
         onClick={onOpen}
-        aria-label={`${name}${me ? ' (나)' : ''} 소리 크기`}
+        aria-label={`${name}${me ? ' (나)' : ''} 설정`}
       >
-        <span className="meet-tile__face">
-          <Face me={me} avatar={avatar} name={name} />
-        </span>
-        {status && <span className="meet-tile__status">{status}</span>}
-        {!me && volume !== PERSON_VOLUME.default && (
-          <span className="meet-tile__vol">{volume === 0 ? <IconVolumeOff size={14} /> : `${Math.round(volume * 100)}%`}</span>
+        {video ? (
+          <RemoteVideo source={video} fit={fit} />
+        ) : localVideo ? (
+          <LocalVideo track={localVideo} mirror={!!mirror} fit={fit} />
+        ) : (
+          <span className="meet-tile__face">
+            <Face me={me} avatar={avatar} name={name} />
+          </span>
         )}
+        {status && <span className="meet-tile__status">{status}</span>}
+        <span className="meet-tile__badges">
+          {pinned && (
+            <span className="meet-tile__badge" title="크게 고정">
+              <IconPin size={14} />
+            </span>
+          )}
+          {!me && volume !== PERSON_VOLUME.default && (
+            <span className="meet-tile__badge">{volume === 0 ? <IconVolumeOff size={14} /> : `${Math.round(volume * 100)}%`}</span>
+          )}
+        </span>
         <span className="meet-tile__name">
           {!micOn && <IconMicOff size={14} className="meet-tile__muted" />}
           <span>{name}</span>
           {me && <small>나</small>}
         </span>
       </button>
+      {extra}
     </li>
   )
 }
@@ -338,7 +405,23 @@ type RoomProps = Joined & {
   onLeave: () => void
 }
 
-type SheetKind = { kind: 'voice' } | { kind: 'volume' } | { kind: 'person'; name: string }
+type SheetKind = { kind: 'voice' } | { kind: 'volume' } | { kind: 'layout' } | { kind: 'person'; id: string; name: string }
+
+/** 보기 방식·카메라 끈 사람 숨기기는 기기에 기억 */
+const LAYOUT_KEY = 'meeting-layout'
+const HIDE_NO_CAMERA_KEY = 'meeting-hide-no-camera'
+
+type Facing = 'user' | 'environment'
+
+/** 카메라 받기 (360p 정도면 충분 — 보내는 화질 상한도 360p). 거절하거나 없으면 null */
+async function getCamera(facing: Facing): Promise<MediaStreamTrack | null> {
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ video: { width: { ideal: 640 }, height: { ideal: 360 }, frameRate: { ideal: 24, max: 30 }, facingMode: facing } })
+    return stream.getVideoTracks()[0] ?? null
+  } catch {
+    return null
+  }
+}
 
 /** 방을 닫고 마이크를 끄는 건 부르는 쪽(MeetingPage)이 한다 */
 function MeetingRoom({ room, name, pin, nickname, voice, settings, onSettings, onVoice, onLeave }: RoomProps) {
@@ -354,7 +437,96 @@ function MeetingRoom({ room, name, pin, nickname, voice, settings, onSettings, o
   const [blocked, setBlocked] = useState(false)
   const [asking, setAsking] = useState(false)
   /** 통화 상태 (바뀔 때마다 새로 받아 그린다) */
-  const [call, setCall] = useState<{ peers: CallPeer[]; mic: boolean; strangers: number }>({ peers: [], mic: true, strangers: 0 })
+  const [call, setCall] = useState<{ peers: CallPeer[]; mic: boolean; strangers: number; videos: Record<string, VideoSource | null> }>({ peers: [], mic: true, strangers: 0, videos: {} })
+
+  // 말하는 사람 (크게 보기는 마지막으로 말한 사람을 크게)
+  const [speakingIds, setSpeakingIds] = useState<Set<string>>(() => new Set())
+  const [active, setActive] = useState<string | null>(null)
+  const onSpeaking = useCallback((id: string, on: boolean) => {
+    setSpeakingIds((prev) => {
+      if (prev.has(id) === on) return prev
+      const next = new Set(prev)
+      if (on) next.add(id)
+      else next.delete(id)
+      return next
+    })
+    if (on && id !== ME) setActive(id)
+  }, [])
+
+  // 보기 방식 (사람마다 고름)
+  const [layout, setLayoutState] = useState<Layout>(() => {
+    const v = readLocal(LAYOUT_KEY)
+    return isLayout(v) ? v : 'grid'
+  })
+  const setLayout = (v: Layout) => {
+    setLayoutState(v)
+    writeLocal(LAYOUT_KEY, v)
+  }
+  const [hideNoCamera, setHideNoCamera] = useState(() => readLocal(HIDE_NO_CAMERA_KEY) === '1')
+  const [pinned, setPinned] = useState<string | null>(null)
+
+  // 카메라 (처음엔 꺼짐)
+  const [camera, setCameraState] = useState<MediaStreamTrack | null>(null)
+  const cameraRef = useRef<MediaStreamTrack | null>(null)
+  const [facing, setFacing] = useState<Facing>('user')
+  const [canFlip, setCanFlip] = useState(false)
+  const [cameraBusy, setCameraBusy] = useState(false)
+  const [cameraError, setCameraError] = useState<string | null>(null)
+  const setCamera = (t: MediaStreamTrack | null) => {
+    cameraRef.current = t
+    setCameraState(t)
+    meshRef.current?.setCamera(t)
+  }
+  // 나가면 카메라를 끈다
+  useEffect(() => () => cameraRef.current?.stop(), [])
+  useEffect(() => {
+    if (!cameraError) return
+    const t = setTimeout(() => setCameraError(null), 5000)
+    return () => clearTimeout(t)
+  }, [cameraError])
+
+  /** 카메라 트랙을 쓰기 시작 (폰을 다른 앱에 보냈다 오면 끝나 버릴 수 있어 그땐 끈 걸로) */
+  const startCamera = (t: MediaStreamTrack) => {
+    t.addEventListener('ended', () => {
+      if (cameraRef.current === t) setCamera(null)
+    })
+    setCamera(t)
+  }
+
+  async function toggleCamera() {
+    const now = cameraRef.current
+    if (now) {
+      setCamera(null)
+      now.stop()
+      return
+    }
+    setCameraBusy(true)
+    const t = await getCamera(facing)
+    setCameraBusy(false)
+    if (!t) return setCameraError('카메라를 켜지 못했어요. 카메라 사용을 허락했는지 확인해 주세요')
+    startCamera(t)
+    void navigator.mediaDevices
+      .enumerateDevices()
+      .then((ds) => setCanFlip(ds.filter((d) => d.kind === 'videoinput').length > 1))
+      .catch(() => {})
+  }
+
+  /** 앞·뒤 카메라 바꾸기 (폰은 둘을 같이 못 여는 경우가 있어 먼저 끄고 연다) */
+  async function flipCamera() {
+    const old = cameraRef.current
+    if (!old) return
+    const next: Facing = facing === 'user' ? 'environment' : 'user'
+    setCameraBusy(true)
+    old.stop()
+    const t = (await getCamera(next)) ?? (await getCamera(facing))
+    setCameraBusy(false)
+    if (!t) {
+      setCamera(null)
+      return setCameraError('카메라를 바꾸지 못했어요')
+    }
+    if (t.getSettings().facingMode !== facing) setFacing(next)
+    startCamera(t)
+  }
   const meshRef = useRef<SfuCall | null>(null)
   const [micVolume, setMicVolume] = useState(() => voice?.volume ?? loadVolume(MIC_VOLUME_KEY, MIC_VOLUME))
   const [speaker] = useState(() => {
@@ -406,10 +578,14 @@ function MeetingRoom({ room, name, pin, nickname, voice, settings, onSettings, o
     const mesh: SfuCall = new SfuCall({
       url: SFU_URL ?? '',
       getToken: () => sfuToken(`meeting-${room.code}`, room.myId, nickname),
-      onChange: () => setCall({ peers: mesh.peers(), mic: mesh.mic, strangers: mesh.strangers() }),
+      onChange: () => {
+        const ps = mesh.peers()
+        setCall({ peers: ps, mic: mesh.mic, strangers: mesh.strangers(), videos: Object.fromEntries(ps.map((p) => [p.id, mesh.videoOf(p.id)])) })
+      },
     })
     meshRef.current = mesh
     mesh.setTrack(voiceRef.current?.track ?? null)
+    mesh.setCamera(cameraRef.current)
     const since = Date.now()
     playJoin()
     const offMembers = room.onMembers((ms) => {
@@ -520,26 +696,71 @@ function MeetingRoom({ room, name, pin, nickname, voice, settings, onSettings, o
     document.querySelectorAll<HTMLAudioElement>('.meet audio').forEach((a) => void a.play().catch((e) => isBlocked(e) && !a.muted && setBlocked(true)))
   }
 
+  // 칸 늘어놓기 (보기 방식대로)
+  const cameraIds = new Set<string>(members.filter((m) => call.videos[m.id]).map((m) => m.id))
+  if (camera) cameraIds.add(ME)
+  const ids = [ME, ...members.map((m) => m.id)]
+  const { main, rest } = arrange({ layout, ids, camera: cameraIds, pinned, active, hideNoCamera })
+  const tileFor = (id: string, size: TileSize) => {
+    if (id === ME)
+      return (
+        <Tile
+          key={ME}
+          name={nickname}
+          me
+          speaking={speakingIds.has(ME)}
+          micOn={micOn}
+          status={null}
+          volume={PERSON_VOLUME.default}
+          video={null}
+          localVideo={camera}
+          mirror={facing === 'user'}
+          size={size}
+          onOpen={() => setSheet({ kind: 'volume' })}
+          extra={
+            camera && canFlip ? (
+              <button type="button" className="meet-cell__flip" disabled={cameraBusy} onClick={() => void flipCamera()} aria-label="앞·뒤 카메라 바꾸기">
+                <IconFlip size={18} />
+              </button>
+            ) : null
+          }
+        />
+      )
+    const m = members.find((x) => x.id === id)
+    if (!m) return null
+    const p = peers.get(id)
+    return (
+      <Tile
+        key={id}
+        name={m.nickname}
+        avatar={m.avatar}
+        speaking={speakingIds.has(id)}
+        micOn={p?.micOn ?? true}
+        status={p ? CONNECTION_TEXT[p.connection] : '연결 중…'}
+        volume={volumeOf(m.nickname)}
+        video={call.videos[id] ?? null}
+        size={size}
+        pinned={pinned === id}
+        onOpen={() => setSheet({ kind: 'person', id, name: m.nickname })}
+      />
+    )
+  }
+
   const people = (
     <div className="meet-stage">
-      <ul className="meet-grid">
-        <Tile name={nickname} me stream={myStream} micOn={micOn} status={null} volume={PERSON_VOLUME.default} onOpen={() => setSheet({ kind: 'volume' })} />
-        {members.map((m) => {
-          const p = peers.get(m.id)
-          return (
-            <Tile
-              key={m.id}
-              name={m.nickname}
-              avatar={m.avatar}
-              stream={p?.stream ?? null}
-              micOn={p?.micOn ?? true}
-              status={p ? CONNECTION_TEXT[p.connection] : '연결 중…'}
-              volume={volumeOf(m.nickname)}
-              onOpen={() => setSheet({ kind: 'person', name: m.nickname })}
-            />
-          )
-        })}
-      </ul>
+      {main === null ? (
+        <ul className={`meet-grid${rest.length <= 2 ? ' meet-grid--few' : ''}`}>{rest.map((id) => tileFor(id, 'normal'))}</ul>
+      ) : (
+        <div className={`meet-focus${wide ? ' meet-focus--side' : ''}`}>
+          <ul className="meet-focus__main">{tileFor(main, 'big')}</ul>
+          {rest.length > 0 && <ul className="meet-focus__strip">{rest.map((id) => tileFor(id, 'small'))}</ul>}
+        </div>
+      )}
+      {cameraError && (
+        <p className="meet__tip meet__tip--error" role="alert">
+          {cameraError}
+        </p>
+      )}
       {members.length === 0 && (
         <p className="meet__tip">{pin ? '친구들에게 방 이름과 코드를 알려 주세요' : '목록에서 이 방을 누르면 들어올 수 있어요'}</p>
       )}
@@ -600,6 +821,11 @@ function MeetingRoom({ room, name, pin, nickname, voice, settings, onSettings, o
       </div>
 
       <Audio stream={speaker.stream} onBlocked={onBlocked} />
+      <SpeakWatch id={ME} stream={micOn ? myStream : null} onChange={onSpeaking} />
+      {members.map((m) => {
+        const p = peers.get(m.id)
+        return <SpeakWatch key={m.id} id={m.id} stream={p && p.micOn ? p.stream : null} onChange={onSpeaking} />
+      })}
       {[...peers.entries()].map(([id, p]) => {
         const who = members.find((m) => m.id === id)
         return p.stream && <PeerAudio key={id} stream={p.stream} speaker={speaker} volume={who ? volumeOf(who.nickname) : PERSON_VOLUME.default} />
@@ -614,7 +840,7 @@ function MeetingRoom({ room, name, pin, nickname, voice, settings, onSettings, o
             onClick={() => meshRef.current?.setMicOn(!micOn)}
           >
             {micOn ? <IconMic size={22} /> : <IconMicOff size={22} />}
-            <span>{micOn ? '마이크' : '마이크 꺼짐'}</span>
+            <span>{micOn ? '마이크' : '꺼짐'}</span>
           </button>
         ) : (
           <button type="button" className="meet-controls__btn meet-controls__btn--off" disabled={asking} onClick={allowMic}>
@@ -622,15 +848,29 @@ function MeetingRoom({ room, name, pin, nickname, voice, settings, onSettings, o
             <span>마이크 허락</span>
           </button>
         )}
+        <button
+          type="button"
+          className={`meet-controls__btn${camera ? ' meet-controls__btn--on' : ''}`}
+          aria-pressed={!!camera}
+          disabled={cameraBusy}
+          onClick={() => void toggleCamera()}
+        >
+          {camera ? <IconCamera size={22} /> : <IconCameraOff size={22} />}
+          <span>카메라</span>
+        </button>
         {voice && (
-          <button type="button" className="meet-controls__btn" onClick={() => openVoice(true)}>
+          <button type="button" className="meet-controls__btn" onClick={() => openVoice(true)} title={`목소리: ${effectLabel}`}>
             <IconWave size={22} />
-            <span>목소리 · {effectLabel}</span>
+            <span>목소리</span>
           </button>
         )}
+        <button type="button" className="meet-controls__btn" onClick={() => setSheet({ kind: 'layout' })}>
+          <IconLayout size={22} />
+          <span>보기</span>
+        </button>
         <button type="button" className="meet-controls__btn" onClick={() => setSheet({ kind: 'volume' })}>
           <IconSliders size={22} />
-          <span>소리 크기</span>
+          <span>소리</span>
         </button>
         <button type="button" className="meet-controls__btn meet-controls__btn--leave" onClick={onLeave}>
           <IconPhoneOff size={22} />
@@ -679,7 +919,57 @@ function MeetingRoom({ room, name, pin, nickname, voice, settings, onSettings, o
           >
             {volumeOf(sheet.name) === 0 ? '이 사람 소리 다시 듣기' : '이 사람 소리 끄기'}
           </button>
+          <button
+            type="button"
+            className={`button${pinned === sheet.id ? ' button--primary' : ''}`}
+            aria-pressed={pinned === sheet.id}
+            onClick={() => {
+              if (pinned === sheet.id) setPinned(null)
+              else {
+                setPinned(sheet.id)
+                if (layout === 'grid') setLayout('focus')
+              }
+              closeSheet()
+            }}
+          >
+            {pinned === sheet.id ? '크게 고정 풀기' : '이 사람 크게 고정'}
+          </button>
           <p className="meet-settings__hint">내 기기에서만 바뀌어요. 상대는 몰라요</p>
+        </Sheet>
+      )}
+      {sheet?.kind === 'layout' && (
+        <Sheet label="보기 방식" onClose={closeSheet}>
+          <div className="meet-layouts" role="radiogroup" aria-label="보기 방식">
+            {LAYOUTS.map((l) => (
+              <button key={l.id} type="button" role="radio" aria-checked={layout === l.id} className={`meet-layouts__option meet-layouts__option--${l.id}`} onClick={() => setLayout(l.id)}>
+                <span className="meet-layouts__pic" aria-hidden>
+                  <i />
+                  <i />
+                  <i />
+                  <i />
+                </span>
+                <b>{l.label}</b>
+                <small>{l.note}</small>
+              </button>
+            ))}
+          </div>
+          <label className="meet-layouts__check">
+            <input
+              type="checkbox"
+              checked={hideNoCamera}
+              onChange={(e) => {
+                setHideNoCamera(e.target.checked)
+                writeLocal(HIDE_NO_CAMERA_KEY, e.target.checked ? '1' : '0')
+              }}
+            />
+            카메라 끈 사람 숨기기
+          </label>
+          {pinned && members.some((m) => m.id === pinned) && (
+            <button type="button" className="button" onClick={() => setPinned(null)}>
+              크게 고정 풀기 ({members.find((m) => m.id === pinned)?.nickname})
+            </button>
+          )}
+          <p className="meet-settings__hint">사람 칸을 누르면 그 사람을 크게 고정할 수 있어요. 내 화면에서만 바뀌어요</p>
         </Sheet>
       )}
     </section>

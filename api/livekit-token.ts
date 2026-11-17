@@ -55,8 +55,9 @@ export async function POST(req: Request): Promise<Response> {
 
   // 참가자 이름 = '방 접속 번호.사용자 ID 앞 8자'. 사용자 ID는 서버가 확인한 것이라, 남의 접속 번호로 받아도 이름이 달라
   // 원래 사람이 쫓겨나지 않는다 (LiveKit은 같은 이름이 들어오면 먼저 있던 사람을 내보냄)
+  // 카메라도 (2026-11-17 화상). 서버 설정 num_tracks 2 = 소리 1 + 카메라 1
   const at = new AccessToken(key, secret, { identity: `${identity}.${userId.replace(/-/g, '').slice(0, 8)}`, name, ttl: '10m' })
-  at.addGrant({ roomJoin: true, room, canPublish: true, canSubscribe: true, canPublishData: false, canUpdateOwnMetadata: false, canPublishSources: [TrackSource.MICROPHONE] })
+  at.addGrant({ roomJoin: true, room, canPublish: true, canSubscribe: true, canPublishData: false, canUpdateOwnMetadata: false, canPublishSources: [TrackSource.MICROPHONE, TrackSource.CAMERA] })
   at.roomConfig = new RoomConfiguration({ maxParticipants: CAPACITY, emptyTimeout: 60, departureTimeout: 20 })
   return json(200, { token: await at.toJwt() })
 }
