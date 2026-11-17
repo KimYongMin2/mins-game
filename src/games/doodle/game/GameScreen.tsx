@@ -134,7 +134,7 @@ export function GameScreen({ room, members, onFinish, onQuit }: Props) {
     if (view.phase === 'intro') return '곧 시작해요'
     if (view.phase === 'choose') return view.options ? '그릴 제시어를 골라요' : `${nameOf(view.drawer)}님이 제시어를 고르는 중`
     if (view.phase === 'draw')
-      return view.word ? `제시어: ${view.word}` : `${view.wordGroup ? `${view.wordGroup} · ` : ''}${view.wordShape ?? '○'.repeat(view.wordLength ?? 0)} (${view.wordLength}글자)`
+      return view.word ? `제시어: ${view.word}` : `${'○'.repeat(view.wordLength ?? 0)} (${view.wordLength}글자)`
     if (view.phase === 'reveal') return `정답: ${view.word}`
     return '끝!'
   })()
@@ -173,17 +173,6 @@ export function GameScreen({ room, members, onFinish, onQuit }: Props) {
           </div>
         )}
       </Sketchpad>
-
-      {view?.choices && !view.choiceTried && (
-        <div className="dd-choices" role="group" aria-label="보기">
-          <p>보기로 맞히기 (한 번만 · 점수 절반)</p>
-          {view.choices.map((c, i) => (
-            <button key={c} type="button" className="button" onClick={() => room.send({ t: 'pick', index: i })}>
-              {c}
-            </button>
-          ))}
-        </div>
-      )}
 
       <div className="dd-chat">
         <ol className="dd-chat__log" aria-live="polite">

@@ -48,11 +48,11 @@ export function doodleReferee(setup: unknown, ctx: RefereeContext): Referee | nu
         ctx.sendTo(from, { t: 'inkAll', turn: s.turnNo, ops: history })
         return null
       }
-      if (m.t !== 'choose' && m.t !== 'guess' && m.t !== 'pick') return undefined
+      if (m.t !== 'choose' && m.t !== 'guess') return undefined
       const player = s.players.findIndex((p) => p.id === from)
       if (player < 0) return null
       if (m.t === 'guess') return typeof m.text === 'string' && m.text.length <= 100 ? { type: 'guess', player, text: m.text } : null
-      return isInt(m.index, 0, 3) ? { type: m.t, player, index: m.index } : null
+      return isInt(m.index, 0, 1) ? { type: 'choose', player, index: m.index } : null
     },
     drop: (s, key) => {
       const player = s.players.findIndex((p) => p.id === key)

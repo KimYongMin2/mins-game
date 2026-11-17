@@ -1,9 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { createEngine, engineReducer, type EngineState } from './engine'
 import { viewFor } from './view'
-import { CHOICES_AT_MS, DRAWER_POINTS, GUESS_POINTS } from '../constants'
-import { DOODLE_WORDS, doodleGroupOf, letterCount, wordShape } from '../words'
-import { CHAT_MAX } from '../constants'
+import { DRAWER_POINTS, GUESS_POINTS } from '../constants'
 
 const players = (n: number) => Array.from({ length: n }, (_, i) => ({ id: `p${i}`, name: `사람${i}` }))
 const at = (s: EngineState, now: number) => engineReducer(s, { type: 'tick', now })
@@ -22,15 +20,6 @@ describe('그림 맞히기 심판', () => {
       expect(order.slice(n)).toEqual(order.slice(0, n))
       for (let i = 0; i < n; i++) expect(order.filter((x) => x === i)).toHaveLength(2)
     }
-  })
-
-  it('사자성어·속담: 맞히는 사람에게 갈래와 띄어쓰기 모양, 띄어쓰기 없이 맞혀도 정답', () => {
-    expect(wordShape('누워서 떡 먹기')).toBe('○○○ ○ ○○')
-    expect(letterCount('누워서 떡 먹기')).toBe(6)
-    expect(doodleGroupOf('누워서 떡 먹기')).toBe('속담')
-    expect(doodleGroupOf('일석이조')).toBe('사자성어')
-    expect(DOODLE_WORDS.every((w) => [...w].length <= CHAT_MAX)).toBe(true)
-    expect(new Set(DOODLE_WORDS).size).toBe(DOODLE_WORDS.length)
   })
 
   it('제시어는 그리는 사람만 보고, 맞히면 순서대로 점수 + 그린 사람 점수', () => {
@@ -54,24 +43,12 @@ describe('그림 맞히기 심판', () => {
     expect(s.phase.kind).toBe('reveal')
   })
 
-  it('보기는 마지막 20초에만, 한 번만, 맞히면 절반', () => {
+  it('보기(힌트)는 없음 — 끝까지 채팅으로만 맞힘', () => {
     let s = toDraw(createEngine({ now: 0, seed: 9, players: players(3) }))
     if (s.phase.kind !== 'draw') throw new Error()
-    const { drawer, word, choices, start } = s.phase
-    const g = [0, 1, 2].find((i) => i !== drawer)!
-    expect(viewFor(s, `p${g}`).choices).toBeNull()
-    const right = choices.indexOf(word)
-    const wrong = choices.findIndex((c) => c !== word)
-    expect(engineReducer(s, { type: 'pick', player: g, index: right }).scores[g]).toBe(0)
-    s = at(s, start + CHOICES_AT_MS)
-    expect(viewFor(s, `p${g}`).choices).toHaveLength(4)
-    expect(viewFor(s, `p${drawer}`).choices).toBeNull()
-    s = engineReducer(s, { type: 'pick', player: g, index: wrong })
-    s = engineReducer(s, { type: 'pick', player: g, index: right })
-    expect(s.scores[g]).toBe(0)
-    const h = [0, 1, 2].find((i) => i !== drawer && i !== g)!
-    s = engineReducer(s, { type: 'pick', player: h, index: right })
-    expect(s.scores[h]).toBe(Math.ceil(GUESS_POINTS[0] / 2))
+    const g = [0, 1, 2].find((i) => i !== (s.phase as { drawer: number }).drawer)!
+    s = at(s, s.phase.until - 1)
+    expect('choices' in viewFor(s, `p${g}`)).toBe(false)
   })
 
   it('아무도 안 해도 끝까지 가고, 그리던 사람이 나가면 그 차례 끝', () => {

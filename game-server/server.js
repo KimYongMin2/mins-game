@@ -4536,7 +4536,7 @@ const clampNumber = (n) => {
 	const x = Math.floor(Number(n));
 	return Number.isFinite(x) ? Math.min(99, Math.max(0, x)) : 7;
 };
-const pick$3 = (list, x, fallback) => typeof x === "string" && list.includes(x) ? x : fallback;
+const pick$2 = (list, x, fallback) => typeof x === "string" && list.includes(x) ? x : fallback;
 /** 방으로 보낼 짧은 글자: '동물.모자.안경.목.털.옷.색.번호' */
 const encodeLook = (l) => [
 	l.animal,
@@ -4556,12 +4556,12 @@ function decodeLook(x) {
 	if (!animal) return void 0;
 	return {
 		animal,
-		hat: pick$3(HATS, hat, "none"),
-		glasses: pick$3(GLASSES, glasses, "none"),
-		neck: pick$3(NECKS, neck, "none"),
-		fur: pick$3(FURS, fur, "base"),
-		outfit: pick$3(OUTFITS, outfit, "shirt"),
-		tint: pick$3(TINTS, tint, "red"),
+		hat: pick$2(HATS, hat, "none"),
+		glasses: pick$2(GLASSES, glasses, "none"),
+		neck: pick$2(NECKS, neck, "none"),
+		fur: pick$2(FURS, fur, "base"),
+		outfit: pick$2(OUTFITS, outfit, "shirt"),
+		tint: pick$2(TINTS, tint, "red"),
 		number: number === void 0 ? 7 : clampNumber(number)
 	};
 }
@@ -5981,6 +5981,10 @@ const WORD_GROUPS = {
 	]
 };
 const WORDS = Object.values(WORD_GROUPS).flat();
+function groupOf(word) {
+	for (const [g, ws] of Object.entries(WORD_GROUPS)) if (ws.includes(word)) return g;
+	return null;
+}
 /** 정답 비교: 띄어쓰기·대소문자 무시 */
 const normalizeGuess = (s) => s.replace(/\s+/g, "").toLowerCase();
 const CHOSUNG = [
@@ -6335,116 +6339,12 @@ const GUESS_POINTS = [
 	3,
 	2
 ];
-/** 보기로 맞히면 점수 절반 (올림) */
-const CHOICE_RATE = .5;
 /** 제시어 보여주기 */
 const VOTE_WORD_MS = 3e3;
 const VOTE_DRAW_MS = 6e4;
 const VOTE_PICK_MS = 15e3;
 /** 판 결과(누가 그렸는지·표) 보여주기 */
 const VOTE_RESULT_MS = 6e3;
-//#endregion
-//#region src/games/doodle/words.ts
-/** 맞히는 사람에게 갈래를 알려 주는 긴 제시어 (글자 수만으론 너무 어려워서) */
-const PHRASE_GROUPS = ["사자성어", "속담"];
-const DOODLE_GROUPS = {
-	...WORD_GROUPS,
-	사자성어: [
-		"일석이조",
-		"동문서답",
-		"금상첨화",
-		"다다익선",
-		"대기만성",
-		"설상가상",
-		"우왕좌왕",
-		"일편단심",
-		"작심삼일",
-		"천고마비",
-		"청출어람",
-		"유비무환",
-		"이심전심",
-		"전화위복",
-		"죽마고우",
-		"학수고대",
-		"호시탐탐",
-		"일취월장",
-		"자업자득",
-		"사면초가",
-		"어부지리",
-		"오리무중",
-		"용두사미",
-		"견원지간",
-		"동상이몽",
-		"마이동풍",
-		"백발백중",
-		"일거양득",
-		"고진감래",
-		"과유불급",
-		"십중팔구",
-		"십시일반",
-		"산전수전",
-		"칠전팔기",
-		"구사일생",
-		"막상막하",
-		"박장대소",
-		"대동소이",
-		"조삼모사",
-		"군계일학",
-		"새옹지마",
-		"형설지공"
-	],
-	속담: [
-		"가는 말이 고와야 오는 말이 곱다",
-		"고래 싸움에 새우 등 터진다",
-		"누워서 떡 먹기",
-		"닭 쫓던 개 지붕 쳐다본다",
-		"등잔 밑이 어둡다",
-		"발 없는 말이 천 리 간다",
-		"백지장도 맞들면 낫다",
-		"소 잃고 외양간 고친다",
-		"우물 안 개구리",
-		"원숭이도 나무에서 떨어진다",
-		"하늘의 별 따기",
-		"호랑이도 제 말 하면 온다",
-		"티끌 모아 태산",
-		"그림의 떡",
-		"금강산도 식후경",
-		"꿩 먹고 알 먹기",
-		"낮말은 새가 듣고 밤말은 쥐가 듣는다",
-		"도토리 키 재기",
-		"돌다리도 두들겨 보고 건너라",
-		"말 한마디로 천 냥 빚을 갚는다",
-		"벼는 익을수록 고개를 숙인다",
-		"빈 수레가 요란하다",
-		"세 살 버릇 여든까지 간다",
-		"수박 겉 핥기",
-		"식은 죽 먹기",
-		"쇠귀에 경 읽기",
-		"울며 겨자 먹기",
-		"사공이 많으면 배가 산으로 간다",
-		"개구리 올챙이 적 생각 못 한다",
-		"병 주고 약 준다",
-		"고양이 목에 방울 달기",
-		"까마귀 날자 배 떨어진다",
-		"물에 빠진 생쥐",
-		"바늘 도둑이 소도둑 된다",
-		"서당 개 삼 년이면 풍월을 읊는다",
-		"열 번 찍어 안 넘어가는 나무 없다",
-		"작은 고추가 더 맵다",
-		"친구 따라 강남 간다",
-		"하룻강아지 범 무서운 줄 모른다",
-		"꿈보다 해몽"
-	]
-};
-const DOODLE_WORDS = Object.values(DOODLE_GROUPS).flat();
-function doodleGroupOf(word) {
-	for (const [g, ws] of Object.entries(DOODLE_GROUPS)) if (ws.includes(word)) return g;
-	return null;
-}
-/** 맞히는 사람 화면의 모양: 글자는 ○, 띄어쓰기는 그대로 (예 '○○ ○○ ○○') */
-const wordShape = (word) => word.replace(/\S/g, "○");
-/** 띄어쓰기 뺀 글자 수 */
-const letterCount = (word) => [...word.replace(/\s/g, "")].length;
 //#endregion
 //#region src/games/doodle/play/engine.ts
 function shuffle$1(rng, xs) {
@@ -6498,10 +6398,10 @@ function nextTurn$2(s) {
 	while (turnNo < s.order.length && s.left[s.order[turnNo]]) turnNo++;
 	if (turnNo >= s.order.length) return finish$2(s);
 	const rng = createRng(s.seed);
-	const fresh = DOODLE_WORDS.filter((w) => !s.used.includes(w));
-	const pool = shuffle$1(rng, fresh.length >= 2 ? fresh : DOODLE_WORDS);
+	const fresh = WORDS.filter((w) => !s.used.includes(w));
+	const pool = shuffle$1(rng, fresh.length >= 2 ? fresh : WORDS);
 	const a = pool[0];
-	const b = pool.find((w) => doodleGroupOf(w) !== doodleGroupOf(a)) ?? pool[1];
+	const b = pool.find((w) => groupOf(w) !== groupOf(a)) ?? pool[1];
 	const drawer = s.order[turnNo];
 	return {
 		...s,
@@ -6515,22 +6415,12 @@ function nextTurn$2(s) {
 		}
 	};
 }
-/** 보기 4개: 정답 + 같은 갈래에서 3개 (모자라면 아무거나) */
-function choicesFor(rng, word) {
-	const group = doodleGroupOf(word);
-	const same = shuffle$1(rng, (group ? DOODLE_GROUPS[group] : DOODLE_WORDS).filter((w) => w !== word));
-	const others = shuffle$1(rng, DOODLE_WORDS.filter((w) => w !== word && !same.includes(w)));
-	return shuffle$1(rng, [word, ...[...same, ...others].slice(0, 3)]);
-}
 function startDraw(s, index) {
 	if (s.phase.kind !== "choose") return s;
 	const { drawer, options } = s.phase;
 	const word = options[index === 1 ? 1 : 0];
-	const rng = createRng(s.seed);
-	const choices = choicesFor(rng, word);
 	return addLog$1({
 		...s,
-		seed: rng.seed(),
 		used: [...s.used, word],
 		phase: {
 			kind: "draw",
@@ -6538,9 +6428,7 @@ function startDraw(s, index) {
 			word,
 			start: s.now,
 			until: s.now + DRAW_MS,
-			choices,
-			guessed: [],
-			choiceTried: []
+			guessed: []
 		}
 	}, "system", drawer, `${s.players[drawer].name}님이 그려요`);
 }
@@ -6567,18 +6455,14 @@ function finish$2(s) {
 		}
 	};
 }
-/** 보기가 보이는지 (마지막 20초) */
-const choicesOpen = (s) => s.phase.kind === "draw" && s.now >= s.phase.start + 4e4;
-/** 맞힘: 순서대로 점수, 보기로 맞히면 절반. 그린 사람은 1명당 점수. 모두 맞히면 바로 정답 보여주기 */
-function correct(s, player, viaChoice) {
+/** 맞힘: 순서대로 점수. 그린 사람은 1명당 점수. 모두 맞히면 바로 정답 보여주기 */
+function correct(s, player) {
 	const phase = s.phase;
 	if (phase.kind !== "draw") return s;
-	const base = GUESS_POINTS[phase.guessed.length] ?? 1;
-	const points = viaChoice ? Math.ceil(base * CHOICE_RATE) : base;
+	const points = GUESS_POINTS[phase.guessed.length] ?? 1;
 	const guessed = [...phase.guessed, {
 		player,
-		points,
-		viaChoice
+		points
 	}];
 	const scores = s.scores.map((v, i) => i === player ? v + points : i === phase.drawer ? v + 3 : v);
 	let next = addLog$1({
@@ -6588,7 +6472,7 @@ function correct(s, player, viaChoice) {
 			...phase,
 			guessed
 		}
-	}, "correct", player, `${s.players[player].name}님 정답!${viaChoice ? " (보기)" : ""}`);
+	}, "correct", player, `${s.players[player].name}님 정답!`);
 	if (activePlayers(next).filter((i) => i !== phase.drawer && !guessed.some((g) => g.player === i)).length === 0) next = reveal$2(next);
 	return next;
 }
@@ -6610,23 +6494,10 @@ function guess(s, player, text) {
 	const clean = [...text.replace(/[\u0000-\u001f\u007f]/g, "").trim()].slice(0, 30).join("");
 	if (!clean) return s;
 	if (canGuess(s, player) && s.phase.kind === "draw") {
-		if (normalizeGuess(clean) === normalizeGuess(s.phase.word)) return correct(s, player, false);
+		if (normalizeGuess(clean) === normalizeGuess(s.phase.word)) return correct(s, player);
 		return addLog$1(s, "chat", player, clean);
 	}
 	return addLog$1(s, "chat", player, clean, s.phase.kind === "draw" && normalizeGuess(clean).includes(normalizeGuess(s.phase.word)) ? s.turnNo : void 0);
-}
-function pick$2(s, player, index) {
-	if (!canGuess(s, player) || s.phase.kind !== "draw" || !choicesOpen(s) || s.phase.choiceTried.includes(player)) return s;
-	const chosen = s.phase.choices[index];
-	if (chosen === void 0) return s;
-	if (chosen === s.phase.word) return correct(s, player, true);
-	return {
-		...s,
-		phase: {
-			...s.phase,
-			choiceTried: [...s.phase.choiceTried, player]
-		}
-	};
 }
 function drop$6(s, player) {
 	if (s.left[player] || s.phase.kind === "done") return s;
@@ -6667,7 +6538,6 @@ function engineReducer$6(s, a) {
 		});
 		case "choose": return s.phase.kind === "choose" && s.phase.drawer === a.player ? startDraw(s, a.index) : s;
 		case "guess": return guess(s, a.player, a.text);
-		case "pick": return pick$2(s, a.player, a.index);
 		case "drop": return drop$6(s, a.player);
 	}
 }
@@ -6747,16 +6617,11 @@ function canSee(s, me, l) {
 	if (l.secret === void 0 || p.kind !== "draw" || l.secret !== s.turnNo) return true;
 	return me === p.drawer || me === l.player || p.guessed.some((g) => g.player === me);
 }
-const phraseGroup = (word) => {
-	const g = doodleGroupOf(word);
-	return g && PHRASE_GROUPS.includes(g) ? g : null;
-};
 function viewFor(s, viewerId) {
 	const me = s.players.findIndex((p) => p.id === viewerId);
 	const p = s.phase;
 	const drawer = p.kind === "choose" || p.kind === "draw" || p.kind === "reveal" ? p.drawer : null;
 	const word = p.kind === "reveal" ? p.word : p.kind === "draw" && drawer === me ? p.word : null;
-	const showChoices = p.kind === "draw" && choicesOpen(s) && canGuess(s, me);
 	return {
 		players: s.players.map(({ id, name, avatar }) => ({
 			id,
@@ -6771,12 +6636,8 @@ function viewFor(s, viewerId) {
 		turns: s.order.length,
 		drawer,
 		word,
-		wordLength: p.kind === "draw" ? letterCount(p.word) : null,
-		wordShape: p.kind === "draw" ? wordShape(p.word) : null,
-		wordGroup: p.kind === "draw" ? phraseGroup(p.word) : null,
+		wordLength: p.kind === "draw" ? [...p.word].length : null,
 		options: p.kind === "choose" && drawer === me ? p.options : null,
-		choices: showChoices ? p.choices : null,
-		choiceTried: p.kind === "draw" && p.choiceTried.includes(me),
 		canGuess: canGuess(s, me),
 		canChat: canChat(s, me),
 		guessed: p.kind === "draw" || p.kind === "reveal" ? p.guessed : [],
@@ -6792,7 +6653,7 @@ function changeKey$1(s) {
 		s.turnNo,
 		s.logSeq,
 		s.left.join(),
-		p.kind === "draw" ? `${p.guessed.length}.${p.choiceTried.length}.${choicesOpen(s)}` : ""
+		p.kind === "draw" ? `${p.guessed.length}` : ""
 	].join("|");
 }
 //#endregion
@@ -6832,7 +6693,7 @@ function nextRound(s) {
 		}
 	};
 	const rng = createRng(s.seed);
-	const pool = DOODLE_WORDS.filter((w) => !s.used.includes(w));
+	const pool = WORDS.filter((w) => !s.used.includes(w));
 	const word = pool[Math.floor(rng.next() * pool.length)];
 	return {
 		...s,
@@ -7036,7 +6897,7 @@ function doodleReferee(setup, ctx) {
 				});
 				return null;
 			}
-			if (m.t !== "choose" && m.t !== "guess" && m.t !== "pick") return void 0;
+			if (m.t !== "choose" && m.t !== "guess") return void 0;
 			const player = s.players.findIndex((p) => p.id === from);
 			if (player < 0) return null;
 			if (m.t === "guess") return typeof m.text === "string" && m.text.length <= 100 ? {
@@ -7044,8 +6905,8 @@ function doodleReferee(setup, ctx) {
 				player,
 				text: m.text
 			} : null;
-			return isInt(m.index, 0, 3) ? {
-				type: m.t,
+			return isInt(m.index, 0, 1) ? {
+				type: "choose",
 				player,
 				index: m.index
 			} : null;

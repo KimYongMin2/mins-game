@@ -7,15 +7,11 @@ export const INTRO_MS = 2000
 export const CHOOSE_MS = 6000
 /** 그리는 시간 */
 export const DRAW_MS = 60_000
-/** 그리기 시작하고 이만큼 지나면 못 맞힌 사람에게 보기 4개 (마지막 20초) */
-export const CHOICES_AT_MS = 40_000
 /** 정답 보여주기 */
 export const REVEAL_MS = 4000
 export const DONE_MS = 2500
 /** 맞힌 순서대로 점수 (그 뒤는 1점) */
 export const GUESS_POINTS = [10, 8, 6, 5, 4, 3, 2] as const
-/** 보기로 맞히면 점수 절반 (올림) */
-export const CHOICE_RATE = 0.5
 /** 그린 사람: 맞힌 사람 1명당 */
 export const DRAWER_POINTS = 3
 /** 한 사람이 그리는 횟수 (두 바퀴) */

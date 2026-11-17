@@ -29,4 +29,3 @@ export type DoodleMsg =
   /** 맞히는 사람 → 서버: 채팅 답 */
   | { t: 'guess'; text: string }
   /** 맞히는 사람 → 서버: 보기 고름 */
-  | { t: 'pick'; index: number }
