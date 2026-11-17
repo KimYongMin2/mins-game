@@ -5,7 +5,7 @@ import { loadNickname } from '../../shared/storage/nickname'
 import { DEX_FISH, RARITY, fishById } from './play/fish'
 import { CHAT_MAX, FISHING_CAPACITY } from './play/protocol'
 import { IRO_FILTERS, SHADOW_FILTER, fishSvg } from './field/fishArt'
-import { type Action, iroName, useFishingRoom } from './game/useFishingRoom'
+import { type Action, CAM_LIMITS, iroName, useFishingRoom } from './game/useFishingRoom'
 import { Joystick } from './game/Joystick'
 import { BragSheet, DexSheet, MyTankSheet, OtherTankSheet } from './screens/Sheets'
 import './fishing.css'
@@ -39,6 +39,7 @@ export function FishingPage() {
   const [sheet, setSheet] = useState<'dex' | 'tank' | 'brag' | null>(null)
   const [portrait, setPortrait] = useState(() => isTouch() && isPortrait())
   const [text, setText] = useState('')
+  const [firstPerson, setFirstPerson] = useState(false)
   const chatRef = useRef<HTMLInputElement>(null)
   const { world, act, send } = room
 
@@ -55,6 +56,16 @@ export function FishingPage() {
   // 나가면 전체 화면 풀기
   useEffect(() => () => void (document.fullscreenElement && document.exitFullscreen?.().catch(() => {})), [])
 
+  /** 3인칭 ↔ 1인칭 (V) */
+  const toggleView = useCallback(() => {
+    const cam = world.cam
+    cam.first = !cam.first
+    const lim = cam.first ? CAM_LIMITS.first : CAM_LIMITS.third
+    cam.pitch = cam.first ? 0.15 : 0.82
+    cam.pitch = Math.min(lim.max, Math.max(lim.min, cam.pitch))
+    setFirstPerson(cam.first)
+  }, [world])
+
   // PC: WASD·방향키로 걷기, 스페이스로 던지기·잡기, Enter로 채팅
   useEffect(() => {
     if (!entered) return
@@ -63,24 +74,35 @@ export function FishingPage() {
       world.input.x = (keys.has('right') ? 1 : 0) - (keys.has('left') ? 1 : 0)
       world.input.y = (keys.has('down') ? 1 : 0) - (keys.has('up') ? 1 : 0)
     }
-    const dir = (k: string) => ({ ArrowLeft: 'left', a: 'left', A: 'left', ArrowRight: 'right', d: 'right', D: 'right', ArrowUp: 'up', w: 'up', W: 'up', ArrowDown: 'down', s: 'down', S: 'down' })[k]
+    // 키 위치(e.code)로 받음 — 한글 입력 상태면 e.key가 'ㅈ·ㅁ·ㄴ·ㅇ'이라 WASD가 안 먹었음
+    const dir = (code: string) => ({ ArrowLeft: 'left', KeyA: 'left', ArrowRight: 'right', KeyD: 'right', ArrowUp: 'up', KeyW: 'up', ArrowDown: 'down', KeyS: 'down' })[code]
+    const spin = () => (world.cam.spin = (keys.has('spinR') ? 1 : 0) - (keys.has('spinL') ? 1 : 0))
     const down = (e: KeyboardEvent) => {
       if ((e.target as HTMLElement).tagName === 'INPUT') return
-      const d = dir(e.key)
+      const d = dir(e.code)
       if (d) {
         keys.add(d)
         apply()
         e.preventDefault()
-      } else if (e.key === ' ') {
+      } else if (e.code === 'KeyQ' || e.code === 'KeyE') {
+        keys.add(e.code === 'KeyQ' ? 'spinL' : 'spinR')
+        spin()
+      } else if (e.code === 'KeyV' && !e.repeat) {
+        toggleView()
+      } else if (e.code === 'Space') {
         e.preventDefault()
         if (!e.repeat) act()
-      } else if (e.key === 'Enter') {
+      } else if (e.code === 'Enter' || e.code === 'NumpadEnter') {
         e.preventDefault()
         chatRef.current?.focus()
       }
     }
     const up = (e: KeyboardEvent) => {
-      const d = dir(e.key)
+      if (e.code === 'KeyQ' || e.code === 'KeyE') {
+        keys.delete(e.code === 'KeyQ' ? 'spinL' : 'spinR')
+        return spin()
+      }
+      const d = dir(e.code)
       if (!d) return
       keys.delete(d)
       apply()
@@ -88,6 +110,7 @@ export function FishingPage() {
     const blur = () => {
       keys.clear()
       apply()
+      spin()
     }
     // 우클릭 메뉴를 막음 (메뉴가 뜨면 키·조이스틱을 뗀 신호를 놓쳐서 계속 눌린 채로 남았음)
     const menu = (e: MouseEvent) => {
@@ -104,7 +127,7 @@ export function FishingPage() {
       window.removeEventListener('blur', blur)
       window.removeEventListener('contextmenu', menu)
     }
-  }, [entered, world, act])
+  }, [entered, world, act, toggleView])
 
   // 잡은 물고기 카드는 잠깐만
   const { myCatch, setMyCatch } = room
@@ -133,7 +156,7 @@ export function FishingPage() {
           <li>바다(부두·바닷가)와 민물(개울·연못)에서 잡히는 물고기가 달라요 — 모두 {DEX_FISH.length}종 + 꽝</li>
           <li>어떤 물고기든 아주 드물게 다른 색(이로치)으로 나와요</li>
           <li>잡은 것 중 10마리를 어항에 넣으면 다른 사람이 나를 눌러 구경해요</li>
-          <li>한 낚시터에 {FISHING_CAPACITY}명까지 · PC는 WASD·방향키와 스페이스</li>
+          <li>한 낚시터에 {FISHING_CAPACITY}명까지 · PC는 WASD·방향키로 걷고 스페이스, 화면을 끌거나 Q·E로 시점 돌리기, V 1인칭</li>
         </ul>
         {!canWebGL() && <p className="error">이 기기는 3D 화면을 그릴 수 없어서 낚시터에 들어갈 수 없어요</p>}
         <button
@@ -170,6 +193,9 @@ export function FishingPage() {
         {!room.saving && <span className="fs-warn">기록 저장 준비 중 (서버를 다시 켜면 사라져요)</span>}
       </div>
       <div className="fs-hud fs-hud--tr">
+        <button type="button" className="fs-key" onClick={toggleView} title="시점 바꾸기 (V) · 화면을 끌면 돌리기 · Q·E 좌우 · 휠 확대">
+          {firstPerson ? '1인칭' : '3인칭'}
+        </button>
         <button type="button" className="fs-key" onClick={() => setSheet('dex')}>
           도감 {myDex}/{DEX_FISH.length}
         </button>

@@ -29,17 +29,15 @@
 
 /* 이름표 · 말풍선 · 입질 ! · 잡은 물고기 */
 .fs-tag { position: absolute; left: 0; top: 0; display: flex; flex-direction: column; align-items: center; gap: 4px; transform-origin: 0 0; will-change: transform; }
-.fs-tag > * { translate: -50% 0; }
-.fs-tag { flex-direction: column-reverse; }
 .fs-tag [hidden] { display: none !important; }
 .fs-tag__name { font-size: 12px; font-weight: 800; padding: 1px 6px; border-radius: 2px; background: rgba(28, 23, 72, 0.72); white-space: nowrap; }
 .fs-tag--me .fs-tag__name { background: #ffd23f; color: #1c1748; }
 .fs-bubble { max-width: 180px; padding: 5px 9px; border-radius: 4px; background: #fff; color: #1f1a4d; border: 2px solid #1f1a4d; font-size: 13px; font-weight: 700; line-height: 1.3; overflow-wrap: anywhere; }
 .fs-bang { width: 30px; height: 36px; display: grid; place-items: center; background: #ffd23f; color: #1f1a4d; border: 3px solid #1f1a4d; border-radius: 2px; font-family: 'Black Han Sans', sans-serif; font-size: 26px; animation: fs-bang 0.35s ease-in-out infinite alternate; }
 @keyframes fs-bang { from { transform: scale(1); } to { transform: scale(1.18); } }
-.fs-pop { width: 0; height: 0; }
-.fs-pop--on { width: 110px; height: 72px; filter: drop-shadow(0 0 10px rgba(255, 226, 120, 0.9)); animation: fs-pop 0.4s cubic-bezier(0.2, 1.6, 0.4, 1); }
-.fs-pop svg { width: 100%; height: 100%; display: block; }
+.fs-pop { display: none; }
+/* 들고 있는 물고기 이름·크기 (그림은 3D로 머리 위에) */
+.fs-pop--on { display: block; padding: 2px 8px; border-radius: 2px; background: #ffd23f; color: #1c1748; font-size: 13px; font-weight: 800; white-space: nowrap; animation: fs-pop 0.4s cubic-bezier(0.2, 1.6, 0.4, 1); }
 @keyframes fs-pop { from { transform: scale(0.2); } to { transform: scale(1); } }
 
 /* 위 버튼들 */
@@ -60,10 +58,11 @@
 @keyframes fs-in { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: none; } }
 
 /* 내가 잡은 것 (가운데 카드) */
-.fs-catch { position: absolute; left: 50%; top: 42%; transform: translate(-50%, -50%); z-index: 5; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 12px 22px 14px; border: 3px solid #ffd23f; border-radius: 2px; background: rgba(28, 23, 72, 0.92); box-shadow: 0 0 28px rgba(255, 210, 63, 0.5); pointer-events: none; animation: fs-pop 0.4s cubic-bezier(0.2, 1.6, 0.4, 1); }
-.fs-catch__art { width: 200px; height: 130px; }
+/* 머리 위로 든 물고기가 보이게 아래쪽 작은 띠로 */
+.fs-catch { position: absolute; left: 50%; bottom: calc(110px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); z-index: 5; display: flex; flex-direction: row; flex-wrap: wrap; justify-content: center; align-items: center; gap: 4px 10px; padding: 8px 16px; border: 3px solid #ffd23f; border-radius: 2px; background: rgba(28, 23, 72, 0.92); box-shadow: 0 0 28px rgba(255, 210, 63, 0.5); pointer-events: none; animation: fs-pop 0.4s cubic-bezier(0.2, 1.6, 0.4, 1); }
+.fs-catch__art { width: 72px; height: 47px; }
 .fs-catch__art svg { width: 100%; height: 100%; display: block; }
-.fs-catch b { font-family: 'Black Han Sans', sans-serif; font-weight: 400; font-size: 26px; }
+.fs-catch b { font-family: 'Black Han Sans', sans-serif; font-weight: 400; font-size: 22px; }
 .fs-catch span { font-size: 14px; font-weight: 700; }
 .fs-catch i { font-style: normal; }
 .fs-catch em { font-style: normal; font-weight: 800; color: #1c1748; background: #ffd23f; padding: 2px 8px; border-radius: 2px; }
@@ -134,5 +133,6 @@
 @media (max-height: 420px) {
   .fs-act { width: 92px; height: 92px; font-size: 17px; }
   .fs-key { min-height: 32px; padding: 4px 9px; font-size: 13px; }
-  .fs-catch__art { width: 150px; height: 98px; }
+  .fs-catch__art { width: 60px; height: 39px; }
+  .fs-catch { bottom: calc(96px + env(safe-area-inset-bottom, 0px)); }
 }

@@ -29,16 +29,24 @@ export type Shown = PlayerPub & {
   /** 이때까지 걷는 중으로 그림 */
   walkUntil: number
   bubble: { text: string; until: number } | null
-  popup: { c: Catch; until: number } | null
+  /** 머리 위로 든 물고기 (잡았거나 자랑) — from = 물에서 날아오는 곳(잡았을 때 찌 자리) */
+  popup: { c: Catch; start: number; until: number; from: [number, number] | null } | null
   biteAt: number
 }
 
 export type World = {
   me: string
   players: Map<string, Shown>
-  /** 조이스틱·키보드 (x 오른쪽, y 아래쪽, 크기 0~1) */
+  /** 조이스틱·키보드 (x 오른쪽, y 아래쪽 = 화면 기준, 크기 0~1) */
   input: { x: number; y: number }
+  /**
+   * 시점 (사용자 요청 2026-11-17): yaw 좌우 돌림(0 = 바다 쪽을 봄), pitch 위아래, dist 3인칭 거리, first 1인칭.
+   * spin = Q·E로 돌리는 중(-1·0·1). 내가 직접 돌릴 때만 움직임 (저절로 돌지 않음 — 멀미)
+   */
+  cam: { yaw: number; pitch: number; dist: number; first: boolean; spin: number }
 }
+
+export const CAM_LIMITS = { third: { min: 0.2, max: 1.35 }, first: { min: -0.7, max: 1.0 }, dist: { min: 5, max: 18 } }
 
 export type Toast = { key: number; text: string; color: string; c?: Catch }
 export type ChatLine = { key: number; name: string; text: string; mine: boolean }
@@ -89,7 +97,7 @@ export function useFishingRoom(nickname: string, active: boolean) {
   const [tankView, setTankView] = useState<{ who: string; name: string; items: BagItem[] } | null>(null)
   const [action, setAction] = useState<Action>('none')
   const roomRef = useRef<Room<ClientMsg> | null>(null)
-  const world = useRef<World>({ me: '', players: new Map(), input: { x: 0, y: 0 } }).current
+  const world = useRef<World>({ me: '', players: new Map(), input: { x: 0, y: 0 }, cam: { yaw: 0, pitch: 0.82, dist: 11, first: false, spin: 0 } }).current
   const keySeq = useRef(0)
   const lastSent = useRef({ at: 0, x: 0, z: 0, r: 0 })
 
@@ -177,7 +185,7 @@ export function useFishingRoom(nickname: string, active: boolean) {
           return
         case 'catch': {
           const p = world.players.get(m.id)
-          if (p) p.popup = { c: m.c, until: now + 3200 }
+          if (p) p.popup = { c: m.c, start: now, until: now + 3800, from: p.bob ? [p.bob[0], p.bob[1]] : null }
           const f = fishById(m.c.fish)
           if (m.id === world.me) {
             playSound(isBig(m.c) ? 'big' : f?.rarity === 'junk' ? 'junk' : 'catch')
@@ -201,7 +209,7 @@ export function useFishingRoom(nickname: string, active: boolean) {
         case 'brag': {
           const p = world.players.get(m.id)
           const c: Catch = { fish: m.item.f, iro: m.item.i, size: m.item.s }
-          if (p) p.popup = { c, until: now + 3500 }
+          if (p) p.popup = { c, start: now, until: now + 3500, from: null }
           toast(`${m.name}님의 자랑: ${iroName(c)}${fishById(c.fish)?.name ?? ''}${c.size ? ` ${c.size}cm` : ''}`, '#ffb3cf', c)
           return
         }
@@ -245,9 +253,17 @@ export function useFishingRoom(nickname: string, active: boolean) {
     (dt: number) => {
       const me = world.players.get(world.me)
       if (!me) return
-      const { x: ix, y: iy } = world.input
+      const cam = world.cam
+      if (cam.spin) cam.yaw += cam.spin * 2.2 * dt
+      // 화면 기준 입력을 보고 있는 쪽 기준으로 돌림 (위로 밀면 보는 쪽으로 걸음)
+      const sx = world.input.x, sy = world.input.y
+      const c = Math.cos(cam.yaw), s = Math.sin(cam.yaw)
+      const ix = sx * c + sy * s
+      const iy = -sx * s + sy * c
       const mag = Math.min(1, Math.hypot(ix, iy))
       const now = performance.now()
+      // 1인칭: 몸은 늘 보는 쪽을 향함 (던지는 방향 = 보는 방향)
+      if (cam.first && me.bed === null) me.r = me.sr = cam.yaw + Math.PI
       if (mag > 0.15) {
         const speed = WALK_SPEED * mag
         const dx = (ix / (Math.hypot(ix, iy) || 1)) * speed * dt
@@ -255,7 +271,7 @@ export function useFishingRoom(nickname: string, active: boolean) {
         const p = moveBy(me.x, me.z, dx, dz)
         me.x = me.sx = p.x
         me.z = me.sz = p.z
-        me.r = me.sr = Math.atan2(ix, iy)
+        if (!cam.first) me.r = me.sr = Math.atan2(ix, iy)
         me.walkUntil = now + 120
         // 움직이면 일어나고 낚싯대를 거둠 (서버도 같은 판단)
         if (me.bed !== null || me.fishing !== 'none') {

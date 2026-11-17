@@ -437,3 +437,28 @@ export function fishSvg(id: string, iro: Iro | null = null, opts: { bg?: 'sea' |
 
 /** 못 잡은 물고기 실루엣 필터 (IRO_FILTERS와 같이 넣음) */
 export const SHADOW_FILTER = `<filter id="fish-shadow" color-interpolation-filters="sRGB"><feColorMatrix type="matrix" values="0 0 0 0 0.16  0 0 0 0 0.14  0 0 0 0 0.4  0 0 0 0.85 0"/></filter>`
+
+/** 3D 화면에 붙일 그림 주소 (이로치 필터를 SVG 안에 넣어 따로 떼어 써도 색이 나옴) */
+export function fishImageUrl(id: string, iro: Iro | null): string {
+  const draw = ART[id]
+  if (!draw) return ''
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 130" width="400" height="260"><defs>${IRO_FILTERS}</defs><g${iro ? ` filter="url(#iro-${iro})"` : ''}>${draw()}</g></svg>`
+  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(dedupeAttrs(svg))}`
+}
+
+/**
+ * 같은 속성이 한 태그에 두 번 있으면 앞의 것만 (예: 공통 선 굵기 뒤에 다시 쓴 굵기).
+ * 화면에 바로 넣을 땐 브라우저가 앞의 것을 쓰고 넘어가지만, 그림 파일(XML)로 읽으면 오류라 3D에 안 나왔음
+ */
+export function dedupeAttrs(svg) {
+  return svg.replace(/<([a-zA-Z][\w-]*)((?:\s+[\w:-]+="[^"]*")*)\s*(\/?)>/g, (_m, tag, attrs, close) => {
+    const seen = new Set()
+    const kept = (attrs.match(/\s+[\w:-]+="[^"]*"/g) ?? []).filter((a) => {
+      const name = a.trim().split('=')[0]
+      if (seen.has(name)) return false
+      seen.add(name)
+      return true
+    })
+    return `<${tag}${kept.join('')}${close ? ' /' : ''}>`
+  })
+}
