@@ -1193,6 +1193,15 @@ html:has(.arcade) body {
   color: var(--brand);
 }
 
+/* 낚시터 띠 (수다방 띠와 같은 모양, 바다색) */
+.talk--fish {
+  background: linear-gradient(100deg, #1f5f9c, #2d86c6);
+}
+
+.talk + .talk {
+  margin-top: 12px;
+}
+
 .home__foot {
   margin-top: auto;
   padding: 24px 16px 32px;

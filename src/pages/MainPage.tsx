@@ -324,6 +324,22 @@ export function MainPage({ nickname }: { nickname: string }) {
           </ul>
         </section>
 
+        {/* 낚시터: 게임 목록과 따로 (사용자 요청 2026-11-18 — 수다방처럼 아래에) */}
+        <Link className="talk talk--fish" to="/games/fishing">
+          <span className="talk__icon">
+            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+              <path d="M3 12c3-4 7-6 11-6 3 0 5 2 7 6-2 4-4 6-7 6-4 0-8-2-11-6Z" />
+              <path d="M3 12 1 9m2 3-2 3" />
+              <circle cx="16" cy="11" r="1" fill="currentColor" />
+            </svg>
+          </span>
+          <span className="talk__body">
+            <strong>낚시터</strong>
+            <span>바닷가를 같이 걸으며 낚시 · 도감·어항·이로치 · 1–16명</span>
+          </span>
+          <IconChevronRight className="talk__go" />
+        </Link>
+
         <Link className="talk" to="/meeting">
           <span className="talk__icon">
             <IconMic />
