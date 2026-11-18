@@ -11,6 +11,8 @@ type RoomHandlers = {
   onMembers: (members: HubMember[]) => void
   onMessage: (from: string, msg: unknown) => void
   onMove: (from: string, move: unknown) => void
+  /** 방 글자 채팅 (없어도 됨) */
+  onTalk?: (from: string, name: string, text: string) => void
 }
 
 type JoinedRoom = { game: string; code: string; role: HubRole; nickname: string; avatar?: string; capacity: number; resume: string; key: string; handlers: RoomHandlers }
@@ -140,6 +142,8 @@ class HubClient {
         return this.rooms.get(m.room)?.handlers.onMessage(m.from, m.msg)
       case 'move':
         return this.rooms.get(m.room)?.handlers.onMove(m.from, m.move)
+      case 'talk':
+        return this.rooms.get(m.room)?.handlers.onTalk?.(m.from, m.name, m.text)
       case 'rooms':
         for (const fn of this.lists.get(m.list) ?? []) fn(m.rooms)
         return
@@ -182,6 +186,7 @@ class HubClient {
       ready: (ready: boolean) => this.raw({ t: 'ready', room: topic(), ready }),
       info: (info: string) => this.raw({ t: 'info', room: topic(), info }),
       move: (move: unknown) => this.raw({ t: 'move', room: topic(), move }),
+      talk: (text: string) => this.raw({ t: 'talk', room: topic(), text }),
       referee: (game: string, setup: unknown) => this.raw({ t: 'referee', room: topic(), game, setup }),
       /** 회의방 음성·화상 입장권 (서버가 이 방 사람인지 보고 줌, 못 받으면 null) */
       sfu: () => this.sfu(topic()),

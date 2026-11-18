@@ -225,10 +225,26 @@ describe('막기 (2026-11-16)', () => {
     await x.hello()
     await x.send({ t: 'sfu', ref: 8, room: topic })
     expect(x.last('sfu')).toEqual({ t: 'sfu', ref: 8, token: null })
-    // 게임 방은 안 줌
+    // 게임 방도 줌 (2026-11-18 모든 게임 방에 음성)
     await h.send(join('host', 'GAME1'))
     await h.send({ t: 'sfu', ref: 9, room: h.last('joined')!.room })
-    expect(h.last('sfu')?.token).toBeNull()
+    expect(h.last('sfu')?.token).toBe('TOKEN')
+  })
+
+  it('방 글자 채팅: 방 사람 모두에게, 보낸 사람·닉네임은 서버가, 너무 빠르면 버림', async () => {
+    const hub = new Hub({ verify })
+    const h = client(hub)
+    await h.hello()
+    await h.send(join('host', 'TALK1'))
+    const topic = h.last('joined')!.room
+    const g = client(hub, 'user2')
+    await g.hello()
+    await g.send(join('guest', 'TALK1'))
+    await g.send({ t: 'talk', room: topic, text: '  안녕\u0007하세요  ' })
+    expect(h.last('talk')).toMatchObject({ t: 'talk', room: topic, from: g.last('joined')!.key, name: 'guest', text: '안녕하세요' })
+    expect(g.last('talk')?.text).toBe('안녕하세요')
+    await g.send({ t: 'talk', room: topic, text: '또' })
+    expect(h.last('talk')?.text).toBe('안녕하세요')
   })
 
   it('회의방은 방장이 나가면 먼저 온 사람이 방장, 게임 방은 그대로', async () => {

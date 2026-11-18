@@ -7,6 +7,7 @@ import { setSwitchTargets } from './shared/nav'
 import { GAMES } from './pages/gameList'
 import { playerRange } from './pages/PlayerDots'
 import { MeetingCallProvider, useMeetingCall } from './pages/meeting/callState'
+import { RoomDock } from './shared/ui/RoomDock'
 import { ErrorBoundary } from './shared/ui/ErrorBoundary'
 
 // 게임·회의방 화면은 들어갈 때 받는다 (사용자 요청 — 처음에 16개 게임을 한꺼번에 받아 첫 화면이 느렸음)
@@ -34,6 +35,12 @@ const MeetingPage = lazy(() => import('./pages/meeting/MeetingPage').then((m) =>
 const MeetingCallHost = lazy(() => import('./pages/meeting/MeetingPage').then((m) => ({ default: m.MeetingCallHost })))
 
 /** 회의방에 들어가 있으면 화면 어디서든 통화 화면(회의방 전체 화면 또는 떠 있는 작은 창)을 띄운다 — 통화한 채로 게임하기 */
+/** 게임 방 공통 채팅·음성 (수다방 통화 중이면 게임 음성은 막음) */
+function GameRoomDock() {
+  const { joined } = useMeetingCall()
+  return <RoomDock voiceBlocked={!!joined} />
+}
+
 function CallHost() {
   const { joined } = useMeetingCall()
   if (!joined) return null
@@ -170,6 +177,9 @@ function App() {
       </PageErrors>
       <ErrorBoundary>
         <CallHost />
+      </ErrorBoundary>
+      <ErrorBoundary>
+        <GameRoomDock />
       </ErrorBoundary>
     </BrowserRouter>
     </MeetingCallProvider>

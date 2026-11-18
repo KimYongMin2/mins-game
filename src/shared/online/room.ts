@@ -1,3 +1,4 @@
+import { registerRoom, unregisterRoom } from './currentRoom'
 import type { RealtimeChannel, SupabaseClient } from '@supabase/supabase-js'
 import { type Advert, advertiseRoom, cleanId, cleanName, isInt } from './roomList'
 import { getRealtimeClient } from './supabase'
@@ -136,7 +137,11 @@ export interface Room<M> {
   startReferee?(game: string, setup: unknown): void
   /** 우리 게임 서버가 이 게임 심판을 맡을 수 있는지 (없거나 false면 예전처럼 방장 폰이 심판) */
   hasReferee?(game: string): boolean
-  /** 회의방: 음성·화상 서버 입장권 (우리 게임 서버가 이 방 사람인지 보고 줌). 우리 서버로 연 방에만 */
+  /** 방 글자 채팅 보내기 (게임 메시지와 따로 — 모든 게임 방, 2026-11-18). 우리 서버로 연 방에만 */
+  sendTalk?(text: string): void
+  /** 방 글자 채팅 받기 (from·name은 서버가 붙임, 내가 보낸 것도 옴) */
+  onTalk?(fn: (t: { from: string; name: string; text: string }) => void): () => void
+  /** 회의방·게임 방: 음성·화상 서버 입장권 (우리 게임 서버가 이 방 사람인지 보고 줌). 우리 서버로 연 방에만 */
   sfuToken?(): Promise<string | null>
   /** 내 역할이 바뀜 (회의방은 방장이 나가면 먼저 온 사람이 방장이 됨). 우리 서버로 연 방에만 */
   onRole?(fn: (role: RoomRole) => void): () => void
@@ -211,6 +216,7 @@ async function openHub<M>(gameId: string, code: string, meta: Meta, { capacity =
   const peerFns = new Set<(peer: Peer | null) => void>()
   const memberFns = new Set<(members: Member[]) => void>()
   const moveFns = new Set<(move: RoomMove) => void>()
+  const talkFns = new Set<(t: { from: string; name: string; text: string }) => void>()
   let peer: Peer | null = null
   let members: Member[] = []
   let myKey = ''
@@ -260,6 +266,9 @@ async function openHub<M>(gameId: string, code: string, meta: Meta, { capacity =
           const mv = move && typeof move === 'object' ? readMove(move as Record<string, unknown>) : null
           if (mv) for (const fn of moveFns) fn(mv)
         },
+        onTalk: (from, name, text) => {
+          for (const fn of talkFns) fn({ from, name, text })
+        },
       },
     )
   } catch (e) {
@@ -273,7 +282,7 @@ async function openHub<M>(gameId: string, code: string, meta: Meta, { capacity =
     advert = advertiseRoom(gameListId(gameId), listed)
   }
 
-  return {
+  const room: Room<M> = {
     code,
     ...(listing ? { name: listing.name } : {}),
     get role() {
@@ -283,6 +292,11 @@ async function openHub<M>(gameId: string, code: string, meta: Meta, { capacity =
       return conn.key()
     },
     send: (msg) => conn.send(msg),
+    sendTalk: (text) => conn.talk(text),
+    onTalk(fn) {
+      talkFns.add(fn)
+      return () => talkFns.delete(fn)
+    },
     sfuToken: () => conn.sfu(),
     onRole(fn) {
       roleFns.add(fn)
@@ -331,9 +345,14 @@ async function openHub<M>(gameId: string, code: string, meta: Meta, { capacity =
       peerFns.clear()
       memberFns.clear()
       moveFns.clear()
+      talkFns.clear()
       conn.leave()
+      unregisterRoom(room)
     },
   }
+  // 게임 방 공통 채팅·음성 창이 지금 방을 알게 (회의방·낚시터는 따로 있어서 뺌)
+  registerRoom(gameId, room as Room<unknown>, members, (fn) => room.onMembers(fn))
+  return room
 }
 
 async function openRealtime<M>(gameId: string, code: string, meta: Meta, { capacity = 2, client, listing }: RoomOptions): Promise<Room<M>> {

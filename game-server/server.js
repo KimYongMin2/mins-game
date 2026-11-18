@@ -7763,7 +7763,9 @@ const LIMIT = {
 /** 방장이 나가면 남은 사람에게 방장을 넘기는 방 (회의방) */
 const HOST_TRANSFER = /* @__PURE__ */ new Set(["meeting", "fishing"]);
 /** 음성·화상 입장권을 주는 방 */
-const SFU_GAMES = /* @__PURE__ */ new Set(["meeting"]);
+/** 글자 채팅 한 줄 최대 길이 · 한 사람이 다시 보낼 수 있는 간격 */
+const TALK_MAX = 200;
+const TALK_MS = 350;
 /** 이만큼 메시지가 없으면 '지금 하는 중'으로 안 침 (서버 업데이트를 미룰지 볼 때) */
 const ACTIVE_MS = 9e5;
 /** 이만큼 아무 일 없는 방은 서버가 닫음 (탭만 켜 두고 자리를 뜬 방이 영영 남지 않게) */
@@ -7910,6 +7912,7 @@ var Hub = class {
 			case "watch": return this.watch(s, m.list);
 			case "unwatch": return this.unwatch(s, m.list);
 			case "sfu": return this.sfu(s, m.ref, m.room);
+			case "talk": return this.talk(s, m.room, m.text);
 		}
 	}
 	join(s, m) {
@@ -8010,7 +8013,7 @@ var Hub = class {
 		if (typeof ref !== "number") return;
 		const at = this.memberOf(s, topic);
 		const game = typeof topic === "string" ? topic.split(":")[0] : "";
-		if (!at || !SFU_GAMES.has(game) || !this.opts.sfuToken) return s.push({
+		if (!at || !game || !this.opts.sfuToken) return s.push({
 			t: "sfu",
 			ref,
 			token: null
@@ -8031,6 +8034,24 @@ var Hub = class {
 				token: null
 			});
 		}
+	}
+	/** 방 글자 채팅: 그 방 사람 모두에게 (보낸 사람·닉네임은 서버가 붙임), 너무 빠르면 버림 */
+	talkAt = /* @__PURE__ */ new WeakMap();
+	talk(s, topic, text) {
+		const at = this.memberOf(s, topic);
+		const t = clean$2(text, TALK_MAX).trim();
+		if (!at || !t) return;
+		const now = this.now();
+		if (now - (this.talkAt.get(at.mem) ?? 0) < TALK_MS) return;
+		this.talkAt.set(at.mem, now);
+		at.room.lastActive = now;
+		for (const m of at.room.members.values()) m.session?.push({
+			t: "talk",
+			room: at.room.topic,
+			from: at.mem.key,
+			name: at.mem.nickname,
+			text: t
+		});
 	}
 	relay(s, topic, msg) {
 		const at = this.memberOf(s, topic);

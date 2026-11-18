@@ -48,6 +48,8 @@ export type ClientMsg =
   | { t: 'unwatch'; list: string }
   /** 회의방 음성·화상 서버(LiveKit) 입장권 — 그 방에 실제로 들어와 있는 사람에게만 (2026-11-17, 예전엔 Vercel이 방 확인 없이 줬음) */
   | { t: 'sfu'; ref: number; room: string }
+  /** 방 글자 채팅 (게임 메시지와 따로, 서버 심판도 안 거침 — 2026-11-18 모든 게임 방에 채팅) */
+  | { t: 'talk'; room: string; text: string }
   | { t: 'ping' }
 
 /** 서버 → 브라우저 */
@@ -62,4 +64,6 @@ export type ServerMsg =
   | { t: 'move'; room: string; from: string; move: unknown }
   | { t: 'rooms'; list: string; rooms: Record<string, unknown>[] }
   | { t: 'sfu'; ref: number; token: string | null }
+  /** 방 글자 채팅 (from = 서버가 붙인 접속 번호, name = 서버가 아는 닉네임) */
+  | { t: 'talk'; room: string; from: string; name: string; text: string }
   | { t: 'pong' }

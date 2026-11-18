@@ -1,0 +1,39 @@
+/* 게임 방 공통 채팅·음성 (테마와 상관없이 남색 — 게임 장면 위에 떠 있어서) */
+.rdock { position: fixed; z-index: 60; left: calc(8px + env(safe-area-inset-left, 0px)); top: 42%; display: flex; flex-direction: column; gap: 8px; font-family: 'IBM Plex Sans KR', sans-serif; color: #f4f2ff; pointer-events: none; }
+.rdock__bar { position: relative; display: flex; flex-direction: column; gap: 8px; align-items: flex-start; pointer-events: none; }
+.rdock__bar > *, .rdock__panel { pointer-events: auto; }
+.rdock__btn { position: relative; display: grid; place-items: center; width: 44px; height: 44px; padding: 0; border: 2px solid #4a43a0; border-radius: 50%; background: rgba(28, 23, 72, 0.9); color: #f4f2ff; box-shadow: 0 3px 0 #120e33; cursor: pointer; touch-action: manipulation; }
+.rdock__btn:active { transform: translateY(2px); box-shadow: 0 1px 0 #120e33; }
+.rdock__btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.rdock__btn--on { background: #ffd23f; color: #1c1748; border-color: #1f1a4d; }
+.rdock__btn--live { background: #2f9e6a; border-color: #1f6e4a; }
+.rdock__btn--muted { background: #8a3a3a; border-color: #5a2020; }
+.rdock__btn--wait { font-weight: 800; }
+.rdock__badge { position: absolute; top: -4px; right: -4px; min-width: 18px; height: 18px; padding: 0 4px; border-radius: 9px; background: #e8473f; color: #fff; font-size: 11px; font-weight: 800; line-height: 18px; text-align: center; }
+.rdock__ring { position: absolute; inset: -5px; border: 3px solid #5be08a; border-radius: 50%; pointer-events: none; }
+.rdock__peek { position: absolute; left: 52px; top: 4px; max-width: min(240px, 60vw); padding: 6px 10px; border: 2px solid #1f1a4d; border-radius: 4px; background: #fff; color: #1f1a4d; font: inherit; font-size: 13px; font-weight: 600; text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; }
+.rdock__peek b { font-weight: 800; }
+.rdock__panel { position: fixed; left: calc(60px + env(safe-area-inset-left, 0px)); top: 18%; width: min(320px, calc(100vw - 76px)); height: min(52vh, 380px); display: flex; flex-direction: column; border: 2px solid #4a43a0; border-radius: 4px; background: rgba(28, 23, 72, 0.95); box-shadow: 0 6px 0 rgba(18, 14, 51, 0.6); }
+.rdock__head { display: flex; align-items: center; justify-content: space-between; padding: 8px 10px; border-bottom: 1px solid #3a338a; font-size: 13px; font-weight: 800; }
+.rdock__close { display: grid; place-items: center; width: 28px; height: 28px; padding: 0; border: 0; border-radius: 4px; background: transparent; color: inherit; cursor: pointer; }
+.rdock__log { flex: 1; margin: 0; padding: 8px 10px; list-style: none; overflow-y: auto; font-size: 14px; line-height: 1.45; overflow-wrap: anywhere; }
+.rdock__log b { font-weight: 800; color: #a5c4ff; }
+.rdock__mine b { color: #ffd23f; }
+.rdock__sys, .rdock__empty { color: #b9b4e8; font-size: 12px; }
+.rdock__form { display: flex; gap: 6px; padding: 8px; border-top: 1px solid #3a338a; }
+.rdock__input { flex: 1; min-width: 0; padding: 8px 10px; border: 2px solid #4a43a0; border-radius: 4px; background: #14103a; color: #f4f2ff; font: inherit; font-size: 16px; }
+.rdock__send { display: grid; place-items: center; width: 40px; padding: 0; border: 2px solid #1f1a4d; border-radius: 4px; background: #ffd23f; color: #1c1748; cursor: pointer; }
+.rdock__send:disabled { opacity: 0.5; }
+
+/* 음성 */
+.rvoice { position: relative; display: flex; flex-direction: column; gap: 6px; align-items: flex-start; }
+.rvoice audio { display: none; }
+.rvoice__more { display: flex; gap: 4px; }
+.rdock__mini { display: grid; place-items: center; width: 30px; height: 30px; padding: 0; border: 2px solid #4a43a0; border-radius: 4px; background: rgba(28, 23, 72, 0.9); color: #f4f2ff; cursor: pointer; }
+.rdock__mini--on { background: #8a3a3a; }
+.rdock__mini--leave { background: #c43a32; border-color: #7a1f1a; }
+.rvoice__who { display: flex; flex-direction: column; gap: 3px; margin: 0; padding: 0; list-style: none; max-width: 120px; }
+.rvoice__who li { display: flex; align-items: center; gap: 3px; padding: 2px 7px; border: 2px solid transparent; border-radius: 3px; background: rgba(28, 23, 72, 0.8); font-size: 11px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rvoice__who li.is-speaking { border-color: #5be08a; }
+.rvoice__unblock { padding: 4px 8px; border: 2px solid #1f1a4d; border-radius: 4px; background: #ffd23f; color: #1c1748; font: inherit; font-size: 12px; font-weight: 800; cursor: pointer; }
+@media (max-height: 460px) { .rdock { top: 30%; } .rdock__panel { top: 8%; height: 70vh; } }
