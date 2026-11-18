@@ -1,7 +1,7 @@
 import * as THREE from 'three'
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 import { gameHour, weatherNow } from './clock'
-import { kit, makeBoat, makePalm, makePine, makeSunbed, makeTree, makeUmbrella, rockGeo, waterNormals } from './props3d'
+import { kit, makeBoat, makeFlipFlops, makePalm, makePine, makeSideTable, makeSunbed, makeTree, makeUmbrella, rockGeo, waterNormals } from './props3d'
 import { BEDS, BOUNDS, BRIDGE, DOCK, type FurnKind, HOUSES, JETTY, LADDERS, LAKE, LAKE_DOCK, PIER, PIER_END, RIVER, type Rect, SEA_EAST, STRUCTS, type Struct, shoreZ, waterAt } from '../play/map'
 
 // 낚시터 3D 맵 그림 (2026-11-18 사용자 요청 — 더 사실적이고 넓게, 구조물 많이, 추가할 만한 것 다).
@@ -554,9 +554,25 @@ export function buildWorld(scene: THREE.Scene, renderer: THREE.WebGLRenderer): W
   const cushions = ['#e8746a', '#5fa9d8', '#e8c040', '#7cbf6a', '#a98ad8']
   BEDS.forEach((b, i) => {
     const g = makeSunbed(cushions[i % cushions.length], i * 7 + 3)
-    g.position.set(b.x, b.z < -30 ? 0.21 : 0, b.z)
+    const by = b.z < -30 ? 0.21 : 0
+    g.position.set(b.x, by, b.z)
     g.rotation.y = b.r
     statics.add(g)
+    // 옆 탁자(하나 걸러)·슬리퍼 — 썬베드 기준 자리 (오른쪽 옆 / 머리 쪽 모래)
+    const at = (lx: number, lz: number) => [b.x + lx * Math.cos(b.r) + lz * Math.sin(b.r), b.z - lx * Math.sin(b.r) + lz * Math.cos(b.r)] as const
+    if (i % 2 === 0) {
+      const [tx, tz] = at(0.85, -0.35)
+      const t = makeSideTable(i)
+      t.position.set(tx, by, tz)
+      statics.add(t)
+    }
+    if (by === 0) {
+      const [fx, fz] = at(-0.75, -1.35)
+      const f = makeFlipFlops(['#e8473f', '#3f8fd0', '#2f9e6a', '#ffd23f'][i % 4])
+      f.position.set(fx, 0, fz)
+      f.rotation.y = b.r + 0.4
+      statics.add(f)
+    }
   })
   // 비치 타월 (그림만 — 모래성은 3D 화면이 그림: 부서지고 다시 쌓여서)
   ;[[-15, -2.5, '#e8473f'], [-7, -3.4, '#3f8fd0'], [8, -1.8, '#ffd23f']].forEach(([x, z, c]) => {

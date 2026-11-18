@@ -9,7 +9,10 @@ export { ANIMALS, ANIMAL_NAMES, type AnimalKind, type Look, plainLook } from './
 
 export type Mood = 'calm' | 'happy' | 'scared' | 'ko'
 /** idle 가만히 · hold 두 손으로 머리 위에 듦 · scared 덜덜 · ko 쓰러짐 · cheer 만세 · raise 한 손 번쩍(외치기) · walk 걷기(낚시터) · fish 두 손으로 낚싯대를 앞으로 */
-export type Pose = 'idle' | 'hold' | 'scared' | 'ko' | 'cheer' | 'raise' | 'aim' | 'walk' | 'fish' | 'run' | 'sit' | 'lie' | 'jump'
+/** 썬베드에 기댄 몸 기울기 (라디안, 수직에서 뒤로) — 게임이 몸을 이만큼 젖힘 */
+export const RECLINE = 0.87
+
+export type Pose = 'idle' | 'hold' | 'scared' | 'ko' | 'cheer' | 'raise' | 'aim' | 'walk' | 'fish' | 'run' | 'sit' | 'lie' | 'jump' | 'recline'
 
 type Palette = { fur: string; light: string; ear: string; nose: string }
 
@@ -817,6 +820,12 @@ export function makeAnimal(lookIn: Look, shirt: string, opts: { team?: boolean }
         az = 2.1
         bob = 0
         break
+      case 'recline':
+        // 썬베드에 기댐 (몸을 젖히는 건 게임이 — 등받이처럼 50° 뒤로): 다리는 쿠션 위로 쭉, 두 손은 머리 뒤로
+        ax = -0.2
+        az = 2.45
+        bob = 0
+        break
       case 'lie':
         // 누움 (눕히는 건 게임이): 두 손을 머리 뒤로
         ax = -0.15
@@ -833,7 +842,8 @@ export function makeAnimal(lookIn: Look, shirt: string, opts: { team?: boolean }
     // 다리: 걸을 땐 앞뒤로, 아니면 제자리
     // 앉으면 두 다리를 앞으로 (발이 +z = 음수 회전)
     const step = pose === 'walk' ? Math.sin(t * 9) * 0.6 : pose === 'run' ? Math.sin(t * 13) * 0.95 : 0
-    const sitLeg = pose === 'sit' ? -1.45 : pose === 'jump' ? -0.55 : 0
+    // 기대 누우면 몸이 50°(0.87) 젖혀지니 다리를 그만큼 앞으로 → 쿠션 위에 수평
+    const sitLeg = pose === 'sit' ? -1.45 : pose === 'jump' ? -0.55 : pose === 'recline' ? -(Math.PI / 2 - RECLINE) : 0
     legs[0].rotation.x = ease(legs[0].rotation.x, step + sitLeg, 0.35)
     legs[1].rotation.x = ease(legs[1].rotation.x, -step + sitLeg, 0.35)
     // 가만히 서 있을 땐 팔도 살짝 흔들림

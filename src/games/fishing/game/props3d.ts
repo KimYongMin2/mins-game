@@ -560,50 +560,58 @@ export function makeBoat(color: string) {
   return g
 }
 
-// ── 파라솔: 색이 번갈아 칠한 천(살 8개) + 술 + 나무 기둥 ──
+// ── 파라솔 (다시 디자인 — 사용자 요청 2026-11-18 '창살이 안 맞음'): 살은 정수리에서 천의 접힘선을 그대로 따라 가장자리까지,
+// 천은 살과 살 사이가 살짝 처진 폭 8장(두 색 번갈아), 가장자리 반달 띠도 같은 폭에 맞춤, 아래엔 손잡이 링·지지대, 위엔 꼭지 ──
 export function makeUmbrella(color: string) {
   const K = kit()
   const g = new THREE.Group()
-  const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.04, 2.7, 8), K.plankM)
-  pole.position.y = 1.35
-  g.add(pole)
-  const R = 1.65, H = 0.55, ribs = 8
-  const pos: number[] = [], col: number[] = []
-  const a = new THREE.Color(color), b = new THREE.Color('#f7f3ea')
-  for (let i = 0; i < ribs; i++) {
-    const a0 = (i / ribs) * Math.PI * 2, a1 = ((i + 1) / ribs) * Math.PI * 2
-    const c = i % 2 ? a : b
-    // 살과 살 사이 천은 조금 처짐 (가운데 점을 낮춤)
-    const am = (a0 + a1) / 2
-    const pts = [[0, 2.62 + H, 0], [Math.cos(a0) * R, 2.62, Math.sin(a0) * R], [Math.cos(am) * R * 0.96, 2.56, Math.sin(am) * R * 0.96], [Math.cos(a1) * R, 2.62, Math.sin(a1) * R]]
-    for (const tri of [[0, 1, 2], [0, 2, 3]]) for (const k of tri) {
-      pos.push(...pts[k])
-      col.push(c.r, c.g, c.b)
-    }
+  const R = 1.7, APEX = 3.12, EDGE = 2.62, N = 8
+  const ca = new THREE.Color(color), cb = new THREE.Color('#f7f3ea')
+  /** 살 위 점 (v: 정수리 0 → 가장자리 1) — 천은 위로 살짝 볼록 */
+  const rib = (a: number, v: number, drop = 0) => new THREE.Vector3(Math.cos(a) * R * v, APEX + (EDGE - APEX) * v + Math.sin(v * Math.PI) * 0.07 - drop, Math.sin(a) * R * v)
+  // 천: 폭마다 촘촘한 그물 (살 사이는 안쪽으로 조금 처짐)
+  const pos: number[] = [], col: number[] = [], idx: number[] = []
+  const U = 6, V = 7
+  for (let i = 0; i < N; i++) {
+    const a0 = (i / N) * Math.PI * 2, a1 = ((i + 1) / N) * Math.PI * 2
+    const c = i % 2 ? ca : cb
+    const base = pos.length / 3
+    for (let vi = 0; vi <= V; vi++)
+      for (let ui = 0; ui <= U; ui++) {
+        const u = ui / U, v = vi / V
+        const a = a0 + (a1 - a0) * u
+        const sag = Math.sin(u * Math.PI) * v
+        const p = rib(a, v * (1 - sag * 0.025), sag * 0.06)
+        pos.push(p.x, p.y, p.z)
+        col.push(c.r, c.g, c.b)
+      }
+    for (let vi = 0; vi < V; vi++)
+      for (let ui = 0; ui < U; ui++) {
+        const q = base + vi * (U + 1) + ui
+        idx.push(q, q + U + 1, q + 1, q + 1, q + U + 1, q + U + 2)
+      }
   }
   const cg = new THREE.BufferGeometry()
   cg.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3))
   cg.setAttribute('color', new THREE.Float32BufferAttribute(col, 3))
+  cg.setIndex(idx)
   cg.computeVertexNormals()
-  g.add(new THREE.Mesh(cg, new THREE.MeshStandardMaterial({ vertexColors: true, side: THREE.DoubleSide, roughness: 0.85 })))
-  // 가장자리 물결 띠 (폭마다 반달 모양으로 늘어짐, 색 번갈아)
+  const fabric = new THREE.MeshStandardMaterial({ vertexColors: true, side: THREE.DoubleSide, roughness: 0.88 })
+  g.add(new THREE.Mesh(cg, fabric))
+  // 가장자리 반달 띠 (폭마다, 같은 색)
   const vpos: number[] = [], vcol: number[] = []
-  for (let i = 0; i < ribs; i++) {
-    const c = i % 2 ? a : b
-    const segs = 6
-    for (let k = 0; k < segs; k++) {
-      const t0 = k / segs, t1 = (k + 1) / segs
-      const a0 = ((i + t0) / ribs) * Math.PI * 2, a1 = ((i + t1) / ribs) * Math.PI * 2
-      const drop = (t: number) => 0.06 + Math.sin(t * Math.PI) * 0.1
-      const top = 2.6, rr = R * 0.985
-      const p = [
-        [Math.cos(a0) * rr, top, Math.sin(a0) * rr],
-        [Math.cos(a1) * rr, top, Math.sin(a1) * rr],
-        [Math.cos(a1) * rr, top - drop(t1), Math.sin(a1) * rr],
-        [Math.cos(a0) * rr, top - drop(t0), Math.sin(a0) * rr],
-      ]
-      for (const tri of [[0, 1, 2], [0, 2, 3]]) for (const q of tri) {
-        vpos.push(...p[q])
+  for (let i = 0; i < N; i++) {
+    const a0 = (i / N) * Math.PI * 2, a1 = ((i + 1) / N) * Math.PI * 2
+    const c = i % 2 ? ca : cb
+    const S = 8
+    for (let k = 0; k < S; k++) {
+      const t0 = k / S, t1 = (k + 1) / S
+      const e0 = rib(a0 + (a1 - a0) * t0, 1 - Math.sin(t0 * Math.PI) * 0.025, Math.sin(t0 * Math.PI) * 0.06)
+      const e1 = rib(a0 + (a1 - a0) * t1, 1 - Math.sin(t1 * Math.PI) * 0.025, Math.sin(t1 * Math.PI) * 0.06)
+      const d0 = 0.05 + Math.sin(t0 * Math.PI) * 0.1, d1 = 0.05 + Math.sin(t1 * Math.PI) * 0.1
+      const q = [[e0.x, e0.y, e0.z], [e1.x, e1.y, e1.z], [e1.x, e1.y - d1, e1.z], [e0.x, e0.y - d0, e0.z]]
+      for (const tri of [[0, 1, 2], [0, 2, 3]]) for (const n of tri) {
+        vpos.push(...q[n])
         vcol.push(c.r, c.g, c.b)
       }
     }
@@ -612,25 +620,97 @@ export function makeUmbrella(color: string) {
   vg.setAttribute('position', new THREE.Float32BufferAttribute(vpos, 3))
   vg.setAttribute('color', new THREE.Float32BufferAttribute(vcol, 3))
   vg.computeVertexNormals()
-  g.add(new THREE.Mesh(vg, new THREE.MeshStandardMaterial({ vertexColors: true, side: THREE.DoubleSide, roughness: 0.9 })))
-  // 기둥 이음새(쇠 고리)·기울이는 손잡이·바닥 모래 둔덕
-  for (const y of [1.45, 2.2]) g.add(new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.06, 10), K.metalM).translateY(y))
-  const knob = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.03, 0.03), K.metalM)
-  knob.position.set(0.07, 1.45, 0)
-  g.add(knob)
-  const mound = new THREE.Mesh(new THREE.SphereGeometry(0.28, 12, 8).scale(1, 0.25, 1), new THREE.MeshStandardMaterial({ color: '#d6bb82', roughness: 1 }))
-  g.add(mound)
-  // 살
-  for (let i = 0; i < ribs; i++) {
-    const ang = (i / ribs) * Math.PI * 2
-    const rib = new THREE.Mesh(new THREE.CylinderGeometry(0.01, 0.01, 1.2, 4), K.metalM)
-    rib.position.set(Math.cos(ang) * 0.55, 2.4, Math.sin(ang) * 0.55)
-    rib.rotation.set(0, -ang, 0)
-    rib.rotateZ(1.1)
-    g.add(rib)
+  g.add(new THREE.Mesh(vg, fabric))
+  // 살: 천 바로 밑에서 접힘선을 따라 (정확히 같은 곡선)
+  const ribTubes: THREE.BufferGeometry[] = []
+  const runnerY = 2.28
+  for (let i = 0; i < N; i++) {
+    const a = (i / N) * Math.PI * 2
+    const pts = Array.from({ length: 9 }, (_, k) => rib(a, 0.04 + (k / 8) * 0.96, 0.025))
+    ribTubes.push(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 12, 0.011, 5))
+    // 끝 마개
+    const tip = rib(a, 1, 0.025)
+    ribTubes.push(new THREE.SphereGeometry(0.022, 6, 4).translate(tip.x, tip.y, tip.z))
+    // 지지대: 손잡이 링 → 살 중간
+    const mid = rib(a, 0.5, 0.03)
+    const from = new THREE.Vector3(Math.cos(a) * 0.05, runnerY, Math.sin(a) * 0.05)
+    ribTubes.push(new THREE.TubeGeometry(new THREE.LineCurve3(from, mid), 1, 0.008, 4))
   }
-  g.add(new THREE.Mesh(new THREE.SphereGeometry(0.06, 8, 6), K.whiteM).translateY(2.62 + H + 0.03))
+  g.add(new THREE.Mesh(mergeGeometries(ribTubes.map((t) => (t.index ? t.toNonIndexed() : t)))!, K.metalM))
+  // 기둥: 나무 두 토막 + 쇠 이음새 + 손잡이 링 + 꼭지
+  const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.036, APEX - 0.05, 10), K.plankM)
+  pole.position.y = (APEX - 0.05) / 2
+  g.add(pole)
+  for (const y of [1.35, runnerY]) g.add(new THREE.Mesh(new THREE.CylinderGeometry(0.048, 0.048, 0.08, 12), K.metalM).translateY(y))
+  const knob = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.015, 0.16, 6), K.metalM)
+  knob.rotation.z = Math.PI / 2
+  knob.position.set(0.09, 1.35, 0)
+  g.add(knob)
+  g.add(new THREE.Mesh(new THREE.ConeGeometry(0.06, 0.12, 10), K.metalM).translateY(APEX + 0.08))
+  g.add(new THREE.Mesh(new THREE.SphereGeometry(0.035, 8, 6), K.whiteM).translateY(APEX + 0.16))
+  // 모래에 박은 자리
+  g.add(new THREE.Mesh(new THREE.SphereGeometry(0.3, 14, 8).scale(1, 0.22, 1), new THREE.MeshStandardMaterial({ color: '#d6bb82', roughness: 1 })))
   g.traverse((o) => (o.castShadow = true))
+  return g
+}
+
+/** 썬베드 옆 작은 탁자: 음료(빨대·레몬) · 선글라스 · 선크림 */
+export function makeSideTable(seed: number) {
+  const K = kit()
+  const r = seeded(seed)
+  const g = new THREE.Group()
+  const top = new THREE.Mesh(new THREE.CylinderGeometry(0.26, 0.26, 0.04, 18), K.plankM)
+  top.position.y = 0.5
+  g.add(top)
+  for (let i = 0; i < 3; i++) {
+    const a = (i / 3) * Math.PI * 2
+    const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.015, 0.52, 5), K.plankM)
+    leg.position.set(Math.cos(a) * 0.16, 0.25, Math.sin(a) * 0.16)
+    leg.rotation.set(Math.sin(a) * 0.18, 0, -Math.cos(a) * 0.18)
+    g.add(leg)
+  }
+  // 음료 잔
+  const glass = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.035, 0.14, 12, 1, true), new THREE.MeshStandardMaterial({ color: '#dff4ff', transparent: true, opacity: 0.45, roughness: 0.05, side: THREE.DoubleSide }))
+  glass.position.set(0.08, 0.59, 0.02)
+  const drink = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.032, 0.1, 12), new THREE.MeshStandardMaterial({ color: ['#ff9a3c', '#e8473f', '#5fd0c0'][Math.floor(r() * 3)], roughness: 0.2 }))
+  drink.position.set(0.08, 0.575, 0.02)
+  const straw = new THREE.Mesh(new THREE.CylinderGeometry(0.006, 0.006, 0.2, 5), new THREE.MeshStandardMaterial({ color: '#ff5fa0' }))
+  straw.position.set(0.1, 0.66, 0.02)
+  straw.rotation.z = -0.3
+  const lemon = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.01, 10), new THREE.MeshStandardMaterial({ color: '#f5e050' }))
+  lemon.position.set(0.045, 0.655, 0.02)
+  lemon.rotation.z = Math.PI / 2
+  g.add(glass, drink, straw, lemon)
+  // 선글라스
+  const dark = new THREE.MeshStandardMaterial({ color: '#1a1a22', roughness: 0.2, metalness: 0.3 })
+  for (const sx of [-0.035, 0.035]) {
+    const lens = new THREE.Mesh(new THREE.CylinderGeometry(0.028, 0.028, 0.006, 12), dark)
+    lens.position.set(-0.1 + sx, 0.525, -0.06)
+    g.add(lens)
+  }
+  // 선크림 통
+  const tube = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.026, 0.12, 10), new THREE.MeshStandardMaterial({ color: '#ffd23f', roughness: 0.5 }))
+  tube.position.set(-0.05, 0.585, 0.11)
+  g.add(tube, new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.025, 8), new THREE.MeshStandardMaterial({ color: '#e8473f' })).translateX(-0.05).translateY(0.655).translateZ(0.11))
+  g.traverse((o) => {
+    if (o instanceof THREE.Mesh) o.castShadow = true
+  })
+  return g
+}
+
+/** 모래 위 슬리퍼 한 켤레 */
+export function makeFlipFlops(color: string) {
+  const g = new THREE.Group()
+  const sole = new THREE.MeshStandardMaterial({ color, roughness: 0.8 })
+  const strap = new THREE.MeshStandardMaterial({ color: '#f4f2ec', roughness: 0.7 })
+  for (const sx of [-0.09, 0.09]) {
+    const s = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.045, 0.02, 12).scale(1, 1, 2.3), sole)
+    s.position.set(sx, 0.012, 0)
+    const st = new THREE.Mesh(new THREE.TorusGeometry(0.035, 0.008, 4, 10, Math.PI), strap)
+    st.position.set(sx, 0.025, -0.02)
+    g.add(s, st)
+  }
+  g.rotation.y = 0.4
   return g
 }
 

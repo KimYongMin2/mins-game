@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import * as THREE from 'three'
 import { createStage, nearestOnScreen } from '../../../shared/art3d/stage'
-import { type AnimalRig, ANIMALS, makeAnimal, plainLook } from '../../../shared/art3d/animals'
+import { type AnimalRig, ANIMALS, RECLINE, makeAnimal, plainLook } from '../../../shared/art3d/animals'
 import { decodeLook } from '../../../shared/art3d/animalKinds'
 import { BEDS, BOAT_SLOTS, BOUNDS, BUILD_MS, CASTLES, CRATES, LADDERS, groundY, houseAt } from '../play/map'
 import { buildWorld, makeBoat } from './worldArt'
@@ -391,14 +391,20 @@ export function Scene3D({ world, step, onTapPlayer }: { world: World; step: (dt:
         const pose = jumping ? 'jump' : running ? 'run' : walking ? 'walk' : lyingDown ? 'lie' : holding ? 'hold' : p.fishing !== 'none' || reeling || (p.popup && now < p.popup.until) ? 'fish' : 'idle'
         const dizzy = now - p.hitAt < 900
         const mood = dizzy ? 'ko' : p.popup && now < p.popup.until ? 'happy' : p.fishing === 'bite' ? 'scared' : 'calm'
-        a.rig.update(t, dizzy && !lying ? 'scared' : (sitting || p.ride !== null) && pose !== 'hold' ? 'sit' : pose, mood)
+        a.rig.update(t, dizzy && !lying ? 'scared' : lying && pose !== 'hold' ? 'recline' : (sitting || p.ride !== null) && pose !== 'hold' ? 'sit' : pose, mood)
+        // 썬베드에서 낚시: 다리는 기댄 채, 팔만 낚싯대를 앞으로
+        if (lying && pose === 'fish') {
+          a.rig.armL.rotation.set(-1.05 + RECLINE * 0.6, a.rig.armL.rotation.y, -0.28)
+          a.rig.armR.rotation.set(-1.05 + RECLINE * 0.6, a.rig.armR.rotation.y, 0.28)
+        }
         const root = a.rig.root
         if (lying) {
-          // 엉덩이는 쿠션 가운데, 등은 등받이 쪽으로 기대고 다리는 쿠션 위로 쭉 (몸이 한 덩어리라 엉덩이를 축으로 젖힘)
+          // 엉덩이는 등받이 경첩 바로 앞 쿠션 위, 등은 등받이 각도(40°)대로 기대고 다리는 쿠션 위로 쭉 (recline 자세가 다리를 맞춰 폄)
           const b = BEDS[p.bed!]
-          const lean = -1.12
+          const lean = -RECLINE
           const hipY = 0.55 * SCALE
-          const hx = b.x + Math.sin(b.r) * 0.05, hz = b.z + Math.cos(b.r) * 0.05, hy = 0.5
+          const baseY = b.z < -30 ? 0.21 : 0
+          const hx = b.x + Math.sin(b.r) * -0.3, hz = b.z + Math.cos(b.r) * -0.3, hy = 0.55 + baseY
           const up = hipY * Math.cos(lean), back = hipY * Math.sin(lean)
           root.position.set(hx - Math.sin(b.r) * back, hy - up, hz - Math.cos(b.r) * back)
           root.rotation.set(lean, b.r, 0)
@@ -473,7 +479,7 @@ export function Scene3D({ world, step, onTapPlayer }: { world: World; step: (dt:
         else if (caught) rodX = 0.95 - Math.min(1, (now - p.popup!.start) / 160) * 1.1
         else if (reelK < 0.5) rodX = 0.95 - Math.sin((reelK / 0.5) * Math.PI) * 0.55
         // 누워 있으면 몸을 젖힌 만큼 낚싯대를 앞으로 (안 그러면 머리 쪽을 향함)
-        a.rod.rotation.x = rodX + (lying ? 1.0 : 0)
+        a.rod.rotation.x = rodX + (lying ? RECLINE : 0)
         a.rig.root.updateMatrixWorld(true)
         a.tip.getWorldPosition(tipW)
         // 찌 자리
