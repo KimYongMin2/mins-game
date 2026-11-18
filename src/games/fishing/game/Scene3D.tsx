@@ -229,6 +229,8 @@ export function Scene3D({ world, step, onTapPlayer }: { world: World; step: (dt:
 
     const follow = new THREE.Vector3()
     let camReady = false
+    let eyeReady = false
+    let eyeY = 0
     const head = new THREE.Vector3()
     const v = new THREE.Vector3()
     const tipW = new THREE.Vector3()
@@ -287,17 +289,17 @@ export function Scene3D({ world, step, onTapPlayer }: { world: World; step: (dt:
       }
     }
     let last = performance.now()
-    const angleLerp = (a: number, b: number, k: number) => a + Math.atan2(Math.sin(b - a), Math.cos(b - a)) * k
 
     function frame() {
       raf = requestAnimationFrame(frame)
       const now = performance.now()
       const gap = (now - last) / 1000
-      const dt = Math.min(0.05, gap)
+      // 그림·카메라·걷기가 같은 시간으로 움직여야 안 덜컥거림 (예전엔 걷기와 카메라가 다른 시간을 써서 느린 폰에서 카메라가 밀렸다 따라붙음)
+      const dt = Math.min(0.1, gap)
       last = now
       const t = now / 1000
       // 걷기는 실제 지난 시간만큼 (느린 기기에서도 같은 빠르기, 화면을 떠났다 온 긴 틈은 빼고)
-      stepRef.current(Math.min(0.25, gap))
+      stepRef.current(dt)
 
       // 사람 맞추기
       for (const [id, a] of actors) {
@@ -313,21 +315,19 @@ export function Scene3D({ world, step, onTapPlayer }: { world: World; step: (dt:
           a = makeActor(p.id, p.avatar)
           actors.set(p.id, a)
         }
-        const isMe = p.id === world.me
-        if (!isMe) {
-          p.sx += (p.x - p.sx) * Math.min(1, dt * 10)
-          p.sz += (p.z - p.sz) * Math.min(1, dt * 10)
-          p.sr = angleLerp(p.sr, p.r, Math.min(1, dt * 10))
-        }
         const lying = p.bed !== null && p.ride === null && BEDS[p.bed]
         const climbing = !!p.climb && now - p.climb.start < p.climb.dur
-        const walking = (!lying && p.ride === null && now < p.walkUntil) || climbing
+        const moving = !lying && p.ride === null && p.speed > 0.4
+        const running = moving && p.speed > 7.2
+        const walking = moving || climbing
+        const sitting = !walking && p.act === 'sit' && p.ride === null
+        const lyingDown = !walking && p.act === 'lie' && p.ride === null
         const holding = !!p.popup && now < p.popup.until && now - p.popup.start > (p.popup.from ? 420 : 0)
         const reeling = now - a.reelAt < 500
-        const pose = walking ? 'walk' : holding ? 'hold' : p.fishing !== 'none' || reeling || (p.popup && now < p.popup.until) ? 'fish' : 'idle'
+        const pose = running ? 'run' : walking ? 'walk' : lyingDown ? 'lie' : holding ? 'hold' : p.fishing !== 'none' || reeling || (p.popup && now < p.popup.until) ? 'fish' : 'idle'
         const dizzy = now - p.hitAt < 900
         const mood = dizzy ? 'ko' : p.popup && now < p.popup.until ? 'happy' : p.fishing === 'bite' ? 'scared' : 'calm'
-        a.rig.update(t, dizzy && !lying ? 'scared' : pose, mood)
+        a.rig.update(t, dizzy && !lying ? 'scared' : sitting && pose !== 'hold' ? 'sit' : pose, mood)
         const root = a.rig.root
         if (lying) {
           // 엉덩이는 쿠션 가운데, 등은 등받이 쪽으로 기대고 다리는 쿠션 위로 쭉 (몸이 한 덩어리라 엉덩이를 축으로 젖힘)
@@ -350,8 +350,16 @@ export function Scene3D({ world, step, onTapPlayer }: { world: World; step: (dt:
           root.position.set(p.sx, 0.08 + Math.sin(t * 1.3 + p.sx) * 0.05, p.sz)
           root.rotation.set(0, p.sr, 0)
         } else {
-          root.position.set(p.sx, p.up !== null ? LADDERS[p.up].y : groundY(p.sx, p.sz), p.sz)
-          root.rotation.set(0, p.sr, 0)
+          const gy = p.up !== null ? LADDERS[p.up].y : groundY(p.sx, p.sz)
+          if (lyingDown) {
+            // 바닥에 등을 대고 누움 (발끝이 서 있던 자리)
+            root.position.set(p.sx, gy + 0.2 * SCALE, p.sz)
+            root.rotation.set(-1.5, p.sr, 0)
+          } else {
+            // 앉으면 엉덩이가 바닥에 닿게 몸을 내림
+            root.position.set(p.sx, gy - (sitting ? 0.5 * SCALE : 0), p.sz)
+            root.rotation.set(0, p.sr, 0)
+          }
         }
         // 뿅망치: 들었다가 내리치기 (0.55초)
         const swing = (now - p.bonkAt) / 550
@@ -478,9 +486,13 @@ export function Scene3D({ world, step, onTapPlayer }: { world: World; step: (dt:
         if (meActor) meActor.rig.head.visible = !cam.first
         const fx = Math.sin(cam.yaw), fz = Math.cos(cam.yaw)
         if (cam.first && meActor) {
-          meActor.rig.head.visible = true
           meActor.rig.head.getWorldPosition(head)
           meActor.rig.head.visible = false
+          // 눈 높이는 천천히 따라감 — 걸음마다 머리가 통통 튀는 게 1인칭에선 그대로 흔들림이 돼서
+          if (!eyeReady) eyeY = head.y
+          eyeY += (head.y - eyeY) * (1 - Math.exp(-dt * 3))
+          eyeReady = true
+          head.set(me.sx, eyeY, me.sz)
           const cp = Math.cos(cam.pitch)
           camera.position.set(head.x - fx * 0.15, head.y + 0.12, head.z - fz * 0.15)
           camera.lookAt(head.x - fx * cp * 10, head.y + 0.12 - Math.sin(cam.pitch) * 10, head.z - fz * cp * 10)
@@ -490,7 +502,8 @@ export function Scene3D({ world, step, onTapPlayer }: { world: World; step: (dt:
           if (!camReady) {
             follow.copy(want)
             camReady = true
-          } else follow.lerp(want, Math.min(1, dt * 6))
+          } else follow.lerp(want, 1 - Math.exp(-dt * 7))
+          eyeReady = false
           const d = cam.dist, cp = Math.cos(cam.pitch)
           camera.position.set(follow.x + fx * d * cp, follow.y + Math.sin(cam.pitch) * d, follow.z + fz * d * cp)
           camera.lookAt(follow)

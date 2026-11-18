@@ -239,6 +239,11 @@ export function makeBoat(color: string) {
   return g
 }
 
+/** 해 그림자: 폰은 가볍게 (그리는 게 느리면 끊겨서 멀미가 남) */
+const TOUCH = typeof navigator !== 'undefined' && navigator.maxTouchPoints > 0
+const SHADOW_RES = TOUCH ? 1024 : 2048
+const SHADOW_HALF = TOUCH ? 20 : 26
+
 export function buildWorld(scene: THREE.Scene, renderer: THREE.WebGLRenderer): WorldArt {
   const occluders: Occluder[] = []
   const disposables: { dispose: () => void }[] = []
@@ -276,8 +281,9 @@ export function buildWorld(scene: THREE.Scene, renderer: THREE.WebGLRenderer): W
   // 해: 그림자는 내 주변 50m만 (follow로 따라감)
   const sun = new THREE.DirectionalLight('#fff4dc', 1.6)
   sun.castShadow = true
-  sun.shadow.mapSize.set(2048, 2048)
-  Object.assign(sun.shadow.camera, { left: -26, right: 26, top: 26, bottom: -26, near: 1, far: 200 })
+  sun.shadow.mapSize.set(SHADOW_RES, SHADOW_RES)
+  Object.assign(sun.shadow.camera, { left: -SHADOW_HALF, right: SHADOW_HALF, top: SHADOW_HALF, bottom: -SHADOW_HALF, near: 1, far: 200 })
+  const UP = new THREE.Vector3(0, 1, 0), lightRight = new THREE.Vector3(), lightUp = new THREE.Vector3(), snapP = new THREE.Vector3()
   sun.shadow.bias = -0.0004
   sun.shadow.normalBias = 0.03
   const sunDir = new THREE.Vector3(0.4, 1, -0.3).normalize()
@@ -1339,8 +1345,15 @@ export function buildWorld(scene: THREE.Scene, renderer: THREE.WebGLRenderer): W
   return {
     roofs,
     follow(x, z) {
-      sun.target.position.set(x, 0, z)
-      sun.position.set(x + sunDir.x * 80, sunDir.y * 80, z + sunDir.z * 80)
+      // 그림자 칸에 딱 맞춰 옮김 — 걸을 때마다 그림자 가장자리가 지글지글 떨리지 않게
+      const texel = (2 * SHADOW_HALF) / SHADOW_RES
+      lightRight.crossVectors(UP, sunDir).normalize()
+      lightUp.crossVectors(sunDir, lightRight).normalize()
+      snapP.set(x, 0, z)
+      const a = snapP.dot(lightRight), b = snapP.dot(lightUp)
+      snapP.addScaledVector(lightRight, Math.round(a / texel) * texel - a).addScaledVector(lightUp, Math.round(b / texel) * texel - b)
+      sun.target.position.copy(snapP)
+      sun.position.copy(snapP).addScaledVector(sunDir, 80)
     },
     occluders,
     minimap,

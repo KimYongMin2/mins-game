@@ -9,7 +9,7 @@ export { ANIMALS, ANIMAL_NAMES, type AnimalKind, type Look, plainLook } from './
 
 export type Mood = 'calm' | 'happy' | 'scared' | 'ko'
 /** idle 가만히 · hold 두 손으로 머리 위에 듦 · scared 덜덜 · ko 쓰러짐 · cheer 만세 · raise 한 손 번쩍(외치기) · walk 걷기(낚시터) · fish 두 손으로 낚싯대를 앞으로 */
-export type Pose = 'idle' | 'hold' | 'scared' | 'ko' | 'cheer' | 'raise' | 'aim' | 'walk' | 'fish'
+export type Pose = 'idle' | 'hold' | 'scared' | 'ko' | 'cheer' | 'raise' | 'aim' | 'walk' | 'fish' | 'run' | 'sit' | 'lie'
 
 type Palette = { fur: string; light: string; ear: string; nose: string }
 
@@ -797,6 +797,26 @@ export function makeAnimal(lookIn: Look, shirt: string, opts: { team?: boolean }
         az = 0.15
         bob = Math.abs(Math.sin(t * 9)) * 0.05
         break
+      case 'run':
+        // 달리기: 팔·다리를 크게, 몸은 앞으로 조금 숙임
+        ax = Math.sin(t * 13) * 0.95
+        az = 0.22
+        lean = 0.16
+        bob = Math.abs(Math.sin(t * 13)) * 0.09
+        break
+      case 'sit':
+        // 바닥에 앉음 (다리는 앞으로 쭉 — 몸을 내리는 건 게임이): 손은 무릎 쪽
+        ax = -0.75
+        az = 0.3
+        lean = -0.08
+        bob = Math.sin(t * 1.8) * 0.008
+        break
+      case 'lie':
+        // 누움 (눕히는 건 게임이): 두 손을 머리 뒤로
+        ax = -0.15
+        az = 2.55
+        bob = 0
+        break
       case 'fish':
         // 두 손으로 낚싯대를 앞으로 (게임이 손 앞에 낚싯대를 붙임)
         ax = -1.05
@@ -805,9 +825,11 @@ export function makeAnimal(lookIn: Look, shirt: string, opts: { team?: boolean }
         break
     }
     // 다리: 걸을 땐 앞뒤로, 아니면 제자리
-    const step = pose === 'walk' ? Math.sin(t * 9) * 0.6 : 0
-    legs[0].rotation.x = ease(legs[0].rotation.x, step, 0.35)
-    legs[1].rotation.x = ease(legs[1].rotation.x, -step, 0.35)
+    // 앉으면 두 다리를 앞으로 (발이 +z = 음수 회전)
+    const step = pose === 'walk' ? Math.sin(t * 9) * 0.6 : pose === 'run' ? Math.sin(t * 13) * 0.95 : 0
+    const sitLeg = pose === 'sit' ? -1.45 : 0
+    legs[0].rotation.x = ease(legs[0].rotation.x, step + sitLeg, 0.35)
+    legs[1].rotation.x = ease(legs[1].rotation.x, -step + sitLeg, 0.35)
     // 가만히 서 있을 땐 팔도 살짝 흔들림
     if (pose === 'idle') ax += Math.sin(t * 2.2 + seed) * 0.06
     if (pose === 'scared') sink = -0.06
@@ -816,7 +838,7 @@ export function makeAnimal(lookIn: Look, shirt: string, opts: { team?: boolean }
     if (raise) bob = Math.abs(Math.sin(t * 5)) * 0.06
     const aim = pose === 'aim'
     armL.rotation.x = ease(armL.rotation.x, aim ? -1.5 : ax)
-    armR.rotation.x = ease(armR.rotation.x, raise ? -0.2 : aim ? -1.3 : pose === 'walk' ? -ax : ax)
+    armR.rotation.x = ease(armR.rotation.x, raise ? -0.2 : aim ? -1.3 : pose === 'walk' || pose === 'run' ? -ax : ax)
     armL.rotation.z = ease(armL.rotation.z, aim ? 0.3 : -az)
     armR.rotation.z = ease(armR.rotation.z, raise ? 2.85 : aim ? -0.85 : az)
     bodyG.rotation.x = ease(bodyG.rotation.x, lean, 0.12)

@@ -4,8 +4,9 @@ import { REFEREE_FROM } from '../../../shared/online/hubProtocol'
 import { encodeLook } from '../../../shared/art3d/animalKinds'
 import { loadLook } from '../../../shared/storage/avatar'
 import { type Catch, fishById, isBig } from '../play/fish'
-import { castTarget, nearBed, moveBy, WALK_SPEED, BEDS, BOATS, BOAT_REACH, BOAT_SPEED, LADDERS, landingSpot, moveBoat, nearLadder, onLadderTop } from '../play/map'
+import { castTarget, nearBed, moveBy, RUN_SPEED, WALK_SPEED, BEDS, BOATS, BOAT_REACH, BOAT_SPEED, LADDERS, landingSpot, moveBoat, nearLadder, onLadderTop } from '../play/map'
 import {
+  type Act,
   type BagItem,
   type BoatPub,
   type ClientMsg,
@@ -38,7 +39,15 @@ export type Shown = PlayerPub & {
   hitAt: number
   /** 사다리 오르내리는 중 (그림만): 시작 시각·걸리는 시간·위로(1)/아래로(-1)·사다리 번호 */
   climb: { start: number; dur: number; dir: 1 | -1; i: number } | null
+  /** 받은 위치 기록 (다른 사람): 0.16초 늦게 그 사이를 이어 그려서 툭툭 끊기지 않게 */
+  hist: { t: number; x: number; z: number; r: number }[]
+  /** 지금 움직이는 빠르기 (m/s, 걷기·달리기 그림) */
+  speed: number
 }
+
+/** 다른 사람은 이만큼 늦게 그림 (서버가 0.1초마다 보내서 그 사이를 이어 그림) */
+const INTERP_MS = 160
+const angleLerp = (a: number, b: number, k: number) => a + Math.atan2(Math.sin(b - a), Math.cos(b - a)) * k
 
 /** 사다리 오르내리는 데 걸리는 시간 (ms) — 높이에 비례 */
 export const climbMs = (i: number) => 500 + LADDERS[i].y * 180
@@ -56,7 +65,9 @@ export type World = {
   me: string
   players: Map<string, Shown>
   /** 조이스틱·키보드 (x 오른쪽, y 아래쪽 = 화면 기준, 크기 0~1) */
-  input: { x: number; y: number }
+  input: { x: number; y: number; run: boolean }
+  /** 내 움직임 빠르기 (부드럽게 출발·멈춤) */
+  vel: { x: number; z: number }
   /**
    * 시점 (사용자 요청 2026-11-17): yaw 좌우 돌림(0 = 바다 쪽을 봄), pitch 위아래, dist 3인칭 거리, first 1인칭.
    * spin = Q·E로 돌리는 중(-1·0·1). 내가 직접 돌릴 때만 움직임 (저절로 돌지 않음 — 멀미)
@@ -120,7 +131,7 @@ export function useFishingRoom(nickname: string, active: boolean) {
   const [action, setAction] = useState<Action>('none')
   const [alt, setAlt] = useState<Alt>(null)
   const roomRef = useRef<Room<ClientMsg> | null>(null)
-  const world = useRef<World>({ me: '', players: new Map(), input: { x: 0, y: 0 }, cam: { yaw: 0, pitch: 0.82, dist: 11, first: false, spin: 0 }, boats: BOATS.map((b) => ({ x: b.x, z: b.z, r: b.r, rider: null })) }).current
+  const world = useRef<World>({ me: '', players: new Map(), input: { x: 0, y: 0, run: false }, cam: { yaw: 0, pitch: 0.82, dist: 11, first: false, spin: 0 }, vel: { x: 0, z: 0 }, boats: BOATS.map((b) => ({ x: b.x, z: b.z, r: b.r, rider: null })) }).current
   const keySeq = useRef(0)
   // 개발 모드에서만: 브라우저 시험이 상태를 볼 수 있게
   if (import.meta.env.DEV) (window as unknown as { __fishWorld?: World }).__fishWorld = world
@@ -144,7 +155,7 @@ export function useFishingRoom(nickname: string, active: boolean) {
     const upsert = (p: PlayerPub) => {
       const old = world.players.get(p.id)
       if (!old) {
-        world.players.set(p.id, { ...p, sx: p.x, sz: p.z, sr: p.r, walkUntil: 0, bubble: null, popup: null, biteAt: 0, bonkAt: 0, hitAt: 0, climb: null })
+        world.players.set(p.id, { ...p, sx: p.x, sz: p.z, sr: p.r, walkUntil: 0, bubble: null, popup: null, biteAt: 0, bonkAt: 0, hitAt: 0, climb: null, hist: [{ t: performance.now(), x: p.x, z: p.z, r: p.r }], speed: 0 })
         return
       }
       const isMe = p.id === world.me
@@ -156,12 +167,14 @@ export function useFishingRoom(nickname: string, active: boolean) {
       // 내 위치는 내 기기가 정함 — 서버와 많이 어긋났거나(물·막힘) 썬베드에 누웠거나 배·사다리가 바뀌었을 때만 맞춤
       const changedSpot = p.ride !== old.ride || p.up !== old.up
       const snap = !isMe || p.bed !== null || changedSpot || Math.hypot(p.x - old.x, p.z - old.z) > 1.5
-      Object.assign(old, { name: p.name, avatar: p.avatar, bed: p.bed, fishing: p.fishing, bob: p.bob, ride: p.ride, up: p.up })
+      Object.assign(old, { name: p.name, avatar: p.avatar, bed: p.bed, fishing: p.fishing, bob: p.bob, ride: p.ride, up: p.up, act: p.act })
       if (changedSpot) {
         old.sx = old.x = p.x
         old.sz = old.z = p.z
         old.sr = old.r = p.r
-      }
+        old.hist = [{ t: performance.now(), x: p.x, z: p.z, r: p.r }]
+        if (isMe) world.vel.x = world.vel.z = 0
+      } else if (!isMe && snap) old.hist.push({ t: performance.now(), x: p.x, z: p.z, r: p.r })
       if (snap) {
         old.x = p.x
         old.z = p.z
@@ -209,7 +222,8 @@ export function useFishingRoom(nickname: string, active: boolean) {
             p.x = x
             p.z = z
             p.r = r
-            p.walkUntil = now + 260
+            p.hist.push({ t: now, x, z, r })
+            if (p.hist.length > 8) p.hist.splice(0, p.hist.length - 8)
           }
           return
         case 'gone':
@@ -323,14 +337,51 @@ export function useFishingRoom(nickname: string, active: boolean) {
       const iy = -sx * s + sy * c
       const mag = Math.min(1, Math.hypot(ix, iy))
       const now = performance.now()
+      // 다른 사람: 받은 위치 사이를 0.16초 늦게 이어 그림 (툭툭 끊기지 않게)
+      const at = now - INTERP_MS
+      for (const p of world.players.values()) {
+        if (p.id === world.me) continue
+        const h = p.hist
+        while (h.length > 2 && h[1].t <= at) h.shift()
+        let x = p.x, z = p.z, r = p.r
+        if (h.length >= 2 && at < h[h.length - 1].t) {
+          const a = h[0], b = h[1]
+          const k = Math.max(0, Math.min(1, (at - a.t) / Math.max(1, b.t - a.t)))
+          x = a.x + (b.x - a.x) * k
+          z = a.z + (b.z - a.z) * k
+          r = angleLerp(a.r, b.r, k)
+        } else if (h.length) ({ x, z, r } = h[h.length - 1])
+        const moved = Math.hypot(x - p.sx, z - p.sz)
+        p.speed += ((dt > 0 ? moved / dt : 0) - p.speed) * Math.min(1, dt * 8)
+        p.sx = x
+        p.sz = z
+        // 걸어가는 쪽을 보게, 몸은 부드럽게 돌림
+        p.sr = angleLerp(p.sr, r, 1 - Math.exp(-dt * 12))
+      }
       // 사다리 오르내리는 동안은 못 움직임
       if (me.climb && now - me.climb.start < me.climb.dur) return
       // 1인칭: 몸은 늘 보는 쪽을 향함 (던지는 방향 = 보는 방향)
       if (cam.first && me.bed === null) me.r = me.sr = cam.yaw + Math.PI
-      if (mag > 0.15) {
-        const speed = (me.ride !== null ? BOAT_SPEED : WALK_SPEED) * mag
-        const dx = (ix / (Math.hypot(ix, iy) || 1)) * speed * dt
-        const dz = (iy / (Math.hypot(ix, iy) || 1)) * speed * dt
+      // 빠르기는 부드럽게 붙었다 줄어듦 (확 출발·확 멈춤이 어지러워서)
+      const top = me.ride !== null ? BOAT_SPEED : world.input.run ? RUN_SPEED : WALK_SPEED
+      const want = mag > 0.15 ? top * mag : 0
+      const n = Math.hypot(ix, iy) || 1
+      const tvx = mag > 0.15 ? (ix / n) * want : 0, tvz = mag > 0.15 ? (iy / n) * want : 0
+      const acc = 1 - Math.exp(-dt * (mag > 0.15 ? (me.ride !== null ? 3 : 10) : me.ride !== null ? 1.5 : 14))
+      const vel = world.vel
+      vel.x += (tvx - vel.x) * acc
+      vel.z += (tvz - vel.z) * acc
+      const sp = Math.hypot(vel.x, vel.z)
+      me.speed = sp
+      if (!cam.first && me.bed === null && mag > 0.15) {
+        me.r = Math.atan2(ix, iy)
+        // 몸은 부드럽게 돌림 (확 돌면 어지러움)
+        me.sr = angleLerp(me.sr, me.r, 1 - Math.exp(-dt * 14))
+      } else if (!cam.first) me.sr = angleLerp(me.sr, me.r, 1 - Math.exp(-dt * 14))
+      if (sp < 0.05) vel.x = vel.z = 0
+      if (sp > 0.05) {
+        const dx = vel.x * dt
+        const dz = vel.z * dt
         // 배는 그 물 위만, 사다리 위는 위 자리 안만
         const p =
           me.ride !== null
@@ -344,13 +395,16 @@ export function useFishingRoom(nickname: string, active: boolean) {
           const b = world.boats[me.ride]
           if (b) Object.assign(b, { x: p.x, z: p.z, r: me.r })
         }
+        // 벽에 막히면 그 방향 빠르기는 버림
+        if (Math.abs(p.x - me.x) < Math.abs(dx) * 0.5) vel.x = 0
+        if (Math.abs(p.z - me.z) < Math.abs(dz) * 0.5) vel.z = 0
         me.x = me.sx = p.x
         me.z = me.sz = p.z
-        if (!cam.first) me.r = me.sr = Math.atan2(ix, iy)
         me.walkUntil = now + 120
         // 움직이면 일어나고 낚싯대를 거둠 (서버도 같은 판단)
-        if (me.bed !== null || me.fishing !== 'none') {
+        if (me.bed !== null || me.fishing !== 'none' || me.act) {
           me.bed = null
+          me.act = null
           me.fishing = 'none'
           me.bob = null
         }
@@ -421,6 +475,19 @@ export function useFishingRoom(nickname: string, active: boolean) {
     }
   }, [send, world, toast])
 
+  /** 앉기·눕기 (같은 걸 다시 누르면 일어남) */
+  const setPose = useCallback(
+    (a: Exclude<Act, null>) => {
+      const me = world.players.get(world.me)
+      if (!me || me.ride !== null || me.bed !== null) return
+      const next = me.act === a ? null : a
+      me.act = next
+      world.vel.x = world.vel.z = 0
+      send({ t: 'pose', p: next })
+    },
+    [send, world],
+  )
+
   /** 뿅망치 (F) — 내 화면은 바로 휘두르고, 맞았는지는 서버가 알려 줌 */
   const bonk = useCallback(() => {
     const me = world.players.get(world.me)
@@ -429,7 +496,7 @@ export function useFishingRoom(nickname: string, active: boolean) {
     send({ t: 'bonk' })
   }, [send, world])
 
-  return { status, error, roomLabel, count, profile, saving, chat, toasts, myCatch, setMyCatch, tankView, setTankView, action, act, alt, doAlt, bonk, step, send, world }
+  return { status, error, roomLabel, count, profile, saving, chat, toasts, myCatch, setMyCatch, tankView, setTankView, action, act, alt, doAlt, setPose, bonk, step, send, world }
 }
 
 const round = (v: number) => Math.round(v * 100) / 100

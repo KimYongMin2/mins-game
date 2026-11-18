@@ -42,7 +42,8 @@ export function FishingPage() {
   const [text, setText] = useState('')
   const [firstPerson, setFirstPerson] = useState(false)
   const chatRef = useRef<HTMLInputElement>(null)
-  const { world, act, send, bonk, doAlt } = room
+  const { world, act, send, bonk, doAlt, setPose } = room
+  const [running, setRunning] = useState(false)
 
   useEffect(() => {
     const on = () => setPortrait(isTouch() && isPortrait())
@@ -92,6 +93,14 @@ export function FishingPage() {
         bonk()
       } else if (e.code === 'KeyR' && !e.repeat) {
         doAlt()
+      } else if ((e.code === 'ShiftLeft' || e.code === 'ShiftRight') && !e.repeat) {
+        // 누르는 동안 달리기
+        world.input.run = true
+        setRunning(true)
+      } else if (e.code === 'KeyC' && !e.repeat) {
+        setPose('sit')
+      } else if (e.code === 'KeyZ' && !e.repeat) {
+        setPose('lie')
       } else if (e.code === 'KeyV' && !e.repeat) {
         toggleView()
       } else if (e.code === 'Space') {
@@ -103,6 +112,11 @@ export function FishingPage() {
       }
     }
     const up = (e: KeyboardEvent) => {
+      if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') {
+        world.input.run = false
+        setRunning(false)
+        return
+      }
       if (e.code === 'KeyQ' || e.code === 'KeyE') {
         keys.delete(e.code === 'KeyQ' ? 'spinL' : 'spinR')
         return spin()
@@ -114,6 +128,8 @@ export function FishingPage() {
     }
     const blur = () => {
       keys.clear()
+      world.input.run = false
+      setRunning(false)
       apply()
       spin()
     }
@@ -132,7 +148,7 @@ export function FishingPage() {
       window.removeEventListener('blur', blur)
       window.removeEventListener('contextmenu', menu)
     }
-  }, [entered, world, act, toggleView, bonk, doAlt])
+  }, [entered, world, act, toggleView, bonk, doAlt, setPose])
 
   // 잡은 물고기 카드는 잠깐만
   const { myCatch, setMyCatch } = room
@@ -238,6 +254,29 @@ export function FishingPage() {
       )}
 
       <Joystick out={world.input} />
+      {/* 달리기(켜고 끄기)·앉기·눕기 — PC는 Shift·C·Z */}
+      <div className="fs-poses">
+        <button
+          type="button"
+          className="fs-pose"
+          aria-pressed={running}
+          onPointerDown={(e) => {
+            e.preventDefault()
+            if (e.button !== 0) return
+            world.input.run = !world.input.run
+            setRunning(world.input.run)
+          }}
+          title="달리기 (Shift를 누르는 동안)"
+        >
+          달리기<small>Shift</small>
+        </button>
+        <button type="button" className="fs-pose" onPointerDown={(e) => { e.preventDefault(); if (e.button === 0) setPose('sit') }} title="앉기 (C) — 한 번 더 누르면 일어나요">
+          앉기<small>C</small>
+        </button>
+        <button type="button" className="fs-pose" onPointerDown={(e) => { e.preventDefault(); if (e.button === 0) setPose('lie') }} title="눕기 (Z) — 한 번 더 누르면 일어나요">
+          눕기<small>Z</small>
+        </button>
+      </div>
       <button
         type="button"
         className={`fs-act fs-act--${room.action}`}

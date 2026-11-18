@@ -67,6 +67,18 @@ describe('낚시터 심판', () => {
     expect(s.last('boats')?.l[0][3]).toBeNull()
   })
 
+  it('앉기·눕기: 아무 데서나, 움직이면 풀림, 배에선 안 됨', () => {
+    const s = setup()
+    s.ref.input('a', { t: 'hi' })
+    s.ref.input('a', { t: 'pose', p: 'sit' })
+    expect(s.last('st')?.p.act).toBe('sit')
+    s.ref.input('a', { t: 'pose', p: 'lie' })
+    expect(s.last('st')?.p.act).toBe('lie')
+    s.tick(1000)
+    s.ref.input('a', { t: 'mv', x: 1, z: 9, r: 0 })
+    expect(s.last('st')?.p.act).toBeNull()
+  })
+
   it('사다리: 아래에서만 오르고, 위에선 위 자리 안만', () => {
     const s = setup()
     s.ref.input('a', { t: 'hi' })
@@ -101,8 +113,8 @@ describe('낚시터 심판', () => {
       s.ref.input('a', { t: 'mv', x: 0, z: -12, r: 0 })
     }
     s.tick(100)
-    const z = s.last('pos')!.l[0][2]
-    expect(z).toBeGreaterThanOrEqual(shoreZ(0))
+    const [, px, z] = s.last('pos')!.l[0]
+    expect(z).toBeGreaterThanOrEqual(shoreZ(px))
     s.tick(1000)
     s.ref.input('a', { t: 'mv', x: 25, z: 10, r: 0 })
     s.tick(100)

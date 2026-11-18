@@ -33,6 +33,8 @@ const WALK_ON_WATER: Rect[] = [PIER, PIER_END, JETTY, DOCK, BRIDGE, LAKE_DOCK]
 
 /** 걷는 빠르기 (m/s) — 맵이 넓어져 5에서 6으로 */
 export const WALK_SPEED = 6
+/** 달리기 (Shift · 폰은 [달리기]) */
+export const RUN_SPEED = 9.5
 /** 물가에서 이만큼 안이면 던질 수 있음 */
 export const CAST_REACH = 3.2
 /** 썬베드에 이만큼 가까우면 누울 수 있음 */

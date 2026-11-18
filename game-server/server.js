@@ -12558,6 +12558,8 @@ const WALK_ON_WATER = [
 		maxZ: 25.2
 	}
 ];
+/** 달리기 (Shift · 폰은 [달리기]) */
+const RUN_SPEED = 9.5;
 /** 물가에서 이만큼 안이면 던질 수 있음 */
 const CAST_REACH = 3.2;
 const S = [
@@ -13321,7 +13323,8 @@ const pub = (p) => ({
 	fishing: p.fishing,
 	bob: p.bob,
 	ride: p.ride,
-	up: p.up
+	up: p.up,
+	act: p.act
 });
 /** 아무도 안 탄 배가 이만큼 그대로면 제자리로 */
 const BOAT_HOME_MS = 6e5;
@@ -13395,6 +13398,7 @@ function fishingReferee(_setup, ctx) {
 				bob: null,
 				ride: null,
 				up: null,
+				act: null,
 				uid: mem.uid ?? null,
 				castAt: 0,
 				biteAt: 0,
@@ -13436,7 +13440,7 @@ function fishingReferee(_setup, ctx) {
 		p.lastMv = now;
 		let { x, z } = m;
 		const far = Math.hypot(x - p.x, z - p.z);
-		const allow = (p.ride !== null ? 7 : 6) * dt * 1.6 + .6;
+		const allow = (p.ride !== null ? 7 : RUN_SPEED) * dt * 1.6 + .6;
 		if (far > allow) {
 			x = p.x + (x - p.x) / far * allow;
 			z = p.z + (z - p.z) / far * allow;
@@ -13456,8 +13460,9 @@ function fishingReferee(_setup, ctx) {
 			b.r = p.r;
 			b.used = now;
 		}
-		if (moved && (p.bed !== null || p.fishing !== "none")) {
+		if (moved && (p.bed !== null || p.fishing !== "none" || p.act)) {
 			p.bed = null;
+			p.act = null;
 			stopFishing(p);
 			all({
 				t: "st",
@@ -13558,6 +13563,7 @@ function fishingReferee(_setup, ctx) {
 		if (p.ride !== null || p.up !== null || b.rider || Math.hypot(b.x - p.x, b.z - p.z) > 3.3) return bad(p);
 		stopFishing(p);
 		p.bed = null;
+		p.act = null;
 		p.ride = i;
 		b.rider = p.id;
 		b.used = ctx.now();
@@ -13593,9 +13599,21 @@ function fishingReferee(_setup, ctx) {
 		if (p.ride !== null || p.up !== null || nearLadder(p.x, p.z) !== i) return bad(p);
 		stopFishing(p);
 		p.bed = null;
+		p.act = null;
 		p.up = i;
 		p.x = LADDERS[i].top.x;
 		p.z = LADDERS[i].top.z;
+		all({
+			t: "st",
+			p: pub(p)
+		});
+	}
+	/** 앉기·눕기 (배·썬베드에선 안 됨) */
+	function pose(p, a) {
+		const act = a === "sit" || a === "lie" ? a : null;
+		if (act && (p.ride !== null || p.bed !== null)) return bad(p);
+		if (p.act === act) return;
+		p.act = act;
 		all({
 			t: "st",
 			p: pub(p)
@@ -13620,6 +13638,7 @@ function fishingReferee(_setup, ctx) {
 			p: pub(p)
 		});
 		stopFishing(p);
+		p.act = null;
 		p.bed = i;
 		p.x = BEDS[i].x;
 		p.z = BEDS[i].z;
@@ -13755,7 +13774,10 @@ function fishingReferee(_setup, ctx) {
 				case "climb":
 					climb(p, m.i);
 					break;
-				case "down": down(p);
+				case "down":
+					down(p);
+					break;
+				case "pose": pose(p, m.p);
 			}
 			return true;
 		},

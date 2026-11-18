@@ -35,7 +35,10 @@ export type PlayerPub = {
   /** 타고 있는 배 번호 (BOATS) · 올라가 있는 사다리 번호 (LADDERS) */
   ride: number | null
   up: number | null
+  /** 앉기·눕기 (아무 데서나, 움직이면 풀림 — 사용자 요청 2026-11-18) */
+  act: Act
 }
+export type Act = 'sit' | 'lie' | null
 /** 배 하나: 자리·방향·탄 사람 */
 export type BoatPub = [number, number, number, string | null]
 
@@ -61,6 +64,7 @@ export type ClientMsg =
   | { t: 'unboard' }
   | { t: 'climb'; i: number }
   | { t: 'down' }
+  | { t: 'pose'; p: Act }
 
 export type ServerMsg =
   | { t: 'init'; you: string; players: PlayerPub[]; saving: boolean; boats: BoatPub[] }
