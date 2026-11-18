@@ -288,6 +288,8 @@ export function buildWorld(scene: THREE.Scene, renderer: THREE.WebGLRenderer): W
   sea.rotation.x = -Math.PI / 2
   sea.position.y = -0.14
   sea.receiveShadow = true
+  // 배 안 물 막이(renderOrder 1)보다 나중에 그림
+  sea.renderOrder = 2
   scene.add(sea)
   disposables.push(sea.geometry, seaMat)
 
@@ -361,7 +363,7 @@ export function buildWorld(scene: THREE.Scene, renderer: THREE.WebGLRenderer): W
 
   // ── 민물 (호수·강) ──
   const freshMat = new THREE.MeshStandardMaterial({ color: '#1f6f73', roughness: 0.06, metalness: 0 })
-  flat(new THREE.CircleGeometry(LAKE.r + 0.15, 64).translate(LAKE.x, -LAKE.z, 0), freshMat, 0.035)
+  flat(new THREE.CircleGeometry(LAKE.r + 0.15, 64).translate(LAKE.x, -LAKE.z, 0), freshMat, 0.035).renderOrder = 2
   // 강: 꺾은선을 따라 띠
   {
     const p = RIVER.pts
@@ -374,7 +376,7 @@ export function buildWorld(scene: THREE.Scene, renderer: THREE.WebGLRenderer): W
       left.push([px + nx * w, pz + nz * w])
       right.push([px - nx * w, pz - nz * w])
     }
-    flat(shapeGeo([...left, ...right.reverse()], 4), freshMat, 0.034)
+    flat(shapeGeo([...left, ...right.reverse()], 4), freshMat, 0.034).renderOrder = 2
   }
   // 호수 가 돌·갈대, 연잎
   for (let i = 0; i < 46; i++) {

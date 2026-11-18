@@ -532,6 +532,26 @@ export function makeBoat(color: string) {
       o.receiveShadow = true
     }
   })
+  // 물 막이: 뱃전 안쪽을 덮는 안 보이는 판 (깊이만 씀) — 배를 먼저 그리고 이 판, 그다음 물을 그리면
+  // 배 안에는 물이 안 그려짐 (물결이 배 바닥보다 높이 올라와 배 안이 잠겨 보였음). 물 쪽은 renderOrder 2
+  const outline = new THREE.Shape()
+  for (let s = 0; s <= ST; s++) {
+    const t = s / ST
+    const x = Math.max(0.02, half(t)) * 0.97, z = L / 2 - t * L
+    if (s === 0) outline.moveTo(x, -z)
+    else outline.lineTo(x, -z)
+  }
+  for (let s = ST; s >= 0; s--) {
+    const t = s / ST
+    outline.lineTo(-Math.max(0.02, half(t)) * 0.97, -(L / 2 - t * L))
+  }
+  const mask = new THREE.Mesh(new THREE.ShapeGeometry(outline), new THREE.MeshBasicMaterial({ colorWrite: false }))
+  mask.rotation.x = -Math.PI / 2
+  mask.position.y = D - 0.03
+  mask.renderOrder = 1
+  g.add(mask)
+  /** 가운데 앉는 판 윗면 높이 (배 기준) */
+  g.userData.seatY = sheer(0.5) - 0.16 + 0.025
   // 예전 배와 같은 크기·방향 (뱃머리 -z)
   return g
 }

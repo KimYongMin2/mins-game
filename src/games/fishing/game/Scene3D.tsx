@@ -20,6 +20,8 @@ const SHIRTS = ['#5b8cff', '#ff8ab0', '#7cc8ff', '#9be08a', '#ffd23f', '#c79bff'
 const SCALE = 0.62
 /** 낚싯줄 점 수 (처지는 곡선) */
 const LINE_PTS = 16
+/** 배 높이 (물에 조금 잠기게) */
+const BOAT_Y = -0.12
 
 const hash = (s: string) => [...s].reduce((a, c) => (a * 31 + c.charCodeAt(0)) >>> 0, 7)
 
@@ -335,7 +337,7 @@ export function Scene3D({ world, step, onTapPlayer }: { world: World; step: (dt:
         const pose = jumping ? 'jump' : running ? 'run' : walking ? 'walk' : lyingDown ? 'lie' : holding ? 'hold' : p.fishing !== 'none' || reeling || (p.popup && now < p.popup.until) ? 'fish' : 'idle'
         const dizzy = now - p.hitAt < 900
         const mood = dizzy ? 'ko' : p.popup && now < p.popup.until ? 'happy' : p.fishing === 'bite' ? 'scared' : 'calm'
-        a.rig.update(t, dizzy && !lying ? 'scared' : sitting && pose !== 'hold' ? 'sit' : pose, mood)
+        a.rig.update(t, dizzy && !lying ? 'scared' : (sitting || p.ride !== null) && pose !== 'hold' ? 'sit' : pose, mood)
         const root = a.rig.root
         if (lying) {
           // 엉덩이는 쿠션 가운데, 등은 등받이 쪽으로 기대고 다리는 쿠션 위로 쭉 (몸이 한 덩어리라 엉덩이를 축으로 젖힘)
@@ -354,8 +356,9 @@ export function Scene3D({ world, step, onTapPlayer }: { world: World; step: (dt:
           root.position.set(l.foot.x + (l.top.x - l.foot.x) * k, groundY(l.foot.x, l.foot.z) + l.y * k, l.foot.z + (l.top.z - l.foot.z) * k)
           root.rotation.set(0, Math.atan2(l.top.x - l.foot.x, l.top.z - l.foot.z), 0)
         } else if (p.ride !== null) {
-          // 배에 앉음 (다리는 배 안에 가려짐)
-          root.position.set(p.sx, 0.08 + Math.sin(t * 1.3 + p.sx) * 0.05, p.sz)
+          // 배 가운데 앉는 판에 앉음 (배와 같이 출렁, 다리는 앞으로)
+          const seat = (boatObjs[p.ride]?.userData.seatY as number | undefined) ?? 0.49
+          root.position.set(p.sx, BOAT_Y + seat - 0.5 * SCALE + Math.sin(t * 1.3 + p.sx) * 0.05, p.sz)
           root.rotation.set(0, p.sr, 0)
         } else {
           const gy = p.up !== null ? LADDERS[p.up].y : groundY(p.sx, p.sz)
@@ -483,7 +486,7 @@ export function Scene3D({ world, step, onTapPlayer }: { world: World; step: (dt:
         if (!b) return
         const rider = b.rider ? world.players.get(b.rider) : null
         const x = rider ? rider.sx : b.x, z = rider ? rider.sz : b.z, r = rider ? rider.sr : b.r
-        g.position.set(x, -0.18 + Math.sin(t * 1.3 + x) * 0.05, z)
+        g.position.set(x, BOAT_Y + Math.sin(t * 1.3 + x) * 0.05, z)
         g.rotation.set(Math.sin(t * 0.9 + z) * 0.03, r + Math.PI, Math.sin(t * 1.1 + x) * 0.04)
       })
 
