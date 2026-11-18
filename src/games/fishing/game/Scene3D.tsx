@@ -44,6 +44,9 @@ type Actor = {
   reelAt: number
   lastBob: [number, number] | null
   ringMat: THREE.MeshBasicMaterial
+  /** 뿅망치 (오른손) · 마지막으로 맞은 때(별 한 번만) */
+  hammer: THREE.Group
+  lastHit: number
 }
 
 /** 잡은 물고기를 들었을 때 그림 너비 (m): 실제 크기를 따르되 너무 작거나 크지 않게 (캐릭터 키 약 1.6m) */
@@ -279,6 +282,23 @@ export function Scene3D({ world, step, onTapPlayer }: { world: World; step: (dt:
       rod.add(stick, reel, tip)
       rod.visible = false
       rig.root.add(rod)
+      // 뿅망치: 빨강·노랑 장난감 망치 (평소엔 숨김, 휘두를 때만)
+      const hammer = new THREE.Group()
+      hammer.position.set(-0.45, 1.5, 0.25)
+      const handle = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 1.3, 8), mat('#ffd23f', 0.5))
+      handle.position.y = 0.65
+      const headM = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.32, 0.75, 14), mat('#e8473f', 0.45))
+      headM.rotation.z = Math.PI / 2
+      headM.position.y = 1.35
+      for (const sx of [-0.38, 0.38]) {
+        const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.33, 0.33, 0.06, 14), mat('#ffd23f', 0.45))
+        cap.rotation.z = Math.PI / 2
+        cap.position.set(sx, 1.35, 0)
+        hammer.add(cap)
+      }
+      hammer.add(handle, headM)
+      hammer.visible = false
+      rig.root.add(hammer)
       const line = new THREE.Line(new THREE.BufferGeometry().setFromPoints(Array.from({ length: LINE_PTS }, () => new THREE.Vector3())), lineMat)
       line.frustumCulled = false
       line.visible = false
@@ -306,7 +326,7 @@ export function Scene3D({ world, step, onTapPlayer }: { world: World; step: (dt:
       // 위에서부터 말풍선 · ! · 들고 있는 물고기 이름 · 내 이름 (기준점이 맨 아래 = 머리 위)
       tag.append(bubble, bang, pop, name)
       layer!.appendChild(tag)
-      return { id, rig, rod, tip, line, bob, ring, tag, bubble, bang, pop, popKey: '', avatar, held, heldKey: '', prev: 'none', castAt: -9e9, reelAt: -9e9, lastBob: null, ringMat }
+      return { id, rig, rod, tip, line, bob, ring, tag, bubble, bang, pop, popKey: '', avatar, held, heldKey: '', prev: 'none', castAt: -9e9, reelAt: -9e9, lastBob: null, ringMat, hammer, lastHit: 0 }
     }
 
     function removeActor(a: Actor) {
@@ -362,17 +382,36 @@ export function Scene3D({ world, step, onTapPlayer }: { world: World; step: (dt:
         const holding = !!p.popup && now < p.popup.until && now - p.popup.start > (p.popup.from ? 420 : 0)
         const reeling = now - a.reelAt < 500
         const pose = walking ? 'walk' : holding ? 'hold' : p.fishing !== 'none' || reeling || (p.popup && now < p.popup.until) ? 'fish' : 'idle'
-        const mood = p.popup && now < p.popup.until ? 'happy' : p.fishing === 'bite' ? 'scared' : 'calm'
-        a.rig.update(t, pose, mood)
+        const dizzy = now - p.hitAt < 900
+        const mood = dizzy ? 'ko' : p.popup && now < p.popup.until ? 'happy' : p.fishing === 'bite' ? 'scared' : 'calm'
+        a.rig.update(t, dizzy && !lying ? 'scared' : pose, mood)
         const root = a.rig.root
         if (lying) {
+          // 엉덩이는 쿠션 가운데, 등은 등받이 쪽으로 기대고 다리는 쿠션 위로 쭉 (몸이 한 덩어리라 엉덩이를 축으로 젖힘)
           const b = BEDS[p.bed!]
-          root.position.set(b.x - Math.sin(b.r) * 0.25, 0.42, b.z - Math.cos(b.r) * 0.25)
-          root.rotation.set(-1.15, b.r, 0)
+          const lean = -1.12
+          const hipY = 0.55 * SCALE
+          const hx = b.x + Math.sin(b.r) * 0.05, hz = b.z + Math.cos(b.r) * 0.05, hy = 0.5
+          const up = hipY * Math.cos(lean), back = hipY * Math.sin(lean)
+          root.position.set(hx - Math.sin(b.r) * back, hy - up, hz - Math.cos(b.r) * back)
+          root.rotation.set(lean, b.r, 0)
         } else {
           root.position.set(p.sx, onPierY(p.sx, p.sz), p.sz)
           root.rotation.set(0, p.sr, 0)
         }
+        // 뿅망치: 들었다가 내리치기 (0.55초)
+        const swing = (now - p.bonkAt) / 550
+        a.hammer.visible = swing >= 0 && swing < 1
+        if (a.hammer.visible) a.hammer.rotation.x = swing < 0.35 ? -0.4 - (swing / 0.35) * 1.4 : -1.8 + Math.min(1, (swing - 0.35) / 0.2) * 3.0
+        // 맞으면: 머리 위 별 + 잠깐 찌그러짐
+        if (p.hitAt > a.lastHit) {
+          a.lastHit = p.hitAt
+          a.rig.head.getWorldPosition(v)
+          stage.burst(v.clone().setY(v.y + 0.3), { color: '#ffd23f', count: 16, speed: 1.8, size: 0.16, gravity: -1, life: 0.7 })
+          p.bubble = { text: '뿅!', until: now + 900 }
+        }
+        const squash = now - p.hitAt < 220 ? 1 - Math.sin(((now - p.hitAt) / 220) * Math.PI) * 0.28 : 1
+        root.scale.set(SCALE * (2 - squash), SCALE * squash, SCALE * (2 - squash))
         // 낚싯대·줄·찌: 던지면 뒤로 젖혔다 휙 → 찌가 포물선으로 날아가 퐁, 입질엔 낚싯대가 끄덕끄덕 당겨짐,
         // 거두면 찌가 끌려오고, 잡으면 낚싯대를 확 들며 물고기가 물에서 날아와 두 손으로 머리 위에 (실제 크기에 맞춰)
         if (p.fishing !== 'none' && a.prev === 'none') a.castAt = now

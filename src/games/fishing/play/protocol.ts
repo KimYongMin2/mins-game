@@ -17,6 +17,9 @@ export const BITE_WINDOW_MS = 5000
 /** 어항 칸 */
 export const TANK_MAX = 10
 export const CHAT_MAX = 60
+/** 뿅망치가 닿는 거리 (m)와 다시 휘두를 수 있는 간격 */
+export const BONK_REACH = 1.9
+export const BONK_MS = 700
 
 export type Fishing = 'none' | 'cast' | 'bite'
 export type PlayerPub = { id: string; name: string; avatar?: string; x: number; z: number; r: number; bed: number | null; fishing: Fishing; bob: [number, number] | null }
@@ -36,6 +39,8 @@ export type ClientMsg =
   | { t: 'tank'; keys: string[] }
   | { t: 'look'; who: string }
   | { t: 'brag'; key: string }
+  /** 뿅망치 (동물의 숲처럼 장난으로 때리기 — 맞아도 낚시는 안 끊김) */
+  | { t: 'bonk' }
 
 export type ServerMsg =
   | { t: 'init'; you: string; players: PlayerPub[]; saving: boolean }
@@ -49,3 +54,5 @@ export type ServerMsg =
   | { t: 'profile'; profile: Profile }
   | { t: 'tank'; who: string; name: string; items: BagItem[] }
   | { t: 'brag'; id: string; name: string; item: BagItem }
+  /** 누가 뿅망치를 휘두름 (to = 맞은 사람, 없으면 허공) */
+  | { t: 'bonk'; id: string; to: string | null }

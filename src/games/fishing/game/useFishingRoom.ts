@@ -32,6 +32,18 @@ export type Shown = PlayerPub & {
   /** 머리 위로 든 물고기 (잡았거나 자랑) — from = 물에서 날아오는 곳(잡았을 때 찌 자리) */
   popup: { c: Catch; start: number; until: number; from: [number, number] | null } | null
   biteAt: number
+  /** 뿅망치를 휘두른 때 · 맞은 때 */
+  bonkAt: number
+  hitAt: number
+}
+
+/** 폰 진동 (안드로이드 크롬 등 — 아이폰 사파리는 안 됨) */
+const buzz = (pattern: number | number[]) => {
+  try {
+    navigator.vibrate?.(pattern)
+  } catch {
+    /* 안 되는 기기 */
+  }
 }
 
 export type World = {
@@ -99,6 +111,8 @@ export function useFishingRoom(nickname: string, active: boolean) {
   const roomRef = useRef<Room<ClientMsg> | null>(null)
   const world = useRef<World>({ me: '', players: new Map(), input: { x: 0, y: 0 }, cam: { yaw: 0, pitch: 0.82, dist: 11, first: false, spin: 0 } }).current
   const keySeq = useRef(0)
+  // 개발 모드에서만: 브라우저 시험이 상태를 볼 수 있게
+  if (import.meta.env.DEV) (window as unknown as { __fishWorld?: World }).__fishWorld = world
   const lastSent = useRef({ at: 0, x: 0, z: 0, r: 0 })
 
   const send = useCallback((m: ClientMsg) => roomRef.current?.send(m), [])
@@ -119,7 +133,7 @@ export function useFishingRoom(nickname: string, active: boolean) {
     const upsert = (p: PlayerPub) => {
       const old = world.players.get(p.id)
       if (!old) {
-        world.players.set(p.id, { ...p, sx: p.x, sz: p.z, sr: p.r, walkUntil: 0, bubble: null, popup: null, biteAt: 0 })
+        world.players.set(p.id, { ...p, sx: p.x, sz: p.z, sr: p.r, walkUntil: 0, bubble: null, popup: null, biteAt: 0, bonkAt: 0, hitAt: 0 })
         return
       }
       const isMe = p.id === world.me
@@ -174,7 +188,11 @@ export function useFishingRoom(nickname: string, active: boolean) {
         case 'bite': {
           const p = world.players.get(m.id)
           if (p) p.biteAt = now
-          if (m.id === world.me) playSound('bite')
+          if (m.id === world.me) {
+            playSound('bite')
+            // 입질이 오면 폰이 부르르 (사용자 요청)
+            buzz([90, 60, 90, 60, 140])
+          }
           return
         }
         case 'escape':
@@ -189,6 +207,7 @@ export function useFishingRoom(nickname: string, active: boolean) {
           const f = fishById(m.c.fish)
           if (m.id === world.me) {
             playSound(isBig(m.c) ? 'big' : f?.rarity === 'junk' ? 'junk' : 'catch')
+            buzz(isBig(m.c) ? [60, 40, 60, 40, 260] : 70)
             setMyCatch({ c: m.c, best: m.best, key: ++keySeq.current })
           } else if (m.big) playSound('cheer')
           if (m.big) toast(`${m.name}님이 ${iroName(m.c)}${f?.name ?? ''}${m.c.size ? ` ${m.c.size}cm` : ''}를 낚았어요!`, '#ffd23f', m.c)
@@ -206,6 +225,17 @@ export function useFishingRoom(nickname: string, active: boolean) {
         case 'tank':
           setTankView({ who: m.who, name: m.name, items: m.items })
           return
+        case 'bonk': {
+          const p = world.players.get(m.id)
+          if (p) p.bonkAt = now
+          const hit = m.to ? world.players.get(m.to) : null
+          if (hit) hit.hitAt = now
+          if (m.to === world.me) buzz(50)
+          // 소리는 나랑 관계있거나 가까울 때만
+          const me = world.players.get(world.me)
+          if (me && p && (m.id === world.me || m.to === world.me || Math.hypot(p.sx - me.sx, p.sz - me.sz) < 9)) playSound(hit ? 'bonk' : 'whiff')
+          return
+        }
         case 'brag': {
           const p = world.players.get(m.id)
           const c: Catch = { fish: m.item.f, iro: m.item.i, size: m.item.s }
@@ -296,7 +326,8 @@ export function useFishingRoom(nickname: string, active: boolean) {
     const t = setInterval(() => {
       const me = world.players.get(world.me)
       if (!me) return setAction('none')
-      const next: Action = me.fishing === 'bite' ? 'reel' : me.fishing === 'cast' ? 'reelIn' : me.bed !== null ? 'cast' : canCast(me) ? 'cast' : nearBed(me.x, me.z) !== null ? 'bed' : 'none'
+      // 썬베드 앞이면 눕기가 먼저 (사용자 요청 — 물가 바로 옆이라 늘 던지기만 떴음)
+      const next: Action = me.fishing === 'bite' ? 'reel' : me.fishing === 'cast' ? 'reelIn' : me.bed !== null ? 'cast' : freeBed(world, me) !== null ? 'bed' : canCast(me) ? 'cast' : 'none'
       setAction(next)
     }, 150)
     return () => clearInterval(t)
@@ -310,6 +341,8 @@ export function useFishingRoom(nickname: string, active: boolean) {
       playSound('cast')
       return send({ t: 'cast' })
     }
+    const bedHere = freeBed(world, me)
+    if (bedHere !== null) return send({ t: 'bed', i: bedHere })
     const t = castTarget(me.x, me.z, me.r) ?? castTarget(me.x, me.z, me.r + Math.PI)
     if (t) {
       // 물 쪽으로 돌아서 던짐 (서버는 마지막 위치·방향으로 다시 확인)
@@ -319,13 +352,26 @@ export function useFishingRoom(nickname: string, active: boolean) {
       playSound('cast')
       return send({ t: 'cast' })
     }
-    const bed = nearBed(me.x, me.z)
-    if (bed !== null && BEDS[bed]) send({ t: 'bed', i: bed })
   }, [send, world])
 
-  return { status, error, roomLabel, count, profile, saving, chat, toasts, myCatch, setMyCatch, tankView, setTankView, action, act, step, send, world }
+  /** 뿅망치 (F) — 내 화면은 바로 휘두르고, 맞았는지는 서버가 알려 줌 */
+  const bonk = useCallback(() => {
+    const me = world.players.get(world.me)
+    if (!me || performance.now() - me.bonkAt < 700) return
+    me.bonkAt = performance.now()
+    send({ t: 'bonk' })
+  }, [send, world])
+
+  return { status, error, roomLabel, count, profile, saving, chat, toasts, myCatch, setMyCatch, tankView, setTankView, action, act, bonk, step, send, world }
 }
 
 const round = (v: number) => Math.round(v * 100) / 100
+/** 가까운 빈 썬베드 (다른 사람이 누워 있으면 없음) */
+function freeBed(world: World, me: Shown): number | null {
+  const i = nearBed(me.x, me.z)
+  if (i === null || !BEDS[i]) return null
+  for (const p of world.players.values()) if (p.id !== me.id && p.bed === i) return null
+  return i
+}
 const canCast = (p: { x: number; z: number; r: number }) => !!(castTarget(p.x, p.z, p.r) ?? castTarget(p.x, p.z, p.r + Math.PI))
 export const iroName = (c: Catch) => (c.iro ? `${{ silver: '은빛', sakura: '벚꽃', gold: '금빛', neon: '형광', obsidian: '흑요석', ghost: '유령', rainbow: '무지개' }[c.iro]} ` : '')

@@ -10834,6 +10834,7 @@ const POINTS_OF = {
 	l: (n) => n === 4,
 	r: (n) => n === 4,
 	e: (n) => n === 4,
+	t: (n) => n === 4,
 	f: (n) => n === 2
 };
 /** 받은 묶음 검사 (그리는 사람이 보낸 것만 쓰지만 모양도 확인). 이상하면 null */
@@ -10892,7 +10893,7 @@ function viewFor(s, viewerId) {
 		turns: s.order.length,
 		drawer,
 		word,
-		wordLength: p.kind === "draw" ? [...p.word].length : null,
+		wordLength: null,
 		options: p.kind === "choose" && drawer === me ? p.options : null,
 		canGuess: canGuess(s, me),
 		canChat: canChat(s, me),
@@ -12091,6 +12092,8 @@ const round = (v) => Math.round(v * 100) / 100;
 const BITE_MIN_MS = 7e3;
 /** 입질 뒤 이만큼 안에 눌러야 잡힘 */
 const BITE_WINDOW_MS = 5e3;
+/** 뿅망치가 닿는 거리 (m)와 다시 휘두를 수 있는 간격 */
+const BONK_REACH = 1.9;
 //#endregion
 //#region src/server/env.ts
 const env$1 = globalThis.process?.env ?? {};
@@ -12271,7 +12274,8 @@ function fishingReferee(_setup, ctx) {
 				biteUntil: 0,
 				zone: null,
 				lastMv: ctx.now(),
-				lastChat: 0
+				lastChat: 0,
+				lastBonk: 0
 			};
 			players.set(key, p);
 			all({
@@ -12432,6 +12436,29 @@ function fishingReferee(_setup, ctx) {
 			text: t
 		});
 	}
+	/** 뿅망치: 바라보는 쪽 가까운 사람 하나 (누워 있는 사람도 맞음). 맞아도 낚시·눕기는 그대로 */
+	function bonk(p) {
+		const now = ctx.now();
+		if (now - p.lastBonk < 700) return;
+		p.lastBonk = now;
+		const fx = Math.sin(p.r), fz = Math.cos(p.r);
+		let best = null;
+		let bestD = BONK_REACH;
+		for (const o of players.values()) {
+			if (o === p) continue;
+			const dx = o.x - p.x, dz = o.z - p.z;
+			const d = Math.hypot(dx, dz);
+			if (d < bestD && (d < .4 || (dx * fx + dz * fz) / d > .35)) {
+				best = o;
+				bestD = d;
+			}
+		}
+		all({
+			t: "bonk",
+			id: p.id,
+			to: best?.id ?? null
+		});
+	}
 	async function setTank(p, keys) {
 		if (!p.uid || !Array.isArray(keys)) return;
 		const uid = p.uid;
@@ -12508,7 +12535,10 @@ function fishingReferee(_setup, ctx) {
 				case "look":
 					look(p, m.who);
 					break;
-				case "brag": brag(p, m.key);
+				case "brag":
+					brag(p, m.key);
+					break;
+				case "bonk": bonk(p);
 			}
 			return true;
 		},

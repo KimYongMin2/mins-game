@@ -29,7 +29,7 @@ describe('그림 맞히기 심판', () => {
     const others = [0, 1, 2].filter((i) => i !== drawer)
     expect(viewFor(s, `p${drawer}`).word).toBe(word)
     expect(viewFor(s, `p${others[0]}`).word).toBeNull()
-    expect(viewFor(s, `p${others[0]}`).wordLength).toBe([...word].length)
+    expect(viewFor(s, `p${others[0]}`).wordLength).toBeNull()
     s = engineReducer(s, { type: 'guess', player: others[0], text: '틀린답' })
     expect(s.log.at(-1)).toMatchObject({ kind: 'chat', text: '틀린답' })
     s = engineReducer(s, { type: 'guess', player: others[0], text: ` ${word} ` })

@@ -134,7 +134,7 @@ export function GameScreen({ room, members, onFinish, onQuit }: Props) {
     if (view.phase === 'intro') return '곧 시작해요'
     if (view.phase === 'choose') return view.options ? '그릴 제시어를 골라요' : `${nameOf(view.drawer)}님이 제시어를 고르는 중`
     if (view.phase === 'draw')
-      return view.word ? `제시어: ${view.word}` : `${'○'.repeat(view.wordLength ?? 0)} (${view.wordLength}글자)`
+      return view.word ? `제시어: ${view.word}` : '그림을 보고 맞혀요'
     if (view.phase === 'reveal') return `정답: ${view.word}`
     return '끝!'
   })()

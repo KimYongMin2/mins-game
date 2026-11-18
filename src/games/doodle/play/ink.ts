@@ -3,9 +3,9 @@ import { CANVAS_H, CANVAS_W } from '../constants'
 // 그림: 선(stroke) 목록. 그리는 사람이 0.04초마다 바뀐 것(ops)을 묶어 보내고, 받는 쪽은 그대로 쌓는다.
 // 좌표는 1000×750 판 안의 정수 [x0, y0, x1, y1, …].
 // 종류 k (사용자 요청 2026-11-16 — 그림판처럼 도형·채우기도): p 펜(점 여러 개) · l 직선 · r 네모 · e 동그라미(두 점 = 시작·끝, 끄는 동안은
-// 그리는 사람 화면에만 미리 보기, 떼면 한 번에 보냄) · f 채우기(누른 점 하나, 그 순간 그림 위에서 둘러싸인 곳을 칠함 — 순서대로 다시 그리면 같은 결과)
+// 그리는 사람 화면에만 미리 보기, 떼면 한 번에 보냄) · t 세모(두 점 — 첫 점 높이가 꼭짓점, 2026-11-18) · f 채우기(누른 점 하나, 그 순간 그림 위에서 둘러싸인 곳을 칠함 — 순서대로 다시 그리면 같은 결과)
 
-export type StrokeKind = 'p' | 'l' | 'r' | 'e' | 'f'
+export type StrokeKind = 'p' | 'l' | 'r' | 'e' | 't' | 'f'
 
 export type Stroke = { id: number; c: string; w: number; p: number[]; k?: StrokeKind }
 
@@ -19,10 +19,14 @@ export type InkOp =
   /** 다 지우기 */
   | { op: 'x' }
 
-/** 16색 (사용자 요청 — 8색에서 늘림) */
+/** 28색 (사용자 요청 — 8색 → 16색 → 2026-11-18 더 다양하게). 어두운 것부터 밝은 것, 무지개 순 */
 export const PEN_COLORS = [
-  '#1c1748', '#6b7280', '#e8473f', '#7f1d1d', '#f59f0b', '#ffd23f', '#a3e635', '#22a861',
-  '#14532d', '#7dd3fc', '#2f8fe0', '#1e3a8a', '#8b5cf6', '#f9a8d4', '#fcd5b5', '#8a5a2b',
+  '#000000', '#1c1748', '#4b5563', '#9ca3af', '#ffffff',
+  '#7f1d1d', '#e8473f', '#fb7185', '#db2777', '#f9a8d4',
+  '#c2410c', '#f97316', '#f59f0b', '#ffd23f', '#fde68a',
+  '#14532d', '#22a861', '#a3e635', '#065f46', '#06b6d4',
+  '#7dd3fc', '#2f8fe0', '#1e3a8a', '#8b5cf6', '#c4b5fd',
+  '#fcd5b5', '#d4a373', '#8a5a2b',
 ] as const
 export const ERASER = '#ffffff'
 export const PEN_WIDTHS = [4, 10, 22] as const
@@ -49,7 +53,7 @@ export function applyOps(strokes: Stroke[], ops: readonly InkOp[]): Stroke[] {
 export const pointCount = (strokes: readonly Stroke[]) => strokes.reduce((n, s) => n + s.p.length / 2, 0)
 
 /** 종류마다 점 개수: 도형은 정확히 두 점, 채우기는 한 점 */
-const POINTS_OF: Record<StrokeKind, (n: number) => boolean> = { p: (n) => n >= 2, l: (n) => n === 4, r: (n) => n === 4, e: (n) => n === 4, f: (n) => n === 2 }
+const POINTS_OF: Record<StrokeKind, (n: number) => boolean> = { p: (n) => n >= 2, l: (n) => n === 4, r: (n) => n === 4, e: (n) => n === 4, t: (n) => n === 4, f: (n) => n === 2 }
 
 /** 받은 묶음 검사 (그리는 사람이 보낸 것만 쓰지만 모양도 확인). 이상하면 null */
 export function readOps(x: unknown): InkOp[] | null {
@@ -139,6 +143,12 @@ export function drawStroke(ctx: CanvasRenderingContext2D, s: Stroke, from = 0) {
     ctx.rect(Math.min(p[0], p[2]), Math.min(p[1], p[3]), Math.abs(p[2] - p[0]), Math.abs(p[3] - p[1]))
   } else if (k === 'e') {
     ctx.ellipse((p[0] + p[2]) / 2, (p[1] + p[3]) / 2, Math.abs(p[2] - p[0]) / 2, Math.abs(p[3] - p[1]) / 2, 0, 0, Math.PI * 2)
+  } else if (k === 't') {
+    // 세모: 처음 누른 높이가 꼭짓점(가운데), 끝 높이가 밑변 — 아래로 끌면 위가 뾰족, 위로 끌면 아래가 뾰족
+    ctx.moveTo((p[0] + p[2]) / 2, p[1])
+    ctx.lineTo(p[2], p[3])
+    ctx.lineTo(p[0], p[3])
+    ctx.closePath()
   } else if (p.length === 2) {
     ctx.arc(p[0], p[1], s.w / 2, 0, Math.PI * 2)
     ctx.fill()

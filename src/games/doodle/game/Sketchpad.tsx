@@ -12,17 +12,18 @@ export type SketchHandle = {
   load: (ops: readonly InkOp[]) => void
 }
 
-/** 그리기 도구 (사용자 요청 — 그림판처럼): 펜 · 직선 · 네모 · 동그라미 · 채우기 · 지우개(흰 펜) */
-type Tool = 'pen' | 'line' | 'rect' | 'ellipse' | 'fill' | 'eraser'
+/** 그리기 도구 (사용자 요청 — 그림판처럼): 펜 · 직선 · 네모 · 세모 · 동그라미 · 채우기 · 지우개(흰 펜) */
+type Tool = 'pen' | 'line' | 'rect' | 'tri' | 'ellipse' | 'fill' | 'eraser'
 const TOOLS: { id: Tool; label: string }[] = [
   { id: 'pen', label: '펜' },
   { id: 'line', label: '직선' },
   { id: 'rect', label: '네모' },
+  { id: 'tri', label: '세모' },
   { id: 'ellipse', label: '동그라미' },
   { id: 'fill', label: '채우기' },
   { id: 'eraser', label: '지우개' },
 ]
-const SHAPE_KIND: Partial<Record<Tool, StrokeKind>> = { line: 'l', rect: 'r', ellipse: 'e' }
+const SHAPE_KIND: Partial<Record<Tool, StrokeKind>> = { line: 'l', rect: 'r', tri: 't', ellipse: 'e' }
 /** 그림 묶어 보내는 간격 */
 const SEND_MS = 40
 

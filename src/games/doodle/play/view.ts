@@ -51,7 +51,8 @@ export function viewFor(s: EngineState, viewerId: string): DoodleView {
     turns: s.order.length,
     drawer,
     word,
-    wordLength: p.kind === 'draw' ? [...p.word].length : null,
+    // 글자 수는 안 보냄 (사용자 요청 2026-11-18 — 힌트 없이)
+    wordLength: null,
     options: p.kind === 'choose' && drawer === me ? p.options : null,
     canGuess: canGuess(s, me),
     canChat: canChat(s, me),

@@ -41,7 +41,7 @@ export function FishingPage() {
   const [text, setText] = useState('')
   const [firstPerson, setFirstPerson] = useState(false)
   const chatRef = useRef<HTMLInputElement>(null)
-  const { world, act, send } = room
+  const { world, act, send, bonk } = room
 
   useEffect(() => {
     const on = () => setPortrait(isTouch() && isPortrait())
@@ -87,6 +87,8 @@ export function FishingPage() {
       } else if (e.code === 'KeyQ' || e.code === 'KeyE') {
         keys.add(e.code === 'KeyQ' ? 'spinL' : 'spinR')
         spin()
+      } else if (e.code === 'KeyF' && !e.repeat) {
+        bonk()
       } else if (e.code === 'KeyV' && !e.repeat) {
         toggleView()
       } else if (e.code === 'Space') {
@@ -127,7 +129,7 @@ export function FishingPage() {
       window.removeEventListener('blur', blur)
       window.removeEventListener('contextmenu', menu)
     }
-  }, [entered, world, act, toggleView])
+  }, [entered, world, act, toggleView, bonk])
 
   // 잡은 물고기 카드는 잠깐만
   const { myCatch, setMyCatch } = room
@@ -156,7 +158,8 @@ export function FishingPage() {
           <li>바다(부두·바닷가)와 민물(개울·연못)에서 잡히는 물고기가 달라요 — 모두 {DEX_FISH.length}종 + 꽝</li>
           <li>어떤 물고기든 아주 드물게 다른 색(이로치)으로 나와요</li>
           <li>잡은 것 중 10마리를 어항에 넣으면 다른 사람이 나를 눌러 구경해요</li>
-          <li>한 낚시터에 {FISHING_CAPACITY}명까지 · PC는 WASD·방향키로 걷고 스페이스, 화면을 끌거나 Q·E로 시점 돌리기, V 1인칭</li>
+          <li>한 낚시터에 {FISHING_CAPACITY}명까지 · PC는 WASD·방향키로 걷고 스페이스, 화면을 끌거나 Q·E로 시점 돌리기, V 1인칭, F 뿅망치</li>
+          <li>[뿅]을 누르면 앞에 있는 친구를 장난감 망치로 뿅 (맞아도 낚시는 그대로)</li>
         </ul>
         {!canWebGL() && <p className="error">이 기기는 3D 화면을 그릴 수 없어서 낚시터에 들어갈 수 없어요</p>}
         <button
@@ -243,6 +246,19 @@ export function FishingPage() {
       >
         {ACTION_LABEL[room.action]}
         <small>스페이스</small>
+      </button>
+
+      <button
+        type="button"
+        className="fs-bonk"
+        onPointerDown={(e) => {
+          e.preventDefault()
+          if (e.button === 0) bonk()
+        }}
+        aria-label="뿅망치 (F)"
+        title="뿅망치 (F) — 앞에 있는 사람을 장난으로 뿅"
+      >
+        뿅<small>F</small>
       </button>
 
       <div className="fs-chat">

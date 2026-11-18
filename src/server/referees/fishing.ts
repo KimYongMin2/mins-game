@@ -6,6 +6,8 @@ import {
   BITE_MIN_MS,
   BITE_WINDOW_MS,
   type BagItem,
+  BONK_MS,
+  BONK_REACH,
   CHAT_MAX,
   type ClientMsg,
   type PlayerPub,
@@ -19,7 +21,7 @@ import { loadProfile, markDirty, savingOn, startFlushing } from '../fishingStore
 // 위치는 화면이 보내고 여기서 빠르기·물 검사, 입질 시각·잡힌 물고기·크기·이로치는 여기서만 정함 → 도감·어항에 가짜가 못 들어감.
 // 도감·어항은 계정(uid)별로 Supabase에 (fishingStore). 방장이 없어도 계속 돎(회의방처럼 방장을 넘겨받음).
 
-type P = PlayerPub & { uid: string | null; castAt: number; biteAt: number; biteUntil: number; zone: 'sea' | 'fresh' | null; lastMv: number; lastChat: number }
+type P = PlayerPub & { uid: string | null; castAt: number; biteAt: number; biteUntil: number; zone: 'sea' | 'fresh' | null; lastMv: number; lastChat: number; lastBonk: number }
 
 /** 가방: 최근 것 + 자랑할 만한 것, 모두 이만큼까지 */
 const BAG_RECENT = 40
@@ -71,7 +73,7 @@ export function fishingReferee(_setup: unknown, ctx: RefereeContext): Referee {
     if (!p) {
       // 빈자리 근처에서 시작 (겹치지 않게 조금씩 흩뿌림)
       const a = rand() * Math.PI * 2
-      p = { id: key, name: mem.nickname, ...(mem.avatar ? { avatar: mem.avatar } : {}), x: r2(Math.cos(a) * 2.5), z: r2(5 + Math.sin(a) * 1.5), r: Math.PI, bed: null, fishing: 'none', bob: null, uid: mem.uid ?? null, castAt: 0, biteAt: 0, biteUntil: 0, zone: null, lastMv: ctx.now(), lastChat: 0 }
+      p = { id: key, name: mem.nickname, ...(mem.avatar ? { avatar: mem.avatar } : {}), x: r2(Math.cos(a) * 2.5), z: r2(5 + Math.sin(a) * 1.5), r: Math.PI, bed: null, fishing: 'none', bob: null, uid: mem.uid ?? null, castAt: 0, biteAt: 0, biteUntil: 0, zone: null, lastMv: ctx.now(), lastChat: 0, lastBonk: 0 }
       players.set(key, p)
       all({ t: 'st', p: pub(p) })
     }
@@ -174,6 +176,26 @@ export function fishingReferee(_setup: unknown, ctx: RefereeContext): Referee {
     all({ t: 'chat', id: p.id, name: p.name, text: t })
   }
 
+  /** 뿅망치: 바라보는 쪽 가까운 사람 하나 (누워 있는 사람도 맞음). 맞아도 낚시·눕기는 그대로 */
+  function bonk(p: P) {
+    const now = ctx.now()
+    if (now - p.lastBonk < BONK_MS) return
+    p.lastBonk = now
+    const fx = Math.sin(p.r), fz = Math.cos(p.r)
+    let best: P | null = null
+    let bestD = BONK_REACH
+    for (const o of players.values()) {
+      if (o === p) continue
+      const dx = o.x - p.x, dz = o.z - p.z
+      const d = Math.hypot(dx, dz)
+      if (d < bestD && (d < 0.4 || (dx * fx + dz * fz) / d > 0.35)) {
+        best = o
+        bestD = d
+      }
+    }
+    all({ t: 'bonk', id: p.id, to: best?.id ?? null })
+  }
+
   async function setTank(p: P, keys: unknown) {
     if (!p.uid || !Array.isArray(keys)) return
     const uid = p.uid
@@ -238,6 +260,9 @@ export function fishingReferee(_setup: unknown, ctx: RefereeContext): Referee {
           break
         case 'brag':
           void brag(p, m.key)
+          break
+        case 'bonk':
+          bonk(p)
           break
       }
       return true

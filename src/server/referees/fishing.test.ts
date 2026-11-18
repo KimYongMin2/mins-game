@@ -104,4 +104,25 @@ describe('낚시터 심판', () => {
     expect(bag.length).toBe(150)
     expect(bag.some((x) => x.k === 'gold')).toBe(true)
   })
+
+  it('뿅망치: 바라보는 쪽 가까운 사람이 맞고, 너무 자주는 못 휘두름', () => {
+    const s = setup()
+    s.ref.input('a', { t: 'hi' })
+    s.ref.input('b', { t: 'hi' })
+    const init = s.last('init')!.players
+    const a = init.find((p) => p.id === 'a')!, b = init.find((p) => p.id === 'b')!
+    // a를 b 바로 앞으로 옮기고 b 쪽을 보게
+    const r = Math.atan2(b.x - a.x, b.z - a.z)
+    s.tick(1000)
+    s.ref.input('a', { t: 'mv', x: b.x - Math.sin(r) * 1, z: b.z - Math.cos(r) * 1, r })
+    s.ref.input('a', { t: 'bonk' })
+    expect(s.last('bonk')).toEqual({ t: 'bonk', id: 'a', to: 'b' })
+    const n = s.got.filter((g) => g.m.t === 'bonk').length
+    s.ref.input('a', { t: 'bonk' })
+    expect(s.got.filter((g) => g.m.t === 'bonk').length).toBe(n)
+    s.tick(800)
+    s.ref.input('a', { t: 'mv', x: b.x - Math.sin(r) * 1, z: b.z - Math.cos(r) * 1, r: r + Math.PI })
+    s.ref.input('a', { t: 'bonk' })
+    expect(s.last('bonk')?.to).toBeNull()
+  })
 })
