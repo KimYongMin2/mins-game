@@ -1,6 +1,6 @@
 import * as THREE from 'three'
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
-import { kit, makeBoat, makePalm, makePine, makeTree, makeUmbrella, rockGeo } from './props3d'
+import { kit, makeBoat, makePalm, makePine, makeSunbed, makeTree, makeUmbrella, rockGeo, waterNormals } from './props3d'
 import { BEDS, BOUNDS, BRIDGE, DOCK, type FurnKind, HOUSES, JETTY, LADDERS, LAKE, LAKE_DOCK, PIER, PIER_END, RIVER, type Rect, SEA_EAST, STRUCTS, type Struct, shoreZ, waterAt } from '../play/map'
 
 // 낚시터 3D 맵 그림 (2026-11-18 사용자 요청 — 더 사실적이고 넓게, 구조물 많이, 추가할 만한 것 다).
@@ -246,20 +246,26 @@ export function buildWorld(scene: THREE.Scene, renderer: THREE.WebGLRenderer): W
   seaMat.onBeforeCompile = (sh) => {
     sh.uniforms.uTime = time
     sh.uniforms.uNight = nightU
-    const head = 'uniform float uTime;\nuniform float uNight;\nvarying vec3 vW;\n'
+    sh.uniforms.uNorm = { value: waterNormals() }
+    const head = 'uniform float uTime;\nuniform float uNight;\nuniform sampler2D uNorm;\nvarying vec3 vW;\n'
     sh.vertexShader = head + sh.vertexShader
       .replace(
         '#include <beginnormal_vertex>',
         `float wx = position.x; float wz = -position.y;
-        float a1 = wx*0.35 + uTime*1.1; float a2 = wz*0.55 - uTime*1.4 + wx*0.2; float a3 = (wx+wz)*1.3 + uTime*2.3;
-        float dx = 0.07*0.35*cos(a1) + 0.05*0.2*cos(a2) + 0.025*1.3*cos(a3);
-        float dz = 0.05*0.55*cos(a2) + 0.025*1.3*cos(a3);
+        // 방향이 제각각인 물결 4개 (한 방향 줄무늬·격자처럼 안 보이게)
+        vec2 P = vec2(wx, wz);
+        vec2 D1 = vec2(0.82, 0.57); vec2 D2 = vec2(-0.37, 0.93); vec2 D3 = vec2(0.96, -0.28); vec2 D4 = vec2(-0.71, -0.70);
+        float a1 = dot(P, D1)*0.31 + uTime*1.05; float a2 = dot(P, D2)*0.47 - uTime*1.3;
+        float a3 = dot(P, D3)*0.83 + uTime*1.9; float a4 = dot(P, D4)*1.37 - uTime*2.6;
+        float A1 = 0.065, A2 = 0.045, A3 = 0.022, A4 = 0.012;
+        vec2 G = D1*(A1*0.31*cos(a1)) + D2*(A2*0.47*cos(a2)) + D3*(A3*0.83*cos(a3)) + D4*(A4*1.37*cos(a4));
+        float dx = G.x; float dz = G.y;
         vec3 objectNormal = normalize(vec3(-dx, dz, 1.0));`,
       )
       .replace(
         '#include <begin_vertex>',
         `vec3 transformed = vec3(position);
-        transformed.z += 0.07*sin(a1) + 0.05*sin(a2) + 0.025*sin(a3);
+        transformed.z += A1*sin(a1) + A2*sin(a2) + A3*sin(a3) + A4*sin(a4);
         vW = (modelMatrix * vec4(transformed, 1.0)).xyz;`,
       )
     sh.fragmentShader = head + sh.fragmentShader.replace(
@@ -270,7 +276,8 @@ export function buildWorld(scene: THREE.Scene, renderer: THREE.WebGLRenderer): W
       vec3 shallow = vec3(0.09,0.55,0.6); vec3 mid = vec3(0.02,0.26,0.52); vec3 deep = vec3(0.005,0.09,0.27);
       vec3 col = mix(shallow, mid, smoothstep(0.0, 6.0, d));
       col = mix(col, deep, smoothstep(6.0, 40.0, d));
-      float foam = (1.0 - smoothstep(0.0, 0.9, d)) * (0.55 + 0.45*sin(uTime*1.7 + vW.x*0.6));
+      float fn = texture2D(uNorm, vW.xz*0.09 + vec2(uTime*0.02, 0.0)).x;
+      float foam = (1.0 - smoothstep(0.0, 0.9 + fn*0.5, d)) * (0.5 + 0.5*sin(uTime*1.7 + vW.x*0.6 + fn*4.0));
       foam += (1.0 - smoothstep(0.0, 0.25, abs(d - 1.6 - 0.5*sin(uTime*0.9 + vW.x*0.2)))) * 0.35;
       col = mix(col, vec3(1.0), clamp(foam, 0.0, 1.0) * 0.8);
       col *= mix(1.0, 0.35, uNight);
@@ -278,10 +285,12 @@ export function buildWorld(scene: THREE.Scene, renderer: THREE.WebGLRenderer): W
     ).replace(
       '#include <normal_fragment_maps>',
       `#include <normal_fragment_maps>
-      // 잔물결: 작은 물결 무늬로 빛이 반짝반짝 (하늘이 비침)
-      float r1 = sin(vW.x*2.3 + vW.z*1.7 + uTime*2.6) + sin(vW.x*-1.4 + vW.z*3.1 + uTime*3.3);
-      float r2 = cos(vW.x*3.7 - vW.z*1.1 - uTime*2.1) + cos(vW.x*1.2 + vW.z*-2.6 + uTime*2.9);
-      normal = normalize(normal + (viewMatrix * vec4(r1*0.045, 0.0, r2*0.045, 0.0)).xyz);`,
+      // 잔물결: 불규칙한 물결 질감 두 겹을 서로 다른 방향·빠르기로 흘려 겹침 (예전 sin 무늬는 격자처럼 보였음)
+      vec3 n1 = texture2D(uNorm, vW.xz*0.045 + vec2(uTime*0.011, uTime*0.007)).xyz*2.0 - 1.0;
+      vec3 n2 = texture2D(uNorm, vW.xz*0.13 + vec2(-uTime*0.017, uTime*0.013)).xyz*2.0 - 1.0;
+      vec3 n3 = texture2D(uNorm, vW.xz*0.37 + vec2(uTime*0.03, -uTime*0.024)).xyz*2.0 - 1.0;
+      vec2 rip = n1.xy*0.5 + n2.xy*0.35 + n3.xy*0.2;
+      normal = normalize(normal + (viewMatrix * vec4(rip.x*0.5, 0.0, rip.y*0.5, 0.0)).xyz);`,
     )
   }
   const sea = new THREE.Mesh(new THREE.PlaneGeometry(700, 700, 120, 120), seaMat)
@@ -362,7 +371,11 @@ export function buildWorld(scene: THREE.Scene, renderer: THREE.WebGLRenderer): W
   plaza.position.set(-10, 0.025, 37)
 
   // ── 민물 (호수·강) ──
-  const freshMat = new THREE.MeshStandardMaterial({ color: '#1f6f73', roughness: 0.06, metalness: 0 })
+  // 호수·강: 물결 질감을 천천히 흘림
+  const freshNorm = waterNormals().clone()
+  freshNorm.repeat.set(5, 5)
+  const freshMat = new THREE.MeshStandardMaterial({ color: '#1f6f73', roughness: 0.08, metalness: 0, normalMap: freshNorm, normalScale: new THREE.Vector2(0.45, 0.45) })
+  dyn.push((t) => freshNorm.offset.set(t * 0.012, t * 0.008))
   flat(new THREE.CircleGeometry(LAKE.r + 0.15, 64).translate(LAKE.x, -LAKE.z, 0), freshMat, 0.035).renderOrder = 2
   // 강: 꺾은선을 따라 띠
   {
@@ -538,43 +551,20 @@ export function buildWorld(scene: THREE.Scene, renderer: THREE.WebGLRenderer): W
       statics.add(r)
     }
 
-  // ── 썬베드 ──
-  const cushions = ['#ff8a7a', '#7cc8ff', '#ffd23f', '#9be08a', '#c79bff']
-  const frameM = mat('#f4f2ff', 0.5)
+  // ── 썬베드 (나무 틀·살 판·쿠션·수건) ──
+  const cushions = ['#e8746a', '#5fa9d8', '#e8c040', '#7cbf6a', '#a98ad8']
   BEDS.forEach((b, i) => {
-    const g = new THREE.Group()
+    const g = makeSunbed(cushions[i % cushions.length], i * 7 + 3)
     g.position.set(b.x, b.z < -30 ? 0.21 : 0, b.z)
     g.rotation.y = b.r
-    const cm = mat(cushions[i % cushions.length], 0.9)
-    g.add(box(0.95, 0.12, 2.1, frameM, 0, 0.32, 0), box(0.85, 0.08, 1.6, cm, 0, 0.42, 0.2))
-    const back = box(0.85, 0.08, 0.8, cm, 0, 0.62, -0.75)
-    back.rotation.x = 0.7
-    g.add(back)
-    for (const [x, z] of [[-0.4, 0.9], [0.4, 0.9], [-0.4, -0.9], [0.4, -0.9]]) g.add(cyl(0.04, 0.04, 0.32, mat('#cfd3e6'), x, 0.16, z, 6))
     statics.add(g)
   })
-  // 비치 타월·모래성 (그림만)
+  // 비치 타월 (그림만 — 모래성은 3D 화면이 그림: 부서지고 다시 쌓여서)
   ;[[-15, -2.5, '#e8473f'], [-7, -3.4, '#3f8fd0'], [8, -1.8, '#ffd23f']].forEach(([x, z, c]) => {
     const t = box(1, 0.02, 1.9, mat(c as string, 1), x as number, 0.012, z as number)
     t.rotation.y = 0.3
     statics.add(t)
   })
-  {
-    const g = new THREE.Group()
-    g.position.set(-11, 0, 3)
-    const sm = mat('#e3c98c', 1)
-    g.add(box(1.4, 0.5, 1.4, sm, 0, 0.25, 0))
-    for (const [x, z] of [[-0.6, -0.6], [0.6, -0.6], [-0.6, 0.6], [0.6, 0.6]]) {
-      g.add(cyl(0.22, 0.25, 0.8, sm, x, 0.4, z, 8))
-      const c = new THREE.Mesh(new THREE.ConeGeometry(0.26, 0.35, 8), sm)
-      c.position.set(x, 0.97, z)
-      g.add(c)
-    }
-    const top = new THREE.Mesh(new THREE.ConeGeometry(0.4, 0.6, 8), sm)
-    top.position.y = 0.8
-    g.add(top, cyl(0.01, 0.01, 0.6, mat('#6b4320'), 0, 1.3, 0, 4), box(0.3, 0.18, 0.01, mat('#e8473f'), 0.15, 1.5, 0))
-    statics.add(g)
-  }
 
   // ── 구조물 ──
   const lit: THREE.MeshStandardMaterial[] = [] // 밤에 켜지는 것

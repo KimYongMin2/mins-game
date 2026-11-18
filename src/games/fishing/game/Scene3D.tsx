@@ -3,8 +3,9 @@ import * as THREE from 'three'
 import { createStage, nearestOnScreen } from '../../../shared/art3d/stage'
 import { type AnimalRig, ANIMALS, makeAnimal, plainLook } from '../../../shared/art3d/animals'
 import { decodeLook } from '../../../shared/art3d/animalKinds'
-import { BEDS, BOATS, BOUNDS, LADDERS, groundY, houseAt } from '../play/map'
+import { BEDS, BOATS, BOUNDS, BUILD_MS, CASTLES, LADDERS, groundY, houseAt } from '../play/map'
 import { buildWorld, makeBoat } from './worldArt'
+import { makeSandRuin, makeSandcastle } from './props3d'
 import { fishImageUrl } from '../field/fishArt'
 import { type Catch, fishById, IRO } from '../play/fish'
 import { CAM_LIMITS, type World } from './useFishingRoom'
@@ -111,6 +112,16 @@ export function Scene3D({ world, step, onTapPlayer }: { world: World; step: (dt:
     if (import.meta.env.DEV) (window as unknown as { __fishStage?: unknown }).__fishStage = stage
     // 그림자는 해가 (내 주변), 따라다니는 조명은 밤에만 손전등처럼
     lamp.castShadow = false
+    // 모래성 (서 있음 / 무너짐 / 쌓는 중이면 점점 올라옴)
+    const castleObjs = CASTLES.map((c) => {
+      const full = makeSandcastle()
+      const ruin = makeSandRuin()
+      full.position.set(c.x, 0, c.z)
+      ruin.position.set(c.x, 0, c.z)
+      full.rotation.y = ruin.rotation.y = c.x * 0.7
+      scene.add(full, ruin)
+      return { full, ruin, lastHit: 0 }
+    })
     // 탈 수 있는 배 (탄 사람이 있으면 그 사람 자리)
     const boatObjs = BOATS.map((b) => {
       const g = makeBoat(b.color)
@@ -330,7 +341,10 @@ export function Scene3D({ world, step, onTapPlayer }: { world: World; step: (dt:
         const jk = (now - p.jumpAt) / JUMP_MS
         const jumping = jk >= 0 && jk < 1 && !lying && p.ride === null && !climbing
         const jumpY = jumping ? JUMP_HEIGHT * 4 * jk * (1 - jk) : 0
-        const sitting = !walking && p.act === 'sit' && p.ride === null
+        // 모래성 쌓는 중: 모래성 쪽을 보고 앉아서 토닥토닥
+        const buildingAt = world.castles.findIndex((c) => c.builder === p.id)
+        const building = buildingAt >= 0 && !walking
+        const sitting = (!walking && p.act === 'sit' && p.ride === null) || building
         const lyingDown = !walking && p.act === 'lie' && p.ride === null
         const holding = !!p.popup && now < p.popup.until && now - p.popup.start > (p.popup.from ? 420 : 0)
         const reeling = now - a.reelAt < 500
@@ -380,7 +394,13 @@ export function Scene3D({ world, step, onTapPlayer }: { world: World; step: (dt:
             // 앉으면 엉덩이가 바닥에 닿게 몸을 내림
             root.position.set(p.sx, gy - (sitting ? 0.5 * SCALE : 0) + jumpY, p.sz)
             if (p.id === world.me) meJumpY = jumpY
-            root.rotation.set(0, p.sr, 0)
+            const c = building ? CASTLES[buildingAt] : null
+            root.rotation.set(0, c ? Math.atan2(c.x - p.sx, c.z - p.sz) : p.sr, 0)
+            // 토닥토닥 (손이 위아래로)
+            if (building) {
+              a.rig.armL.rotation.x = -0.9 + Math.sin(t * 9) * 0.35
+              a.rig.armR.rotation.x = -0.9 - Math.sin(t * 9) * 0.35
+            }
           }
         }
         // 뿅망치: 들었다가 내리치기 (0.55초)
@@ -489,6 +509,22 @@ export function Scene3D({ world, step, onTapPlayer }: { world: World; step: (dt:
           }
         }
       }
+
+      // 모래성: 서 있음 / 무너짐 / 쌓는 중(무너진 더미 위로 점점 솟음), 부서지는 순간 모래 알갱이
+      castleObjs.forEach((o, i) => {
+        const c = world.castles[i]
+        if (!c) return
+        const k = c.builder ? Math.min(1, Math.max(0, 1 - (c.buildEnd - now) / BUILD_MS)) : c.built ? 1 : 0
+        o.full.visible = k > 0
+        o.ruin.visible = k < 1
+        o.full.scale.set(0.6 + 0.4 * k, Math.max(0.05, k), 0.6 + 0.4 * k)
+        if (c.hitAt > o.lastHit) {
+          o.lastHit = c.hitAt
+          const at = new THREE.Vector3(CASTLES[i].x, 0.6, CASTLES[i].z)
+          stage.burst(at, { color: '#dcc18a', count: 40, speed: 2.6, size: 0.14, gravity: 6, life: 0.9 })
+          stage.burst(at, { color: '#b8995f', count: 22, speed: 1.6, size: 0.2, gravity: 7, life: 0.8 })
+        }
+      })
 
       // 배: 탄 사람이 있으면 그 사람 자리·방향, 아니면 놓인 자리 (물결에 출렁)
       boatObjs.forEach((g, i) => {

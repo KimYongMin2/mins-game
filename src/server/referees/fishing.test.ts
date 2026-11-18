@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import type { BagItem, ServerMsg } from '../../games/fishing/play/protocol'
-import { BOATS, LADDERS, shoreZ } from '../../games/fishing/play/map'
+import { BOATS, BUILD_MS, CASTLES, LADDERS, shoreZ } from '../../games/fishing/play/map'
 import { resetStore } from '../fishingStore'
 import { addToBag, fishingReferee } from './fishing'
 
@@ -108,6 +108,34 @@ describe('낚시터 심판', () => {
     s.ref.input('a', { t: 'mv', x: b.x, z: b.z, r: 0 })
     s.ref.input('a', { t: 'unboard' })
     expect(s.last('boats')?.l[0].slice(3)).toEqual(['b', null])
+  })
+
+  it('모래성: 뿅망치로 부수고, 가까이에서 쌓으면 4초 뒤 다시 서고, 움직이면 멈춤', () => {
+    const s = setup()
+    s.ref.input('a', { t: 'hi' })
+    expect(s.last('init')?.castles.every((c) => c[0] === 1)).toBe(true)
+    const c = CASTLES[0]
+    // 모래성 바로 앞(남쪽)에서 북쪽을 보고 뿅
+    walkTo(s, 'a', c.x, c.z + 1.4)
+    s.tick(1000)
+    s.ref.input('a', { t: 'mv', x: c.x, z: c.z + 1.4, r: Math.PI })
+    s.ref.input('a', { t: 'bonk' })
+    expect(s.last('bonk')).toMatchObject({ id: 'a', to: null, castle: 0 })
+    expect(s.last('castles')!.l[0][0]).toBe(0)
+    // 쌓기 시작 → 움직이면 멈춤
+    s.ref.input('a', { t: 'build', i: 0 })
+    expect(s.last('castles')!.l[0][2]).toBe('a')
+    s.tick(500)
+    s.ref.input('a', { t: 'mv', x: c.x + 1, z: c.z + 1.4, r: 0 })
+    expect(s.last('castles')!.l[0][2]).toBeNull()
+    // 다시 쌓기 → 4초 뒤 섬
+    s.ref.input('a', { t: 'build', i: 0 })
+    s.tick(BUILD_MS + 200)
+    expect(s.last('castles')!.l[0]).toEqual([1, 0, null])
+    // 서 있는 건 못 쌓음
+    const n = s.got.length
+    s.ref.input('a', { t: 'build', i: 0 })
+    expect(s.got.length).toBe(n)
   })
 
   it('앉기·눕기: 아무 데서나, 움직이면 풀림, 배에선 안 됨', () => {

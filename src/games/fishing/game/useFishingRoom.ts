@@ -4,11 +4,12 @@ import { REFEREE_FROM } from '../../../shared/online/hubProtocol'
 import { encodeLook } from '../../../shared/art3d/animalKinds'
 import { loadLook } from '../../../shared/storage/avatar'
 import { type Catch, fishById, isBig } from '../play/fish'
-import { castTarget, nearBed, moveBy, RUN_SPEED, WALK_SPEED, BEDS, BOATS, BOAT_REACH, BOAT_SPEED, LADDERS, landingSpot, moveBoat, nearLadder, onLadderTop } from '../play/map'
+import { castTarget, nearBed, moveBy, RUN_SPEED, WALK_SPEED, BEDS, BOATS, BOAT_REACH, BOAT_SPEED, CASTLES, LADDERS, nearCastle, landingSpot, moveBoat, nearLadder, onLadderTop } from '../play/map'
 import {
   type Act,
   type BagItem,
   type BoatPub,
+  type CastlePub,
   type ClientMsg,
   FISHING_CAPACITY,
   FISHING_GAME,
@@ -78,6 +79,8 @@ export type World = {
   cam: { yaw: number; pitch: number; dist: number; first: boolean; spin: number }
   /** 탈 수 있는 배들 (탄 사람이 있으면 그 사람 자리를 따라 그림) */
   boats: { x: number; z: number; r: number; rider: string | null; passenger: string | null }[]
+  /** 모래성: 서 있는지 · 쌓는 사람 · 다 쌓는 때(내 시계) · 부서진 때(그림 효과) */
+  castles: { built: boolean; builder: string | null; buildEnd: number; hitAt: number }[]
 }
 
 export const CAM_LIMITS = { third: { min: 0.2, max: 1.35 }, first: { min: -0.7, max: 1.0 }, dist: { min: 5, max: 24 } }
@@ -86,7 +89,7 @@ export type Toast = { key: number; text: string; color: string; c?: Catch }
 export type ChatLine = { key: number; name: string; text: string; mine: boolean }
 export type Action = 'reel' | 'reelIn' | 'cast' | 'bed' | 'none'
 /** 작은 버튼 (E): 배 타기·내리기, 사다리 오르기·내려가기 */
-export type Alt = 'board' | 'unboard' | 'climb' | 'down' | 'noLand' | null
+export type Alt = 'board' | 'unboard' | 'climb' | 'down' | 'noLand' | 'build' | null
 
 const SEND_MS = 125
 
@@ -134,7 +137,7 @@ export function useFishingRoom(nickname: string, active: boolean) {
   const [action, setAction] = useState<Action>('none')
   const [alt, setAlt] = useState<Alt>(null)
   const roomRef = useRef<Room<ClientMsg> | null>(null)
-  const world = useRef<World>({ me: '', players: new Map(), input: { x: 0, y: 0, run: false }, cam: { yaw: 0, pitch: 0.82, dist: 11, first: false, spin: 0 }, vel: { x: 0, z: 0 }, boats: BOATS.map((b) => ({ x: b.x, z: b.z, r: b.r, rider: null, passenger: null })) }).current
+  const world = useRef<World>({ me: '', players: new Map(), input: { x: 0, y: 0, run: false }, cam: { yaw: 0, pitch: 0.82, dist: 11, first: false, spin: 0 }, vel: { x: 0, z: 0 }, boats: BOATS.map((b) => ({ x: b.x, z: b.z, r: b.r, rider: null, passenger: null })), castles: CASTLES.map(() => ({ built: true, builder: null, buildEnd: 0, hitAt: 0 })) }).current
   const keySeq = useRef(0)
   // 개발 모드에서만: 브라우저 시험이 상태를 볼 수 있게
   if (import.meta.env.DEV) (window as unknown as { __fishWorld?: World }).__fishWorld = world
@@ -195,6 +198,19 @@ export function useFishingRoom(nickname: string, active: boolean) {
         if (world.boats[i]) Object.assign(world.boats[i], { x, z, r, rider, passenger: passenger ?? null })
       })
     }
+    const setCastles = (l: CastlePub[]) => {
+      const now = performance.now()
+      l.forEach(([built, left, builder], i) => {
+        const c = world.castles[i]
+        if (!c) return
+        // 내가 쌓던 게 다 됐으면 알림
+        if (!c.built && built && c.builder === world.me) {
+          playSound('built')
+          toast('모래성을 다시 쌓았어요!', '#ffd23f')
+        }
+        Object.assign(c, { built: !!built, builder, buildEnd: builder ? now + left : 0 })
+      })
+    }
     const onMsg = (raw: unknown, from?: string) => {
       if (from !== REFEREE_FROM) return
       const m = raw as ServerMsg
@@ -207,11 +223,15 @@ export function useFishingRoom(nickname: string, active: boolean) {
           for (const p of m.players) upsert(p)
           setSaving(m.saving)
           setBoats(m.boats)
+          if (m.castles) setCastles(m.castles)
           setCount(m.players.length)
           setStatus('ready')
           return
         case 'boats':
           setBoats(m.l)
+          return
+        case 'castles':
+          setCastles(m.l)
           return
         case 'st':
           upsert(m.p)
@@ -282,6 +302,15 @@ export function useFishingRoom(nickname: string, active: boolean) {
         case 'bonk': {
           const p = world.players.get(m.id)
           if (p) p.bonkAt = now
+          // 모래성을 부숨: 와르르 (소리는 가까울 때만)
+          if (m.castle !== undefined && world.castles[m.castle]) {
+            world.castles[m.castle].hitAt = now
+            const me0 = world.players.get(world.me)
+            const c = CASTLES[m.castle]
+            if (me0 && Math.hypot(c.x - me0.sx, c.z - me0.sz) < 14) playSound('crumble')
+            if (m.id === world.me) toast('모래성이 와르르!', '#e3c98c')
+            return
+          }
           const hit = m.to ? world.players.get(m.to) : null
           if (hit) hit.hitAt = now
           if (m.to === world.me) buzz(50)
@@ -450,7 +479,9 @@ export function useFishingRoom(nickname: string, active: boolean) {
       setAction(next)
       // 작은 버튼: 배에선 내리기(땅이 멀면 안내), 사다리 위면 내려가기, 아니면 가까운 배·사다리
       const ladder = me.ride === null && me.up === null ? nearLadder(me.x, me.z) : null
-      setAlt(me.ride !== null ? (landingSpot(me.x, me.z) ? 'unboard' : 'noLand') : me.up !== null ? 'down' : ladder !== null ? 'climb' : freeBoat(world, me) !== null ? 'board' : null)
+      const ci = me.ride === null && me.up === null ? nearCastle(me.x, me.z) : null
+      const ruined = ci !== null && !world.castles[ci].built && !world.castles[ci].builder
+      setAlt(me.ride !== null ? (landingSpot(me.x, me.z) ? 'unboard' : 'noLand') : me.up !== null ? 'down' : ladder !== null ? 'climb' : ruined ? 'build' : freeBoat(world, me) !== null ? 'board' : null)
     }, 150)
     return () => clearInterval(t)
   }, [status, world])
@@ -489,6 +520,12 @@ export function useFishingRoom(nickname: string, active: boolean) {
     if (me.up !== null) return send({ t: 'down' })
     const l = nearLadder(me.x, me.z)
     if (l !== null) return send({ t: 'climb', i: l })
+    const ci = nearCastle(me.x, me.z)
+    if (ci !== null && !world.castles[ci].built && !world.castles[ci].builder) {
+      world.vel.x = world.vel.z = 0
+      playSound('dig')
+      return send({ t: 'build', i: ci })
+    }
     const b = freeBoat(world, me)
     if (b !== null) {
       playSound('board')

@@ -12945,6 +12945,33 @@ const SPAWN = {
 	x: 0,
 	z: 9
 };
+const CASTLES = [
+	{
+		x: -11,
+		z: 3
+	},
+	{
+		x: 5,
+		z: 5
+	},
+	{
+		x: -30,
+		z: 7
+	}
+];
+const BUILD_MS = 4e3;
+function nearCastle(x, z, reach = 2) {
+	let best = null;
+	let bestD = reach;
+	CASTLES.forEach((c, i) => {
+		const d = Math.hypot(c.x - x, c.z - z);
+		if (d < bestD) {
+			bestD = d;
+			best = i;
+		}
+	});
+	return best;
+}
 const WALL = .25;
 const DOOR = 1.5;
 /** 네모를 구조물 기준(앞 = +z)에서 세상 좌표로 (r은 90° 단위) */
@@ -13402,6 +13429,26 @@ function fishingReferee(_setup, ctx) {
 		b.passenger
 	]);
 	let lastHome = 0;
+	const castles = CASTLES.map(() => ({
+		built: true,
+		buildEnd: 0,
+		builder: null
+	}));
+	const castlesPub = () => castles.map((c) => [
+		c.built ? 1 : 0,
+		c.builder ? Math.max(0, c.buildEnd - ctx.now()) : 0,
+		c.builder
+	]);
+	const allCastles = () => all({
+		t: "castles",
+		l: castlesPub()
+	});
+	/** 이 사람이 쌓던 모래성은 멈춤 */
+	const stopBuilding = (id) => {
+		let changed = false;
+		for (const c of castles) if (c.builder === id) c.builder = null, changed = true;
+		if (changed) allCastles();
+	};
 	const nameOf = (key) => ctx.members().find((m) => m.id === key)?.nickname ?? "익명";
 	function join(key) {
 		const mem = ctx.members().find((m) => m.id === key);
@@ -13445,7 +13492,8 @@ function fishingReferee(_setup, ctx) {
 			you: key,
 			players: [...players.values()].map(pub),
 			saving: savingOn(),
-			boats: boatsPub()
+			boats: boatsPub(),
+			castles: castlesPub()
 		});
 		if (p.uid) loadProfile(p.uid).then((profile) => players.has(key) && send(key, {
 			t: "profile",
@@ -13506,6 +13554,7 @@ function fishingReferee(_setup, ctx) {
 		}
 		const drift = Math.hypot(p.x - p.castX, p.z - p.castZ);
 		const reelOff = p.fishing !== "none" && drift > (p.ride !== null ? 4 : 1);
+		if (moved) stopBuilding(p.id);
 		if (moved && (p.bed !== null || p.act) || reelOff) {
 			p.bed = null;
 			p.act = null;
@@ -13752,11 +13801,51 @@ function fishingReferee(_setup, ctx) {
 				bestD = d;
 			}
 		}
+		if (!best) {
+			let ci = -1;
+			let cd = 2.8;
+			CASTLES.forEach((c, i) => {
+				const dx = c.x - p.x, dz = c.z - p.z;
+				const d = Math.hypot(dx, dz);
+				const k = castles[i];
+				if ((k.built || k.builder) && d < cd && (d < 1.1 || (dx * fx + dz * fz) / d > .3)) {
+					ci = i;
+					cd = d;
+				}
+			});
+			if (ci >= 0) {
+				castles[ci].built = false;
+				castles[ci].builder = null;
+				all({
+					t: "bonk",
+					id: p.id,
+					to: null,
+					castle: ci
+				});
+				return allCastles();
+			}
+		}
 		all({
 			t: "bonk",
 			id: p.id,
 			to: best?.id ?? null
 		});
+	}
+	/** 무너진 모래성 다시 쌓기 (가까이에서, 아무도 안 쌓고 있을 때) */
+	function build(p, i) {
+		if (typeof i !== "number" || !Number.isInteger(i) || !castles[i]) return;
+		const c = castles[i];
+		if (c.built || c.builder || p.ride !== null || p.up !== null || nearCastle(p.x, p.z) !== i) return;
+		stopFishing(p);
+		p.act = null;
+		p.bed = null;
+		c.builder = p.id;
+		c.buildEnd = ctx.now() + BUILD_MS;
+		all({
+			t: "st",
+			p: pub(p)
+		});
+		allCastles();
 	}
 	async function setTank(p, keys) {
 		if (!p.uid || !Array.isArray(keys)) return;
@@ -13855,7 +13944,10 @@ function fishingReferee(_setup, ctx) {
 				case "pose":
 					pose(p, m.p);
 					break;
-				case "jump": jump(p);
+				case "jump":
+					jump(p);
+					break;
+				case "build": build(p, m.i);
 			}
 			return true;
 		},
@@ -13881,6 +13973,10 @@ function fishingReferee(_setup, ctx) {
 					t: "st",
 					p: pub(p)
 				});
+			}
+			if (castles.some((c) => c.builder && now >= c.buildEnd)) {
+				for (const c of castles) if (c.builder && now >= c.buildEnd) c.built = true, c.builder = null;
+				allCastles();
 			}
 			if (now - lastHome > 1e4) {
 				lastHome = now;
@@ -13922,6 +14018,7 @@ function fishingReferee(_setup, ctx) {
 				leaveBoat(p);
 				allBoats();
 			}
+			if (p) stopBuilding(p.id);
 			if (players.delete(key)) all({
 				t: "gone",
 				id: key

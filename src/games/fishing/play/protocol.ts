@@ -44,6 +44,8 @@ export type PlayerPub = {
 export type Act = 'sit' | 'lie' | null
 /** 배 하나: 자리·방향·젓는 사람(가운데 판)·같이 탄 사람(앞 판) — 두 명까지 (사용자 요청 2026-11-18) */
 export type BoatPub = [number, number, number, string | null, string | null]
+/** 모래성 하나: 서 있는지(1/0) · 쌓는 중이면 남은 ms · 쌓는 사람 */
+export type CastlePub = [0 | 1, number, string | null]
 
 /** 잡은 것 하나 (k = 고유 번호) */
 export type BagItem = { k: string; f: string; i: Iro | null; s: number; at: number }
@@ -70,9 +72,12 @@ export type ClientMsg =
   | { t: 'pose'; p: Act }
   /** 점프 (그림만 — 자리는 그대로) */
   | { t: 'jump' }
+  /** 무너진 모래성 다시 쌓기 시작 (움직이면 멈춤) */
+  | { t: 'build'; i: number }
 
 export type ServerMsg =
-  | { t: 'init'; you: string; players: PlayerPub[]; saving: boolean; boats: BoatPub[] }
+  | { t: 'init'; you: string; players: PlayerPub[]; saving: boolean; boats: BoatPub[]; castles: CastlePub[] }
+  | { t: 'castles'; l: CastlePub[] }
   | { t: 'boats'; l: BoatPub[] }
   | { t: 'jump'; id: string }
   | { t: 'pos'; l: [string, number, number, number][] }
@@ -86,4 +91,4 @@ export type ServerMsg =
   | { t: 'tank'; who: string; name: string; items: BagItem[] }
   | { t: 'brag'; id: string; name: string; item: BagItem }
   /** 누가 뿅망치를 휘두름 (to = 맞은 사람, 없으면 허공) */
-  | { t: 'bonk'; id: string; to: string | null }
+  | { t: 'bonk'; id: string; to: string | null; castle?: number }

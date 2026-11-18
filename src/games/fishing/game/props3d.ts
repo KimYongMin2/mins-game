@@ -1,5 +1,6 @@
 import * as THREE from 'three'
 import { mergeGeometries, mergeVertices } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
+import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js'
 
 // 낚시터 소품을 더 사실적으로 (사용자 요청 2026-11-18 '나무 돌 배 등등 모든 것 좀 더 사실적으로').
 // 그림 파일 없이: 캔버스로 그린 질감(나무껍질·야자 잎·솔잎·나뭇잎·판자) + 휘고 가늘어지는 모양을 직접 만든 도형.
@@ -585,10 +586,40 @@ export function makeUmbrella(color: string) {
   cg.setAttribute('color', new THREE.Float32BufferAttribute(col, 3))
   cg.computeVertexNormals()
   g.add(new THREE.Mesh(cg, new THREE.MeshStandardMaterial({ vertexColors: true, side: THREE.DoubleSide, roughness: 0.85 })))
-  // 술 (가장자리 띠)
-  const fr = new THREE.Mesh(new THREE.CylinderGeometry(R * 0.99, R * 0.99, 0.12, 24, 1, true), new THREE.MeshStandardMaterial({ color, side: THREE.DoubleSide, roughness: 0.9 }))
-  fr.position.y = 2.56
-  g.add(fr)
+  // 가장자리 물결 띠 (폭마다 반달 모양으로 늘어짐, 색 번갈아)
+  const vpos: number[] = [], vcol: number[] = []
+  for (let i = 0; i < ribs; i++) {
+    const c = i % 2 ? a : b
+    const segs = 6
+    for (let k = 0; k < segs; k++) {
+      const t0 = k / segs, t1 = (k + 1) / segs
+      const a0 = ((i + t0) / ribs) * Math.PI * 2, a1 = ((i + t1) / ribs) * Math.PI * 2
+      const drop = (t: number) => 0.06 + Math.sin(t * Math.PI) * 0.1
+      const top = 2.6, rr = R * 0.985
+      const p = [
+        [Math.cos(a0) * rr, top, Math.sin(a0) * rr],
+        [Math.cos(a1) * rr, top, Math.sin(a1) * rr],
+        [Math.cos(a1) * rr, top - drop(t1), Math.sin(a1) * rr],
+        [Math.cos(a0) * rr, top - drop(t0), Math.sin(a0) * rr],
+      ]
+      for (const tri of [[0, 1, 2], [0, 2, 3]]) for (const q of tri) {
+        vpos.push(...p[q])
+        vcol.push(c.r, c.g, c.b)
+      }
+    }
+  }
+  const vg = new THREE.BufferGeometry()
+  vg.setAttribute('position', new THREE.Float32BufferAttribute(vpos, 3))
+  vg.setAttribute('color', new THREE.Float32BufferAttribute(vcol, 3))
+  vg.computeVertexNormals()
+  g.add(new THREE.Mesh(vg, new THREE.MeshStandardMaterial({ vertexColors: true, side: THREE.DoubleSide, roughness: 0.9 })))
+  // 기둥 이음새(쇠 고리)·기울이는 손잡이·바닥 모래 둔덕
+  for (const y of [1.45, 2.2]) g.add(new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.06, 10), K.metalM).translateY(y))
+  const knob = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.03, 0.03), K.metalM)
+  knob.position.set(0.07, 1.45, 0)
+  g.add(knob)
+  const mound = new THREE.Mesh(new THREE.SphereGeometry(0.28, 12, 8).scale(1, 0.25, 1), new THREE.MeshStandardMaterial({ color: '#d6bb82', roughness: 1 }))
+  g.add(mound)
   // 살
   for (let i = 0; i < ribs; i++) {
     const ang = (i / ribs) * Math.PI * 2
@@ -600,5 +631,211 @@ export function makeUmbrella(color: string) {
   }
   g.add(new THREE.Mesh(new THREE.SphereGeometry(0.06, 8, 6), K.whiteM).translateY(2.62 + H + 0.03))
   g.traverse((o) => (o.castShadow = true))
+  return g
+}
+
+// ── 물결 질감 (격자무늬 대신): 방향·크기가 제각각인 물결 40개를 겹친 높이로 만든 노멀 맵, 끝과 끝이 이어짐 ──
+let waterNormCache: THREE.Texture | null = null
+export function waterNormals() {
+  if (waterNormCache) return waterNormCache
+  const N = 256
+  const r = seeded(31)
+  const waves = Array.from({ length: 40 }, () => {
+    // 정수 진동수라 타일 끝이 이어짐
+    const fx = Math.round((r() - 0.5) * 18), fy = Math.round((r() - 0.5) * 18) || 1
+    const f = Math.hypot(fx, fy)
+    return { fx, fy, a: 1 / (0.6 + f), ph: r() * Math.PI * 2 }
+  })
+  const c = document.createElement('canvas')
+  c.width = c.height = N
+  const g = c.getContext('2d')!
+  const img = g.createImageData(N, N)
+  for (let y = 0; y < N; y++)
+    for (let x = 0; x < N; x++) {
+      let dx = 0, dy = 0
+      for (const w of waves) {
+        const k = (2 * Math.PI) / N
+        const cs = Math.cos(k * (w.fx * x + w.fy * y) + w.ph) * w.a
+        dx += cs * w.fx * k
+        dy += cs * w.fy * k
+      }
+      const nx = -dx * 9, ny = -dy * 9, l = Math.hypot(nx, ny, 1)
+      const i = (y * N + x) * 4
+      img.data[i] = ((nx / l) * 0.5 + 0.5) * 255
+      img.data[i + 1] = ((ny / l) * 0.5 + 0.5) * 255
+      img.data[i + 2] = ((1 / l) * 0.5 + 0.5) * 255
+      img.data[i + 3] = 255
+    }
+  g.putImageData(img, 0, 0)
+  const t = new THREE.CanvasTexture(c)
+  t.wrapS = t.wrapT = THREE.RepeatWrapping
+  t.colorSpace = THREE.NoColorSpace
+  t.anisotropy = 4
+  return (waterNormCache = t)
+}
+
+// ── 썬베드: 나무 틀 + 살 판 + 젖힌 등받이 + 둥근 쿠션(테두리 선) + 개어 둔 줄무늬 수건, 머리 쪽 바퀴 ──
+// 크기·높이는 예전 그대로(눕는 자세가 맞게): 앉는 면 약 0.46m, 등받이는 머리 쪽(-z)에서 0.7rad
+export function makeSunbed(color: string, seed: number) {
+  const K = kit()
+  const r = seeded(seed)
+  const g = new THREE.Group()
+  const wood = K.plankM
+  const B = (w: number, h: number, d: number, m: THREE.Material, x: number, y: number, z: number) => {
+    const o = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m)
+    o.position.set(x, y, z)
+    return o
+  }
+  // 옆 틀·다리
+  for (const sx of [-0.43, 0.43]) {
+    g.add(B(0.06, 0.09, 2.05, wood, sx, 0.3, 0.02))
+    for (const z of [0.9, -0.85]) g.add(B(0.07, 0.3, 0.07, wood, sx, 0.15, z))
+  }
+  // 바퀴 (머리 쪽)
+  for (const sx of [-0.43, 0.43]) {
+    const w = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 0.04, 12), K.metalM)
+    w.rotation.z = Math.PI / 2
+    w.position.set(sx * 1.08, 0.07, -0.95)
+    g.add(w)
+  }
+  // 앉는 살 판
+  for (let i = 0; i < 9; i++) g.add(B(0.82, 0.03, 0.11, wood, 0, 0.36, -0.32 + i * 0.155))
+  // 등받이 (경첩에서 젖힘)
+  const back = new THREE.Group()
+  back.position.set(0, 0.38, -0.38)
+  back.rotation.x = 0.7
+  for (let i = 0; i < 5; i++) back.add(B(0.82, 0.03, 0.11, wood, 0, 0, -0.08 - i * 0.15))
+  for (const sx of [-0.4, 0.4]) back.add(B(0.05, 0.05, 0.8, wood, sx, -0.02, -0.38))
+  g.add(back)
+  // 받침 다리 (등받이 아래)
+  const strut = B(0.04, 0.04, 0.55, wood, 0, 0.42, -0.7)
+  strut.rotation.x = -0.9
+  g.add(strut)
+  // 쿠션 (둥근 상자 + 테두리 선)
+  const fabric = new THREE.MeshStandardMaterial({ color, roughness: 0.95 })
+  const pipe = new THREE.MeshStandardMaterial({ color: new THREE.Color(color).multiplyScalar(0.7), roughness: 0.9 })
+  const cushion = new THREE.Mesh(new RoundedBoxGeometry(0.8, 0.08, 1.4, 3, 0.035), fabric)
+  cushion.position.set(0, 0.42, 0.33)
+  const cBack = new THREE.Mesh(new RoundedBoxGeometry(0.8, 0.08, 0.78, 3, 0.035), fabric)
+  cBack.position.set(0, 0.05, -0.38)
+  back.add(cBack)
+  g.add(cushion)
+  for (const sx of [-0.4, 0.4]) {
+    const p1 = B(0.02, 0.02, 1.38, pipe, sx, 0.46, 0.33)
+    g.add(p1)
+  }
+  // 개어 둔 수건 (발 쪽, 줄무늬)
+  const towelC = ['#ffffff', ['#3f8fd0', '#e8473f', '#2f9e6a', '#ffd23f'][Math.floor(r() * 4)]]
+  for (let i = 0; i < 4; i++) g.add(B(0.5, 0.025, 0.07, new THREE.MeshStandardMaterial({ color: towelC[i % 2], roughness: 1 }), 0.05, 0.475, 0.78 + i * 0.07))
+  g.traverse((o) => {
+    if (o instanceof THREE.Mesh) {
+      o.castShadow = true
+      o.receiveShadow = true
+    }
+  })
+  return g
+}
+
+// ── 모래성 (부서질 수 있음): 모래 질감, 가운데 큰 탑 + 모서리 양동이 탑 4개 + 톱니 성벽 + 조개 장식 + 깃발 + 해자 ──
+let sandM: THREE.MeshStandardMaterial | null = null
+function sandMat() {
+  if (sandM) return sandM
+  const r = seeded(77)
+  const t = canvas(128, 128, (g) => {
+    g.fillStyle = '#dcc18a'
+    g.fillRect(0, 0, 128, 128)
+    for (let i = 0; i < 1400; i++) {
+      g.fillStyle = ['#c9ab72', '#ead39f', '#b8995f', '#f2e2b8'][Math.floor(r() * 4)]
+      g.fillRect(r() * 128, r() * 128, 1 + r() * 2, 1 + r() * 2)
+    }
+  }, { repeat: [2, 2] })
+  return (sandM = new THREE.MeshStandardMaterial({ map: t, roughness: 1 }))
+}
+export function makeSandcastle() {
+  const S = sandMat()
+  const g = new THREE.Group()
+  const add = (geo: THREE.BufferGeometry, x: number, y: number, z: number, m: THREE.Material = S) => {
+    const o = new THREE.Mesh(geo, m)
+    o.position.set(x, y, z)
+    g.add(o)
+    return o
+  }
+  // 바닥 둔덕 · 해자 (젖은 모래)
+  add(new THREE.CylinderGeometry(1.05, 1.2, 0.18, 24), 0, 0.09, 0)
+  const moat = add(new THREE.RingGeometry(1.2, 1.45, 32), 0, 0.012, 0, new THREE.MeshStandardMaterial({ color: '#a88a55', roughness: 0.6 }))
+  moat.rotation.x = -Math.PI / 2
+  const crenels = (cx: number, cz: number, rad: number, y: number, n: number) => {
+    for (let i = 0; i < n; i++) {
+      const a = (i / n) * Math.PI * 2
+      add(new THREE.BoxGeometry(rad * 0.45, 0.09, 0.08), cx + Math.cos(a) * rad, y, cz + Math.sin(a) * rad).rotation.y = -a + Math.PI / 2
+    }
+  }
+  // 모서리 양동이 탑
+  for (const [x, z] of [[-0.6, -0.6], [0.6, -0.6], [-0.6, 0.6], [0.6, 0.6]]) {
+    add(new THREE.CylinderGeometry(0.2, 0.26, 0.55, 14), x, 0.45, z)
+    for (const y of [0.33, 0.52]) add(new THREE.TorusGeometry(0.235 - (y - 0.33) * 0.15, 0.015, 4, 16), x, y, z).rotation.x = Math.PI / 2
+    crenels(x, z, 0.19, 0.77, 6)
+  }
+  // 성벽 (모서리 사이, 위에 톱니)
+  for (const [x, z, ry] of [[0, -0.6, 0], [0, 0.6, 0], [-0.6, 0, Math.PI / 2], [0.6, 0, Math.PI / 2]]) {
+    const w = add(new THREE.BoxGeometry(0.85, 0.32, 0.14), x, 0.34, z)
+    w.rotation.y = ry
+    for (let k = -1; k <= 1; k++) {
+      const c = add(new THREE.BoxGeometry(0.12, 0.08, 0.14), x + (ry ? 0 : k * 0.28), 0.54, z + (ry ? k * 0.28 : 0))
+      c.rotation.y = ry
+    }
+  }
+  // 문 (앞 +z 성벽에 어두운 아치)
+  add(new THREE.CylinderGeometry(0.09, 0.09, 0.16, 12, 1, false, 0, Math.PI), 0, 0.3, 0.6, new THREE.MeshStandardMaterial({ color: '#7a6040', roughness: 1 })).rotation.set(Math.PI / 2, 0, 0)
+  // 가운데 큰 탑
+  add(new THREE.CylinderGeometry(0.3, 0.4, 0.8, 16), 0, 0.58, 0)
+  add(new THREE.CylinderGeometry(0.18, 0.24, 0.35, 14), 0, 1.15, 0)
+  crenels(0, 0, 0.29, 1.0, 8)
+  crenels(0, 0, 0.17, 1.36, 6)
+  // 조개 장식
+  const shell = new THREE.MeshStandardMaterial({ color: '#fbefe6', roughness: 0.5 })
+  for (let i = 0; i < 7; i++) {
+    const a = i * 0.9
+    add(new THREE.SphereGeometry(0.05, 8, 6).scale(1, 0.4, 0.8), Math.cos(a) * 1.0, 0.19, Math.sin(a) * 1.0, shell)
+  }
+  // 깃발
+  add(new THREE.CylinderGeometry(0.008, 0.008, 0.5, 4), 0, 1.55, 0, new THREE.MeshStandardMaterial({ color: '#6b4320' }))
+  const flag = new THREE.Shape()
+  flag.moveTo(0, 0)
+  flag.lineTo(0.24, -0.07)
+  flag.lineTo(0, -0.14)
+  add(new THREE.ShapeGeometry(flag), 0.005, 1.78, 0, new THREE.MeshStandardMaterial({ color: '#e8473f', side: THREE.DoubleSide }))
+  g.traverse((o) => {
+    if (o instanceof THREE.Mesh) {
+      o.castShadow = true
+      o.receiveShadow = true
+    }
+  })
+  return g
+}
+
+/** 무너진 모래성: 울퉁불퉁한 모래 더미 + 부러진 탑 밑동 + 쓰러진 깃발 */
+export function makeSandRuin() {
+  const S = sandMat()
+  const g = new THREE.Group()
+  const r = seeded(5)
+  g.add(new THREE.Mesh(new THREE.CylinderGeometry(1.0, 1.25, 0.12, 24), S).translateY(0.06))
+  for (let i = 0; i < 9; i++) {
+    const a = r() * Math.PI * 2, d = r() * 0.8
+    const lump = new THREE.Mesh(new THREE.SphereGeometry(0.18 + r() * 0.2, 10, 8).scale(1, 0.45, 1), S)
+    lump.position.set(Math.cos(a) * d, 0.12, Math.sin(a) * d)
+    g.add(lump)
+  }
+  g.add(new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.4, 0.25, 14), S).translateY(0.2))
+  const stick = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.008, 0.5, 4), new THREE.MeshStandardMaterial({ color: '#6b4320' }))
+  stick.rotation.z = Math.PI / 2 - 0.1
+  stick.position.set(0.55, 0.08, 0.35)
+  g.add(stick)
+  g.traverse((o) => {
+    if (o instanceof THREE.Mesh) {
+      o.castShadow = true
+      o.receiveShadow = true
+    }
+  })
   return g
 }

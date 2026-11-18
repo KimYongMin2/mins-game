@@ -1,12 +1,13 @@
 import type { Referee, RefereeContext, RefereeFactory } from '../hub'
 import { type Catch, fishById, isBig, rollCatch } from '../../games/fishing/play/fish'
-import { BEDS, BOATS, BOAT_REACH, BOAT_SPEED, BOUNDS, LADDERS, RUN_SPEED, SPAWN, boatable, castTarget, landingSpot, nearBed, nearLadder, onLadderTop, walkable } from '../../games/fishing/play/map'
+import { BEDS, BOATS, BOAT_REACH, BOAT_SPEED, BOUNDS, BUILD_MS, CASTLES, LADDERS, nearCastle, RUN_SPEED, SPAWN, boatable, castTarget, landingSpot, nearBed, nearLadder, onLadderTop, walkable } from '../../games/fishing/play/map'
 import {
   BITE_MAX_MS,
   BITE_MIN_MS,
   BITE_WINDOW_MS,
   type BagItem,
   type BoatPub,
+  type CastlePub,
   BONK_MS,
   BONK_REACH,
   CHAT_MAX,
@@ -71,6 +72,15 @@ export function fishingReferee(_setup: unknown, ctx: RefereeContext): Referee {
   const boats = BOATS.map((b) => ({ x: b.x, z: b.z, r: b.r, rider: null as string | null, passenger: null as string | null, used: 0 }))
   const boatsPub = (): BoatPub[] => boats.map((b) => [b.x, b.z, b.r, b.rider, b.passenger])
   let lastHome = 0
+  const castles = CASTLES.map(() => ({ built: true, buildEnd: 0, builder: null as string | null }))
+  const castlesPub = (): CastlePub[] => castles.map((c) => [c.built ? 1 : 0, c.builder ? Math.max(0, c.buildEnd - ctx.now()) : 0, c.builder])
+  const allCastles = () => all({ t: 'castles', l: castlesPub() })
+  /** 이 사람이 쌓던 모래성은 멈춤 */
+  const stopBuilding = (id: string) => {
+    let changed = false
+    for (const c of castles) if (c.builder === id) ((c.builder = null), (changed = true))
+    if (changed) allCastles()
+  }
   const nameOf = (key: string) => ctx.members().find((m) => m.id === key)?.nickname ?? '익명'
 
   function join(key: string) {
@@ -84,7 +94,7 @@ export function fishingReferee(_setup: unknown, ctx: RefereeContext): Referee {
       players.set(key, p)
       all({ t: 'st', p: pub(p) })
     }
-    send(key, { t: 'init', you: key, players: [...players.values()].map(pub), saving: savingOn(), boats: boatsPub() })
+    send(key, { t: 'init', you: key, players: [...players.values()].map(pub), saving: savingOn(), boats: boatsPub(), castles: castlesPub() })
     if (p.uid) void loadProfile(p.uid).then((profile) => players.has(key) && send(key, { t: 'profile', profile }))
   }
 
@@ -144,6 +154,7 @@ export function fishingReferee(_setup: unknown, ctx: RefereeContext): Referee {
     // (손을 떼도 조금 미끄러지는 것·배가 출렁 밀리는 것으론 안 끊기게 — 배에서 던지자마자 거둬지던 문제)
     const drift = Math.hypot(p.x - p.castX, p.z - p.castZ)
     const reelOff = p.fishing !== 'none' && drift > (p.ride !== null ? 4 : 1)
+    if (moved) stopBuilding(p.id)
     if ((moved && (p.bed !== null || p.act)) || reelOff) {
       p.bed = null
       p.act = null
@@ -325,7 +336,41 @@ export function fishingReferee(_setup: unknown, ctx: RefereeContext): Referee {
         bestD = d
       }
     }
+    // 사람이 없으면 앞에 있는 모래성을 부숨 (서 있거나 쌓는 중인 것)
+    if (!best) {
+      let ci = -1
+      let cd = BONK_REACH + 0.9
+      CASTLES.forEach((c, i) => {
+        const dx = c.x - p.x, dz = c.z - p.z
+        const d = Math.hypot(dx, dz)
+        const k = castles[i]
+        if ((k.built || k.builder) && d < cd && (d < 1.1 || (dx * fx + dz * fz) / d > 0.3)) {
+          ci = i
+          cd = d
+        }
+      })
+      if (ci >= 0) {
+        castles[ci].built = false
+        castles[ci].builder = null
+        all({ t: 'bonk', id: p.id, to: null, castle: ci })
+        return allCastles()
+      }
+    }
     all({ t: 'bonk', id: p.id, to: best?.id ?? null })
+  }
+
+  /** 무너진 모래성 다시 쌓기 (가까이에서, 아무도 안 쌓고 있을 때) */
+  function build(p: P, i: unknown) {
+    if (typeof i !== 'number' || !Number.isInteger(i) || !castles[i]) return
+    const c = castles[i]
+    if (c.built || c.builder || p.ride !== null || p.up !== null || nearCastle(p.x, p.z) !== i) return
+    stopFishing(p)
+    p.act = null
+    p.bed = null
+    c.builder = p.id
+    c.buildEnd = ctx.now() + BUILD_MS
+    all({ t: 'st', p: pub(p) })
+    allCastles()
   }
 
   async function setTank(p: P, keys: unknown) {
@@ -414,6 +459,9 @@ export function fishingReferee(_setup: unknown, ctx: RefereeContext): Referee {
         case 'jump':
           jump(p)
           break
+        case 'build':
+          build(p, m.i)
+          break
       }
       return true
     },
@@ -429,6 +477,11 @@ export function fishingReferee(_setup: unknown, ctx: RefereeContext): Referee {
           all({ t: 'escape', id: p.id })
           all({ t: 'st', p: pub(p) })
         }
+      }
+      // 다 쌓은 모래성
+      if (castles.some((c) => c.builder && now >= c.buildEnd)) {
+        for (const c of castles) if (c.builder && now >= c.buildEnd) ((c.built = true), (c.builder = null))
+        allCastles()
       }
       // 오래 아무도 안 탄 배는 제자리로 (멀리 두고 가도 다른 사람이 탈 수 있게)
       if (now - lastHome > 10_000) {
@@ -458,6 +511,7 @@ export function fishingReferee(_setup: unknown, ctx: RefereeContext): Referee {
         leaveBoat(p)
         allBoats()
       }
+      if (p) stopBuilding(p.id)
       if (players.delete(key)) all({ t: 'gone', id: key })
     },
     finished: () => false,

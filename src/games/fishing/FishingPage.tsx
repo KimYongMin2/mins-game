@@ -16,7 +16,7 @@ import './fishing.css'
 
 const Scene3D = lazy(() => import('./game/Scene3D').then((m) => ({ default: m.Scene3D })))
 
-const ALT_LABEL: Record<NonNullable<Alt>, string> = { board: '배 타기', unboard: '내리기', noLand: '내리기', climb: '올라가기', down: '내려가기' }
+const ALT_LABEL: Record<NonNullable<Alt>, string> = { board: '배 타기', unboard: '내리기', noLand: '내리기', climb: '올라가기', down: '내려가기', build: '모래성 쌓기' }
 const ACTION_LABEL: Record<Action, string> = { reel: '잡기!', reelIn: '거두기', cast: '던지기', bed: '눕기', none: '물가로 가요' }
 
 const isTouch = () => typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches

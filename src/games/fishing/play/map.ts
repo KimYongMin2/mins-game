@@ -102,6 +102,28 @@ export const BEDS: Bed[] = [
 ]
 export const SPAWN = { x: 0, z: 9 }
 
+// ── 모래성 (뿅망치로 부수고, 다시 쌓을 수 있음 — 사용자 요청 2026-11-18). 안 막힘 ──
+export const CASTLES = [
+  { x: -11, z: 3 },
+  { x: 5, z: 5 },
+  { x: -30, z: 7 },
+]
+/** 모래성 쌓기를 시작할 수 있는 거리 · 걸리는 시간 */
+export const CASTLE_REACH = 2
+export const BUILD_MS = 4000
+export function nearCastle(x: number, z: number, reach = CASTLE_REACH): number | null {
+  let best: number | null = null
+  let bestD = reach
+  CASTLES.forEach((c, i) => {
+    const d = Math.hypot(c.x - x, c.z - z)
+    if (d < bestD) {
+      bestD = d
+      best = i
+    }
+  })
+  return best
+}
+
 // ── 집 안 (벽·가구) ──
 export type FurnKind = 'bed' | 'sofa' | 'shelf' | 'table' | 'fireplace' | 'kitchen'
 export type HouseLayout = { walls: Rect[]; furniture: { kind: FurnKind; rect: Rect; r: number }[]; inside: Rect }
