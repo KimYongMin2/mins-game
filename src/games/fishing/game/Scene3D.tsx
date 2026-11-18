@@ -1,9 +1,10 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import * as THREE from 'three'
 import { createStage, nearestOnScreen } from '../../../shared/art3d/stage'
 import { type AnimalRig, ANIMALS, makeAnimal, plainLook } from '../../../shared/art3d/animals'
 import { decodeLook } from '../../../shared/art3d/animalKinds'
-import { BEDS, PIER, POND, SEA_EAST, STREAM, shoreZ } from '../play/map'
+import { BEDS, BOUNDS, groundY } from '../play/map'
+import { buildWorld } from './worldArt'
 import { fishImageUrl } from '../field/fishArt'
 import { type Catch, fishById, IRO } from '../play/fish'
 import { CAM_LIMITS, type World } from './useFishingRoom'
@@ -68,139 +69,20 @@ function mat(color: string, rough = 0.85) {
   return new THREE.MeshStandardMaterial({ color, roughness: rough })
 }
 
-/** 맵 (땅·물·부두·썬베드·나무). 돌려주는 것 = 카메라와 나 사이에 오면 반투명해질 것 (파라솔·나무) */
-function buildWorld(scene: THREE.Scene): THREE.Group[] {
-  const occluders: THREE.Group[] = []
-  const flat = (geo: THREE.BufferGeometry, m: THREE.Material, y: number) => {
-    const mesh = new THREE.Mesh(geo, m)
-    mesh.rotation.x = -Math.PI / 2
-    mesh.position.y = y
-    mesh.receiveShadow = true
-    scene.add(mesh)
-    return mesh
-  }
-  // 바다 (아주 넓게)
-  flat(new THREE.PlaneGeometry(260, 260), new THREE.MeshStandardMaterial({ color: '#2f86c6', roughness: 0.3, metalness: 0.05 }), -0.12)
-  // 모래사장: 물가선을 따라 (모양 좌표는 (x, -z))
-  const sand = new THREE.Shape()
-  sand.moveTo(-80, -shoreZ(-80))
-  for (let x = -80; x <= SEA_EAST; x += 0.5) sand.lineTo(x, -shoreZ(x))
-  sand.lineTo(SEA_EAST, -60)
-  sand.lineTo(-80, -60)
-  flat(new THREE.ShapeGeometry(sand), mat('#efd9a0'), 0)
-  // 젖은 모래 띠
-  const wet = new THREE.Shape()
-  wet.moveTo(-80, -shoreZ(-80))
-  for (let x = -80; x <= SEA_EAST; x += 0.5) wet.lineTo(x, -shoreZ(x))
-  for (let x = SEA_EAST; x >= -80; x -= 0.5) wet.lineTo(x, -(shoreZ(x) + 0.9))
-  flat(new THREE.ShapeGeometry(wet), mat('#d9bf86'), 0.004)
-  // 풀밭 (오른쪽, 북쪽 끝까지)
-  flat(new THREE.PlaneGeometry(80, 140).translate(SEA_EAST + 40, -10, 0), mat('#7cc46a'), 0.01)
-  // 연못·개울
-  const fresh = new THREE.MeshStandardMaterial({ color: '#3fa3a8', roughness: 0.25 })
-  flat(new THREE.CircleGeometry(POND.r, 40).translate(POND.x, -POND.z, 0), fresh, 0.03)
-  const len = Math.hypot(STREAM.bx - STREAM.ax, STREAM.bz - STREAM.az)
-  const stream = flat(new THREE.PlaneGeometry(STREAM.half * 2, len + 2), fresh, 0.03)
-  stream.position.set((STREAM.ax + STREAM.bx) / 2, 0.03, (STREAM.az + STREAM.bz) / 2)
-  stream.rotation.set(-Math.PI / 2, 0, -Math.atan2(STREAM.bx - STREAM.ax, STREAM.bz - STREAM.az))
-  // 연못 돌
-  const stone = mat('#9aa3ad')
-  for (let i = 0; i < 18; i++) {
-    const a = (i / 18) * Math.PI * 2
-    const s = new THREE.Mesh(new THREE.SphereGeometry(0.35 + (i % 3) * 0.1, 8, 6), stone)
-    s.position.set(POND.x + Math.cos(a) * (POND.r + 0.3), 0.08, POND.z + Math.sin(a) * (POND.r + 0.3))
-    s.scale.y = 0.5
-    s.castShadow = true
-    scene.add(s)
-  }
-  // 바다와 풀밭 사이 바위
-  for (let z = shoreZ(SEA_EAST); z > -22; z -= 1.4) {
-    const s = new THREE.Mesh(new THREE.DodecahedronGeometry(0.8 + (Math.abs(z) % 3) * 0.2), mat('#8b8f99'))
-    s.position.set(SEA_EAST - 0.2, 0.2, z)
-    s.castShadow = true
-    scene.add(s)
-  }
-  // 부두 (나무 판 + 기둥)
-  const wood = mat('#a9733f', 0.7)
-  const pierEnd = shoreZ((PIER.minX + PIER.maxX) / 2) + 0.5
-  const pierLen = pierEnd - PIER.minZ
-  const deck = new THREE.Mesh(new THREE.BoxGeometry(PIER.maxX - PIER.minX, 0.18, pierLen), wood)
-  deck.position.set((PIER.minX + PIER.maxX) / 2, 0.12, (PIER.minZ + pierEnd) / 2)
-  deck.receiveShadow = true
-  deck.castShadow = true
-  scene.add(deck)
-  for (let z = PIER.minZ + 0.4; z < pierEnd; z += 2.4) {
-    for (const x of [PIER.minX + 0.15, PIER.maxX - 0.15]) {
-      const post = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.14, 1.2, 8), mat('#6b4320'))
-      post.position.set(x, -0.3, z)
-      scene.add(post)
-    }
-  }
-  for (let z = PIER.minZ + 0.6; z < pierEnd; z += 0.6) {
-    const gap = new THREE.Mesh(new THREE.BoxGeometry(PIER.maxX - PIER.minX, 0.01, 0.04), mat('#7a4e26'))
-    gap.position.set((PIER.minX + PIER.maxX) / 2, 0.215, z)
-    scene.add(gap)
-  }
-  // 썬베드 (앞이 물 쪽, 머리 쪽 등받이)
-  const cushions = ['#ff8a7a', '#7cc8ff', '#ffd23f', '#9be08a', '#c79bff']
-  BEDS.forEach((b, i) => {
-    const g = new THREE.Group()
-    g.position.set(b.x, 0, b.z)
-    g.rotation.y = b.r
-    const frame = new THREE.Mesh(new THREE.BoxGeometry(0.95, 0.12, 2.1), mat('#f4f2ff', 0.5))
-    frame.position.y = 0.32
-    const cushion = new THREE.Mesh(new THREE.BoxGeometry(0.85, 0.08, 1.6), mat(cushions[i % cushions.length], 0.9))
-    cushion.position.set(0, 0.42, 0.2)
-    const back = new THREE.Mesh(new THREE.BoxGeometry(0.85, 0.08, 0.8), mat(cushions[i % cushions.length], 0.9))
-    back.position.set(0, 0.62, -0.75)
-    back.rotation.x = 0.7
-    for (const [x, z] of [[-0.4, 0.9], [0.4, 0.9], [-0.4, -0.9], [0.4, -0.9]]) {
-      const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.32, 6), mat('#cfd3e6'))
-      leg.position.set(x, 0.16, z)
-      g.add(leg)
-    }
-    g.add(frame, cushion, back)
-    g.traverse((o) => (o.castShadow = true))
-    scene.add(g)
-  })
-  // 파라솔
-  for (const x of [-5, 3]) {
-    const g = new THREE.Group()
-    // 물가 바로 뒤 (카메라와 나 사이를 가리지 않게 썬베드 사이에)
-    g.position.set(x, 0, shoreZ(x) + 1.4)
-    const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 2.6, 8), mat('#f4f2ff'))
-    pole.position.y = 1.3
-    const top = new THREE.Mesh(new THREE.ConeGeometry(1.6, 0.6, 12, 1, true), new THREE.MeshStandardMaterial({ color: x < 0 ? '#e8473f' : '#3f8fd0', side: THREE.DoubleSide, roughness: 0.8 }))
-    top.position.y = 2.6
-    g.add(pole, top)
-    g.traverse((o) => (o.castShadow = true))
-    scene.add(g)
-    occluders.push(g)
-  }
-  // 나무
-  const trunk = mat('#7a4e26')
-  const leaf = mat('#3f8a3a')
-  for (const [x, z, s] of [[16, -10, 1.2], [26, -4, 1], [25, 12, 1.3], [14, 14, 0.9], [-24, 10, 1.1], [-18, 13, 0.9], [8, 13, 1]] as const) {
-    const g = new THREE.Group()
-    g.position.set(x, 0, z)
-    g.scale.setScalar(s)
-    const t = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.28, 1.6, 8), trunk)
-    t.position.y = 0.8
-    const l = new THREE.Mesh(new THREE.SphereGeometry(1.2, 12, 10), leaf)
-    l.position.y = 2.2
-    const l2 = new THREE.Mesh(new THREE.SphereGeometry(0.9, 12, 10), leaf)
-    l2.position.set(0.6, 1.9, 0.3)
-    g.add(t, l, l2)
-    g.traverse((o) => (o.castShadow = true))
-    scene.add(g)
-    occluders.push(g)
-  }
-  return occluders
-}
-
 export function Scene3D({ world, step, onTapPlayer }: { world: World; step: (dt: number) => void; onTapPlayer: (id: string) => void }) {
   const hostRef = useRef<HTMLDivElement>(null)
   const layerRef = useRef<HTMLDivElement>(null)
+  const miniRef = useRef<HTMLCanvasElement>(null)
+  const [bigMap, setBigMap] = useState(false)
+  // M: 지도 크게/작게 (채팅 칸에 쓰는 중이면 빼고)
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.code !== 'KeyM' || e.repeat || (e.target as HTMLElement)?.closest?.('input, textarea')) return
+      setBigMap((b) => !b)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
   const tapRef = useRef(onTapPlayer)
   const stepRef = useRef(step)
   useEffect(() => {
@@ -214,19 +96,18 @@ export function Scene3D({ world, step, onTapPlayer }: { world: World; step: (dt:
     if (!host || !layer) return
     const stage = createStage(host, { background: SKY, fov: 42, sway: 0 })
     const { scene, camera, lamp } = stage
-    scene.fog = new THREE.Fog(SKY, 32, 70)
-    camera.far = 140
+    camera.far = 460
     camera.updateProjectionMatrix()
-    // 야외: 해(넓게 밝게) + 나를 따라다니며 그림자를 만드는 조명
-    scene.add(new THREE.DirectionalLight('#fff4dc', 1.5).translateX(-10).translateY(20).translateZ(8))
+    // 하늘·해·바다·땅·구조물 (시각 따라 낮·노을·밤) + 나를 따라다니며 그림자를 만드는 조명
     lamp.intensity = 260
     lamp.distance = 50
     lamp.angle = Math.PI / 3.4
     lamp.penumbra = 0.6
     lamp.shadow.camera.far = 50
-    const occluders = buildWorld(scene)
+    const art = buildWorld(scene)
+    const occluders = art.occluders
     // 가리는 것들은 각자 재질을 따로 (반투명을 하나씩 바꾸려고)
-    for (const g of occluders)
+    for (const { g } of occluders)
       g.traverse((o) => {
         if (o instanceof THREE.Mesh) {
           o.material = (o.material as THREE.MeshStandardMaterial).clone()
@@ -344,6 +225,59 @@ export function Scene3D({ world, step, onTapPlayer }: { world: World; step: (dt:
     const v = new THREE.Vector3()
     const tipW = new THREE.Vector3()
     let raf = 0
+    // 미니맵: 바탕(맵) 위에 다른 사람 흰 점 · 나 노란 화살표 · 보는 쪽 부채꼴
+    const mini = miniRef.current
+    const mctx = mini?.getContext('2d') ?? null
+    let mapTick = 0
+    if (mini) {
+      mini.width = art.minimap.width
+      mini.height = art.minimap.height
+    }
+    function drawMinimap() {
+      if (!mctx || !mini) return
+      const K = mini.width / (BOUNDS.maxX - BOUNDS.minX)
+      mctx.drawImage(art.minimap, 0, 0)
+      const at = (x: number, z: number) => [(x - BOUNDS.minX) * K, (z - BOUNDS.minZ) * K] as const
+      for (const p of world.players.values()) {
+        if (p.id === world.me) continue
+        const [x, y] = at(p.sx, p.sz)
+        mctx.fillStyle = '#ffffff'
+        mctx.strokeStyle = '#1f1a4d'
+        mctx.lineWidth = 2
+        mctx.beginPath()
+        mctx.arc(x, y, 4, 0, Math.PI * 2)
+        mctx.fill()
+        mctx.stroke()
+      }
+      const me = world.players.get(world.me)
+      if (me) {
+        const [x, y] = at(me.sx, me.sz)
+        // 보는 쪽 (카메라는 yaw 반대편에서 봄)
+        const look = world.cam.yaw + Math.PI
+        mctx.fillStyle = 'rgba(255,255,255,0.28)'
+        mctx.beginPath()
+        mctx.moveTo(x, y)
+        mctx.arc(x, y, 26, Math.atan2(Math.cos(look), Math.sin(look)) - 0.55, Math.atan2(Math.cos(look), Math.sin(look)) + 0.55)
+        mctx.closePath()
+        mctx.fill()
+        const a = Math.atan2(Math.cos(me.sr), Math.sin(me.sr))
+        mctx.save()
+        mctx.translate(x, y)
+        mctx.rotate(a)
+        mctx.fillStyle = '#ffd23f'
+        mctx.strokeStyle = '#1f1a4d'
+        mctx.lineWidth = 2
+        mctx.beginPath()
+        mctx.moveTo(8, 0)
+        mctx.lineTo(-5, 5.5)
+        mctx.lineTo(-2, 0)
+        mctx.lineTo(-5, -5.5)
+        mctx.closePath()
+        mctx.fill()
+        mctx.stroke()
+        mctx.restore()
+      }
+    }
     let last = performance.now()
     const angleLerp = (a: number, b: number, k: number) => a + Math.atan2(Math.sin(b - a), Math.cos(b - a)) * k
 
@@ -396,7 +330,7 @@ export function Scene3D({ world, step, onTapPlayer }: { world: World; step: (dt:
           root.position.set(hx - Math.sin(b.r) * back, hy - up, hz - Math.cos(b.r) * back)
           root.rotation.set(lean, b.r, 0)
         } else {
-          root.position.set(p.sx, onPierY(p.sx, p.sz), p.sz)
+          root.position.set(p.sx, groundY(p.sx, p.sz), p.sz)
           root.rotation.set(0, p.sr, 0)
         }
         // 뿅망치: 들었다가 내리치기 (0.55초)
@@ -531,15 +465,19 @@ export function Scene3D({ world, step, onTapPlayer }: { world: World; step: (dt:
           camera.position.set(follow.x + fx * d * cp, follow.y + Math.sin(cam.pitch) * d, follow.z + fz * d * cp)
           camera.lookAt(follow)
         }
+        // 밤엔 손전등처럼 내 주변만 따뜻하게
+        lamp.intensity = 260 - art.night() * 110
+        lamp.color.set(art.night() > 0.5 ? '#ffd9a0' : '#ffe6c4')
         lamp.position.set(me.sx + 2, 14, me.sz + 4)
         lamp.target.position.set(me.sx, 0, me.sz - 2)
       }
       // 카메라와 나 사이를 가리는 파라솔·나무는 반투명하게 (3인칭)
       if (me && !world.cam.first) {
         seg.set(camera.position, v.set(me.sx, 0.9, me.sz))
-        for (const g of occluders) {
-          seg.closestPointToPoint(g.position.clone().setY(1.6), true, near)
-          const hide = near.distanceTo(g.position.clone().setY(1.6)) < 1.9 && near.distanceTo(seg.end) > 0.8
+        for (const { g, r, y } of occluders) {
+          const c = g.position.clone().setY(y)
+          seg.closestPointToPoint(c, true, near)
+          const hide = near.distanceTo(c) < r && near.distanceTo(seg.end) > 0.8
           g.traverse((o) => {
             if (o instanceof THREE.Mesh) {
               const m = o.material as THREE.MeshStandardMaterial
@@ -549,7 +487,9 @@ export function Scene3D({ world, step, onTapPlayer }: { world: World; step: (dt:
           })
         }
       }
+      art.update(t, dt)
       stage.render()
+      if (++mapTick % 4 === 0) drawMinimap()
 
       // 이름표·말풍선·!·잡은 물고기
       for (const a of actors.values()) {
@@ -631,6 +571,7 @@ export function Scene3D({ world, step, onTapPlayer }: { world: World; step: (dt:
       host.removeEventListener('pointercancel', onCancel)
       host.removeEventListener('wheel', onWheel)
       for (const a of actors.values()) removeActor(a)
+      art.dispose()
       bobGeo.dispose()
       ringGeo.dispose()
       stage.dispose()
@@ -641,9 +582,9 @@ export function Scene3D({ world, step, onTapPlayer }: { world: World; step: (dt:
     <div className="fs-scene">
       <div ref={hostRef} className="fs-scene__gl" />
       <div ref={layerRef} className="fs-scene__layer" aria-hidden="true" />
+      <button type="button" className={`fs-minimap${bigMap ? ' fs-minimap--big' : ''}`} onClick={() => setBigMap((b) => !b)} aria-label={bigMap ? '지도 작게' : '지도 크게'} title="지도 (M)">
+        <canvas ref={miniRef} />
+      </button>
     </div>
   )
 }
-
-/** 부두 위면 판자 높이만큼 */
-const onPierY = (x: number, z: number) => (x >= PIER.minX && x <= PIER.maxX && z < shoreZ(x) + 0.5 ? 0.21 : 0)

@@ -1,16 +1,33 @@
 import { describe, expect, it } from 'vitest'
-import { BEDS, PIER, POND, SPAWN, castTarget, moveBy, shoreZ, walkable, waterAt } from './map'
+import { BEDS, BRIDGE, JETTY, LAKE, LAKE_DOCK, PIER, PIER_END, SPAWN, STRUCTS, blocked, castTarget, moveBy, shoreZ, walkable, waterAt } from './map'
 import { FISH, rollCatch } from './fish'
 
 describe('낚시터 맵', () => {
   it('바다·민물·땅', () => {
-    expect(waterAt(0, -12)).toBe('sea')
-    expect(waterAt(POND.x, POND.z)).toBe('fresh')
+    expect(waterAt(0, -20)).toBe('sea')
+    expect(waterAt(LAKE.x, LAKE.z)).toBe('fresh')
     expect(waterAt(SPAWN.x, SPAWN.z)).toBeNull()
     expect(walkable(SPAWN.x, SPAWN.z)).toBe(true)
-    expect(walkable(0, -12)).toBe(false)
-    // 부두 위는 바다 위지만 걸을 수 있음
-    expect(walkable((PIER.minX + PIER.maxX) / 2, -14)).toBe(true)
+    expect(walkable(0, -20)).toBe(false)
+    // 부두·방파제·다리·호수 선착장 위는 물 위지만 걸을 수 있음
+    expect(walkable((PIER.minX + PIER.maxX) / 2, -20)).toBe(true)
+    expect(walkable(-30, -37)).toBe(true)
+    expect(walkable((JETTY.minX + JETTY.maxX) / 2, -20)).toBe(true)
+    expect(waterAt(35.6, -7.6)).toBe('fresh')
+    expect(walkable(35.6, (BRIDGE.minZ + BRIDGE.maxZ) / 2)).toBe(true)
+    expect(walkable(35.6, BRIDGE.minZ - 0.5)).toBe(false)
+    expect(walkable(LAKE_DOCK.minX + 4, (LAKE_DOCK.minZ + LAKE_DOCK.maxZ) / 2)).toBe(true)
+  })
+
+  it('구조물은 막히고, 처음 자리·썬베드는 안 막힘', () => {
+    const shop = STRUCTS.find((s) => s.kind === 'shop')!
+    expect(walkable(shop.x, shop.z)).toBe(false)
+    expect(blocked(SPAWN.x, SPAWN.z)).toBe(false)
+    for (const b of BEDS) expect(blocked(b.x, b.z)).toBe(false)
+    // 구조물이 물가를 따라 걷는 길을 막지 않음 (모래사장 가로질러 걷기)
+    let p = { x: -45, z: 11 }
+    for (let i = 0; i < 400; i++) p = moveBy(p.x, p.z, 0.25, 0)
+    expect(p.x).toBeGreaterThan(20)
   })
 
   it('물에는 못 들어가고 미끄러짐', () => {
@@ -25,10 +42,14 @@ describe('낚시터 맵', () => {
     expect(t?.zone).toBe('sea')
     expect(waterAt(t!.bob[0], t!.bob[1])).toBe('sea')
     expect(castTarget(SPAWN.x, SPAWN.z + 8, 0)).toBeNull()
-    // 부두 끝: 바다
-    expect(castTarget(-13.5, -16.5, Math.PI)?.zone).toBe('sea')
-    // 연못가: 민물
-    expect(castTarget(POND.x - POND.r - 1, POND.z, Math.PI / 2)?.zone).toBe('fresh')
+    // 부두 끝·방파제: 바다, 찌는 판자 위가 아니라 물에
+    const end = castTarget(-30, PIER_END.minZ + 0.5, Math.PI)
+    expect(end?.zone).toBe('sea')
+    expect(end!.bob[1]).toBeLessThan(PIER_END.minZ)
+    expect(castTarget(JETTY.minX + 0.5, -20, -Math.PI / 2)?.zone).toBe('sea')
+    // 호숫가·다리 위: 민물
+    expect(castTarget(LAKE.x - LAKE.r - 1, LAKE.z + 3, Math.PI / 2)?.zone).toBe('fresh')
+    expect(castTarget(35.6, BRIDGE.minZ + 0.4, Math.PI)?.zone).toBe('fresh')
   })
 
   it('썬베드에 누워서도 물에 닿음', () => {

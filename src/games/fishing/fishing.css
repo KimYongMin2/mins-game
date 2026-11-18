@@ -142,3 +142,9 @@
 .fs-bonk small { font-family: 'IBM Plex Sans KR', sans-serif; font-size: 10px; font-weight: 700; opacity: 0.85; }
 .fs-bonk:active { transform: translateY(3px); box-shadow: 0 1px 0 #a3241b; }
 @media (max-height: 420px) { .fs-bonk { right: calc(128px + env(safe-area-inset-right, 0px)); bottom: calc(70px + env(safe-area-inset-bottom, 0px)); width: 54px; height: 54px; font-size: 19px; } }
+
+/* 미니맵 (왼쪽 위 버튼 줄 아래, 누르면 크게) */
+.fs-minimap { position: absolute; z-index: 3; top: calc(58px + env(safe-area-inset-top, 0px)); left: calc(10px + env(safe-area-inset-left, 0px)); width: 150px; padding: 0; border: 2px solid #1f1a4d; border-radius: 2px; background: #1f1a4d; box-shadow: 0 3px 0 #120e33; cursor: pointer; line-height: 0; opacity: 0.92; }
+.fs-minimap canvas { display: block; width: 100%; height: auto; }
+.fs-minimap--big { width: min(70vw, 560px); opacity: 1; }
+@media (max-height: 460px) { .fs-minimap { width: 118px; top: calc(52px + env(safe-area-inset-top, 0px)); } .fs-minimap--big { width: min(60vw, 420px); } }

@@ -12491,67 +12491,476 @@ const isBig = (c) => !!c.iro || [
 //#endregion
 //#region src/games/fishing/play/map.ts
 const BOUNDS = {
-	minX: -28,
-	maxX: 28,
-	minZ: -18,
-	maxZ: 16
+	minX: -64,
+	maxX: 64,
+	minZ: -40,
+	maxZ: 46
 };
-const shoreZ = (x) => -6 + Math.sin(x * .25) * 1;
+const shoreZ = (x) => -8 + Math.sin(x * .13) * 2.2 + Math.sin(x * .31 + 1) * .6;
+/** 긴 나무 부두 (몸통 + 끝의 넓은 자리) */
 const PIER = {
-	minX: -15,
-	maxX: -12,
-	minZ: -17
+	minX: -34,
+	maxX: -31,
+	minZ: -34,
+	maxZ: 0
 };
-const POND = {
-	x: 19,
-	z: 6,
-	r: 4.5
+const PIER_END = {
+	minX: -39,
+	maxX: -26,
+	minZ: -39,
+	maxZ: -34
 };
-const STREAM = {
-	ax: 24,
-	az: -18,
-	bx: 21,
-	bz: 2,
-	half: 1.3
+/** 바위 방파제 (끝에 등대) */
+const JETTY = {
+	minX: -56,
+	maxX: -51,
+	minZ: -36,
+	maxZ: 0
 };
+/** 가운데 작은 배 선착장 */
+const DOCK = {
+	minX: 6,
+	maxX: 8.5,
+	minZ: -19,
+	maxZ: 0
+};
+/** 호수와 강 (민물). 강은 꺾은선, 반폭 half */
+const LAKE = {
+	x: 44,
+	z: 24,
+	r: 11
+};
+const RIVER = {
+	pts: [
+		[47, -54],
+		[42, -24],
+		[35, -6],
+		[37, 8],
+		[41, 15]
+	],
+	half: 2
+};
+const WALK_ON_WATER = [
+	PIER,
+	PIER_END,
+	JETTY,
+	DOCK,
+	{
+		minX: 30,
+		maxX: 41,
+		minZ: -9.2,
+		maxZ: -6.2
+	},
+	{
+		minX: 30,
+		maxX: 37.5,
+		minZ: 23,
+		maxZ: 25.2
+	}
+];
 /** 물가에서 이만큼 안이면 던질 수 있음 */
 const CAST_REACH = 3.2;
-/** 썬베드: 바닷가 물가를 따라 4개(바다 쪽을 봄) + 연못가 1개 */
-const BEDS = [...[
-	-7,
-	-3,
-	1,
-	5
-].map((x) => ({
-	x,
-	z: shoreZ(x) + 2.4,
-	r: Math.PI
-})), {
-	x: 13.4,
-	z: 9.5,
-	r: Math.atan2(POND.x - 13.4, POND.z - 9.5)
-}];
-const onPier = (x, z) => x >= PIER.minX && x <= PIER.maxX && z >= PIER.minZ && z <= shoreZ(x) + .5;
-function streamDist(x, z) {
-	const { ax, az, bx, bz } = STREAM;
-	const dx = bx - ax, dz = bz - az;
-	const t = Math.max(0, Math.min(1, ((x - ax) * dx + (z - az) * dz) / (dx * dx + dz * dz)));
-	return Math.hypot(x - (ax + dx * t), z - (az + dz * t));
+const S = [
+	{
+		kind: "lighthouse",
+		x: -53.5,
+		z: -33,
+		c: 2.2
+	},
+	{
+		kind: "shop",
+		x: -14,
+		z: 24,
+		w: 8,
+		d: 5.5,
+		label: "낚시 가게"
+	},
+	{
+		kind: "house",
+		x: 6,
+		z: 34,
+		w: 7,
+		d: 6,
+		color: "#e8473f"
+	},
+	{
+		kind: "house",
+		x: 19,
+		z: 33,
+		w: 6,
+		d: 6,
+		color: "#3f8fd0"
+	},
+	{
+		kind: "house",
+		x: -30,
+		z: 33,
+		w: 7,
+		d: 6,
+		color: "#2f9e6a"
+	},
+	{
+		kind: "house",
+		x: -46,
+		z: 30,
+		w: 6.5,
+		d: 6,
+		color: "#c79bff"
+	},
+	{
+		kind: "fountain",
+		x: -10,
+		z: 37,
+		c: 2.4
+	},
+	{
+		kind: "vending",
+		x: -8.6,
+		z: 24,
+		w: 1.1,
+		d: .9
+	},
+	{
+		kind: "well",
+		x: 30,
+		z: 38,
+		c: 1.1
+	},
+	...[
+		-46,
+		-42,
+		-38
+	].map((x, i) => ({
+		kind: "hut",
+		x,
+		z: 9,
+		w: 2.6,
+		d: 2.6,
+		color: [
+			"#ff8a7a",
+			"#7cc8ff",
+			"#ffd23f"
+		][i]
+	})),
+	{
+		kind: "tower",
+		x: 14,
+		z: 2.5,
+		w: 2.2,
+		d: 2.2
+	},
+	{
+		kind: "fire",
+		x: -20,
+		z: 9,
+		c: 1.4
+	},
+	{
+		kind: "boat",
+		x: -24,
+		z: 4,
+		r: .4,
+		c: 1.6,
+		color: "#e8473f"
+	},
+	{
+		kind: "boat",
+		x: 18,
+		z: 7,
+		r: -.3,
+		c: 1.6,
+		color: "#3f8fd0"
+	},
+	{
+		kind: "crate",
+		x: -29.5,
+		z: 2.5,
+		w: 1.6,
+		d: 1.2
+	},
+	{
+		kind: "crate",
+		x: 9.6,
+		z: 1.6,
+		w: 1.2,
+		d: 1.2
+	},
+	{
+		kind: "flag",
+		x: 11.5,
+		z: 3.5,
+		c: .2
+	},
+	...[
+		-50,
+		-36,
+		-6,
+		4
+	].map((x) => ({
+		kind: "bench",
+		x,
+		z: 17.8,
+		w: 2,
+		d: .8
+	})),
+	...[
+		-56,
+		-42,
+		-28,
+		-14,
+		0,
+		14
+	].map((x) => ({
+		kind: "lamp",
+		x,
+		z: 15,
+		c: .25
+	})),
+	...[
+		-4,
+		8,
+		22,
+		-24,
+		36
+	].map((x, i) => ({
+		kind: "lamp",
+		x,
+		z: [
+			28,
+			28,
+			26,
+			28,
+			30
+		][i],
+		c: .25
+	})),
+	{
+		kind: "sign",
+		x: 24,
+		z: 16,
+		c: .25,
+		label: "← 바다 · 호수 →"
+	},
+	{
+		kind: "sign",
+		x: -50,
+		z: 4,
+		c: .25,
+		label: "등대 방파제"
+	},
+	{
+		kind: "cabin",
+		x: 57,
+		z: 8,
+		w: 6,
+		d: 5
+	},
+	...[
+		[50, 40],
+		[56, 32],
+		[28, 30]
+	].map(([x, z]) => ({
+		kind: "table",
+		x,
+		z,
+		w: 2,
+		d: 1.6
+	})),
+	{
+		kind: "boat",
+		x: 34,
+		z: 27,
+		r: 1.2,
+		c: 0,
+		color: "#ffd23f"
+	},
+	...[
+		[-58, 12],
+		[-34, 12],
+		[-27, 13],
+		[-10, 12.5],
+		[-2, 13],
+		[10, 12],
+		[17, 12.5],
+		[-52, 8]
+	].map(([x, z], i) => ({
+		kind: "palm",
+		x,
+		z,
+		c: .45,
+		s: .9 + i % 3 * .15
+	})),
+	...[
+		[26, -36],
+		[30, -30],
+		[27, -22],
+		[52, -34],
+		[58, -26],
+		[54, -16],
+		[60, -6],
+		[50, -2],
+		[28, -14],
+		[56, 2],
+		[62, 16],
+		[26, 2],
+		[60, 44],
+		[40, 42],
+		[52, 44]
+	].map(([x, z], i) => ({
+		kind: "pine",
+		x,
+		z,
+		c: .8,
+		s: 1 + i % 4 * .18
+	})),
+	...[
+		[-56, 38],
+		[-22, 42],
+		[-2, 43],
+		[12, 42],
+		[28, 44],
+		[-38, 42]
+	].map(([x, z], i) => ({
+		kind: "tree",
+		x,
+		z,
+		c: .6,
+		s: 1 + i % 3 * .2
+	})),
+	...[
+		[
+			23,
+			-30,
+			1.6
+		],
+		[
+			24,
+			-18,
+			1.2
+		],
+		[
+			23,
+			-12,
+			1.4
+		],
+		[
+			-60,
+			-2,
+			1.5
+		],
+		[
+			-48,
+			2,
+			1
+		],
+		[
+			48,
+			12,
+			.9
+		],
+		[
+			62,
+			30,
+			1.3
+		],
+		[
+			-20,
+			1,
+			.7
+		]
+	].map(([x, z, s]) => ({
+		kind: "rock",
+		x,
+		z,
+		c: s * .9,
+		s
+	})),
+	...[
+		-17,
+		-9,
+		-1,
+		3
+	].map((x, i) => ({
+		kind: "umbrella",
+		x: x - 2,
+		z: shoreZ(x - 2) + 1.4,
+		c: 0,
+		color: [
+			"#e8473f",
+			"#3f8fd0",
+			"#ffd23f",
+			"#2f9e6a"
+		][i]
+	}))
+];
+/** 썬베드: 바닷가 물가를 따라 8개(바다 쪽을 봄) + 호숫가 2개 + 부두 끝 1개 */
+const BEDS = [
+	...[
+		-21,
+		-17,
+		-13,
+		-9,
+		-5,
+		-1,
+		3,
+		16
+	].map((x) => ({
+		x,
+		z: shoreZ(x) + 2.4,
+		r: Math.PI
+	})),
+	...[[LAKE.x - 2, LAKE.z + LAKE.r + 2.2], [LAKE.x + 9, LAKE.z + 9]].map(([x, z]) => ({
+		x,
+		z,
+		r: Math.atan2(LAKE.x - x, LAKE.z - z)
+	})),
+	{
+		x: -28,
+		z: -36.2,
+		r: Math.PI
+	}
+];
+const SPAWN = {
+	x: 0,
+	z: 9
+};
+const inRect = (x, z, b) => x >= b.minX && x <= b.maxX && z >= b.minZ && z <= b.maxZ;
+const onBoards = (x, z) => WALK_ON_WATER.some((b) => inRect(x, z, b));
+function riverDist(x, z) {
+	let best = Infinity;
+	const p = RIVER.pts;
+	for (let i = 0; i < p.length - 1; i++) {
+		const [ax, az] = p[i], [bx, bz] = p[i + 1];
+		const dx = bx - ax, dz = bz - az;
+		const t = Math.max(0, Math.min(1, ((x - ax) * dx + (z - az) * dz) / (dx * dx + dz * dz)));
+		best = Math.min(best, Math.hypot(x - (ax + dx * t), z - (az + dz * t)));
+	}
+	return best;
 }
-/** 이 자리 물 (바다·민물), 땅이면 null */
+/** 이 자리 물 (바다·민물), 땅이면 null (부두·다리 아래도 물) */
 function waterAt(x, z) {
-	if (Math.hypot(x - POND.x, z - POND.z) < POND.r || streamDist(x, z) < STREAM.half) return "fresh";
-	if (x < 12 && z < shoreZ(x) && !onPier(x, z)) return "sea";
-	if (z < BOUNDS.minZ) return "sea";
+	if (Math.hypot(x - LAKE.x, z - LAKE.z) < LAKE.r || riverDist(x, z) < RIVER.half) return "fresh";
+	if (x < 22 && z < shoreZ(x)) return "sea";
+	if (x < 22 && z < BOUNDS.minZ) return "sea";
 	return null;
 }
-/** 걸을 수 있는 곳 (맵 안 + 물이 아님 — 부두 위는 됨) */
+/** 구조물에 막히는지 (사람 반지름 0.35 포함) */
+function blocked(x, z) {
+	const R = .35;
+	for (const s of S) if (s.w && s.d) {
+		if (Math.abs(x - s.x) < s.w / 2 + R && Math.abs(z - s.z) < s.d / 2 + R) return true;
+	} else if (s.c && Math.hypot(x - s.x, z - s.z) < s.c + R) return true;
+	return false;
+}
+/** 걸을 수 있는 곳 (맵 안 + 물이 아님(부두·다리 위는 됨) + 구조물이 아님) */
 function walkable(x, z) {
-	if (x < BOUNDS.minX || x > BOUNDS.maxX || z > BOUNDS.maxZ) return false;
-	if (onPier(x, z)) return true;
-	if (z < BOUNDS.minZ) return false;
+	if (x < BOUNDS.minX || x > BOUNDS.maxX || z > BOUNDS.maxZ || z < BOUNDS.minZ) return false;
+	if (blocked(x, z)) return false;
+	if (onBoards(x, z)) return true;
 	return waterAt(x, z) === null;
 }
+/** 던질 수 있는 물 (판자·다리 바로 밑은 빼고 — 찌가 판자 위에 떨어지지 않게) */
+const castWater = (x, z) => onBoards(x, z) ? null : waterAt(x, z);
 /**
 * 던질 곳 (r = 바라보는 방향, 앞이 (sin r, cos r)). 바라보는 쪽부터 양옆으로 넓혀 가며 가까운 물을 찾고,
 * 찌는 물가에서 조금 더 안쪽에 떨어진다. 물이 없으면 null
@@ -12561,10 +12970,10 @@ function castTarget(x, z, r, reach = CAST_REACH) {
 		const a = r + side * k * (Math.PI / 16);
 		const dx = Math.sin(a), dz = Math.cos(a);
 		for (let s = .3; s <= reach; s += .15) {
-			const zone = waterAt(x + dx * s, z + dz * s);
+			const zone = castWater(x + dx * s, z + dz * s);
 			if (!zone) continue;
 			let far = s;
-			for (let e = s; e <= s + 3; e += .25) if (waterAt(x + dx * e, z + dz * e) === zone) far = e;
+			for (let e = s; e <= s + 3; e += .25) if (castWater(x + dx * e, z + dz * e) === zone) far = e;
 			const d = Math.min(far, s + 2.2);
 			return {
 				zone,
@@ -12765,8 +13174,8 @@ function fishingReferee(_setup, ctx) {
 				id: key,
 				name: mem.nickname,
 				...mem.avatar ? { avatar: mem.avatar } : {},
-				x: r2(Math.cos(a) * 2.5),
-				z: r2(5 + Math.sin(a) * 1.5),
+				x: r2(SPAWN.x + Math.cos(a) * 2.5),
+				z: r2(SPAWN.z + Math.sin(a) * 1.5),
 				r: Math.PI,
 				bed: null,
 				fishing: "none",
@@ -12811,7 +13220,7 @@ function fishingReferee(_setup, ctx) {
 		p.lastMv = now;
 		let { x, z } = m;
 		const far = Math.hypot(x - p.x, z - p.z);
-		const allow = 5 * dt * 1.6 + .6;
+		const allow = 6 * dt * 1.6 + .6;
 		if (far > allow) {
 			x = p.x + (x - p.x) / far * allow;
 			z = p.z + (z - p.z) / far * allow;

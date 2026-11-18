@@ -1,6 +1,6 @@
 import type { Referee, RefereeContext, RefereeFactory } from '../hub'
 import { type Catch, fishById, isBig, rollCatch } from '../../games/fishing/play/fish'
-import { BEDS, BOUNDS, WALK_SPEED, castTarget, nearBed, walkable } from '../../games/fishing/play/map'
+import { BEDS, BOUNDS, SPAWN, WALK_SPEED, castTarget, nearBed, walkable } from '../../games/fishing/play/map'
 import {
   BITE_MAX_MS,
   BITE_MIN_MS,
@@ -73,7 +73,7 @@ export function fishingReferee(_setup: unknown, ctx: RefereeContext): Referee {
     if (!p) {
       // 빈자리 근처에서 시작 (겹치지 않게 조금씩 흩뿌림)
       const a = rand() * Math.PI * 2
-      p = { id: key, name: mem.nickname, ...(mem.avatar ? { avatar: mem.avatar } : {}), x: r2(Math.cos(a) * 2.5), z: r2(5 + Math.sin(a) * 1.5), r: Math.PI, bed: null, fishing: 'none', bob: null, uid: mem.uid ?? null, castAt: 0, biteAt: 0, biteUntil: 0, zone: null, lastMv: ctx.now(), lastChat: 0, lastBonk: 0 }
+      p = { id: key, name: mem.nickname, ...(mem.avatar ? { avatar: mem.avatar } : {}), x: r2(SPAWN.x + Math.cos(a) * 2.5), z: r2(SPAWN.z + Math.sin(a) * 1.5), r: Math.PI, bed: null, fishing: 'none', bob: null, uid: mem.uid ?? null, castAt: 0, biteAt: 0, biteUntil: 0, zone: null, lastMv: ctx.now(), lastChat: 0, lastBonk: 0 }
       players.set(key, p)
       all({ t: 'st', p: pub(p) })
     }

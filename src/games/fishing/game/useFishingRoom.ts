@@ -58,7 +58,7 @@ export type World = {
   cam: { yaw: number; pitch: number; dist: number; first: boolean; spin: number }
 }
 
-export const CAM_LIMITS = { third: { min: 0.2, max: 1.35 }, first: { min: -0.7, max: 1.0 }, dist: { min: 5, max: 18 } }
+export const CAM_LIMITS = { third: { min: 0.2, max: 1.35 }, first: { min: -0.7, max: 1.0 }, dist: { min: 5, max: 24 } }
 
 export type Toast = { key: number; text: string; color: string; c?: Catch }
 export type ChatLine = { key: number; name: string; text: string; mine: boolean }
