@@ -1,5 +1,6 @@
 import * as THREE from 'three'
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
+import { kit, makeBoat, makePalm, makePine, makeTree, makeUmbrella, rockGeo } from './props3d'
 import { BEDS, BOUNDS, BRIDGE, DOCK, type FurnKind, HOUSES, JETTY, LADDERS, LAKE, LAKE_DOCK, PIER, PIER_END, RIVER, type Rect, SEA_EAST, STRUCTS, type Struct, shoreZ, waterAt } from '../play/map'
 
 // 낚시터 3D 맵 그림 (2026-11-18 사용자 요청 — 더 사실적이고 넓게, 구조물 많이, 추가할 만한 것 다).
@@ -126,7 +127,8 @@ function mergeByMaterial(root: THREE.Object3D, rel: THREE.Matrix4) {
     if (!(o instanceof THREE.Mesh) || Array.isArray(o.material)) return
     let geo = o.geometry.clone().applyMatrix4(m4.multiplyMatrices(rel, o.matrixWorld))
     if (geo.index) geo = geo.toNonIndexed()
-    for (const name of Object.keys(geo.attributes)) if (!['position', 'normal', 'uv'].includes(name)) geo.deleteAttribute(name)
+    const keep = ['position', 'normal', 'uv', ...((o.material as THREE.MeshStandardMaterial).vertexColors ? ['color'] : [])]
+    for (const name of Object.keys(geo.attributes)) if (!keep.includes(name)) geo.deleteAttribute(name)
     if (!geo.getAttribute('uv')) geo.setAttribute('uv', new THREE.Float32BufferAttribute(new Float32Array(geo.getAttribute('position').count * 2), 2))
     geo.clearGroups()
     const list = byMat.get(o.material) ?? []
@@ -159,20 +161,6 @@ function compact(g: THREE.Object3D) {
   return out
 }
 
-/** 울퉁불퉁한 바위 (같은 자리 꼭짓점은 같이 움직여 틈이 안 생김) */
-function rockGeo(size: number, seed: number) {
-  const g = new THREE.IcosahedronGeometry(size, 1)
-  const p = g.getAttribute('position') as THREE.BufferAttribute
-  for (let i = 0; i < p.count; i++) {
-    const x = p.getX(i), y = p.getY(i), z = p.getZ(i)
-    const n = Math.sin(x * 3.1 + seed) * Math.cos(z * 2.7 + seed * 1.3) * Math.sin(y * 2.3 + seed * 0.7)
-    const k = 1 + n * 0.28
-    p.setXYZ(i, x * k, y * k * 0.75, z * k)
-  }
-  g.computeVertexNormals()
-  return g
-}
-
 /** 줄무늬 텍스처 (판자 벽·기와) */
 function stripeTex(base: string, line: string, rows: number, opts: { tiles?: boolean; repeatX?: number; repeatY?: number } = {}) {
   const c = document.createElement('canvas')
@@ -196,48 +184,7 @@ function stripeTex(base: string, line: string, rows: number, opts: { tiles?: boo
   return t
 }
 
-/** 나무배 (뱃머리가 -z) — 3D 화면이 탈 수 있는 배를 그릴 때도 씀 */
-export function makeBoat(color: string) {
-  const g = new THREE.Group()
-  const s = new THREE.Shape()
-  s.moveTo(0, 1.9)
-  s.quadraticCurveTo(0.95, 0.9, 0.85, -1.4)
-  s.lineTo(-0.85, -1.4)
-  s.quadraticCurveTo(-0.95, 0.9, 0, 1.9)
-  const hull = new THREE.Mesh(new THREE.ExtrudeGeometry(s, { depth: 0.6, bevelEnabled: true, bevelSize: 0.05, bevelThickness: 0.05, bevelSegments: 1 }), new THREE.MeshStandardMaterial({ color, roughness: 0.55 }))
-  hull.rotation.x = -Math.PI / 2
-  const stripe = new THREE.Mesh(new THREE.ExtrudeGeometry(s, { depth: 0.08, bevelEnabled: false }), new THREE.MeshStandardMaterial({ color: '#f4f2ec', roughness: 0.6 }))
-  stripe.rotation.x = -Math.PI / 2
-  stripe.scale.set(1.035, 1.02, 1)
-  stripe.position.y = 0.5
-  const inner = new THREE.Mesh(new THREE.ExtrudeGeometry(s, { depth: 0.1, bevelEnabled: false }), new THREE.MeshStandardMaterial({ color: '#a9733f', roughness: 0.8 }))
-  inner.scale.set(0.85, 0.88, 1)
-  inner.rotation.x = -Math.PI / 2
-  inner.position.y = 0.3
-  const wood = new THREE.MeshStandardMaterial({ color: '#b98a5a', roughness: 0.8 })
-  const seat = (z: number) => {
-    const m = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.06, 0.32), wood)
-    m.position.set(0, 0.5, z)
-    return m
-  }
-  g.add(hull, stripe, inner, seat(0.2), seat(-0.8))
-  for (const sgn of [1, -1]) {
-    const oar = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 2.2, 5), wood)
-    oar.position.set(sgn * 0.8, 0.55, -0.2)
-    oar.rotation.set(Math.PI / 2, 0, sgn * 0.3)
-    const blade = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.18, 0.5), wood)
-    blade.position.set(sgn * 1.12, 0.45, 0.75)
-    blade.rotation.y = sgn * 0.3
-    g.add(oar, blade)
-  }
-  g.traverse((o) => {
-    if (o instanceof THREE.Mesh) {
-      o.castShadow = true
-      o.receiveShadow = true
-    }
-  })
-  return g
-}
+export { makeBoat } from './props3d'
 
 /** 해 그림자: 폰은 가볍게 (그리는 게 느리면 끊겨서 멀미가 남) */
 const TOUCH = typeof navigator !== 'undefined' && navigator.maxTouchPoints > 0
@@ -337,7 +284,7 @@ export function buildWorld(scene: THREE.Scene, renderer: THREE.WebGLRenderer): W
       normal = normalize(normal + (viewMatrix * vec4(r1*0.045, 0.0, r2*0.045, 0.0)).xyz);`,
     )
   }
-  const sea = new THREE.Mesh(new THREE.PlaneGeometry(700, 700, 175, 175), seaMat)
+  const sea = new THREE.Mesh(new THREE.PlaneGeometry(700, 700, 120, 120), seaMat)
   sea.rotation.x = -Math.PI / 2
   sea.position.y = -0.14
   sea.receiveShadow = true
@@ -380,10 +327,10 @@ export function buildWorld(scene: THREE.Scene, renderer: THREE.WebGLRenderer): W
   // 모래와 풀 사이 (부드럽게)
   flat(shapeGeo([[-260, 14.5], [SEA_EAST, 14.5], [SEA_EAST, 16.95], [-260, 16.95]], 6), new THREE.MeshStandardMaterial({ map: sandTex, color: '#c8c58c', roughness: 0.95 }), 0.008)
   // 동쪽 풀밭이 바다와 만나는 곳: 바위 둑
-  const rockM = new THREE.MeshStandardMaterial({ map: noiseTex('#8d929b', [['#767b84', 300, 4], ['#a3a8b0', 300, 3], ['#6d7a5f', 60, 3]], 1, 128), roughness: 0.95, flatShading: true })
+  const rockM = kit().rockM
   for (let z = shoreZ(SEA_EAST) + 1; z > -53; z -= 1.2) {
     const s = 0.7 + Math.abs(Math.sin(z * 2.1)) * 0.6
-    const r = new THREE.Mesh(rockGeo(s, z), rockM)
+    const r = new THREE.Mesh(rockGeo(s, z, { moss: false }), rockM)
     r.position.set(SEA_EAST - 0.4 + Math.sin(z) * 0.4, 0.1, z)
     r.rotation.set(z, z * 2, 0)
     statics.add(r)
@@ -433,7 +380,7 @@ export function buildWorld(scene: THREE.Scene, renderer: THREE.WebGLRenderer): W
   for (let i = 0; i < 46; i++) {
     const a = (i / 46) * Math.PI * 2
     if (Math.abs(a - Math.PI) < 0.2) continue // 선착장 자리
-    const s = new THREE.Mesh(rockGeo(0.35 + (i % 3) * 0.12, i), rockM)
+    const s = new THREE.Mesh(rockGeo(0.35 + (i % 3) * 0.12, i, { detail: 1 }), rockM)
     s.position.set(LAKE.x + Math.cos(a) * (LAKE.r + 0.35), 0.06, LAKE.z + Math.sin(a) * (LAKE.r + 0.35))
     s.scale.y = 0.55
     statics.add(s)
@@ -539,7 +486,7 @@ export function buildWorld(scene: THREE.Scene, renderer: THREE.WebGLRenderer): W
   fence(BOUNDS.minX + 0.4, BOUNDS.maxZ - 0.4, BOUNDS.maxX - 0.4, BOUNDS.maxZ - 0.4)
   fence(BOUNDS.maxX - 0.4, BOUNDS.maxZ - 0.4, BOUNDS.maxX - 0.4, BOUNDS.minZ + 0.4)
   fence(BOUNDS.maxX - 0.4, BOUNDS.minZ + 0.4, SEA_EAST + 1.5, BOUNDS.minZ + 0.4)
-  const fenceM = mat('#b98a5a', 0.9)
+  const fenceM = kit().weatheredM
   instanced(new THREE.BoxGeometry(0.16, 1.1, 0.16).translate(0, 0.55, 0), fenceM, posts, true)
   instanced(mergeGeometries([new THREE.BoxGeometry(0.07, 0.1, 2.4).translate(0, 0.85, 0), new THREE.BoxGeometry(0.07, 0.1, 2.4).translate(0, 0.45, 0)])!, fenceM, rails, true)
 
@@ -583,7 +530,7 @@ export function buildWorld(scene: THREE.Scene, renderer: THREE.WebGLRenderer): W
   statics.add(box(JETTY.maxX - JETTY.minX - 0.6, 0.5, jettyEnd - JETTY.minZ, mat('#b9b7b1', 0.95), (JETTY.minX + JETTY.maxX) / 2, 0.2, (JETTY.minZ + jettyEnd) / 2))
   for (let z = JETTY.minZ; z < jettyEnd; z += 1.1)
     for (const x of [JETTY.minX - 0.3, JETTY.maxX + 0.3]) {
-      const r = new THREE.Mesh(rockGeo(0.9 + rnd() * 0.5, z + x), rockM)
+      const r = new THREE.Mesh(rockGeo(0.9 + rnd() * 0.5, z + x, { moss: false }), rockM)
       r.position.set(x + (rnd() - 0.5) * 0.6, -0.1, z)
       r.rotation.set(rnd() * 3, rnd() * 3, 0)
       statics.add(r)
@@ -723,6 +670,8 @@ export function buildWorld(scene: THREE.Scene, renderer: THREE.WebGLRenderer): W
     const rc = compact(roof)
     scene.add(rc)
     roofs[idx] = rc
+    // 지붕도 카메라를 가리면 반투명 (집 뒤에 서면 지붕에 가려 안 보였음)
+    occluders.push({ g: rc, r: Math.max(w, d) / 2 + 0.8, y: 3.4, house: idx })
     // 바닥
     const floor = new THREE.Mesh(new THREE.PlaneGeometry(w - 0.1, d - 0.1), new THREE.MeshStandardMaterial({ map: floorTex, roughness: 0.75 }))
     floor.rotation.x = -Math.PI / 2
@@ -915,7 +864,7 @@ export function buildWorld(scene: THREE.Scene, renderer: THREE.WebGLRenderer): W
       case 'fire': {
         for (let i = 0; i < 9; i++) {
           const a = (i / 9) * Math.PI * 2
-          g.add(new THREE.Mesh(new THREE.DodecahedronGeometry(0.22), rockM).translateX(Math.cos(a) * 0.75).translateZ(Math.sin(a) * 0.75).translateY(0.1))
+          g.add(new THREE.Mesh(rockGeo(0.22, i, { detail: 1, moss: false }), rockM).translateX(Math.cos(a) * 0.75).translateZ(Math.sin(a) * 0.75).translateY(0.1))
         }
         for (const r of [0.3, 1.9]) {
           const l = cyl(0.09, 0.09, 1.1, mat('#5a3b22'), 0, 0.18, 0, 6)
@@ -952,57 +901,28 @@ export function buildWorld(scene: THREE.Scene, renderer: THREE.WebGLRenderer): W
         return null
       }
       case 'palm': {
-        const trunkM = mat('#9c7650', 0.9)
-        let x = 0, y = 0
-        const lean = (s.x * 7) % 1 > 0.5 ? 1 : -1
-        for (let i = 0; i < 8; i++) {
-          const seg = cyl(0.17 - i * 0.008, 0.2 - i * 0.008, 0.62, trunkM, x, y + 0.31, 0, 7)
-          seg.rotation.z = -lean * i * 0.035
-          g.add(seg)
-          g.add(cyl(0.21 - i * 0.008, 0.21 - i * 0.008, 0.06, mat('#7d5c3c'), x, y + 0.6, 0, 7))
-          x += lean * Math.sin(i * 0.035) * 0.62
-          y += 0.6
-        }
-        const crown = new THREE.Group()
-        crown.position.set(x, y, 0)
-        const leafM = new THREE.MeshStandardMaterial({ color: '#3f8f3a', roughness: 0.8, side: THREE.DoubleSide })
-        for (let i = 0; i < 8; i++) {
-          const leaf = new THREE.Group()
-          leaf.rotation.y = (i / 8) * Math.PI * 2
-          for (let k = 0; k < 4; k++) {
-            const p = box(0.55 - k * 0.08, 0.03, 0.75, leafM, 0, -k * k * 0.12, 0.35 + k * 0.7)
-            p.rotation.x = 0.15 + k * 0.28
-            leaf.add(p)
-          }
-          crown.add(leaf)
-        }
-        for (let i = 0; i < 3; i++) crown.add(new THREE.Mesh(new THREE.SphereGeometry(0.13, 8, 6), mat('#6b4a2a')).translateX(Math.cos(i * 2.1) * 0.2).translateZ(Math.sin(i * 2.1) * 0.2).translateY(-0.15))
-        g.add(crown)
-        g.scale.setScalar(sc)
-        occlude(g, 1.6 * sc, 3.5 * sc)
+        const t = makePalm(sc, s.x * 13 + s.z * 7)
+        g.add(t.group)
+        occlude(g, 2.2 * sc, t.height * 0.75)
         return null
       }
       case 'pine': {
-        g.add(cyl(0.18, 0.26, 1.6, mat('#6b4320'), 0, 0.8, 0, 8))
-        const pm = mat('#2f6e3a', 0.9)
-        ;[[1.6, 1.8, 1.9], [1.25, 1.6, 3], [0.85, 1.4, 4]].forEach(([r, h, y]) => g.add(new THREE.Mesh(new THREE.ConeGeometry(r, h, 9), pm).translateY(y)))
-        g.scale.setScalar(sc)
-        occlude(g, 1.6 * sc, 2.4 * sc)
+        const t = makePine(sc, s.x * 11 + s.z * 5)
+        g.add(t.group)
+        occlude(g, 1.8 * sc, t.height * 0.45)
         return null
       }
       case 'tree': {
-        g.add(cyl(0.2, 0.28, 1.8, mat('#7a4e26'), 0, 0.9, 0, 8))
-        const lm = mat('#4c9a3c', 0.85)
-        ;[[0, 2.5, 0, 1.3], [0.7, 2.2, 0.3, 0.9], [-0.6, 2.3, -0.3, 0.95], [0.1, 3.1, -0.2, 0.85]].forEach(([x, y, z, r]) => g.add(new THREE.Mesh(new THREE.IcosahedronGeometry(r, 1), lm).translateX(x).translateY(y).translateZ(z)))
-        g.scale.setScalar(sc)
-        occlude(g, 1.6 * sc, 2.5 * sc)
+        const t = makeTree(sc, s.x * 17 + s.z * 3)
+        g.add(t.group)
+        occlude(g, 2 * sc, t.height * 0.6)
         return null
       }
       case 'rock': {
-        const r = new THREE.Mesh(rockGeo(sc, s.x * 3 + s.z), rockM)
-        r.scale.set(1.1, 0.7, 0.9)
-        r.position.y = sc * 0.3
-        r.rotation.set(s.x, s.z, 0)
+        const r = new THREE.Mesh(rockGeo(sc, s.x * 3 + s.z, { detail: 3 }), rockM)
+        r.scale.set(1.15, 0.85, 0.95)
+        r.position.y = sc * 0.2
+        r.rotation.y = s.x
         g.add(r)
         statics.add(g)
         return null
@@ -1099,17 +1019,16 @@ export function buildWorld(scene: THREE.Scene, renderer: THREE.WebGLRenderer): W
         return null
       }
       case 'umbrella': {
-        g.add(cyl(0.04, 0.04, 2.6, whiteM, 0, 1.3, 0, 6))
-        const top = new THREE.Mesh(new THREE.ConeGeometry(1.6, 0.6, 12, 1, true), new THREE.MeshStandardMaterial({ color: s.color ?? '#e8473f', side: THREE.DoubleSide, roughness: 0.8 }))
-        top.position.y = 2.6
-        g.add(top, new THREE.Mesh(new THREE.ConeGeometry(0.5, 0.2, 12, 1, true), new THREE.MeshStandardMaterial({ color: '#ffffff', side: THREE.DoubleSide })).translateY(2.86))
+        g.add(makeUmbrella(s.color ?? '#e8473f'))
         occlude(g, 1.9, 1.6)
         return null
       }
       case 'crate': {
-        const cm = mat('#b0814e', 0.9)
-        g.add(box(s.w!, 0.9, s.d!, cm, 0, 0.45, 0))
-        for (const y of [0.08, 0.82]) g.add(box(s.w! + 0.02, 0.1, s.d! + 0.02, mat('#7d5432'), 0, y, 0))
+        // 판자로 짠 상자 + 모서리 각목
+        const K = kit()
+        g.add(box(s.w!, 0.9, s.d!, K.plankM, 0, 0.45, 0))
+        for (const [x, z] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) g.add(box(0.09, 0.92, 0.09, K.weatheredM, (x * s.w!) / 2, 0.46, (z * s.d!) / 2))
+        for (const y of [0.05, 0.86]) g.add(box(s.w! + 0.04, 0.08, s.d! + 0.04, K.weatheredM, 0, y, 0))
         statics.add(g)
         return null
       }

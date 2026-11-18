@@ -106,6 +106,7 @@ export function Scene3D({ world, step, onTapPlayer }: { world: World; step: (dt:
     lamp.penumbra = 0.6
     lamp.shadow.camera.far = 50
     const art = buildWorld(scene, stage.renderer)
+    if (import.meta.env.DEV) (window as unknown as { __fishStage?: unknown }).__fishStage = stage
     // 그림자는 해가 (내 주변), 따라다니는 조명은 밤에만 손전등처럼
     lamp.castShadow = false
     // 탈 수 있는 배 (탄 사람이 있으면 그 사람 자리)
