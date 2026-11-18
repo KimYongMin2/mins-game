@@ -77,7 +77,7 @@ export type World = {
    */
   cam: { yaw: number; pitch: number; dist: number; first: boolean; spin: number }
   /** 탈 수 있는 배들 (탄 사람이 있으면 그 사람 자리를 따라 그림) */
-  boats: { x: number; z: number; r: number; rider: string | null }[]
+  boats: { x: number; z: number; r: number; rider: string | null; passenger: string | null }[]
 }
 
 export const CAM_LIMITS = { third: { min: 0.2, max: 1.35 }, first: { min: -0.7, max: 1.0 }, dist: { min: 5, max: 24 } }
@@ -134,7 +134,7 @@ export function useFishingRoom(nickname: string, active: boolean) {
   const [action, setAction] = useState<Action>('none')
   const [alt, setAlt] = useState<Alt>(null)
   const roomRef = useRef<Room<ClientMsg> | null>(null)
-  const world = useRef<World>({ me: '', players: new Map(), input: { x: 0, y: 0, run: false }, cam: { yaw: 0, pitch: 0.82, dist: 11, first: false, spin: 0 }, vel: { x: 0, z: 0 }, boats: BOATS.map((b) => ({ x: b.x, z: b.z, r: b.r, rider: null })) }).current
+  const world = useRef<World>({ me: '', players: new Map(), input: { x: 0, y: 0, run: false }, cam: { yaw: 0, pitch: 0.82, dist: 11, first: false, spin: 0 }, vel: { x: 0, z: 0 }, boats: BOATS.map((b) => ({ x: b.x, z: b.z, r: b.r, rider: null, passenger: null })) }).current
   const keySeq = useRef(0)
   // 개발 모드에서만: 브라우저 시험이 상태를 볼 수 있게
   if (import.meta.env.DEV) (window as unknown as { __fishWorld?: World }).__fishWorld = world
@@ -191,8 +191,8 @@ export function useFishingRoom(nickname: string, active: boolean) {
       if (p.fishing !== 'bite') old.biteAt = 0
     }
     const setBoats = (l: BoatPub[]) => {
-      l.forEach(([x, z, r, rider], i) => {
-        if (world.boats[i]) Object.assign(world.boats[i], { x, z, r, rider })
+      l.forEach(([x, z, r, rider, passenger], i) => {
+        if (world.boats[i]) Object.assign(world.boats[i], { x, z, r, rider, passenger: passenger ?? null })
       })
     }
     const onMsg = (raw: unknown, from?: string) => {
@@ -369,6 +369,17 @@ export function useFishingRoom(nickname: string, active: boolean) {
       }
       // 사다리 오르내리는 동안은 못 움직임
       if (me.climb && now - me.climb.start < me.climb.dur) return
+      // 같이 탄 사람: 배(젓는 사람)를 따라감, 직접은 못 움직임
+      const myBoat = me.ride !== null ? world.boats[me.ride] : null
+      if (myBoat && myBoat.passenger === me.id) {
+        const rider = myBoat.rider ? world.players.get(myBoat.rider) : null
+        me.x = me.sx = rider ? rider.sx : myBoat.x
+        me.z = me.sz = rider ? rider.sz : myBoat.z
+        me.r = me.sr = rider ? rider.sr : myBoat.r
+        world.vel.x = world.vel.z = 0
+        me.speed = 0
+        return
+      }
       // 1인칭: 몸은 늘 보는 쪽을 향함 (던지는 방향 = 보는 방향)
       if (cam.first && me.bed === null) me.r = me.sr = cam.yaw + Math.PI
       // 빠르기는 부드럽게 붙었다 줄어듦 (확 출발·확 멈춤이 어지러워서)
@@ -535,7 +546,7 @@ function freeBoat(world: World, me: Shown): number | null {
   let bestD = BOAT_REACH
   world.boats.forEach((b, i) => {
     const d = Math.hypot(b.x - me.x, b.z - me.z)
-    if (!b.rider && d < bestD) {
+    if ((!b.rider || !b.passenger) && d < bestD) {
       bestD = d
       best = i
     }

@@ -356,10 +356,20 @@ export function Scene3D({ world, step, onTapPlayer }: { world: World; step: (dt:
           root.position.set(l.foot.x + (l.top.x - l.foot.x) * k, groundY(l.foot.x, l.foot.z) + l.y * k, l.foot.z + (l.top.z - l.foot.z) * k)
           root.rotation.set(0, Math.atan2(l.top.x - l.foot.x, l.top.z - l.foot.z), 0)
         } else if (p.ride !== null) {
-          // 배 가운데 앉는 판에 앉음 (배와 같이 출렁, 다리는 앞으로)
-          const seat = (boatObjs[p.ride]?.userData.seatY as number | undefined) ?? 0.49
-          root.position.set(p.sx, BOAT_Y + seat - 0.5 * SCALE + Math.sin(t * 1.3 + p.sx) * 0.05, p.sz)
-          root.rotation.set(0, p.sr, 0)
+          // 배 가운데 판(젓는 사람) 또는 앞 판(같이 탄 사람)에 앉음 — 배와 같이 출렁, 다리는 앞으로
+          const bo = boatObjs[p.ride]
+          const b = world.boats[p.ride]
+          const ud = (bo?.userData ?? {}) as { seatY?: number; seatY2?: number; seatFwd?: number }
+          if (b && b.passenger === p.id) {
+            const rider = b.rider ? world.players.get(b.rider) : null
+            const bx = rider ? rider.sx : b.x, bz = rider ? rider.sz : b.z, br = rider ? rider.sr : b.r
+            const f = ud.seatFwd ?? 0.88
+            root.position.set(bx + Math.sin(br) * f, BOAT_Y + (ud.seatY2 ?? 0.5) - 0.5 * SCALE + Math.sin(t * 1.3 + bx) * 0.05, bz + Math.cos(br) * f)
+            root.rotation.set(0, br, 0)
+          } else {
+            root.position.set(p.sx, BOAT_Y + (ud.seatY ?? 0.49) - 0.5 * SCALE + Math.sin(t * 1.3 + p.sx) * 0.05, p.sz)
+            root.rotation.set(0, p.sr, 0)
+          }
         } else {
           const gy = p.up !== null ? LADDERS[p.up].y : groundY(p.sx, p.sz)
           if (lyingDown) {

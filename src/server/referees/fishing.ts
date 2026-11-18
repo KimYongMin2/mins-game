@@ -68,8 +68,8 @@ export function fishingReferee(_setup: unknown, ctx: RefereeContext): Referee {
   let lastPos = 0
   const send = (to: string, m: ServerMsg) => ctx.sendTo(to, m)
   const all = (m: ServerMsg) => ctx.broadcast(m)
-  const boats = BOATS.map((b) => ({ x: b.x, z: b.z, r: b.r, rider: null as string | null, used: 0 }))
-  const boatsPub = (): BoatPub[] => boats.map((b) => [b.x, b.z, b.r, b.rider])
+  const boats = BOATS.map((b) => ({ x: b.x, z: b.z, r: b.r, rider: null as string | null, passenger: null as string | null, used: 0 }))
+  const boatsPub = (): BoatPub[] => boats.map((b) => [b.x, b.z, b.r, b.rider, b.passenger])
   let lastHome = 0
   const nameOf = (key: string) => ctx.members().find((m) => m.id === key)?.nickname ?? '익명'
 
@@ -99,6 +99,11 @@ export function fishingReferee(_setup: unknown, ctx: RefereeContext): Referee {
   function move(p: P, m: Extract<ClientMsg, { t: 'mv' }>) {
     if (!num(m.x, BOUNDS.minX - 1, BOUNDS.maxX + 1) || !num(m.z, BOUNDS.minZ - 1, BOUNDS.maxZ + 1) || !num(m.r, -100, 100)) return
     const now = ctx.now()
+    // 같이 탄 사람은 배를 못 움직임 (자리는 배를 따라감)
+    if (p.ride !== null && boats[p.ride].passenger === p.id) {
+      p.lastMv = now
+      return
+    }
     const dt = Math.min(2, (now - p.lastMv) / 1000)
     p.lastMv = now
     let { x, z } = m
@@ -122,6 +127,18 @@ export function fishingReferee(_setup: unknown, ctx: RefereeContext): Referee {
       b.z = p.z
       b.r = p.r
       b.used = now
+      // 같이 탄 사람도 배를 따라감
+      const q = b.passenger ? players.get(b.passenger) : undefined
+      if (q) {
+        q.x = p.x
+        q.z = p.z
+        q.r = p.r
+        posDirty.add(q.id)
+        if (q.fishing !== 'none' && Math.hypot(q.x - q.castX, q.z - q.castZ) > 4) {
+          stopFishing(q)
+          all({ t: 'st', p: pub(q) })
+        }
+      }
     }
     // 움직이면 일어나고, 던진 자리에서 꽤 벗어나면 낚싯대를 거둠
     // (손을 떼도 조금 미끄러지는 것·배가 출렁 밀리는 것으론 안 끊기게 — 배에서 던지자마자 거둬지던 문제)
@@ -182,16 +199,30 @@ export function fishingReferee(_setup: unknown, ctx: RefereeContext): Referee {
   const allBoats = () => all({ t: 'boats', l: boatsPub() })
   const bad = (p: P) => send(p.id, { t: 'st', p: pub(p) })
 
+  /** 배에서 빠짐: 젓던 사람이 빠지면 같이 탄 사람이 이어서 저음 */
+  function leaveBoat(p: P) {
+    if (p.ride === null) return
+    const b = boats[p.ride]
+    if (b.passenger === p.id) b.passenger = null
+    else if (b.rider === p.id) {
+      b.rider = b.passenger
+      b.passenger = null
+    }
+    b.used = ctx.now()
+  }
+
   /** 배 타기: 가까운 빈 배에 앉음 (위치 = 배 자리) */
   function board(p: P, i: unknown) {
     if (typeof i !== 'number' || !Number.isInteger(i) || !boats[i]) return
     const b = boats[i]
-    if (p.ride !== null || p.up !== null || b.rider || Math.hypot(b.x - p.x, b.z - p.z) > BOAT_REACH + 0.5) return bad(p)
+    // 비었으면 젓는 사람, 한 명 타 있으면 같이 탐
+    if (p.ride !== null || p.up !== null || (b.rider && b.passenger) || Math.hypot(b.x - p.x, b.z - p.z) > BOAT_REACH + 0.5) return bad(p)
     stopFishing(p)
     p.bed = null
     p.act = null
     p.ride = i
-    b.rider = p.id
+    if (b.rider) b.passenger = p.id
+    else b.rider = p.id
     b.used = ctx.now()
     p.x = b.x
     p.z = b.z
@@ -205,9 +236,7 @@ export function fishingReferee(_setup: unknown, ctx: RefereeContext): Referee {
     if (p.ride === null) return
     const spot = landingSpot(p.x, p.z)
     if (!spot) return bad(p)
-    const b = boats[p.ride]
-    b.rider = null
-    b.used = ctx.now()
+    leaveBoat(p)
     stopFishing(p)
     p.ride = null
     p.x = spot.x
@@ -407,7 +436,7 @@ export function fishingReferee(_setup: unknown, ctx: RefereeContext): Referee {
         let moved = false
         boats.forEach((b, i) => {
           const h = BOATS[i]
-          if (!b.rider && b.used && now - b.used > BOAT_HOME_MS && (b.x !== h.x || b.z !== h.z)) {
+          if (!b.rider && !b.passenger && b.used && now - b.used > BOAT_HOME_MS && (b.x !== h.x || b.z !== h.z)) {
             Object.assign(b, { x: h.x, z: h.z, r: h.r, used: 0 })
             moved = true
           }
@@ -425,9 +454,8 @@ export function fishingReferee(_setup: unknown, ctx: RefereeContext): Referee {
     },
     leave(key) {
       const p = players.get(key)
-      if (p?.ride !== null && p?.ride !== undefined) {
-        boats[p.ride].rider = null
-        boats[p.ride].used = ctx.now()
+      if (p && p.ride !== null) {
+        leaveBoat(p)
         allBoats()
       }
       if (players.delete(key)) all({ t: 'gone', id: key })

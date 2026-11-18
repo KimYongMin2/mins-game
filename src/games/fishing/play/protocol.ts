@@ -42,8 +42,8 @@ export type PlayerPub = {
   act: Act
 }
 export type Act = 'sit' | 'lie' | null
-/** 배 하나: 자리·방향·탄 사람 */
-export type BoatPub = [number, number, number, string | null]
+/** 배 하나: 자리·방향·젓는 사람(가운데 판)·같이 탄 사람(앞 판) — 두 명까지 (사용자 요청 2026-11-18) */
+export type BoatPub = [number, number, number, string | null, string | null]
 
 /** 잡은 것 하나 (k = 고유 번호) */
 export type BagItem = { k: string; f: string; i: Iro | null; s: number; at: number }

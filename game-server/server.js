@@ -13370,13 +13370,15 @@ function fishingReferee(_setup, ctx) {
 		z: b.z,
 		r: b.r,
 		rider: null,
+		passenger: null,
 		used: 0
 	}));
 	const boatsPub = () => boats.map((b) => [
 		b.x,
 		b.z,
 		b.r,
-		b.rider
+		b.rider,
+		b.passenger
 	]);
 	let lastHome = 0;
 	const nameOf = (key) => ctx.members().find((m) => m.id === key)?.nickname ?? "익명";
@@ -13439,6 +13441,10 @@ function fishingReferee(_setup, ctx) {
 	function move(p, m) {
 		if (!num(m.x, BOUNDS.minX - 1, BOUNDS.maxX + 1) || !num(m.z, BOUNDS.minZ - 1, BOUNDS.maxZ + 1) || !num(m.r, -100, 100)) return;
 		const now = ctx.now();
+		if (p.ride !== null && boats[p.ride].passenger === p.id) {
+			p.lastMv = now;
+			return;
+		}
 		const dt = Math.min(2, (now - p.lastMv) / 1e3);
 		p.lastMv = now;
 		let { x, z } = m;
@@ -13462,6 +13468,20 @@ function fishingReferee(_setup, ctx) {
 			b.z = p.z;
 			b.r = p.r;
 			b.used = now;
+			const q = b.passenger ? players.get(b.passenger) : void 0;
+			if (q) {
+				q.x = p.x;
+				q.z = p.z;
+				q.r = p.r;
+				posDirty.add(q.id);
+				if (q.fishing !== "none" && Math.hypot(q.x - q.castX, q.z - q.castZ) > 4) {
+					stopFishing(q);
+					all({
+						t: "st",
+						p: pub(q)
+					});
+				}
+			}
 		}
 		const drift = Math.hypot(p.x - p.castX, p.z - p.castZ);
 		const reelOff = p.fishing !== "none" && drift > (p.ride !== null ? 4 : 1);
@@ -13563,16 +13583,28 @@ function fishingReferee(_setup, ctx) {
 		t: "st",
 		p: pub(p)
 	});
+	/** 배에서 빠짐: 젓던 사람이 빠지면 같이 탄 사람이 이어서 저음 */
+	function leaveBoat(p) {
+		if (p.ride === null) return;
+		const b = boats[p.ride];
+		if (b.passenger === p.id) b.passenger = null;
+		else if (b.rider === p.id) {
+			b.rider = b.passenger;
+			b.passenger = null;
+		}
+		b.used = ctx.now();
+	}
 	/** 배 타기: 가까운 빈 배에 앉음 (위치 = 배 자리) */
 	function board(p, i) {
 		if (typeof i !== "number" || !Number.isInteger(i) || !boats[i]) return;
 		const b = boats[i];
-		if (p.ride !== null || p.up !== null || b.rider || Math.hypot(b.x - p.x, b.z - p.z) > 3.3) return bad(p);
+		if (p.ride !== null || p.up !== null || b.rider && b.passenger || Math.hypot(b.x - p.x, b.z - p.z) > 3.3) return bad(p);
 		stopFishing(p);
 		p.bed = null;
 		p.act = null;
 		p.ride = i;
-		b.rider = p.id;
+		if (b.rider) b.passenger = p.id;
+		else b.rider = p.id;
 		b.used = ctx.now();
 		p.x = b.x;
 		p.z = b.z;
@@ -13588,9 +13620,7 @@ function fishingReferee(_setup, ctx) {
 		if (p.ride === null) return;
 		const spot = landingSpot(p.x, p.z);
 		if (!spot) return bad(p);
-		const b = boats[p.ride];
-		b.rider = null;
-		b.used = ctx.now();
+		leaveBoat(p);
 		stopFishing(p);
 		p.ride = null;
 		p.x = spot.x;
@@ -13836,7 +13866,7 @@ function fishingReferee(_setup, ctx) {
 				let moved = false;
 				boats.forEach((b, i) => {
 					const h = BOATS[i];
-					if (!b.rider && b.used && now - b.used > BOAT_HOME_MS && (b.x !== h.x || b.z !== h.z)) {
+					if (!b.rider && !b.passenger && b.used && now - b.used > BOAT_HOME_MS && (b.x !== h.x || b.z !== h.z)) {
 						Object.assign(b, {
 							x: h.x,
 							z: h.z,
@@ -13867,9 +13897,8 @@ function fishingReferee(_setup, ctx) {
 		},
 		leave(key) {
 			const p = players.get(key);
-			if (p?.ride !== null && p?.ride !== void 0) {
-				boats[p.ride].rider = null;
-				boats[p.ride].used = ctx.now();
+			if (p && p.ride !== null) {
+				leaveBoat(p);
 				allBoats();
 			}
 			if (players.delete(key)) all({

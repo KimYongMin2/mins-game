@@ -77,6 +77,39 @@ describe('낚시터 심판', () => {
     expect(s.last('boats')?.l[0][3]).toBeNull()
   })
 
+  it('배 두 명: 둘째는 같이 타서 배를 따라가고, 젓던 사람이 내리면 이어서 저음', () => {
+    const s = setup()
+    s.ref.input('a', { t: 'hi' })
+    s.ref.input('b', { t: 'hi' })
+    const b = BOATS[0]
+    for (const id of ['a', 'b']) {
+      walkTo(s, id, 7.2, 2)
+      walkTo(s, id, 8.2, b.z)
+    }
+    s.ref.input('a', { t: 'board', i: 0 })
+    s.ref.input('b', { t: 'board', i: 0 })
+    expect(s.last('boats')?.l[0].slice(3)).toEqual(['a', 'b'])
+    // 셋째 자리는 없음 (빈 배가 아니면 못 탐): 같이 탄 사람은 배를 못 움직임
+    s.tick(1000)
+    s.ref.input('b', { t: 'mv', x: b.x, z: b.z - 5, r: 0 })
+    s.tick(100)
+    expect(s.last('pos')).toBeUndefined
+    // 젓는 사람이 움직이면 같이 탄 사람도 따라감
+    s.tick(1000)
+    s.ref.input('a', { t: 'mv', x: b.x, z: b.z - 3, r: 0 })
+    s.tick(100)
+    const pos = new Map(s.last('pos')!.l.map(([id, x, z]) => [id, [x, z]]))
+    expect(pos.get('b')).toEqual(pos.get('a'))
+    // 같이 탄 사람도 던질 수 있음
+    s.ref.input('b', { t: 'cast' })
+    expect(s.last('st')?.p).toMatchObject({ id: 'b', fishing: 'cast' })
+    // 선착장 옆으로 와서 젓던 사람이 내리면 같이 탄 사람이 젓는 사람으로
+    s.tick(1000)
+    s.ref.input('a', { t: 'mv', x: b.x, z: b.z, r: 0 })
+    s.ref.input('a', { t: 'unboard' })
+    expect(s.last('boats')?.l[0].slice(3)).toEqual(['b', null])
+  })
+
   it('앉기·눕기: 아무 데서나, 움직이면 풀림, 배에선 안 됨', () => {
     const s = setup()
     s.ref.input('a', { t: 'hi' })
@@ -131,20 +164,24 @@ describe('낚시터 심판', () => {
   it('물에는 못 들어가고, 너무 빨리 가면 갈 수 있는 만큼만', () => {
     const s = setup()
     s.ref.input('a', { t: 'hi' })
-    s.tick(1000)
-    // 바다 쪽으로 계속 가려고 해도 물가에서 멈춤
-    for (let i = 0; i < 10; i++) {
-      s.tick(1000)
-      s.ref.input('a', { t: 'mv', x: 0, z: -12, r: 0 })
+    walkTo(s, 'a', 0, 0)
+    // 바다 쪽으로 조금씩 계속 가려고 해도 물가에서 멈춤
+    for (let i = 0; i < 40; i++) {
+      s.tick(200)
+      const last = s.last('pos')?.l[0][2] ?? 0
+      s.ref.input('a', { t: 'mv', x: 0, z: last - 0.5, r: 0 })
     }
     s.tick(100)
     const [, px, z] = s.last('pos')!.l[0]
     expect(z).toBeGreaterThanOrEqual(shoreZ(px))
+    // 1초에 달리기 빠르기(9.5m/s)의 1.6배 + 0.6m 넘게는 못 감 — 막힌 것 없는 모래사장 뒤 줄(z 11)에서
+    walkTo(s, 'a', 0, 11)
     s.tick(1000)
-    s.ref.input('a', { t: 'mv', x: 25, z: 10, r: 0 })
+    s.ref.input('a', { t: 'mv', x: 40, z: 11, r: 0 })
     s.tick(100)
     const [, x] = s.last('pos')!.l[0]
-    expect(x).toBeLessThan(15)
+    expect(x).toBeGreaterThan(5)
+    expect(x).toBeLessThan(9.5 * 1.6 + 0.6 + 0.01)
   })
 
   it('물가에서 던지면 7~16초 뒤 입질, 5초 안에 당기면 잡힘 (도감·가방에 들어감)', async () => {
