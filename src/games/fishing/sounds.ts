@@ -1,7 +1,7 @@
 import { noise, tone } from '../../shared/audio/synth'
 
 // 낚시터 효과음 (Web Audio 합성)
-type Name = 'cast' | 'bite' | 'catch' | 'big' | 'junk' | 'escape' | 'cheer' | 'bonk' | 'whiff'
+type Name = 'cast' | 'bite' | 'catch' | 'big' | 'junk' | 'escape' | 'cheer' | 'bonk' | 'whiff' | 'board'
 
 const RECIPES: Record<Name, () => void> = {
   // 휙 — 낚싯줄 던지기, 퐁 — 찌가 물에
@@ -33,6 +33,11 @@ const RECIPES: Record<Name, () => void> = {
   bonk: () => {
     tone({ freq: 380, to: 1100, type: 'square', duration: 0.12, gain: 0.08 })
     tone({ freq: 1100, to: 620, type: 'triangle', duration: 0.16, gain: 0.08, delay: 0.1 })
+  },
+  // 배 타기·내리기 (나무배가 출렁)
+  board: () => {
+    tone({ freq: 180, to: 120, type: 'sine', duration: 0.12, gain: 0.16 })
+    noise({ filter: 'lowpass', freq: 700, to: 250, duration: 0.35, gain: 0.12, delay: 0.05 })
   },
   // 허공에 휘두름
   whiff: () => noise({ filter: 'bandpass', freq: 1200, to: 500, q: 1.3, duration: 0.14, gain: 0.12 }),

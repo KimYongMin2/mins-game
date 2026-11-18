@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { BEDS, BRIDGE, JETTY, LAKE, LAKE_DOCK, PIER, PIER_END, SPAWN, STRUCTS, blocked, castTarget, moveBy, shoreZ, walkable, waterAt } from './map'
+import { BEDS, BOATS, HOUSES, LADDERS, boatable, houseAt, landingSpot, moveBoat, nearLadder, onLadderTop, BRIDGE, JETTY, LAKE, LAKE_DOCK, PIER, PIER_END, SPAWN, blocked, castTarget, moveBy, shoreZ, walkable, waterAt } from './map'
 import { FISH, rollCatch } from './fish'
 
 describe('낚시터 맵', () => {
@@ -20,8 +20,16 @@ describe('낚시터 맵', () => {
   })
 
   it('구조물은 막히고, 처음 자리·썬베드는 안 막힘', () => {
-    const shop = STRUCTS.find((s) => s.kind === 'shop')!
-    expect(walkable(shop.x, shop.z)).toBe(false)
+    // 집 벽은 막히고, 문으로 들어가면 안을 걸을 수 있음
+    for (const h of HOUSES) {
+      const wall = h.walls[0]
+      expect(walkable((wall.minX + wall.maxX) / 2, (wall.minZ + wall.maxZ) / 2)).toBe(false)
+      // 문 앞(북쪽 바깥)에서 남쪽으로 걸어 들어가기
+      let p = { x: h.s.x, z: h.s.z - h.s.d! / 2 - 1.2 }
+      expect(walkable(p.x, p.z)).toBe(true)
+      for (let i = 0; i < 20; i++) p = moveBy(p.x, p.z, 0, 0.15)
+      expect(houseAt(p.x, p.z)).toBe(HOUSES.indexOf(h))
+    }
     expect(blocked(SPAWN.x, SPAWN.z)).toBe(false)
     for (const b of BEDS) expect(blocked(b.x, b.z)).toBe(false)
     // 구조물이 물가를 따라 걷는 길을 막지 않음 (모래사장 가로질러 걷기)
@@ -72,5 +80,29 @@ describe('낚시터 맵', () => {
     }
     expect(seen.sea.has('coelacanth')).toBe(true)
     expect(seen.fresh.has('sturgeon')).toBe(true)
+  })
+
+  it('사다리: 아래에서 오르고 위에서만 다님', () => {
+    for (const [i, l] of LADDERS.entries()) {
+      expect(walkable(l.foot.x, l.foot.z)).toBe(true)
+      expect(nearLadder(l.foot.x, l.foot.z)).toBe(i)
+      expect(onLadderTop(i, l.top.x, l.top.z)).toBe(true)
+    }
+    // 등대 위에서 바다로 던질 수 있음
+    const l = LADDERS[1]
+    expect(castTarget(l.top.x - 1.3, l.area.kind === 'ring' ? l.area.z : 0, -Math.PI / 2)?.zone).toBe('sea')
+  })
+
+  it('배: 제자리는 물 위, 땅으로는 못 가고, 물가에서 내릴 곳이 있음', () => {
+    for (const b of BOATS) expect(boatable(b.x, b.z, b.zone)).toBe(true)
+    const b = BOATS[0]
+    let p = { x: b.x, z: b.z }
+    for (let i = 0; i < 200; i++) p = moveBoat(p.x, p.z, 0, 0.2, 'sea')
+    expect(boatable(p.x, p.z, 'sea')).toBe(true)
+    expect(p.z).toBeLessThan(shoreZ(p.x))
+    expect(landingSpot(p.x, p.z)).not.toBeNull()
+    expect(landingSpot(0, -30)).toBeNull()
+    // 호수 배는 바다로 못 감
+    expect(boatable(BOATS[3].x, BOATS[3].z, 'sea')).toBe(false)
   })
 })

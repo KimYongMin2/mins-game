@@ -43,7 +43,7 @@ export const BED_REACH = 2
  * r = 그림 방향(라디안), s = 크기 배율
  */
 export type StructKind =
-  | 'lighthouse' | 'shop' | 'house' | 'cabin' | 'hut' | 'tower' | 'fire' | 'palm' | 'pine' | 'tree' | 'rock'
+  | 'lighthouse' | 'house' | 'cabin' | 'hut' | 'tower' | 'fire' | 'palm' | 'pine' | 'tree' | 'rock'
   | 'boat' | 'table' | 'bench' | 'lamp' | 'fountain' | 'vending' | 'sign' | 'umbrella' | 'crate' | 'flag' | 'well'
 export type Struct = { kind: StructKind; x: number; z: number; r?: number; s?: number; w?: number; d?: number; c?: number; color?: string; label?: string }
 
@@ -51,13 +51,14 @@ const S: Struct[] = [
   // 방파제 끝 등대
   { kind: 'lighthouse', x: -53.5, z: -33, c: 2.2 },
   // 마을
-  { kind: 'shop', x: -14, z: 24, w: 8, d: 5.5, label: '낚시 가게' },
-  { kind: 'house', x: 6, z: 34, w: 7, d: 6, color: '#e8473f' },
-  { kind: 'house', x: 19, z: 33, w: 6, d: 6, color: '#3f8fd0' },
-  { kind: 'house', x: -30, z: 33, w: 7, d: 6, color: '#2f9e6a' },
-  { kind: 'house', x: -46, z: 30, w: 6.5, d: 6, color: '#c79bff' },
+  // 집: 문은 r 쪽(π = 북쪽, 길 쪽). 막힘은 벽·가구로 (houseLayout) — 들어갈 수 있음 (사용자 요청 2026-11-18, 낚시 가게는 뺌)
+  { kind: 'house', x: 6, z: 34, r: Math.PI, w: 7, d: 6, color: '#c8553d' },
+  { kind: 'house', x: 19, z: 33, r: Math.PI, w: 6, d: 6, color: '#3d6f9e' },
+  { kind: 'house', x: -30, z: 33, r: Math.PI, w: 7, d: 6, color: '#3f7f5a' },
+  { kind: 'house', x: -46, z: 30, r: Math.PI, w: 6.5, d: 6, color: '#7a5c9e' },
+  { kind: 'house', x: -16, z: 27, r: Math.PI, w: 7, d: 6, color: '#8a6a4a' },
   { kind: 'fountain', x: -10, z: 37, c: 2.4 },
-  { kind: 'vending', x: -8.6, z: 24, w: 1.1, d: 0.9 },
+  { kind: 'vending', x: -5.6, z: 32.4, w: 1.1, d: 0.9 },
   { kind: 'well', x: 30, z: 38, c: 1.1 },
   // 모래사장
   ...[-46, -42, -38].map((x, i) => ({ kind: 'hut' as const, x, z: 9, w: 2.6, d: 2.6, color: ['#ff8a7a', '#7cc8ff', '#ffd23f'][i] })),
@@ -75,9 +76,8 @@ const S: Struct[] = [
   { kind: 'sign', x: 24, z: 16, c: 0.25, label: '← 바다 · 호수 →' },
   { kind: 'sign', x: -50, z: 4, c: 0.25, label: '등대 방파제' },
   // 호수 옆
-  { kind: 'cabin', x: 57, z: 8, w: 6, d: 5 },
+  { kind: 'cabin', x: 57, z: 8, r: Math.PI, w: 6, d: 5 },
   ...[[50, 40], [56, 32], [28, 30]].map(([x, z]) => ({ kind: 'table' as const, x, z, w: 2, d: 1.6 })),
-  { kind: 'boat', x: 34, z: 27, r: 1.2, c: 0, color: '#ffd23f' },
   // 야자수 (모래사장 뒤쪽)
   ...[[-58, 12], [-34, 12], [-27, 13], [-10, 12.5], [-2, 13], [10, 12], [17, 12.5], [-52, 8]].map(([x, z], i) => ({ kind: 'palm' as const, x, z, c: 0.45, s: 0.9 + (i % 3) * 0.15 })),
   // 소나무 숲 (동쪽·북동쪽)
@@ -99,6 +99,102 @@ export const BEDS: Bed[] = [
   { x: -28, z: -36.2, r: Math.PI },
 ]
 export const SPAWN = { x: 0, z: 9 }
+
+// ── 집 안 (벽·가구) ──
+export type FurnKind = 'bed' | 'sofa' | 'shelf' | 'table' | 'fireplace' | 'kitchen'
+export type HouseLayout = { walls: Rect[]; furniture: { kind: FurnKind; rect: Rect; r: number }[]; inside: Rect }
+const WALL = 0.25
+const DOOR = 1.5
+/** 네모를 구조물 기준(앞 = +z)에서 세상 좌표로 (r은 90° 단위) */
+function placeRect(s: Struct, b: Rect): Rect {
+  const r = s.r ?? 0
+  const c = Math.round(Math.cos(r)), n = Math.round(Math.sin(r))
+  const pts = [[b.minX, b.minZ], [b.maxX, b.maxZ]].map(([x, z]) => [s.x + x * c + z * n, s.z - x * n + z * c])
+  return { minX: Math.min(pts[0][0], pts[1][0]), maxX: Math.max(pts[0][0], pts[1][0]), minZ: Math.min(pts[0][1], pts[1][1]), maxZ: Math.max(pts[0][1], pts[1][1]) }
+}
+export function houseLayout(s: Struct): HouseLayout {
+  const w = s.w!, d = s.d!, hw = w / 2, hd = d / 2, T = WALL
+  const L = (minX: number, maxX: number, minZ: number, maxZ: number): Rect => ({ minX, maxX, minZ, maxZ })
+  const walls = [L(-hw, hw, -hd, -hd + T), L(-hw, -hw + T, -hd, hd), L(hw - T, hw, -hd, hd), L(-hw, -DOOR / 2, hd - T, hd), L(DOOR / 2, hw, hd - T, hd)]
+  const ix0 = -hw + T, ix1 = hw - T, iz0 = -hd + T
+  const furniture: { kind: FurnKind; rect: Rect }[] = [
+    { kind: 'bed', rect: L(ix0, ix0 + 1.4, iz0, iz0 + 2.1) },
+    { kind: 'sofa', rect: L(ix0, ix0 + 0.8, 0.2, Math.min(2, hd - T - 0.3)) },
+    s.kind === 'cabin' ? { kind: 'fireplace', rect: L(-0.75, 0.75, iz0, iz0 + 0.6) } : { kind: 'kitchen', rect: L(-0.2, 1, iz0, iz0 + 0.6) },
+    { kind: 'shelf', rect: L(ix1 - 1.5, ix1, iz0, iz0 + 0.45) },
+    { kind: 'table', rect: L(ix1 - 1.7, ix1 - 0.7, -0.5, 0.5) },
+  ]
+  return {
+    walls: walls.map((b) => placeRect(s, b)),
+    furniture: furniture.map((f) => ({ kind: f.kind, rect: placeRect(s, f.rect), r: s.r ?? 0 })),
+    inside: placeRect(s, L(ix0, ix1, iz0, hd - T)),
+  }
+}
+export const HOUSES = S.filter((s) => s.kind === 'house' || s.kind === 'cabin').map((s) => ({ s, ...houseLayout(s) }))
+/** 지금 서 있는 집 (번호), 밖이면 null */
+export function houseAt(x: number, z: number): number | null {
+  const i = HOUSES.findIndex((h) => inRect(x, z, h.inside))
+  return i >= 0 ? i : null
+}
+
+// ── 사다리 (인명구조 탑·등대) ──
+export type Ladder = { foot: { x: number; z: number }; top: { x: number; z: number }; y: number; /** 위에서 다닐 수 있는 곳 */ area: { kind: 'rect'; rect: Rect } | { kind: 'ring'; x: number; z: number; rIn: number; rOut: number } }
+export const LADDERS: Ladder[] = [
+  { foot: { x: 14, z: 4.5 }, top: { x: 14, z: 3.2 }, y: 2.68, area: { kind: 'rect', rect: { minX: 13, maxX: 15, minZ: 2.9, maxZ: 3.6 } } },
+  { foot: { x: -53.5, z: -30.25 }, top: { x: -53.5, z: -31.6 }, y: 11.42, area: { kind: 'ring', x: -53.5, z: -33, rIn: 1.05, rOut: 1.45 } },
+]
+export const LADDER_REACH = 1.4
+export function nearLadder(x: number, z: number): number | null {
+  const i = LADDERS.findIndex((l) => Math.hypot(l.foot.x - x, l.foot.z - z) < LADDER_REACH)
+  return i >= 0 ? i : null
+}
+/** 사다리 위에서 갈 수 있는 곳인지 */
+export function onLadderTop(i: number, x: number, z: number): boolean {
+  const a = LADDERS[i]?.area
+  if (!a) return false
+  if (a.kind === 'rect') return inRect(x, z, a.rect)
+  const r = Math.hypot(x - a.x, z - a.z)
+  return r >= a.rIn && r <= a.rOut
+}
+
+// ── 배 (탈 수 있음) ──
+export type BoatHome = { x: number; z: number; r: number; zone: Zone; color: string }
+export const BOATS: BoatHome[] = [
+  { x: 10.6, z: -14, r: 0.1, zone: 'sea', color: '#2f9e6a' },
+  { x: 4, z: -11, r: -0.2, zone: 'sea', color: '#f4f2ec' },
+  { x: -28.4, z: -22, r: 0.05, zone: 'sea', color: '#3f8fd0' },
+  { x: 35.5, z: 27.6, r: 1.2, zone: 'fresh', color: '#e0b030' },
+  { x: 40, z: 31, r: 2.4, zone: 'fresh', color: '#c8553d' },
+]
+export const BOAT_SPEED = 7
+/** 배에 탈 수 있는 거리 · 내릴 땅을 찾는 거리 */
+export const BOAT_REACH = 2.8
+/** 배가 갈 수 있는 곳: 그 물(바다·민물) 위, 배 둘레(0.9m)도 물, 판자·방파제 밑이 아님 */
+export function boatable(x: number, z: number, zone: Zone): boolean {
+  if (x < BOUNDS.minX || x > BOUNDS.maxX || z < BOUNDS.minZ || z > BOUNDS.maxZ) return false
+  for (const [ox, oz] of [[0, 0], [0.9, 0], [-0.9, 0], [0, 0.9], [0, -0.9]]) {
+    const px = x + ox, pz = z + oz
+    if (waterAt(px, pz) !== zone || onBoards(px, pz)) return false
+    if (inRect(px, pz, { minX: JETTY.minX - 1.2, maxX: JETTY.maxX + 1.2, minZ: JETTY.minZ - 1.2, maxZ: JETTY.maxZ })) return false
+  }
+  return true
+}
+export function moveBoat(x: number, z: number, dx: number, dz: number, zone: Zone): { x: number; z: number } {
+  if (boatable(x + dx, z + dz, zone)) return { x: x + dx, z: z + dz }
+  if (boatable(x + dx, z, zone)) return { x: x + dx, z }
+  if (boatable(x, z + dz, zone)) return { x, z: z + dz }
+  return { x, z }
+}
+/** 배에서 내릴 곳: 가까운 땅·판자 (없으면 null) */
+export function landingSpot(x: number, z: number): { x: number; z: number } | null {
+  for (let r = 1; r <= BOAT_REACH + 0.6; r += 0.3)
+    for (let k = 0; k < 24; k++) {
+      const a = (k / 24) * Math.PI * 2
+      const px = x + Math.sin(a) * r, pz = z + Math.cos(a) * r
+      if (walkable(px, pz)) return { x: round(px), z: round(pz) }
+    }
+  return null
+}
 
 const inRect = (x: number, z: number, b: Rect) => x >= b.minX && x <= b.maxX && z >= b.minZ && z <= b.maxZ
 const onBoards = (x: number, z: number) => WALK_ON_WATER.some((b) => inRect(x, z, b))
@@ -126,7 +222,13 @@ export function waterAt(x: number, z: number): Zone | null {
 /** 구조물에 막히는지 (사람 반지름 0.35 포함) */
 export function blocked(x: number, z: number): boolean {
   const R = 0.35
+  for (const h of HOUSES) {
+    if (x < h.s.x - h.s.w! / 2 - 1 || x > h.s.x + h.s.w! / 2 + 1 || z < h.s.z - h.s.d! / 2 - 1 || z > h.s.z + h.s.d! / 2 + 1) continue
+    for (const b of h.walls) if (x > b.minX - R && x < b.maxX + R && z > b.minZ - R && z < b.maxZ + R) return true
+    for (const f of h.furniture) if (x > f.rect.minX - R && x < f.rect.maxX + R && z > f.rect.minZ - R && z < f.rect.maxZ + R) return true
+  }
   for (const s of S) {
+    if (s.kind === 'house' || s.kind === 'cabin') continue
     if (s.w && s.d) {
       if (Math.abs(x - s.x) < s.w / 2 + R && Math.abs(z - s.z) < s.d / 2 + R) return true
     } else if (s.c && Math.hypot(x - s.x, z - s.z) < s.c + R) return true

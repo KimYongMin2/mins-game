@@ -3,8 +3,8 @@ import * as THREE from 'three'
 import { createStage, nearestOnScreen } from '../../../shared/art3d/stage'
 import { type AnimalRig, ANIMALS, makeAnimal, plainLook } from '../../../shared/art3d/animals'
 import { decodeLook } from '../../../shared/art3d/animalKinds'
-import { BEDS, BOUNDS, groundY } from '../play/map'
-import { buildWorld } from './worldArt'
+import { BEDS, BOATS, BOUNDS, LADDERS, groundY, houseAt } from '../play/map'
+import { buildWorld, makeBoat } from './worldArt'
 import { fishImageUrl } from '../field/fishArt'
 import { type Catch, fishById, IRO } from '../play/fish'
 import { CAM_LIMITS, type World } from './useFishingRoom'
@@ -104,7 +104,15 @@ export function Scene3D({ world, step, onTapPlayer }: { world: World; step: (dt:
     lamp.angle = Math.PI / 3.4
     lamp.penumbra = 0.6
     lamp.shadow.camera.far = 50
-    const art = buildWorld(scene)
+    const art = buildWorld(scene, stage.renderer)
+    // 그림자는 해가 (내 주변), 따라다니는 조명은 밤에만 손전등처럼
+    lamp.castShadow = false
+    // 탈 수 있는 배 (탄 사람이 있으면 그 사람 자리)
+    const boatObjs = BOATS.map((b) => {
+      const g = makeBoat(b.color)
+      scene.add(g)
+      return g
+    })
     const occluders = art.occluders
     // 가리는 것들은 각자 재질을 따로 (반투명을 하나씩 바꾸려고)
     for (const { g } of occluders)
@@ -311,8 +319,9 @@ export function Scene3D({ world, step, onTapPlayer }: { world: World; step: (dt:
           p.sz += (p.z - p.sz) * Math.min(1, dt * 10)
           p.sr = angleLerp(p.sr, p.r, Math.min(1, dt * 10))
         }
-        const lying = p.bed !== null && BEDS[p.bed]
-        const walking = !lying && now < p.walkUntil
+        const lying = p.bed !== null && p.ride === null && BEDS[p.bed]
+        const climbing = !!p.climb && now - p.climb.start < p.climb.dur
+        const walking = (!lying && p.ride === null && now < p.walkUntil) || climbing
         const holding = !!p.popup && now < p.popup.until && now - p.popup.start > (p.popup.from ? 420 : 0)
         const reeling = now - a.reelAt < 500
         const pose = walking ? 'walk' : holding ? 'hold' : p.fishing !== 'none' || reeling || (p.popup && now < p.popup.until) ? 'fish' : 'idle'
@@ -329,8 +338,19 @@ export function Scene3D({ world, step, onTapPlayer }: { world: World; step: (dt:
           const up = hipY * Math.cos(lean), back = hipY * Math.sin(lean)
           root.position.set(hx - Math.sin(b.r) * back, hy - up, hz - Math.cos(b.r) * back)
           root.rotation.set(lean, b.r, 0)
+        } else if (climbing && p.climb) {
+          // 사다리: 아래 ↔ 위 (사다리 쪽을 보고)
+          const l = LADDERS[p.climb.i]
+          const k0 = (now - p.climb.start) / p.climb.dur
+          const k = p.climb.dir > 0 ? k0 : 1 - k0
+          root.position.set(l.foot.x + (l.top.x - l.foot.x) * k, groundY(l.foot.x, l.foot.z) + l.y * k, l.foot.z + (l.top.z - l.foot.z) * k)
+          root.rotation.set(0, Math.atan2(l.top.x - l.foot.x, l.top.z - l.foot.z), 0)
+        } else if (p.ride !== null) {
+          // 배에 앉음 (다리는 배 안에 가려짐)
+          root.position.set(p.sx, 0.08 + Math.sin(t * 1.3 + p.sx) * 0.05, p.sz)
+          root.rotation.set(0, p.sr, 0)
         } else {
-          root.position.set(p.sx, groundY(p.sx, p.sz), p.sz)
+          root.position.set(p.sx, p.up !== null ? LADDERS[p.up].y : groundY(p.sx, p.sz), p.sz)
           root.rotation.set(0, p.sr, 0)
         }
         // 뿅망치: 들었다가 내리치기 (0.55초)
@@ -440,6 +460,16 @@ export function Scene3D({ world, step, onTapPlayer }: { world: World; step: (dt:
         }
       }
 
+      // 배: 탄 사람이 있으면 그 사람 자리·방향, 아니면 놓인 자리 (물결에 출렁)
+      boatObjs.forEach((g, i) => {
+        const b = world.boats[i]
+        if (!b) return
+        const rider = b.rider ? world.players.get(b.rider) : null
+        const x = rider ? rider.sx : b.x, z = rider ? rider.sz : b.z, r = rider ? rider.sr : b.r
+        g.position.set(x, -0.18 + Math.sin(t * 1.3 + x) * 0.05, z)
+        g.rotation.set(Math.sin(t * 0.9 + z) * 0.03, r + Math.PI, Math.sin(t * 1.1 + x) * 0.04)
+      })
+
       // 카메라: 3인칭은 나를 부드럽게 따라가며 내가 돌린 방향·높이에서, 1인칭은 내 눈 자리에서 (저절로 흔들거나 돌지 않음)
       const me = world.players.get(world.me)
       if (me) {
@@ -456,7 +486,7 @@ export function Scene3D({ world, step, onTapPlayer }: { world: World; step: (dt:
           camera.lookAt(head.x - fx * cp * 10, head.y + 0.12 - Math.sin(cam.pitch) * 10, head.z - fz * cp * 10)
           camReady = false
         } else {
-          const want = v.set(me.sx, 0.7, me.sz)
+          const want = v.set(me.sx, 0.7 + (me.up !== null ? LADDERS[me.up].y : 0), me.sz)
           if (!camReady) {
             follow.copy(want)
             camReady = true
@@ -465,8 +495,9 @@ export function Scene3D({ world, step, onTapPlayer }: { world: World; step: (dt:
           camera.position.set(follow.x + fx * d * cp, follow.y + Math.sin(cam.pitch) * d, follow.z + fz * d * cp)
           camera.lookAt(follow)
         }
-        // 밤엔 손전등처럼 내 주변만 따뜻하게
-        lamp.intensity = 260 - art.night() * 110
+        // 밤엔 손전등처럼 내 주변만 따뜻하게 (낮엔 끔 — 해가 비춤)
+        art.follow(me.sx, me.sz)
+        lamp.intensity = art.night() * 170
         lamp.color.set(art.night() > 0.5 ? '#ffd9a0' : '#ffe6c4')
         lamp.position.set(me.sx + 2, 14, me.sz + 4)
         lamp.target.position.set(me.sx, 0, me.sz - 2)
@@ -474,10 +505,13 @@ export function Scene3D({ world, step, onTapPlayer }: { world: World; step: (dt:
       // 카메라와 나 사이를 가리는 파라솔·나무는 반투명하게 (3인칭)
       if (me && !world.cam.first) {
         seg.set(camera.position, v.set(me.sx, 0.9, me.sz))
-        for (const { g, r, y } of occluders) {
+        const inHouse = houseAt(me.sx, me.sz)
+        // 집 안이면 그 집 지붕을 숨김
+        art.roofs.forEach((rf, i) => (rf.visible = i !== inHouse))
+        for (const { g, r, y, house } of occluders) {
           const c = g.position.clone().setY(y)
           seg.closestPointToPoint(c, true, near)
-          const hide = near.distanceTo(c) < r && near.distanceTo(seg.end) > 0.8
+          const hide = (house !== undefined && house === inHouse) || (near.distanceTo(c) < r && near.distanceTo(seg.end) > 0.8)
           g.traverse((o) => {
             if (o instanceof THREE.Mesh) {
               const m = o.material as THREE.MeshStandardMaterial

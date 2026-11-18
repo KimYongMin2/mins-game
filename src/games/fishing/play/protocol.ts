@@ -22,7 +22,22 @@ export const BONK_REACH = 1.9
 export const BONK_MS = 700
 
 export type Fishing = 'none' | 'cast' | 'bite'
-export type PlayerPub = { id: string; name: string; avatar?: string; x: number; z: number; r: number; bed: number | null; fishing: Fishing; bob: [number, number] | null }
+export type PlayerPub = {
+  id: string
+  name: string
+  avatar?: string
+  x: number
+  z: number
+  r: number
+  bed: number | null
+  fishing: Fishing
+  bob: [number, number] | null
+  /** 타고 있는 배 번호 (BOATS) · 올라가 있는 사다리 번호 (LADDERS) */
+  ride: number | null
+  up: number | null
+}
+/** 배 하나: 자리·방향·탄 사람 */
+export type BoatPub = [number, number, number, string | null]
 
 /** 잡은 것 하나 (k = 고유 번호) */
 export type BagItem = { k: string; f: string; i: Iro | null; s: number; at: number }
@@ -41,9 +56,15 @@ export type ClientMsg =
   | { t: 'brag'; key: string }
   /** 뿅망치 (동물의 숲처럼 장난으로 때리기 — 맞아도 낚시는 안 끊김) */
   | { t: 'bonk' }
+  /** 배 타기·내리기, 사다리 오르기·내려가기 (사용자 요청 2026-11-18) */
+  | { t: 'board'; i: number }
+  | { t: 'unboard' }
+  | { t: 'climb'; i: number }
+  | { t: 'down' }
 
 export type ServerMsg =
-  | { t: 'init'; you: string; players: PlayerPub[]; saving: boolean }
+  | { t: 'init'; you: string; players: PlayerPub[]; saving: boolean; boats: BoatPub[] }
+  | { t: 'boats'; l: BoatPub[] }
   | { t: 'pos'; l: [string, number, number, number][] }
   | { t: 'st'; p: PlayerPub }
   | { t: 'gone'; id: string }

@@ -148,3 +148,10 @@
 .fs-minimap canvas { display: block; width: 100%; height: auto; }
 .fs-minimap--big { width: min(70vw, 560px); opacity: 1; }
 @media (max-height: 460px) { .fs-minimap { width: 118px; top: calc(52px + env(safe-area-inset-top, 0px)); } .fs-minimap--big { width: min(60vw, 420px); } }
+
+/* 배 타기·사다리 버튼 (뿅망치 위) */
+.fs-alt { position: absolute; right: calc(150px + env(safe-area-inset-right, 0px)); bottom: calc(156px + env(safe-area-inset-bottom, 0px)); z-index: 3; min-width: 84px; padding: 8px 12px; border: 3px solid #1f1a4d; border-radius: 2px; background: #5be0f0; color: #1c1748; font: inherit; font-family: 'Black Han Sans', sans-serif; font-size: 17px; box-shadow: 0 4px 0 #1f7f8c; display: flex; flex-direction: column; align-items: center; line-height: 1.05; cursor: pointer; touch-action: none; }
+.fs-alt small { font-family: 'IBM Plex Sans KR', sans-serif; font-size: 10px; font-weight: 700; opacity: 0.8; }
+.fs-alt:active { transform: translateY(3px); box-shadow: 0 1px 0 #1f7f8c; }
+.fs-alt--off { background: #9aa0b8; box-shadow: 0 4px 0 #5d6178; }
+@media (max-height: 420px) { .fs-alt { right: calc(128px + env(safe-area-inset-right, 0px)); bottom: calc(134px + env(safe-area-inset-bottom, 0px)); font-size: 15px; } }

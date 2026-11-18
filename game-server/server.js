@@ -12568,44 +12568,49 @@ const S = [
 		c: 2.2
 	},
 	{
-		kind: "shop",
-		x: -14,
-		z: 24,
-		w: 8,
-		d: 5.5,
-		label: "낚시 가게"
-	},
-	{
 		kind: "house",
 		x: 6,
 		z: 34,
+		r: Math.PI,
 		w: 7,
 		d: 6,
-		color: "#e8473f"
+		color: "#c8553d"
 	},
 	{
 		kind: "house",
 		x: 19,
 		z: 33,
+		r: Math.PI,
 		w: 6,
 		d: 6,
-		color: "#3f8fd0"
+		color: "#3d6f9e"
 	},
 	{
 		kind: "house",
 		x: -30,
 		z: 33,
+		r: Math.PI,
 		w: 7,
 		d: 6,
-		color: "#2f9e6a"
+		color: "#3f7f5a"
 	},
 	{
 		kind: "house",
 		x: -46,
 		z: 30,
+		r: Math.PI,
 		w: 6.5,
 		d: 6,
-		color: "#c79bff"
+		color: "#7a5c9e"
+	},
+	{
+		kind: "house",
+		x: -16,
+		z: 27,
+		r: Math.PI,
+		w: 7,
+		d: 6,
+		color: "#8a6a4a"
 	},
 	{
 		kind: "fountain",
@@ -12615,8 +12620,8 @@ const S = [
 	},
 	{
 		kind: "vending",
-		x: -8.6,
-		z: 24,
+		x: -5.6,
+		z: 32.4,
 		w: 1.1,
 		d: .9
 	},
@@ -12752,6 +12757,7 @@ const S = [
 		kind: "cabin",
 		x: 57,
 		z: 8,
+		r: Math.PI,
 		w: 6,
 		d: 5
 	},
@@ -12766,14 +12772,6 @@ const S = [
 		w: 2,
 		d: 1.6
 	})),
-	{
-		kind: "boat",
-		x: 34,
-		z: 27,
-		r: 1.2,
-		c: 0,
-		color: "#ffd23f"
-	},
 	...[
 		[-58, 12],
 		[-34, 12],
@@ -12924,6 +12922,195 @@ const SPAWN = {
 	x: 0,
 	z: 9
 };
+const WALL = .25;
+const DOOR = 1.5;
+/** 네모를 구조물 기준(앞 = +z)에서 세상 좌표로 (r은 90° 단위) */
+function placeRect(s, b) {
+	const r = s.r ?? 0;
+	const c = Math.round(Math.cos(r)), n = Math.round(Math.sin(r));
+	const pts = [[b.minX, b.minZ], [b.maxX, b.maxZ]].map(([x, z]) => [s.x + x * c + z * n, s.z - x * n + z * c]);
+	return {
+		minX: Math.min(pts[0][0], pts[1][0]),
+		maxX: Math.max(pts[0][0], pts[1][0]),
+		minZ: Math.min(pts[0][1], pts[1][1]),
+		maxZ: Math.max(pts[0][1], pts[1][1])
+	};
+}
+function houseLayout(s) {
+	const w = s.w, d = s.d, hw = w / 2, hd = d / 2, T = WALL;
+	const L = (minX, maxX, minZ, maxZ) => ({
+		minX,
+		maxX,
+		minZ,
+		maxZ
+	});
+	const walls = [
+		L(-hw, hw, -hd, -hd + T),
+		L(-hw, -hw + T, -hd, hd),
+		L(hw - T, hw, -hd, hd),
+		L(-hw, -1.5 / 2, hd - T, hd),
+		L(DOOR / 2, hw, hd - T, hd)
+	];
+	const ix0 = -hw + T, ix1 = hw - T, iz0 = -hd + T;
+	const furniture = [
+		{
+			kind: "bed",
+			rect: L(ix0, ix0 + 1.4, iz0, iz0 + 2.1)
+		},
+		{
+			kind: "sofa",
+			rect: L(ix0, ix0 + .8, .2, Math.min(2, hd - T - .3))
+		},
+		s.kind === "cabin" ? {
+			kind: "fireplace",
+			rect: L(-.75, .75, iz0, iz0 + .6)
+		} : {
+			kind: "kitchen",
+			rect: L(-.2, 1, iz0, iz0 + .6)
+		},
+		{
+			kind: "shelf",
+			rect: L(ix1 - 1.5, ix1, iz0, iz0 + .45)
+		},
+		{
+			kind: "table",
+			rect: L(ix1 - 1.7, ix1 - .7, -.5, .5)
+		}
+	];
+	return {
+		walls: walls.map((b) => placeRect(s, b)),
+		furniture: furniture.map((f) => ({
+			kind: f.kind,
+			rect: placeRect(s, f.rect),
+			r: s.r ?? 0
+		})),
+		inside: placeRect(s, L(ix0, ix1, iz0, hd - T))
+	};
+}
+const HOUSES = S.filter((s) => s.kind === "house" || s.kind === "cabin").map((s) => ({
+	s,
+	...houseLayout(s)
+}));
+const LADDERS = [{
+	foot: {
+		x: 14,
+		z: 4.5
+	},
+	top: {
+		x: 14,
+		z: 3.2
+	},
+	y: 2.68,
+	area: {
+		kind: "rect",
+		rect: {
+			minX: 13,
+			maxX: 15,
+			minZ: 2.9,
+			maxZ: 3.6
+		}
+	}
+}, {
+	foot: {
+		x: -53.5,
+		z: -30.25
+	},
+	top: {
+		x: -53.5,
+		z: -31.6
+	},
+	y: 11.42,
+	area: {
+		kind: "ring",
+		x: -53.5,
+		z: -33,
+		rIn: 1.05,
+		rOut: 1.45
+	}
+}];
+const LADDER_REACH = 1.4;
+function nearLadder(x, z) {
+	const i = LADDERS.findIndex((l) => Math.hypot(l.foot.x - x, l.foot.z - z) < LADDER_REACH);
+	return i >= 0 ? i : null;
+}
+/** 사다리 위에서 갈 수 있는 곳인지 */
+function onLadderTop(i, x, z) {
+	const a = LADDERS[i]?.area;
+	if (!a) return false;
+	if (a.kind === "rect") return inRect(x, z, a.rect);
+	const r = Math.hypot(x - a.x, z - a.z);
+	return r >= a.rIn && r <= a.rOut;
+}
+const BOATS = [
+	{
+		x: 10.6,
+		z: -14,
+		r: .1,
+		zone: "sea",
+		color: "#2f9e6a"
+	},
+	{
+		x: 4,
+		z: -11,
+		r: -.2,
+		zone: "sea",
+		color: "#f4f2ec"
+	},
+	{
+		x: -28.4,
+		z: -22,
+		r: .05,
+		zone: "sea",
+		color: "#3f8fd0"
+	},
+	{
+		x: 35.5,
+		z: 27.6,
+		r: 1.2,
+		zone: "fresh",
+		color: "#e0b030"
+	},
+	{
+		x: 40,
+		z: 31,
+		r: 2.4,
+		zone: "fresh",
+		color: "#c8553d"
+	}
+];
+/** 배가 갈 수 있는 곳: 그 물(바다·민물) 위, 배 둘레(0.9m)도 물, 판자·방파제 밑이 아님 */
+function boatable(x, z, zone) {
+	if (x < BOUNDS.minX || x > BOUNDS.maxX || z < BOUNDS.minZ || z > BOUNDS.maxZ) return false;
+	for (const [ox, oz] of [
+		[0, 0],
+		[.9, 0],
+		[-.9, 0],
+		[0, .9],
+		[0, -.9]
+	]) {
+		const px = x + ox, pz = z + oz;
+		if (waterAt(px, pz) !== zone || onBoards(px, pz)) return false;
+		if (inRect(px, pz, {
+			minX: JETTY.minX - 1.2,
+			maxX: JETTY.maxX + 1.2,
+			minZ: JETTY.minZ - 1.2,
+			maxZ: JETTY.maxZ
+		})) return false;
+	}
+	return true;
+}
+/** 배에서 내릴 곳: 가까운 땅·판자 (없으면 null) */
+function landingSpot(x, z) {
+	for (let r = 1; r <= 3.4; r += .3) for (let k = 0; k < 24; k++) {
+		const a = k / 24 * Math.PI * 2;
+		const px = x + Math.sin(a) * r, pz = z + Math.cos(a) * r;
+		if (walkable(px, pz)) return {
+			x: round(px),
+			z: round(pz)
+		};
+	}
+	return null;
+}
 const inRect = (x, z, b) => x >= b.minX && x <= b.maxX && z >= b.minZ && z <= b.maxZ;
 const onBoards = (x, z) => WALK_ON_WATER.some((b) => inRect(x, z, b));
 function riverDist(x, z) {
@@ -12947,9 +13134,17 @@ function waterAt(x, z) {
 /** 구조물에 막히는지 (사람 반지름 0.35 포함) */
 function blocked(x, z) {
 	const R = .35;
-	for (const s of S) if (s.w && s.d) {
-		if (Math.abs(x - s.x) < s.w / 2 + R && Math.abs(z - s.z) < s.d / 2 + R) return true;
-	} else if (s.c && Math.hypot(x - s.x, z - s.z) < s.c + R) return true;
+	for (const h of HOUSES) {
+		if (x < h.s.x - h.s.w / 2 - 1 || x > h.s.x + h.s.w / 2 + 1 || z < h.s.z - h.s.d / 2 - 1 || z > h.s.z + h.s.d / 2 + 1) continue;
+		for (const b of h.walls) if (x > b.minX - R && x < b.maxX + R && z > b.minZ - R && z < b.maxZ + R) return true;
+		for (const f of h.furniture) if (x > f.rect.minX - R && x < f.rect.maxX + R && z > f.rect.minZ - R && z < f.rect.maxZ + R) return true;
+	}
+	for (const s of S) {
+		if (s.kind === "house" || s.kind === "cabin") continue;
+		if (s.w && s.d) {
+			if (Math.abs(x - s.x) < s.w / 2 + R && Math.abs(z - s.z) < s.d / 2 + R) return true;
+		} else if (s.c && Math.hypot(x - s.x, z - s.z) < s.c + R) return true;
+	}
 	return false;
 }
 /** 걸을 수 있는 곳 (맵 안 + 물이 아님(부두·다리 위는 됨) + 구조물이 아님) */
@@ -13124,8 +13319,12 @@ const pub = (p) => ({
 	r: p.r,
 	bed: p.bed,
 	fishing: p.fishing,
-	bob: p.bob
+	bob: p.bob,
+	ride: p.ride,
+	up: p.up
 });
+/** 아무도 안 탄 배가 이만큼 그대로면 제자리로 */
+const BOAT_HOME_MS = 6e5;
 /** 가방에 넣기: 자랑할 만한 것은 남기고 흔한 것부터 버림 */
 function addToBag(bag, item) {
 	const next = [...bag, item];
@@ -13163,6 +13362,20 @@ function fishingReferee(_setup, ctx) {
 	let lastPos = 0;
 	const send = (to, m) => ctx.sendTo(to, m);
 	const all = (m) => ctx.broadcast(m);
+	const boats = BOATS.map((b) => ({
+		x: b.x,
+		z: b.z,
+		r: b.r,
+		rider: null,
+		used: 0
+	}));
+	const boatsPub = () => boats.map((b) => [
+		b.x,
+		b.z,
+		b.r,
+		b.rider
+	]);
+	let lastHome = 0;
 	const nameOf = (key) => ctx.members().find((m) => m.id === key)?.nickname ?? "익명";
 	function join(key) {
 		const mem = ctx.members().find((m) => m.id === key);
@@ -13180,6 +13393,8 @@ function fishingReferee(_setup, ctx) {
 				bed: null,
 				fishing: "none",
 				bob: null,
+				ride: null,
+				up: null,
 				uid: mem.uid ?? null,
 				castAt: 0,
 				biteAt: 0,
@@ -13199,7 +13414,8 @@ function fishingReferee(_setup, ctx) {
 			t: "init",
 			you: key,
 			players: [...players.values()].map(pub),
-			saving: savingOn()
+			saving: savingOn(),
+			boats: boatsPub()
 		});
 		if (p.uid) loadProfile(p.uid).then((profile) => players.has(key) && send(key, {
 			t: "profile",
@@ -13220,12 +13436,12 @@ function fishingReferee(_setup, ctx) {
 		p.lastMv = now;
 		let { x, z } = m;
 		const far = Math.hypot(x - p.x, z - p.z);
-		const allow = 6 * dt * 1.6 + .6;
+		const allow = (p.ride !== null ? 7 : 6) * dt * 1.6 + .6;
 		if (far > allow) {
 			x = p.x + (x - p.x) / far * allow;
 			z = p.z + (z - p.z) / far * allow;
 		}
-		if (!walkable(x, z)) return send(p.id, {
+		if (!(p.ride !== null ? boatable(x, z, BOATS[p.ride].zone) : p.up !== null ? onLadderTop(p.up, x, z) : walkable(x, z))) return send(p.id, {
 			t: "st",
 			p: pub(p)
 		});
@@ -13233,6 +13449,13 @@ function fishingReferee(_setup, ctx) {
 		p.x = r2(x);
 		p.z = r2(z);
 		p.r = r2(m.r);
+		if (p.ride !== null) {
+			const b = boats[p.ride];
+			b.x = p.x;
+			b.z = p.z;
+			b.r = p.r;
+			b.used = now;
+		}
 		if (moved && (p.bed !== null || p.fishing !== "none")) {
 			p.bed = null;
 			stopFishing(p);
@@ -13320,8 +13543,78 @@ function fishingReferee(_setup, ctx) {
 			});
 		}
 	}
+	const allBoats = () => all({
+		t: "boats",
+		l: boatsPub()
+	});
+	const bad = (p) => send(p.id, {
+		t: "st",
+		p: pub(p)
+	});
+	/** 배 타기: 가까운 빈 배에 앉음 (위치 = 배 자리) */
+	function board(p, i) {
+		if (typeof i !== "number" || !Number.isInteger(i) || !boats[i]) return;
+		const b = boats[i];
+		if (p.ride !== null || p.up !== null || b.rider || Math.hypot(b.x - p.x, b.z - p.z) > 3.3) return bad(p);
+		stopFishing(p);
+		p.bed = null;
+		p.ride = i;
+		b.rider = p.id;
+		b.used = ctx.now();
+		p.x = b.x;
+		p.z = b.z;
+		p.r = b.r;
+		all({
+			t: "st",
+			p: pub(p)
+		});
+		allBoats();
+	}
+	/** 배에서 내리기: 가까운 땅·판자로 (배는 거기 둠) */
+	function unboard(p) {
+		if (p.ride === null) return;
+		const spot = landingSpot(p.x, p.z);
+		if (!spot) return bad(p);
+		const b = boats[p.ride];
+		b.rider = null;
+		b.used = ctx.now();
+		stopFishing(p);
+		p.ride = null;
+		p.x = spot.x;
+		p.z = spot.z;
+		all({
+			t: "st",
+			p: pub(p)
+		});
+		allBoats();
+	}
+	function climb(p, i) {
+		if (typeof i !== "number" || !Number.isInteger(i) || !LADDERS[i]) return;
+		if (p.ride !== null || p.up !== null || nearLadder(p.x, p.z) !== i) return bad(p);
+		stopFishing(p);
+		p.bed = null;
+		p.up = i;
+		p.x = LADDERS[i].top.x;
+		p.z = LADDERS[i].top.z;
+		all({
+			t: "st",
+			p: pub(p)
+		});
+	}
+	function down(p) {
+		if (p.up === null) return;
+		const l = LADDERS[p.up];
+		stopFishing(p);
+		p.up = null;
+		p.x = l.foot.x;
+		p.z = l.foot.z;
+		all({
+			t: "st",
+			p: pub(p)
+		});
+	}
 	function lie(p, i) {
-		if (typeof i !== "number" || !Number.isInteger(i) || !BEDS[i]) return;
+		if (typeof i !== "number" || !Number.isInteger(i) || !BEDS[i] || p.ride !== null || p.up !== null) return;
 		if (nearBed(p.x, p.z) !== i || [...players.values()].some((o) => o !== p && o.bed === i)) return send(p.id, {
 			t: "st",
 			p: pub(p)
@@ -13450,7 +13743,19 @@ function fishingReferee(_setup, ctx) {
 				case "brag":
 					brag(p, m.key);
 					break;
-				case "bonk": bonk(p);
+				case "bonk":
+					bonk(p);
+					break;
+				case "board":
+					board(p, m.i);
+					break;
+				case "unboard":
+					unboard(p);
+					break;
+				case "climb":
+					climb(p, m.i);
+					break;
+				case "down": down(p);
 			}
 			return true;
 		},
@@ -13477,6 +13782,23 @@ function fishingReferee(_setup, ctx) {
 					p: pub(p)
 				});
 			}
+			if (now - lastHome > 1e4) {
+				lastHome = now;
+				let moved = false;
+				boats.forEach((b, i) => {
+					const h = BOATS[i];
+					if (!b.rider && b.used && now - b.used > BOAT_HOME_MS && (b.x !== h.x || b.z !== h.z)) {
+						Object.assign(b, {
+							x: h.x,
+							z: h.z,
+							r: h.r,
+							used: 0
+						});
+						moved = true;
+					}
+				});
+				if (moved) allBoats();
+			}
 			if (posDirty.size && now - lastPos >= POS_MS) {
 				lastPos = now;
 				all({
@@ -13495,6 +13817,12 @@ function fishingReferee(_setup, ctx) {
 			}
 		},
 		leave(key) {
+			const p = players.get(key);
+			if (p?.ride !== null && p?.ride !== void 0) {
+				boats[p.ride].rider = null;
+				boats[p.ride].used = ctx.now();
+				allBoats();
+			}
 			if (players.delete(key)) all({
 				t: "gone",
 				id: key

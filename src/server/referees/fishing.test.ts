@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import type { BagItem, ServerMsg } from '../../games/fishing/play/protocol'
-import { shoreZ } from '../../games/fishing/play/map'
+import { BOATS, LADDERS, shoreZ } from '../../games/fishing/play/map'
 import { resetStore } from '../fishingStore'
 import { addToBag, fishingReferee } from './fishing'
 
@@ -23,6 +23,65 @@ function setup() {
 
 describe('낚시터 심판', () => {
   beforeEach(() => resetStore())
+
+  /** 서버가 아는 내 자리로 순간 이동 (시험용: 아주 오래 기다린 뒤 한 걸음씩) */
+  function walkTo(s: ReturnType<typeof setup>, id: string, x: number, z: number) {
+    for (let i = 0; i < 400; i++) {
+      s.tick(2000)
+      s.ref.input(id, { t: 'mv', x, z, r: 0 })
+    }
+  }
+
+  it('배: 가까이 가서 타면 물 위로 다니고, 땅으로는 못 가고, 물가에서 내림', () => {
+    const s = setup()
+    s.ref.input('a', { t: 'hi' })
+    const b = BOATS[0]
+    // 선착장 위 배 옆으로
+    walkTo(s, 'a', 7.2, 2)
+    walkTo(s, 'a', 8.2, b.z)
+    s.ref.input('a', { t: 'board', i: 0 })
+    expect(s.last('st')?.p.ride).toBe(0)
+    expect(s.last('boats')?.l[0][3]).toBe('a')
+    // 바다 쪽으로 저어 감
+    s.tick(1000)
+    s.ref.input('a', { t: 'mv', x: b.x, z: b.z - 10, r: 0 })
+    s.tick(100)
+    expect(s.last('pos')!.l[0][2]).toBeCloseTo(b.z - 10)
+    // 판자(선착장) 위로는 못 감
+    s.tick(1000)
+    s.ref.input('a', { t: 'mv', x: 7.2, z: -18, r: 0 })
+    expect(s.last('st')?.p.z).toBeCloseTo(b.z - 10)
+    // 바다 한가운데선 못 내림
+    s.ref.input('a', { t: 'unboard' })
+    expect(s.last('st')?.p.ride).toBe(0)
+    // 다른 사람은 탄 배에 못 탐
+    s.ref.input('b', { t: 'hi' })
+    s.ref.input('b', { t: 'board', i: 0 })
+    expect(s.last('st')?.p.ride).toBeNull()
+    // 선착장 옆으로 돌아와 내림
+    s.tick(1000)
+    s.ref.input('a', { t: 'mv', x: b.x, z: b.z, r: 0 })
+    s.ref.input('a', { t: 'unboard' })
+    const st = s.last('st')!.p
+    expect(st.ride).toBeNull()
+    expect(s.last('boats')?.l[0][3]).toBeNull()
+  })
+
+  it('사다리: 아래에서만 오르고, 위에선 위 자리 안만', () => {
+    const s = setup()
+    s.ref.input('a', { t: 'hi' })
+    s.ref.input('a', { t: 'climb', i: 0 })
+    expect(s.last('st')?.p.up).toBeNull()
+    const l = LADDERS[0]
+    walkTo(s, 'a', l.foot.x, l.foot.z)
+    s.ref.input('a', { t: 'climb', i: 0 })
+    expect(s.last('st')?.p.up).toBe(0)
+    s.tick(1000)
+    s.ref.input('a', { t: 'mv', x: l.top.x, z: l.top.z + 3, r: 0 })
+    expect(s.last('st')?.p.z).toBeCloseTo(l.top.z)
+    s.ref.input('a', { t: 'down' })
+    expect(s.last('st')?.p).toMatchObject({ up: null, x: l.foot.x, z: l.foot.z })
+  })
 
   it('들어오면 모두에게 알리고 지금 사람들을 받음', () => {
     const s = setup()

@@ -1,6 +1,6 @@
 import * as THREE from 'three'
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
-import { BEDS, BOUNDS, BRIDGE, DOCK, JETTY, LAKE, LAKE_DOCK, PIER, PIER_END, RIVER, type Rect, SEA_EAST, STRUCTS, type Struct, shoreZ, waterAt } from '../play/map'
+import { BEDS, BOUNDS, BRIDGE, DOCK, type FurnKind, HOUSES, JETTY, LADDERS, LAKE, LAKE_DOCK, PIER, PIER_END, RIVER, type Rect, SEA_EAST, STRUCTS, type Struct, shoreZ, waterAt } from '../play/map'
 
 // 낚시터 3D 맵 그림 (2026-11-18 사용자 요청 — 더 사실적이고 넓게, 구조물 많이, 추가할 만한 것 다).
 // 좌표·막힘은 play/map.ts(서버와 같이 씀), 여기는 그림만.
@@ -9,8 +9,14 @@ import { BEDS, BOUNDS, BRIDGE, DOCK, JETTY, LAKE, LAKE_DOCK, PIER, PIER_END, RIV
 // - 움직이는 것은 물건뿐(물결·배·갈매기·구름·불·깃발·분수) — 카메라는 절대 안 건드림 (사용자 3D 멀미)
 // 멈춰 있는 물건은 재질별로 한 덩어리로 합쳐 그림 (폰에서도 가볍게)
 
-export type Occluder = { g: THREE.Object3D; r: number; y: number }
-export type WorldArt = { occluders: Occluder[]; update: (t: number, dt: number) => void; minimap: HTMLCanvasElement; dispose: () => void; /** 0 낮 ~ 1 밤 */ night: () => number }
+/** 가리면 반투명해질 것. house = 집 번호 (그 집 안에 들어가 있으면 늘 반투명) */
+export type Occluder = { g: THREE.Object3D; r: number; y: number; house?: number }
+export type WorldArt = {
+  /** 집 지붕 (안에 들어가면 숨김) — HOUSES 순서 */
+  roofs: THREE.Object3D[]
+  /** 해 그림자를 내 주변에 맞춤 */
+  follow: (x: number, z: number) => void
+  occluders: Occluder[]; update: (t: number, dt: number) => void; minimap: HTMLCanvasElement; dispose: () => void; /** 0 낮 ~ 1 밤 */ night: () => number }
 
 const matCache = new Map<string, THREE.MeshStandardMaterial>()
 function mat(color: string, rough = 0.85, metal = 0) {
@@ -153,7 +159,87 @@ function compact(g: THREE.Object3D) {
   return out
 }
 
-export function buildWorld(scene: THREE.Scene): WorldArt {
+/** 울퉁불퉁한 바위 (같은 자리 꼭짓점은 같이 움직여 틈이 안 생김) */
+function rockGeo(size: number, seed: number) {
+  const g = new THREE.IcosahedronGeometry(size, 1)
+  const p = g.getAttribute('position') as THREE.BufferAttribute
+  for (let i = 0; i < p.count; i++) {
+    const x = p.getX(i), y = p.getY(i), z = p.getZ(i)
+    const n = Math.sin(x * 3.1 + seed) * Math.cos(z * 2.7 + seed * 1.3) * Math.sin(y * 2.3 + seed * 0.7)
+    const k = 1 + n * 0.28
+    p.setXYZ(i, x * k, y * k * 0.75, z * k)
+  }
+  g.computeVertexNormals()
+  return g
+}
+
+/** 줄무늬 텍스처 (판자 벽·기와) */
+function stripeTex(base: string, line: string, rows: number, opts: { tiles?: boolean; repeatX?: number; repeatY?: number } = {}) {
+  const c = document.createElement('canvas')
+  c.width = c.height = 256
+  const g = c.getContext('2d')!
+  g.fillStyle = base
+  g.fillRect(0, 0, 256, 256)
+  const h = 256 / rows
+  for (let r = 0; r < rows; r++) {
+    // 줄마다 조금씩 다른 밝기
+    g.fillStyle = `rgba(0,0,0,${0.04 + ((r * 37) % 5) * 0.015})`
+    g.fillRect(0, r * h, 256, h)
+    g.fillStyle = line
+    g.fillRect(0, r * h + h - 3, 256, 3)
+    if (opts.tiles) for (let k = 0; k < 6; k++) g.fillRect(((k + (r % 2) * 0.5) * 256) / 6, r * h, 3, h)
+  }
+  const t = new THREE.CanvasTexture(c)
+  t.wrapS = t.wrapT = THREE.RepeatWrapping
+  t.repeat.set(opts.repeatX ?? 1, opts.repeatY ?? 1)
+  t.colorSpace = THREE.SRGBColorSpace
+  return t
+}
+
+/** 나무배 (뱃머리가 -z) — 3D 화면이 탈 수 있는 배를 그릴 때도 씀 */
+export function makeBoat(color: string) {
+  const g = new THREE.Group()
+  const s = new THREE.Shape()
+  s.moveTo(0, 1.9)
+  s.quadraticCurveTo(0.95, 0.9, 0.85, -1.4)
+  s.lineTo(-0.85, -1.4)
+  s.quadraticCurveTo(-0.95, 0.9, 0, 1.9)
+  const hull = new THREE.Mesh(new THREE.ExtrudeGeometry(s, { depth: 0.6, bevelEnabled: true, bevelSize: 0.05, bevelThickness: 0.05, bevelSegments: 1 }), new THREE.MeshStandardMaterial({ color, roughness: 0.55 }))
+  hull.rotation.x = -Math.PI / 2
+  const stripe = new THREE.Mesh(new THREE.ExtrudeGeometry(s, { depth: 0.08, bevelEnabled: false }), new THREE.MeshStandardMaterial({ color: '#f4f2ec', roughness: 0.6 }))
+  stripe.rotation.x = -Math.PI / 2
+  stripe.scale.set(1.035, 1.02, 1)
+  stripe.position.y = 0.5
+  const inner = new THREE.Mesh(new THREE.ExtrudeGeometry(s, { depth: 0.1, bevelEnabled: false }), new THREE.MeshStandardMaterial({ color: '#a9733f', roughness: 0.8 }))
+  inner.scale.set(0.85, 0.88, 1)
+  inner.rotation.x = -Math.PI / 2
+  inner.position.y = 0.3
+  const wood = new THREE.MeshStandardMaterial({ color: '#b98a5a', roughness: 0.8 })
+  const seat = (z: number) => {
+    const m = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.06, 0.32), wood)
+    m.position.set(0, 0.5, z)
+    return m
+  }
+  g.add(hull, stripe, inner, seat(0.2), seat(-0.8))
+  for (const sgn of [1, -1]) {
+    const oar = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 2.2, 5), wood)
+    oar.position.set(sgn * 0.8, 0.55, -0.2)
+    oar.rotation.set(Math.PI / 2, 0, sgn * 0.3)
+    const blade = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.18, 0.5), wood)
+    blade.position.set(sgn * 1.12, 0.45, 0.75)
+    blade.rotation.y = sgn * 0.3
+    g.add(oar, blade)
+  }
+  g.traverse((o) => {
+    if (o instanceof THREE.Mesh) {
+      o.castShadow = true
+      o.receiveShadow = true
+    }
+  })
+  return g
+}
+
+export function buildWorld(scene: THREE.Scene, renderer: THREE.WebGLRenderer): WorldArt {
   const occluders: Occluder[] = []
   const disposables: { dispose: () => void }[] = []
   const statics = new THREE.Group() // 합칠 것 (그림자 냄)
@@ -187,7 +273,14 @@ export function buildWorld(scene: THREE.Scene): WorldArt {
   const stars = new THREE.Points(new THREE.BufferGeometry().setAttribute('position', new THREE.Float32BufferAttribute(starPos, 3)), new THREE.PointsMaterial({ color: '#ffffff', size: 1.6, sizeAttenuation: false, transparent: true, opacity: 0, fog: false, depthWrite: false }))
   scene.add(stars)
 
+  // 해: 그림자는 내 주변 50m만 (follow로 따라감)
   const sun = new THREE.DirectionalLight('#fff4dc', 1.6)
+  sun.castShadow = true
+  sun.shadow.mapSize.set(2048, 2048)
+  Object.assign(sun.shadow.camera, { left: -26, right: 26, top: 26, bottom: -26, near: 1, far: 200 })
+  sun.shadow.bias = -0.0004
+  sun.shadow.normalBias = 0.03
+  const sunDir = new THREE.Vector3(0.4, 1, -0.3).normalize()
   scene.add(sun, sun.target)
   let hemi: THREE.HemisphereLight | null = null
   scene.traverse((o) => {
@@ -196,7 +289,7 @@ export function buildWorld(scene: THREE.Scene): WorldArt {
   scene.fog = new THREE.Fog('#cfeaff', 55, 210)
 
   // ── 바다 (물결 셰이더) ──
-  const seaMat = new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 0.22, metalness: 0.08 })
+  const seaMat = new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 0.07, metalness: 0 })
   seaMat.onBeforeCompile = (sh) => {
     sh.uniforms.uTime = time
     sh.uniforms.uNight = nightU
@@ -229,6 +322,13 @@ export function buildWorld(scene: THREE.Scene): WorldArt {
       col = mix(col, vec3(1.0), clamp(foam, 0.0, 1.0) * 0.8);
       col *= mix(1.0, 0.35, uNight);
       diffuseColor.rgb = col;`,
+    ).replace(
+      '#include <normal_fragment_maps>',
+      `#include <normal_fragment_maps>
+      // 잔물결: 작은 물결 무늬로 빛이 반짝반짝 (하늘이 비침)
+      float r1 = sin(vW.x*2.3 + vW.z*1.7 + uTime*2.6) + sin(vW.x*-1.4 + vW.z*3.1 + uTime*3.3);
+      float r2 = cos(vW.x*3.7 - vW.z*1.1 - uTime*2.1) + cos(vW.x*1.2 + vW.z*-2.6 + uTime*2.9);
+      normal = normalize(normal + (viewMatrix * vec4(r1*0.045, 0.0, r2*0.045, 0.0)).xyz);`,
     )
   }
   const sea = new THREE.Mesh(new THREE.PlaneGeometry(700, 700, 175, 175), seaMat)
@@ -274,10 +374,10 @@ export function buildWorld(scene: THREE.Scene): WorldArt {
   // 모래와 풀 사이 (부드럽게)
   flat(shapeGeo([[-260, 14.5], [SEA_EAST, 14.5], [SEA_EAST, 16.95], [-260, 16.95]], 6), new THREE.MeshStandardMaterial({ map: sandTex, color: '#c8c58c', roughness: 0.95 }), 0.008)
   // 동쪽 풀밭이 바다와 만나는 곳: 바위 둑
-  const rockM = new THREE.MeshStandardMaterial({ color: '#8d929b', roughness: 0.9, flatShading: true })
+  const rockM = new THREE.MeshStandardMaterial({ map: noiseTex('#8d929b', [['#767b84', 300, 4], ['#a3a8b0', 300, 3], ['#6d7a5f', 60, 3]], 1, 128), roughness: 0.95, flatShading: true })
   for (let z = shoreZ(SEA_EAST) + 1; z > -53; z -= 1.2) {
     const s = 0.7 + Math.abs(Math.sin(z * 2.1)) * 0.6
-    const r = new THREE.Mesh(new THREE.DodecahedronGeometry(s), rockM)
+    const r = new THREE.Mesh(rockGeo(s, z), rockM)
     r.position.set(SEA_EAST - 0.4 + Math.sin(z) * 0.4, 0.1, z)
     r.rotation.set(z, z * 2, 0)
     statics.add(r)
@@ -307,7 +407,7 @@ export function buildWorld(scene: THREE.Scene): WorldArt {
   plaza.position.set(-10, 0.025, 37)
 
   // ── 민물 (호수·강) ──
-  const freshMat = new THREE.MeshStandardMaterial({ color: '#2f8f95', roughness: 0.12, metalness: 0.15 })
+  const freshMat = new THREE.MeshStandardMaterial({ color: '#1f6f73', roughness: 0.06, metalness: 0 })
   flat(new THREE.CircleGeometry(LAKE.r + 0.15, 64).translate(LAKE.x, -LAKE.z, 0), freshMat, 0.035)
   // 강: 꺾은선을 따라 띠
   {
@@ -327,7 +427,7 @@ export function buildWorld(scene: THREE.Scene): WorldArt {
   for (let i = 0; i < 46; i++) {
     const a = (i / 46) * Math.PI * 2
     if (Math.abs(a - Math.PI) < 0.2) continue // 선착장 자리
-    const s = new THREE.Mesh(new THREE.DodecahedronGeometry(0.35 + (i % 3) * 0.12), rockM)
+    const s = new THREE.Mesh(rockGeo(0.35 + (i % 3) * 0.12, i), rockM)
     s.position.set(LAKE.x + Math.cos(a) * (LAKE.r + 0.35), 0.06, LAKE.z + Math.sin(a) * (LAKE.r + 0.35))
     s.scale.y = 0.55
     statics.add(s)
@@ -370,8 +470,26 @@ export function buildWorld(scene: THREE.Scene): WorldArt {
     const x = BOUNDS.minX - 4 + rnd() * (SEA_EAST - BOUNDS.minX + 3), z = 13 + rnd() * 3.6
     if (!nearStruct(x, z, 0.5)) tufts.push({ x, z, s: 0.9 + rnd() * 0.6 })
   }
-  const tuftGeo = new THREE.ConeGeometry(0.16, 0.5, 5, 1, true).translate(0, 0.25, 0)
-  instanced(tuftGeo, new THREE.MeshStandardMaterial({ color: '#4f9a3f', roughness: 1, side: THREE.DoubleSide }), tufts)
+  // 풀포기: 가는 잎 7장 (아래 진하고 끝은 밝게)
+  const tuftGeo = (() => {
+    const pos: number[] = [], col: number[] = []
+    const dark = new THREE.Color('#2f6b2a'), light = new THREE.Color('#9fd06e')
+    for (let k = 0; k < 7; k++) {
+      const a = (k / 7) * Math.PI * 2 + k
+      const lean = 0.12 + (k % 3) * 0.06, h = 0.35 + ((k * 13) % 5) * 0.06, w = 0.035
+      const cx = Math.cos(a), cz = Math.sin(a)
+      const px = -cz * w, pz = cx * w
+      const tip = [cx * lean, h, cz * lean]
+      pos.push(px, 0, pz, -px, 0, -pz, tip[0], tip[1], tip[2])
+      col.push(dark.r, dark.g, dark.b, dark.r, dark.g, dark.b, light.r, light.g, light.b)
+    }
+    const g = new THREE.BufferGeometry()
+    g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3))
+    g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3))
+    g.computeVertexNormals()
+    return g
+  })()
+  instanced(tuftGeo, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1, side: THREE.DoubleSide }), tufts)
   const flowerGeo = mergeGeometries([new THREE.CylinderGeometry(0.015, 0.015, 0.32, 4).translate(0, 0.16, 0).toNonIndexed(), new THREE.IcosahedronGeometry(0.07, 0).translate(0, 0.34, 0).toNonIndexed()])!
   instanced(flowerGeo, new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 0.8 }), flowers)
   // 갈대 (호수·강가)
@@ -459,7 +577,7 @@ export function buildWorld(scene: THREE.Scene): WorldArt {
   statics.add(box(JETTY.maxX - JETTY.minX - 0.6, 0.5, jettyEnd - JETTY.minZ, mat('#b9b7b1', 0.95), (JETTY.minX + JETTY.maxX) / 2, 0.2, (JETTY.minZ + jettyEnd) / 2))
   for (let z = JETTY.minZ; z < jettyEnd; z += 1.1)
     for (const x of [JETTY.minX - 0.3, JETTY.maxX + 0.3]) {
-      const r = new THREE.Mesh(new THREE.DodecahedronGeometry(0.9 + rnd() * 0.5), rockM)
+      const r = new THREE.Mesh(rockGeo(0.9 + rnd() * 0.5, z + x), rockM)
       r.position.set(x + (rnd() - 0.5) * 0.6, -0.1, z)
       r.rotation.set(rnd() * 3, rnd() * 3, 0)
       statics.add(r)
@@ -515,11 +633,17 @@ export function buildWorld(scene: THREE.Scene): WorldArt {
   const whiteM = mat('#f4f2ec', 0.8)
   const darkM = mat('#2b2f45', 0.6)
   /** 카메라와 나 사이에 오면 반투명해질 것: 따로 그리되 재질별로 합쳐 가볍게 */
-  const occlude = (g: THREE.Object3D, r: number, y: number) => {
+  const occlude = (g: THREE.Object3D, r: number, y: number, house?: number) => {
     const c = compact(g)
     scene.add(c)
-    occluders.push({ g: c, r, y })
+    occluders.push({ g: c, r, y, ...(house !== undefined ? { house } : {}) })
+    return c
   }
+  const roofs: THREE.Object3D[] = HOUSES.map(() => new THREE.Group())
+  const sidingTex = stripeTex('#efe6d2', 'rgba(120,100,80,0.35)', 14, { repeatX: 2, repeatY: 1 })
+  const roofTex = stripeTex('#ffffff', 'rgba(0,0,0,0.28)', 10, { tiles: true, repeatX: 3, repeatY: 2 })
+  const floorTex = stripeTex('#b78552', 'rgba(70,40,20,0.45)', 12, { tiles: true, repeatX: 2, repeatY: 2 })
+  disposables.push(sidingTex, roofTex, floorTex)
   const groundGlow: THREE.Mesh[] = []
   const glowTex = (() => {
     const c = document.createElement('canvas')
@@ -541,6 +665,145 @@ export function buildWorld(scene: THREE.Scene): WorldArt {
     groundGlow.push(m)
   }
 
+  /** 집: 벽(문 자리 비움, 안에 들어가면 반투명) · 지붕(안에 들어가면 숨김) · 바닥·가구 */
+  function buildHouse(s: Struct) {
+    const idx = HOUSES.findIndex((h) => h.s === s)
+    const H = HOUSES[idx]
+    const log = s.kind === 'cabin'
+    const W = 2.8
+    const wallM = log ? new THREE.MeshStandardMaterial({ map: stripeTex('#8f5f35', 'rgba(50,25,10,0.6)', 7), roughness: 0.9 }) : new THREE.MeshStandardMaterial({ map: sidingTex, roughness: 0.85 })
+    const trimM = log ? mat('#5a3b22') : whiteM
+    // 벽 (세상 좌표 → 집 가운데 기준)
+    const walls = new THREE.Group()
+    walls.position.set(s.x, 0, s.z)
+    for (const b of H.walls) {
+      const w = b.maxX - b.minX, d = b.maxZ - b.minZ
+      walls.add(box(w, W, d, wallM, (b.minX + b.maxX) / 2 - s.x, W / 2, (b.minZ + b.maxZ) / 2 - s.z))
+      walls.add(box(w + 0.04, 0.18, d + 0.04, trimM, (b.minX + b.maxX) / 2 - s.x, 0.09, (b.minZ + b.maxZ) / 2 - s.z))
+    }
+    // 창문 (벽 안팎 양쪽에 붙임) — 집 기준 좌표로 놓고 돌림
+    const local = new THREE.Group()
+    local.rotation.y = s.r ?? 0
+    walls.add(local)
+    const w = s.w!, d = s.d!, hw = w / 2, hd = d / 2
+    const win = (x: number, z: number, side: boolean) => {
+      // 벽을 뚫고 안팎 양쪽에 보이게 (두께 0.25 벽보다 조금 두껍게)
+      const pane = side ? box(0.29, 0.95, 1.1, windowM, x, 1.6, z) : box(1.1, 0.95, 0.29, windowM, x, 1.6, z)
+      const frame = side ? box(0.33, 1.1, 1.26, trimM, x, 1.6, z) : box(1.26, 1.1, 0.33, trimM, x, 1.6, z)
+      const sill = side ? box(0.45, 0.07, 1.3, trimM, x, 1.08, z) : box(1.3, 0.07, 0.45, trimM, x, 1.08, z)
+      local.add(frame, pane, sill)
+    }
+    const T2 = 0.125
+    for (const x of [-hw / 1.7, hw / 1.7]) {
+      win(x, hd - T2, false)
+      win(x, -hd + T2, false)
+    }
+    win(-hw + T2, 0.9, true)
+    win(hw - T2, 0.9, true)
+    // 문틀 + 활짝 연 문
+    local.add(box(0.12, 2.2, 0.32, trimM, -0.81, 1.1, hd - 0.12), box(0.12, 2.2, 0.32, trimM, 0.81, 1.1, hd - 0.12), box(1.74, 0.14, 0.32, trimM, 0, 2.27, hd - 0.12))
+    const door = box(1.4, 2.08, 0.06, mat(log ? '#6b4320' : '#7a4a2a', 0.7), -0.72, 1.04, hd - 0.97)
+    door.rotation.y = Math.PI / 2
+    local.add(door, box(0.9, 0.05, 0.6, mat('#9a6b52'), 0, 0.03, hd + 0.5))
+    occlude(walls, Math.max(w, d) / 2 + 0.6, 1.6, idx)
+    // 지붕
+    const roof = new THREE.Group()
+    roof.position.set(s.x, 0, s.z)
+    roof.rotation.y = s.r ?? 0
+    const roofM = log ? new THREE.MeshStandardMaterial({ map: roofTex, color: '#3f6b3a', roughness: 0.8 }) : new THREE.MeshStandardMaterial({ map: roofTex, color: s.color ?? '#c8553d', roughness: 0.7 })
+    roof.add(new THREE.Mesh(roofGeo(w + 0.8, d + 1, 1.9), roofM).translateY(W))
+    // 천장 (지붕 밑을 막음) · 굴뚝
+    roof.add(box(w, 0.08, d, mat('#e9e2d4'), 0, W + 0.02, 0), box(0.55, 1.6, 0.55, mat('#8a6a5a', 0.9), hw / 2, W + 1.3, -hd / 3), box(0.7, 0.12, 0.7, darkM, hw / 2, W + 2.12, -hd / 3))
+    const rc = compact(roof)
+    scene.add(rc)
+    roofs[idx] = rc
+    // 바닥
+    const floor = new THREE.Mesh(new THREE.PlaneGeometry(w - 0.1, d - 0.1), new THREE.MeshStandardMaterial({ map: floorTex, roughness: 0.75 }))
+    floor.rotation.x = -Math.PI / 2
+    floor.position.set(s.x, 0.03, s.z)
+    floor.receiveShadow = true
+    scene.add(floor)
+    disposables.push(floor.geometry)
+    // 가구 (집 기준 좌표로)
+    const inG = new THREE.Group()
+    inG.position.set(s.x, 0, s.z)
+    inG.rotation.y = s.r ?? 0
+    const r = s.r ?? 0
+    const c = Math.round(Math.cos(r)), n = Math.round(Math.sin(r))
+    // 세상 좌표 → 집 기준 (placeRect의 반대)
+    const toLocal = (b: Rect) => {
+      const pts = [[b.minX, b.minZ], [b.maxX, b.maxZ]].map(([x, z]) => {
+        const dx = x - s.x, dz = z - s.z
+        return [dx * c - dz * n, dx * n + dz * c]
+      })
+      return { x0: Math.min(pts[0][0], pts[1][0]), x1: Math.max(pts[0][0], pts[1][0]), z0: Math.min(pts[0][1], pts[1][1]), z1: Math.max(pts[0][1], pts[1][1]) }
+    }
+    const accent = mat(s.color ?? '#c8553d', 0.8)
+    for (const f of H.furniture) furniture(inG, f.kind, toLocal(f.rect), accent)
+    // 깔개·벽 그림·천장 등·화분
+    inG.add(box(2, 0.02, 1.4, mat(log ? '#a33b2a' : '#3f6fa0', 1), -0.2, 0.045, 0.3))
+    inG.add(box(0.9, 0.6, 0.04, mat('#5a3b22'), hw - 1, 1.8, -hd + 0.27), box(0.78, 0.48, 0.05, mat('#7fb6d8'), hw - 1, 1.8, -hd + 0.28))
+    inG.add(cyl(0.02, 0.02, 0.5, darkM, 0, W - 0.25, 0, 4), new THREE.Mesh(new THREE.SphereGeometry(0.16, 10, 8), bulbM).translateY(W - 0.55))
+    inG.add(cyl(0.18, 0.14, 0.32, mat('#b0603a'), hw - 0.5, 0.16, hd - 0.6, 10), new THREE.Mesh(new THREE.IcosahedronGeometry(0.32, 1), mat('#3f8f3a')).translateX(hw - 0.5).translateY(0.6).translateZ(hd - 0.6))
+    statics.add(inG)
+    if (log) {
+      // 통나무집 앞마루
+      const porch = new THREE.Group()
+      porch.position.set(s.x, 0, s.z)
+      porch.rotation.y = r
+      porch.add(box(w, 0.15, 1.6, plankM, 0, 0.08, hd + 0.8))
+      for (const x of [-hw + 0.2, hw - 0.2]) porch.add(cyl(0.1, 0.1, 2.7, postM, x, 1.35, hd + 1.5, 6))
+      porch.add(box(w + 0.4, 0.1, 1.9, mat('#3f6b3a', 0.8), 0, 2.75, hd + 0.85))
+      statics.add(porch)
+    }
+  }
+
+  function furniture(g: THREE.Group, kind: FurnKind, b: { x0: number; x1: number; z0: number; z1: number }, accent: THREE.Material) {
+    const cx = (b.x0 + b.x1) / 2, cz = (b.z0 + b.z1) / 2, w = b.x1 - b.x0, d = b.z1 - b.z0
+    const wood = mat('#9a6b42', 0.8)
+    switch (kind) {
+      case 'bed':
+        g.add(box(w, 0.32, d, wood, cx, 0.16, cz), box(w - 0.1, 0.22, d - 0.1, mat('#f4f2ec', 0.9), cx, 0.43, cz), box(w - 0.06, 0.08, d * 0.62, accent, cx, 0.56, cz + d * 0.18))
+        g.add(box(w, 0.9, 0.08, wood, cx, 0.45, b.z0 + 0.04), box(w * 0.7, 0.14, 0.4, mat('#ffffff', 0.9), cx, 0.6, b.z0 + 0.35))
+        break
+      case 'sofa':
+        g.add(box(w, 0.4, d, accent, cx, 0.2, cz), box(0.22, 0.85, d, accent, b.x0 + 0.11, 0.42, cz), box(w, 0.6, 0.2, accent, cx, 0.3, b.z0 + 0.1), box(w, 0.6, 0.2, accent, cx, 0.3, b.z1 - 0.1))
+        for (const k of [0.3, 0.7]) g.add(box(w - 0.3, 0.12, d * 0.36, mat('#f4f2ec', 0.95), cx + 0.1, 0.46, b.z0 + d * k))
+        break
+      case 'kitchen':
+        g.add(box(w, 0.88, d, mat('#e9e2d4', 0.6), cx, 0.44, cz), box(w + 0.04, 0.05, d + 0.04, mat('#4a4f5c', 0.4), cx, 0.9, cz), box(0.45, 0.04, 0.35, mat('#9aa3ad', 0.3, 0.6), cx - 0.25, 0.93, cz))
+        g.add(box(w, 0.6, 0.35, mat('#e9e2d4', 0.6), cx, 1.75, b.z0 + 0.18))
+        for (const k of [0.25, 0.75]) g.add(box(0.03, 0.5, 0.02, mat('#4a4f5c'), b.x0 + w * k, 0.5, b.z1 + 0.01))
+        break
+      case 'fireplace': {
+        const stone = new THREE.MeshStandardMaterial({ map: noiseTex('#9a948a', [['#7f796f', 200, 6], ['#b5afa5', 160, 5]], 1, 128), roughness: 0.95 })
+        g.add(box(w, 1.2, d, stone, cx, 0.6, cz), box(w * 0.55, 0.6, 0.1, darkM, cx, 0.4, b.z1 + 0.01), box(w * 0.45, 0.25, 0.05, glowMat('#ff8a3c'), cx, 0.25, b.z1 + 0.03), box(w * 0.5, 1.6, d * 0.6, stone, cx, 2, b.z0 + d * 0.3))
+        break
+      }
+      case 'shelf': {
+        g.add(box(w, 1.9, d, wood, cx, 0.95, cz))
+        const bookC = ['#c8553d', '#3d6f9e', '#e0b030', '#3f7f5a', '#7a5c9e', '#f4f2ec']
+        for (let row = 0; row < 4; row++)
+          for (let k = 0; k < 9; k++) {
+            const bw = w / 10
+            g.add(box(bw * 0.85, 0.3 + ((k * 7 + row) % 3) * 0.04, d * 0.7, mat(bookC[(k + row * 2) % bookC.length], 0.8), b.x0 + bw * (k + 0.8), 0.3 + row * 0.45, cz + 0.02))
+          }
+        break
+      }
+      case 'table': {
+        g.add(cyl(Math.min(w, d) / 2, Math.min(w, d) / 2, 0.05, wood, cx, 0.74, cz, 20), cyl(0.06, 0.1, 0.72, wood, cx, 0.36, cz, 8))
+        g.add(cyl(0.07, 0.05, 0.22, mat('#7fb6d8', 0.2), cx, 0.88, cz, 10), new THREE.Mesh(new THREE.IcosahedronGeometry(0.1, 0), mat('#ff6b5a')).translateX(cx).translateY(1.02).translateZ(cz))
+        // 의자 둘 (막힘 없음)
+        for (const sgn of [-1, 1]) {
+          const z = cz + sgn * (d / 2 + 0.25)
+          g.add(box(0.42, 0.05, 0.42, wood, cx, 0.45, z), box(0.42, 0.5, 0.05, wood, cx, 0.7, z + sgn * 0.2))
+          for (const [ox, oz] of [[-0.18, -0.18], [0.18, -0.18], [-0.18, 0.18], [0.18, 0.18]]) g.add(box(0.04, 0.45, 0.04, wood, cx + ox, 0.22, z + oz))
+        }
+        break
+      }
+    }
+  }
+
   function build(s: Struct): THREE.Object3D | null {
     const g = new THREE.Group()
     g.position.set(s.x, 0, s.z)
@@ -556,6 +819,24 @@ export function buildWorld(scene: THREE.Scene): WorldArt {
           const a = (i / 14) * Math.PI * 2
           g.add(cyl(0.03, 0.03, 0.7, darkM, Math.cos(a) * 1.45, 11.3, Math.sin(a) * 1.45, 4))
         }
+        // 바깥 사다리 (앞 +z, 바닥에서 전망대까지)
+        const lad = LADDERS[1]
+        const fz = lad.foot.z - s.z, tz = lad.top.z - s.z + 0.2, H = lad.y - 0.45
+        const len = Math.hypot(H, fz - tz), tilt = Math.atan2(fz - tz, H)
+        for (const x of [-0.3, 0.3]) {
+          const rail = cyl(0.04, 0.04, len, darkM, x, H / 2, (fz + tz) / 2, 6)
+          rail.rotation.x = -tilt
+          g.add(rail)
+        }
+        for (let i = 1; i < Math.floor(H / 0.32); i++) {
+          const k = (i * 0.32) / H
+          g.add(cyl(0.022, 0.022, 0.6, darkM, 0, k * H, fz + (tz - fz) * k, 5).rotateZ(Math.PI / 2))
+        }
+        // 전망대 바닥
+        const deck = new THREE.Mesh(new THREE.RingGeometry(0.9, 1.55, 24), darkM)
+        deck.rotation.x = -Math.PI / 2
+        deck.position.y = 10.98
+        g.add(deck)
         const lamp = cyl(0.8, 0.8, 1.3, glowMat('#fff3b0'), 0, 11.6, 0, 14)
         g.add(lamp, new THREE.Mesh(new THREE.ConeGeometry(1.05, 0.9, 14), mat('#d94a3c', 0.6)).translateY(12.7))
         // 밤에 도는 불빛 (빛줄기 두 개)
@@ -576,64 +857,9 @@ export function buildWorld(scene: THREE.Scene): WorldArt {
         scene.add(g)
         return null
       }
-      case 'shop': {
-        const w = s.w!, d = s.d!
-        const wall = mat('#b5835a', 0.85)
-        g.add(box(w, 3.2, d, wall, 0, 1.6, 0))
-        for (let y = 0.4; y < 3.2; y += 0.4) g.add(box(w + 0.02, 0.03, d + 0.02, mat('#8d5f3a'), 0, y, 0))
-        g.add(new THREE.Mesh(roofGeo(w + 0.8, d + 1, 1.8), mat('#3c4a6b', 0.7)).translateY(3.2))
-        // 앞(남쪽 = +z) 간판·차양·문·창
-        const sign = new THREE.Mesh(new THREE.PlaneGeometry(4.2, 1), new THREE.MeshStandardMaterial({ map: labelTex(s.label ?? '', '#1c1748', '#ffd23f'), roughness: 0.6 }))
-        sign.position.set(0, 3.55, d / 2 + 0.52)
-        g.add(sign)
-        for (let i = 0; i < 8; i++) {
-          const slat = box(w / 8, 0.06, 1.4, mat(i % 2 ? '#ffffff' : '#e8473f', 0.8), -w / 2 + w / 16 + (i * w) / 8, 2.55, d / 2 + 0.65)
-          slat.rotation.x = 0.35
-          g.add(slat)
-        }
-        g.add(box(1.2, 2.1, 0.08, mat('#5a3b22'), 0, 1.05, d / 2 + 0.03), box(1.6, 1.1, 0.06, windowM, -2.4, 1.6, d / 2 + 0.03), box(1.6, 1.1, 0.06, windowM, 2.4, 1.6, d / 2 + 0.03))
-        // 통·낚싯대 걸이
-        for (const x of [-3.6, 3.4]) g.add(cyl(0.38, 0.34, 0.9, mat('#8d5f3a'), x, 0.45, d / 2 + 1.2, 12))
-        for (let i = 0; i < 4; i++) {
-          const rod = cyl(0.025, 0.035, 2.6, postM, 1.4 + i * 0.25, 1.3, d / 2 + 0.25, 5)
-          rod.rotation.x = -0.2
-          g.add(rod)
-        }
-        occlude(g, Math.max(w, d) / 2 + 0.5, 1.8)
-        return null
-      }
       case 'house':
       case 'cabin': {
-        const w = s.w!, d = s.d!
-        const log = s.kind === 'cabin'
-        if (log) for (let y = 0.2; y < 2.8; y += 0.38) {
-          for (const z of [-d / 2, d / 2]) {
-            const l = cyl(0.2, 0.2, w + 0.4, mat('#8a5a32', 0.9), 0, y, z, 8)
-            l.rotation.z = Math.PI / 2
-            g.add(l)
-          }
-          for (const x of [-w / 2, w / 2]) {
-            const l = cyl(0.2, 0.2, d + 0.4, mat('#7a4e2a', 0.9), x, y + 0.19, 0, 8)
-            l.rotation.x = Math.PI / 2
-            g.add(l)
-          }
-        }
-        g.add(box(w - (log ? 0.2 : 0), 2.8, d - (log ? 0.2 : 0), log ? mat('#9b6a3e') : mat('#f3ead8', 0.85), 0, 1.4, 0))
-        g.add(new THREE.Mesh(roofGeo(w + 0.7, d + 0.9, 1.9), log ? mat('#3f6b3a', 0.8) : mat(s.color ?? '#e8473f', 0.7)).translateY(2.8))
-        g.add(box(0.5, 1.4, 0.5, mat('#9a6b52'), w / 4, 4.2, -d / 6))
-        g.add(box(1.1, 2, 0.08, mat('#6b4320'), 0, 1, d / 2 + 0.03))
-        for (const x of [-w / 3, w / 3]) {
-          g.add(box(1.1, 0.9, 0.06, windowM, x, 1.6, d / 2 + 0.03), box(1.25, 0.08, 0.12, whiteM, x, 1.1, d / 2 + 0.08))
-          g.add(box(0.06, 0.9, 1.1, windowM, -w / 2 - 0.03, 1.6, x * 0.6))
-        }
-        // 화분·꽃 상자
-        g.add(box(1.2, 0.25, 0.3, mat('#8d5f3a'), -w / 3, 1.0, d / 2 + 0.2))
-        for (let i = 0; i < 4; i++) g.add(new THREE.Mesh(new THREE.IcosahedronGeometry(0.11, 0), mat(['#ff6b5a', '#ffd23f', '#ff8ab0', '#ffffff'][i])).translateX(-w / 3 - 0.45 + i * 0.3).translateY(1.2).translateZ(d / 2 + 0.2))
-        if (log) {
-          g.add(box(w, 0.15, 1.6, plankM, 0, 0.1, d / 2 + 0.8))
-          for (const x of [-w / 2 + 0.2, w / 2 - 0.2]) g.add(cyl(0.1, 0.1, 2.6, postM, x, 1.3, d / 2 + 1.5, 6))
-        }
-        occlude(g, Math.max(w, d) / 2 + 0.6, 2)
+        buildHouse(s)
         return null
       }
       case 'hut': {
@@ -646,15 +872,37 @@ export function buildWorld(scene: THREE.Scene): WorldArt {
         return null
       }
       case 'tower': {
-        for (const [x, z] of [[-0.9, -0.9], [0.9, -0.9], [-0.9, 0.9], [0.9, 0.9]]) {
-          const leg = cyl(0.07, 0.09, 2.6, whiteM, x * 0.85, 1.3, z * 0.85, 6)
-          leg.rotation.set(z * 0.06, 0, -x * 0.06)
+        // 인명구조 탑: 앞(+z) 사다리로 올라가 앞쪽 마루에 섬 (뒤쪽은 작은 오두막)
+        const red = mat('#d94a3c', 0.6)
+        for (const [x, z] of [[-1.1, -1.1], [1.1, -1.1], [-1.1, 1.1], [1.1, 1.1]]) {
+          const leg = cyl(0.08, 0.1, 2.62, whiteM, x, 1.31, z, 8)
           g.add(leg)
         }
-        g.add(box(2.4, 0.15, 2.4, plankM, 0, 2.6, 0), box(1.8, 1.3, 1.8, mat('#e8473f', 0.7), 0, 3.3, 0), box(1.6, 0.6, 0.06, windowM, 0, 3.4, -0.92))
-        g.add(box(0.7, 0.18, 0.06, whiteM, 0, 3.4, 0.92), box(0.18, 0.7, 0.06, whiteM, 0, 3.4, 0.93))
-        g.add(new THREE.Mesh(new THREE.ConeGeometry(1.75, 0.8, 4), mat('#f4f2ec')).translateY(4.35).rotateY(Math.PI / 4))
-        for (let i = 0; i < 6; i++) g.add(box(0.8, 0.06, 0.08, plankM, 0, 0.3 + i * 0.4, 1.35 + i * 0.07))
+        for (const z of [-1.1, 1.1]) {
+          const brace = box(2.6, 0.06, 0.06, whiteM, 0, 1.2, z)
+          brace.rotation.z = 0.7
+          g.add(brace)
+        }
+        g.add(box(2.7, 0.15, 2.7, plankM, 0, 2.6, 0))
+        g.add(box(2.0, 1.4, 1.0, red, 0, 3.38, -0.8), box(1.6, 0.55, 0.05, windowM, 0, 3.5, -0.28), box(0.6, 0.15, 0.05, whiteM, 0, 3.5, -1.32), box(0.15, 0.6, 0.05, whiteM, 0, 3.5, -1.33))
+        // 난간 (사다리 자리는 비움)
+        for (const [x, z, w, d] of [[-1.3, 0.25, 0.06, 2.2], [1.3, 0.25, 0.06, 2.2], [-0.85, 1.3, 0.9, 0.06], [0.85, 1.3, 0.9, 0.06]]) g.add(box(w, 0.06, d, whiteM, x, 3.55, z))
+        for (const [x, z] of [[-1.3, 1.3], [1.3, 1.3], [-1.3, -0.3], [1.3, -0.3], [-0.42, 1.3], [0.42, 1.3]]) g.add(cyl(0.04, 0.04, 0.9, whiteM, x, 3.12, z, 6))
+        // 지붕 (기둥 위)
+        for (const [x, z] of [[-1.25, -1.25], [1.25, -1.25], [-1.25, 1.25], [1.25, 1.25]]) g.add(cyl(0.04, 0.04, 1.9, whiteM, x, 3.6, z, 6))
+        g.add(new THREE.Mesh(new THREE.ConeGeometry(2.2, 0.8, 4), red).translateY(4.95).rotateY(Math.PI / 4))
+        // 사다리
+        for (const x of [-0.32, 0.32]) {
+          const rail = cyl(0.04, 0.04, 2.8, whiteM, x, 1.35, 1.65, 6)
+          rail.rotation.x = -0.22
+          g.add(rail)
+        }
+        for (let i = 0; i < 8; i++) g.add(cyl(0.025, 0.025, 0.64, whiteM, 0, 0.25 + i * 0.33, 1.95 - i * 0.075, 5).rotateZ(Math.PI / 2))
+        // 구명 튜브
+        const ring = new THREE.Mesh(new THREE.TorusGeometry(0.28, 0.08, 8, 16), red)
+        ring.position.set(1.36, 2.2, 0.6)
+        ring.rotation.y = Math.PI / 2
+        g.add(ring)
         occlude(g, 1.8, 2.5)
         return null
       }
@@ -745,7 +993,7 @@ export function buildWorld(scene: THREE.Scene): WorldArt {
         return null
       }
       case 'rock': {
-        const r = new THREE.Mesh(new THREE.DodecahedronGeometry(sc), rockM)
+        const r = new THREE.Mesh(rockGeo(sc, s.x * 3 + s.z), rockM)
         r.scale.set(1.1, 0.7, 0.9)
         r.position.y = sc * 0.3
         r.rotation.set(s.x, s.z, 0)
@@ -834,8 +1082,11 @@ export function buildWorld(scene: THREE.Scene): WorldArt {
       }
       case 'sign': {
         g.add(cyl(0.06, 0.06, 2.2, postM, 0, 1.1, 0, 6))
-        const t = labelTex(s.label ?? '', '#f4ead2', '#5a3b22', 512, 128)
-        const board = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.55, 0.06), [mat('#8d5f3a'), mat('#8d5f3a'), mat('#8d5f3a'), mat('#8d5f3a'), new THREE.MeshStandardMaterial({ map: t }), new THREE.MeshStandardMaterial({ map: t })])
+        // 뒷면은 왼쪽·오른쪽이 바뀌므로 '← 바다 · 호수 →'면 뒤엔 '← 호수 · 바다 →' (사용자 제보 2026-11-18)
+        const label = s.label ?? ''
+        const parts = label.replace(/[←→]/g, '').split('·').map((x) => x.trim())
+        const backLabel = parts.length === 2 && label.includes('←') ? `← ${parts[1]} · ${parts[0]} →` : label
+        const board = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.55, 0.06), [mat('#8d5f3a'), mat('#8d5f3a'), mat('#8d5f3a'), mat('#8d5f3a'), new THREE.MeshStandardMaterial({ map: labelTex(label, '#f4ead2', '#5a3b22', 512, 128) }), new THREE.MeshStandardMaterial({ map: labelTex(backLabel, '#f4ead2', '#5a3b22', 512, 128) })])
         board.position.y = 1.9
         g.add(board)
         scene.add(g)
@@ -890,38 +1141,11 @@ export function buildWorld(scene: THREE.Scene): WorldArt {
     }
     return null
   }
-  function boatMesh(color: string) {
-    const g = new THREE.Group()
-    const s = new THREE.Shape()
-    s.moveTo(0, 1.9)
-    s.quadraticCurveTo(0.95, 0.9, 0.85, -1.4)
-    s.lineTo(-0.85, -1.4)
-    s.quadraticCurveTo(-0.95, 0.9, 0, 1.9)
-    const hull = new THREE.Mesh(new THREE.ExtrudeGeometry(s, { depth: 0.6, bevelEnabled: true, bevelSize: 0.05, bevelThickness: 0.05, bevelSegments: 1 }), mat(color, 0.6))
-    hull.rotation.x = -Math.PI / 2
-    const inner = new THREE.Mesh(new THREE.ExtrudeGeometry(s, { depth: 0.1, bevelEnabled: false }), mat('#a9733f', 0.8))
-    inner.scale.set(0.85, 0.88, 1)
-    inner.rotation.x = -Math.PI / 2
-    inner.position.y = 0.3
-    g.add(hull, inner, box(1.5, 0.06, 0.32, plankM, 0, 0.5, 0.2), box(1.5, 0.06, 0.32, plankM, 0, 0.5, -0.8))
-    for (const sgn of [1, -1]) {
-      const oar = cyl(0.03, 0.03, 2.2, mat('#8d5f3a'), sgn * 0.8, 0.55, -0.2, 5)
-      oar.rotation.set(Math.PI / 2, 0, sgn * 0.3)
-      g.add(oar)
-    }
-    return g
-  }
+  const boatMesh = makeBoat
   for (const s of STRUCTS) build(s)
 
   // ── 물 위 움직이는 것: 묶인 배·부표·멀리 돛단배 ──
   const floaters: { o: THREE.Object3D; ph: number }[] = []
-  for (const [x, z, c, r] of [[10.5, -14, '#2f9e6a', 0.1], [4, -11, '#ffffff', -0.2], [-28.5, -22, '#3f8fd0', 0.05]] as const) {
-    const b = boatMesh(c)
-    b.position.set(x, 0, z)
-    b.rotation.y = r
-    scene.add(b)
-    floaters.push({ o: b, ph: x })
-  }
   for (const [x, z] of [[-20, -30], [-6, -34], [12, -30], [-44, -28], [2, -24], [16, -22]]) {
     const b = new THREE.Group()
     b.position.set(x, 0, z)
@@ -1017,6 +1241,11 @@ export function buildWorld(scene: THREE.Scene): WorldArt {
   }
 
   // ── 시각 따라 하늘·빛 ──
+  const pmrem = new THREE.PMREMGenerator(renderer)
+  const envScene = new THREE.Scene()
+  envScene.add(new THREE.Mesh(new THREE.SphereGeometry(400, 32, 16), skyMat))
+  let envTex: THREE.Texture | null = null
+  let envDay = -1, envDusk = -1
   const C = (c: string) => new THREE.Color(c)
   const SKY = { dayTop: C('#4fa6ec'), dayHor: C('#cdeaff'), duskTop: C('#5265b0'), duskHor: C('#ffad78'), nightTop: C('#070d2c'), nightHor: C('#1f2a58') }
   const top = new THREE.Color(), hor = new THREE.Color()
@@ -1033,7 +1262,7 @@ export function buildWorld(scene: THREE.Scene): WorldArt {
     // 해: 6시 동쪽(+x) → 12시 위 → 18시 서쪽
     const a = ((h - 6) / 12) * Math.PI
     const sx = Math.cos(a), sy = Math.sin(a)
-    sun.position.set(sx * 60, Math.max(8, sy * 70), -30)
+    sunDir.set(sx * 60, Math.max(8, sy * 70), -30).normalize()
     sun.color.set(dusk > 0.3 ? '#ffc58f' : day > 0.2 ? '#fff4dc' : '#9fb3ff')
     sun.intensity = 0.22 + day * 1.4
     sunDisc.position.set(sx * 330, sy * 330 - 10, -150)
@@ -1047,7 +1276,16 @@ export function buildWorld(scene: THREE.Scene): WorldArt {
     ;(stars.material as THREE.PointsMaterial).opacity = Math.max(0, night - 0.2)
     const hm = hemi as THREE.HemisphereLight | null
     // 밤엔 확실히 어둡게 (방 반사 빛·보조 빛도 같이 줄임) — 내 주변은 따라다니는 조명이 비춤
-    scene.environmentIntensity = 0.35 * (0.25 + 0.75 * day)
+    scene.environmentIntensity = 0.6 * (0.2 + 0.8 * day)
+    // 하늘을 반사광으로 (물·유리에 하늘이 비침) — 색이 꽤 바뀌었을 때만 다시 구움
+    if (Math.abs(day - envDay) > 0.08 || Math.abs(dusk - envDusk) > 0.08 || !envTex) {
+      envDay = day
+      envDusk = dusk
+      const old = envTex
+      envTex = pmrem.fromScene(envScene, 0, 1, 500).texture
+      scene.environment = envTex
+      old?.dispose()
+    }
     scene.traverse((o) => {
       if (o instanceof THREE.DirectionalLight && o !== sun) o.intensity = 0.35 * day
     })
@@ -1099,6 +1337,11 @@ export function buildWorld(scene: THREE.Scene): WorldArt {
   }
 
   return {
+    roofs,
+    follow(x, z) {
+      sun.target.position.set(x, 0, z)
+      sun.position.set(x + sunDir.x * 80, sunDir.y * 80, z + sunDir.z * 80)
+    },
     occluders,
     minimap,
     update(t, dt) {
@@ -1110,6 +1353,8 @@ export function buildWorld(scene: THREE.Scene): WorldArt {
     dispose() {
       for (const d of disposables) d.dispose()
       skyMat.dispose()
+      envTex?.dispose()
+      pmrem.dispose()
     },
   }
 }

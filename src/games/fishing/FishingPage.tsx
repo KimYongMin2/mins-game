@@ -5,7 +5,7 @@ import { loadNickname } from '../../shared/storage/nickname'
 import { DEX_FISH, RARITY, fishById } from './play/fish'
 import { CHAT_MAX, FISHING_CAPACITY } from './play/protocol'
 import { IRO_FILTERS, SHADOW_FILTER, fishSvg } from './field/fishArt'
-import { type Action, CAM_LIMITS, iroName, useFishingRoom } from './game/useFishingRoom'
+import { type Action, type Alt, CAM_LIMITS, iroName, useFishingRoom } from './game/useFishingRoom'
 import { Joystick } from './game/Joystick'
 import { BragSheet, DexSheet, MyTankSheet, OtherTankSheet } from './screens/Sheets'
 import './fishing.css'
@@ -16,6 +16,7 @@ import './fishing.css'
 
 const Scene3D = lazy(() => import('./game/Scene3D').then((m) => ({ default: m.Scene3D })))
 
+const ALT_LABEL: Record<NonNullable<Alt>, string> = { board: '배 타기', unboard: '내리기', noLand: '내리기', climb: '올라가기', down: '내려가기' }
 const ACTION_LABEL: Record<Action, string> = { reel: '잡기!', reelIn: '거두기', cast: '던지기', bed: '눕기', none: '물가로 가요' }
 
 const isTouch = () => typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches
@@ -41,7 +42,7 @@ export function FishingPage() {
   const [text, setText] = useState('')
   const [firstPerson, setFirstPerson] = useState(false)
   const chatRef = useRef<HTMLInputElement>(null)
-  const { world, act, send, bonk } = room
+  const { world, act, send, bonk, doAlt } = room
 
   useEffect(() => {
     const on = () => setPortrait(isTouch() && isPortrait())
@@ -89,6 +90,8 @@ export function FishingPage() {
         spin()
       } else if (e.code === 'KeyF' && !e.repeat) {
         bonk()
+      } else if (e.code === 'KeyR' && !e.repeat) {
+        doAlt()
       } else if (e.code === 'KeyV' && !e.repeat) {
         toggleView()
       } else if (e.code === 'Space') {
@@ -129,7 +132,7 @@ export function FishingPage() {
       window.removeEventListener('blur', blur)
       window.removeEventListener('contextmenu', menu)
     }
-  }, [entered, world, act, toggleView, bonk])
+  }, [entered, world, act, toggleView, bonk, doAlt])
 
   // 잡은 물고기 카드는 잠깐만
   const { myCatch, setMyCatch } = room
@@ -260,6 +263,20 @@ export function FishingPage() {
       >
         뿅<small>F</small>
       </button>
+      {room.alt && (
+        <button
+          type="button"
+          className={`fs-alt${room.alt === 'noLand' ? ' fs-alt--off' : ''}`}
+          onPointerDown={(e) => {
+            e.preventDefault()
+            if (e.button === 0) doAlt()
+          }}
+          title={room.alt === 'noLand' ? '물가나 부두 가까이 가면 내릴 수 있어요' : undefined}
+        >
+          {ALT_LABEL[room.alt]}
+          <small>R</small>
+        </button>
+      )}
 
       <div className="fs-chat">
         <ol className="fs-chat__log">

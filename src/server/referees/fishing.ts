@@ -1,11 +1,12 @@
 import type { Referee, RefereeContext, RefereeFactory } from '../hub'
 import { type Catch, fishById, isBig, rollCatch } from '../../games/fishing/play/fish'
-import { BEDS, BOUNDS, SPAWN, WALK_SPEED, castTarget, nearBed, walkable } from '../../games/fishing/play/map'
+import { BEDS, BOATS, BOAT_REACH, BOAT_SPEED, BOUNDS, LADDERS, SPAWN, WALK_SPEED, boatable, castTarget, landingSpot, nearBed, nearLadder, onLadderTop, walkable } from '../../games/fishing/play/map'
 import {
   BITE_MAX_MS,
   BITE_MIN_MS,
   BITE_WINDOW_MS,
   type BagItem,
+  type BoatPub,
   BONK_MS,
   BONK_REACH,
   CHAT_MAX,
@@ -35,7 +36,9 @@ const num = (v: unknown, lo: number, hi: number) => typeof v === 'number' && Num
 const cleanText = (v: unknown) => (typeof v === 'string' ? [...v.replace(/[\u0000-\u001f\u007f]/g, ' ').trim()].slice(0, CHAT_MAX).join('') : '')
 const r2 = (v: number) => Math.round(v * 100) / 100
 
-const pub = (p: P): PlayerPub => ({ id: p.id, name: p.name, ...(p.avatar ? { avatar: p.avatar } : {}), x: p.x, z: p.z, r: p.r, bed: p.bed, fishing: p.fishing, bob: p.bob })
+const pub = (p: P): PlayerPub => ({ id: p.id, name: p.name, ...(p.avatar ? { avatar: p.avatar } : {}), x: p.x, z: p.z, r: p.r, bed: p.bed, fishing: p.fishing, bob: p.bob, ride: p.ride, up: p.up })
+/** 아무도 안 탄 배가 이만큼 그대로면 제자리로 */
+const BOAT_HOME_MS = 10 * 60_000
 
 /** 가방에 넣기: 자랑할 만한 것은 남기고 흔한 것부터 버림 */
 export function addToBag(bag: BagItem[], item: BagItem): BagItem[] {
@@ -64,6 +67,9 @@ export function fishingReferee(_setup: unknown, ctx: RefereeContext): Referee {
   let lastPos = 0
   const send = (to: string, m: ServerMsg) => ctx.sendTo(to, m)
   const all = (m: ServerMsg) => ctx.broadcast(m)
+  const boats = BOATS.map((b) => ({ x: b.x, z: b.z, r: b.r, rider: null as string | null, used: 0 }))
+  const boatsPub = (): BoatPub[] => boats.map((b) => [b.x, b.z, b.r, b.rider])
+  let lastHome = 0
   const nameOf = (key: string) => ctx.members().find((m) => m.id === key)?.nickname ?? '익명'
 
   function join(key: string) {
@@ -73,11 +79,11 @@ export function fishingReferee(_setup: unknown, ctx: RefereeContext): Referee {
     if (!p) {
       // 빈자리 근처에서 시작 (겹치지 않게 조금씩 흩뿌림)
       const a = rand() * Math.PI * 2
-      p = { id: key, name: mem.nickname, ...(mem.avatar ? { avatar: mem.avatar } : {}), x: r2(SPAWN.x + Math.cos(a) * 2.5), z: r2(SPAWN.z + Math.sin(a) * 1.5), r: Math.PI, bed: null, fishing: 'none', bob: null, uid: mem.uid ?? null, castAt: 0, biteAt: 0, biteUntil: 0, zone: null, lastMv: ctx.now(), lastChat: 0, lastBonk: 0 }
+      p = { id: key, name: mem.nickname, ...(mem.avatar ? { avatar: mem.avatar } : {}), x: r2(SPAWN.x + Math.cos(a) * 2.5), z: r2(SPAWN.z + Math.sin(a) * 1.5), r: Math.PI, bed: null, fishing: 'none', bob: null, ride: null, up: null, uid: mem.uid ?? null, castAt: 0, biteAt: 0, biteUntil: 0, zone: null, lastMv: ctx.now(), lastChat: 0, lastBonk: 0 }
       players.set(key, p)
       all({ t: 'st', p: pub(p) })
     }
-    send(key, { t: 'init', you: key, players: [...players.values()].map(pub), saving: savingOn() })
+    send(key, { t: 'init', you: key, players: [...players.values()].map(pub), saving: savingOn(), boats: boatsPub() })
     if (p.uid) void loadProfile(p.uid).then((profile) => players.has(key) && send(key, { t: 'profile', profile }))
   }
 
@@ -97,16 +103,25 @@ export function fishingReferee(_setup: unknown, ctx: RefereeContext): Referee {
     let { x, z } = m
     // 너무 빠르면 갈 수 있는 만큼만, 물·맵 밖이면 그대로
     const far = Math.hypot(x - p.x, z - p.z)
-    const allow = WALK_SPEED * dt * 1.6 + 0.6
+    const allow = (p.ride !== null ? BOAT_SPEED : WALK_SPEED) * dt * 1.6 + 0.6
     if (far > allow) {
       x = p.x + ((x - p.x) / far) * allow
       z = p.z + ((z - p.z) / far) * allow
     }
-    if (!walkable(x, z)) return send(p.id, { t: 'st', p: pub(p) })
+    // 배는 그 물 위만, 사다리 위는 위 자리 안만, 아니면 걸을 수 있는 곳
+    const ok = p.ride !== null ? boatable(x, z, BOATS[p.ride].zone) : p.up !== null ? onLadderTop(p.up, x, z) : walkable(x, z)
+    if (!ok) return send(p.id, { t: 'st', p: pub(p) })
     const moved = Math.hypot(x - p.x, z - p.z) > 0.05
     p.x = r2(x)
     p.z = r2(z)
     p.r = r2(m.r)
+    if (p.ride !== null) {
+      const b = boats[p.ride]
+      b.x = p.x
+      b.z = p.z
+      b.r = p.r
+      b.used = now
+    }
     // 움직이면 일어나고 낚싯대를 거둠
     if (moved && (p.bed !== null || p.fishing !== 'none')) {
       p.bed = null
@@ -157,8 +172,65 @@ export function fishingReferee(_setup: unknown, ctx: RefereeContext): Referee {
     }
   }
 
+  const allBoats = () => all({ t: 'boats', l: boatsPub() })
+  const bad = (p: P) => send(p.id, { t: 'st', p: pub(p) })
+
+  /** 배 타기: 가까운 빈 배에 앉음 (위치 = 배 자리) */
+  function board(p: P, i: unknown) {
+    if (typeof i !== 'number' || !Number.isInteger(i) || !boats[i]) return
+    const b = boats[i]
+    if (p.ride !== null || p.up !== null || b.rider || Math.hypot(b.x - p.x, b.z - p.z) > BOAT_REACH + 0.5) return bad(p)
+    stopFishing(p)
+    p.bed = null
+    p.ride = i
+    b.rider = p.id
+    b.used = ctx.now()
+    p.x = b.x
+    p.z = b.z
+    p.r = b.r
+    all({ t: 'st', p: pub(p) })
+    allBoats()
+  }
+
+  /** 배에서 내리기: 가까운 땅·판자로 (배는 거기 둠) */
+  function unboard(p: P) {
+    if (p.ride === null) return
+    const spot = landingSpot(p.x, p.z)
+    if (!spot) return bad(p)
+    const b = boats[p.ride]
+    b.rider = null
+    b.used = ctx.now()
+    stopFishing(p)
+    p.ride = null
+    p.x = spot.x
+    p.z = spot.z
+    all({ t: 'st', p: pub(p) })
+    allBoats()
+  }
+
+  function climb(p: P, i: unknown) {
+    if (typeof i !== 'number' || !Number.isInteger(i) || !LADDERS[i]) return
+    if (p.ride !== null || p.up !== null || nearLadder(p.x, p.z) !== i) return bad(p)
+    stopFishing(p)
+    p.bed = null
+    p.up = i
+    p.x = LADDERS[i].top.x
+    p.z = LADDERS[i].top.z
+    all({ t: 'st', p: pub(p) })
+  }
+
+  function down(p: P) {
+    if (p.up === null) return
+    const l = LADDERS[p.up]
+    stopFishing(p)
+    p.up = null
+    p.x = l.foot.x
+    p.z = l.foot.z
+    all({ t: 'st', p: pub(p) })
+  }
+
   function lie(p: P, i: unknown) {
-    if (typeof i !== 'number' || !Number.isInteger(i) || !BEDS[i]) return
+    if (typeof i !== 'number' || !Number.isInteger(i) || !BEDS[i] || p.ride !== null || p.up !== null) return
     if (nearBed(p.x, p.z) !== i || [...players.values()].some((o) => o !== p && o.bed === i)) return send(p.id, { t: 'st', p: pub(p) })
     stopFishing(p)
     p.bed = i
@@ -264,6 +336,18 @@ export function fishingReferee(_setup: unknown, ctx: RefereeContext): Referee {
         case 'bonk':
           bonk(p)
           break
+        case 'board':
+          board(p, m.i)
+          break
+        case 'unboard':
+          unboard(p)
+          break
+        case 'climb':
+          climb(p, m.i)
+          break
+        case 'down':
+          down(p)
+          break
       }
       return true
     },
@@ -280,6 +364,19 @@ export function fishingReferee(_setup: unknown, ctx: RefereeContext): Referee {
           all({ t: 'st', p: pub(p) })
         }
       }
+      // 오래 아무도 안 탄 배는 제자리로 (멀리 두고 가도 다른 사람이 탈 수 있게)
+      if (now - lastHome > 10_000) {
+        lastHome = now
+        let moved = false
+        boats.forEach((b, i) => {
+          const h = BOATS[i]
+          if (!b.rider && b.used && now - b.used > BOAT_HOME_MS && (b.x !== h.x || b.z !== h.z)) {
+            Object.assign(b, { x: h.x, z: h.z, r: h.r, used: 0 })
+            moved = true
+          }
+        })
+        if (moved) allBoats()
+      }
       if (posDirty.size && now - lastPos >= POS_MS) {
         lastPos = now
         all({ t: 'pos', l: [...posDirty].flatMap((id) => {
@@ -290,6 +387,12 @@ export function fishingReferee(_setup: unknown, ctx: RefereeContext): Referee {
       }
     },
     leave(key) {
+      const p = players.get(key)
+      if (p?.ride !== null && p?.ride !== undefined) {
+        boats[p.ride].rider = null
+        boats[p.ride].used = ctx.now()
+        allBoats()
+      }
       if (players.delete(key)) all({ t: 'gone', id: key })
     },
     finished: () => false,
