@@ -221,6 +221,7 @@ export function MainPage({ nickname }: { nickname: string }) {
           <span className="topnav__logo">MINS GAME</span>
           <nav className="topnav__links" aria-label="메인 메뉴">
             <a href="#all">게임</a>
+            <Link to="/games/fishing">낚시터</Link>
             <Link to="/meeting">수다방</Link>
           </nav>
           <button type="button" className="me-chip" onClick={() => setSheet({ kind: 'me' })}>
