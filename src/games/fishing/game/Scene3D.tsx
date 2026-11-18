@@ -3,9 +3,10 @@ import * as THREE from 'three'
 import { createStage, nearestOnScreen } from '../../../shared/art3d/stage'
 import { type AnimalRig, ANIMALS, makeAnimal, plainLook } from '../../../shared/art3d/animals'
 import { decodeLook } from '../../../shared/art3d/animalKinds'
-import { BEDS, BOATS, BOUNDS, BUILD_MS, CASTLES, LADDERS, groundY, houseAt } from '../play/map'
+import { BEDS, BOAT_SLOTS, BOUNDS, BUILD_MS, CASTLES, CRATES, LADDERS, groundY, houseAt } from '../play/map'
 import { buildWorld, makeBoat } from './worldArt'
-import { makeSandRuin, makeSandcastle } from './props3d'
+import { kit, makeSandRuin, makeSandcastle } from './props3d'
+import { WEATHER_NAME, gameHour, hourLabel, weatherNow } from './clock'
 import { fishImageUrl } from '../field/fishArt'
 import { type Catch, fishById, IRO } from '../play/fish'
 import { CAM_LIMITS, type World } from './useFishingRoom'
@@ -78,6 +79,12 @@ export function Scene3D({ world, step, onTapPlayer }: { world: World; step: (dt:
   const layerRef = useRef<HTMLDivElement>(null)
   const miniRef = useRef<HTMLCanvasElement>(null)
   const [bigMap, setBigMap] = useState(false)
+  // 낚시터 시각·날씨 (실제보다 6배 빠름) — 지도 아래에
+  const [clock, setClock] = useState(() => `${hourLabel(gameHour())} · ${WEATHER_NAME[weatherNow().kind]}`)
+  useEffect(() => {
+    const t = setInterval(() => setClock(`${hourLabel(gameHour())} · ${WEATHER_NAME[weatherNow().kind]}`), 2000)
+    return () => clearInterval(t)
+  }, [])
   // M: 지도 크게/작게 (채팅 칸에 쓰는 중이면 빼고)
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -122,8 +129,41 @@ export function Scene3D({ world, step, onTapPlayer }: { world: World; step: (dt:
       scene.add(full, ruin)
       return { full, ruin, lastHit: 0 }
     })
+    // 나무 상자 (맞으면 흔들리고 금이 가고, 부서지면 판자 조각이 튀고 사라졌다가 다시 생기면 툭 나타남)
+    const crateObjs = CRATES.map((c) => {
+      const K = kit()
+      const g = new THREE.Group()
+      const body = new THREE.Group()
+      const add = (w: number, h: number, d: number, m: THREE.Material, x: number, y: number, z: number) => {
+        const o = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m)
+        o.position.set(x, y, z)
+        o.castShadow = o.receiveShadow = true
+        body.add(o)
+      }
+      add(1.1, 0.9, 1.1, K.plankM, 0, 0.45, 0)
+      for (const [x, z] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) add(0.09, 0.92, 0.09, K.weatheredM, x * 0.55, 0.46, z * 0.55)
+      for (const y of [0.05, 0.86]) add(1.14, 0.08, 1.14, K.weatheredM, 0, y, 0)
+      // 대각선 보강목 (앞뒤)
+      for (const z of [-0.56, 0.56]) {
+        const o = new THREE.Mesh(new THREE.BoxGeometry(1.25, 0.08, 0.03), K.weatheredM)
+        o.position.set(0, 0.45, z)
+        o.rotation.z = 0.68
+        body.add(o)
+      }
+      // 금 (맞을수록 보임)
+      const crackM = new THREE.MeshBasicMaterial({ color: '#2a1a0e', transparent: true, opacity: 0 })
+      const crack = new THREE.Mesh(new THREE.PlaneGeometry(0.5, 0.04), crackM)
+      crack.position.set(0.1, 0.55, 0.575)
+      crack.rotation.z = -0.5
+      body.add(crack)
+      g.add(body)
+      g.position.set(c.x, 0, c.z)
+      g.rotation.y = c.r
+      scene.add(g)
+      return { g, body, crackM, lastHit: 0, wasBroken: false, backAt: 0 }
+    })
     // 탈 수 있는 배 (탄 사람이 있으면 그 사람 자리)
-    const boatObjs = BOATS.map((b) => {
+    const boatObjs = BOAT_SLOTS.map((b) => {
       const g = makeBoat(b.color)
       scene.add(g)
       return g
@@ -526,10 +566,36 @@ export function Scene3D({ world, step, onTapPlayer }: { world: World; step: (dt:
         }
       })
 
+      // 나무 상자
+      crateObjs.forEach((o, i) => {
+        const c = world.crates[i]
+        if (!c) return
+        const broken = c.hp <= 0
+        if (c.hitAt > o.lastHit) {
+          o.lastHit = c.hitAt
+          const at = new THREE.Vector3(CRATES[i].x, 0.5, CRATES[i].z)
+          stage.burst(at, { color: '#a7774a', count: broken || c.hp <= 1 ? 34 : 10, speed: broken || c.hp <= 1 ? 3.2 : 1.6, size: broken || c.hp <= 1 ? 0.2 : 0.1, gravity: 8, life: 0.9 })
+        }
+        if (broken !== o.wasBroken) {
+          if (!broken) o.backAt = now
+          o.wasBroken = broken
+        }
+        o.g.visible = !broken
+        const shake = now - o.lastHit < 260 ? Math.sin((now - o.lastHit) * 0.09) * 0.08 * (1 - (now - o.lastHit) / 260) : 0
+        o.body.rotation.z = shake
+        // 다시 생기면 툭 (작았다가 커짐)
+        const pop = o.backAt ? Math.min(1, (now - o.backAt) / 300) : 1
+        o.body.scale.setScalar(0.3 + 0.7 * (1 - (1 - pop) ** 3))
+        o.crackM.opacity = c.max > 0 ? Math.min(0.9, ((c.max - c.hp) / c.max) * 1.4) : 0
+      })
+
       // 배: 탄 사람이 있으면 그 사람 자리·방향, 아니면 놓인 자리 (물결에 출렁)
       boatObjs.forEach((g, i) => {
         const b = world.boats[i]
         if (!b) return
+        // 더 띄운 배는 필요할 때만 보임
+        g.visible = b.active
+        if (!b.active) return
         const rider = b.rider ? world.players.get(b.rider) : null
         const x = rider ? rider.sx : b.x, z = rider ? rider.sz : b.z, r = rider ? rider.sr : b.r
         g.position.set(x, BOAT_Y + Math.sin(t * 1.3 + x) * 0.05, z)
@@ -594,6 +660,7 @@ export function Scene3D({ world, step, onTapPlayer }: { world: World; step: (dt:
           })
         }
       }
+      art.setCamera(camera.position)
       art.update(t, dt)
       stage.render()
       if (++mapTick % 4 === 0) drawMinimap()
@@ -692,6 +759,7 @@ export function Scene3D({ world, step, onTapPlayer }: { world: World; step: (dt:
       <button type="button" className={`fs-minimap${bigMap ? ' fs-minimap--big' : ''}`} onClick={() => setBigMap((b) => !b)} aria-label={bigMap ? '지도 작게' : '지도 크게'} title="지도 (M)">
         <canvas ref={miniRef} />
       </button>
+      <span className={`fs-clock${bigMap ? ' fs-clock--big' : ''}`}>{clock}</span>
     </div>
   )
 }

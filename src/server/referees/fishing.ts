@@ -1,6 +1,6 @@
 import type { Referee, RefereeContext, RefereeFactory } from '../hub'
 import { type Catch, fishById, isBig, rollCatch } from '../../games/fishing/play/fish'
-import { BEDS, BOATS, BOAT_REACH, BOAT_SPEED, BOUNDS, BUILD_MS, CASTLES, LADDERS, nearCastle, RUN_SPEED, SPAWN, boatable, castTarget, landingSpot, nearBed, nearLadder, onLadderTop, walkable } from '../../games/fishing/play/map'
+import { BEDS, BOAT_SLOTS, BOAT_REACH, CRATES, CRATE_HP, CRATE_RESPAWN_MS, BOAT_SPEED, BOUNDS, BUILD_MS, CASTLES, LADDERS, nearCastle, RUN_SPEED, SPAWN, boatable, castTarget, landingSpot, nearBed, nearLadder, onLadderTop, walkable } from '../../games/fishing/play/map'
 import {
   BITE_MAX_MS,
   BITE_MIN_MS,
@@ -8,6 +8,7 @@ import {
   type BagItem,
   type BoatPub,
   type CastlePub,
+  type CratePub,
   BONK_MS,
   BONK_REACH,
   CHAT_MAX,
@@ -69,8 +70,17 @@ export function fishingReferee(_setup: unknown, ctx: RefereeContext): Referee {
   let lastPos = 0
   const send = (to: string, m: ServerMsg) => ctx.sendTo(to, m)
   const all = (m: ServerMsg) => ctx.broadcast(m)
-  const boats = BOATS.map((b) => ({ x: b.x, z: b.z, r: b.r, rider: null as string | null, passenger: null as string | null, used: 0 }))
-  const boatsPub = (): BoatPub[] => boats.map((b) => [b.x, b.z, b.r, b.rider, b.passenger])
+  // 배: 앞 5척은 늘 있고, 바다에 빈 배가 없을 때만 한 척씩 더 띄움 (최대 3척, 3분 안 쓰면 다시 사라짐)
+  const boats = BOAT_SLOTS.map((b) => ({ x: b.x, z: b.z, r: b.r, rider: null as string | null, passenger: null as string | null, used: 0, active: !b.extra, since: 0 }))
+  const boatsPub = (): BoatPub[] => boats.map((b) => [b.x, b.z, b.r, b.rider, b.passenger, b.active ? 1 : 0])
+  // 나무 상자: 남은 힘·처음 힘·다시 생기는 때
+  const rollHp = () => CRATE_HP.min + Math.floor(rand() * (CRATE_HP.max - CRATE_HP.min + 1))
+  const crates = CRATES.map(() => {
+    const hp = rollHp()
+    return { hp, max: hp, back: 0 }
+  })
+  const cratesPub = (): CratePub[] => crates.map((c) => [c.hp, c.max])
+  const allCrates = () => all({ t: 'crates', l: cratesPub() })
   let lastHome = 0
   const castles = CASTLES.map(() => ({ built: true, buildEnd: 0, builder: null as string | null }))
   const castlesPub = (): CastlePub[] => castles.map((c) => [c.built ? 1 : 0, c.builder ? Math.max(0, c.buildEnd - ctx.now()) : 0, c.builder])
@@ -94,7 +104,7 @@ export function fishingReferee(_setup: unknown, ctx: RefereeContext): Referee {
       players.set(key, p)
       all({ t: 'st', p: pub(p) })
     }
-    send(key, { t: 'init', you: key, players: [...players.values()].map(pub), saving: savingOn(), boats: boatsPub(), castles: castlesPub() })
+    send(key, { t: 'init', you: key, players: [...players.values()].map(pub), saving: savingOn(), boats: boatsPub(), castles: castlesPub(), crates: cratesPub() })
     if (p.uid) void loadProfile(p.uid).then((profile) => players.has(key) && send(key, { t: 'profile', profile }))
   }
 
@@ -125,7 +135,7 @@ export function fishingReferee(_setup: unknown, ctx: RefereeContext): Referee {
       z = p.z + ((z - p.z) / far) * allow
     }
     // 배는 그 물 위만, 사다리 위는 위 자리 안만, 아니면 걸을 수 있는 곳
-    const ok = p.ride !== null ? boatable(x, z, BOATS[p.ride].zone) : p.up !== null ? onLadderTop(p.up, x, z) : walkable(x, z)
+    const ok = p.ride !== null ? boatable(x, z, BOAT_SLOTS[p.ride].zone) : p.up !== null ? onLadderTop(p.up, x, z) : walkable(x, z)
     if (!ok) return send(p.id, { t: 'st', p: pub(p) })
     const moved = Math.hypot(x - p.x, z - p.z) > 0.05
     p.x = r2(x)
@@ -227,7 +237,7 @@ export function fishingReferee(_setup: unknown, ctx: RefereeContext): Referee {
     if (typeof i !== 'number' || !Number.isInteger(i) || !boats[i]) return
     const b = boats[i]
     // 비었으면 젓는 사람, 한 명 타 있으면 같이 탐
-    if (p.ride !== null || p.up !== null || (b.rider && b.passenger) || Math.hypot(b.x - p.x, b.z - p.z) > BOAT_REACH + 0.5) return bad(p)
+    if (!b.active || p.ride !== null || p.up !== null || (b.rider && b.passenger) || Math.hypot(b.x - p.x, b.z - p.z) > BOAT_REACH + 0.5) return bad(p)
     stopFishing(p)
     p.bed = null
     p.act = null
@@ -336,24 +346,36 @@ export function fishingReferee(_setup: unknown, ctx: RefereeContext): Referee {
         bestD = d
       }
     }
-    // 사람이 없으면 앞에 있는 모래성을 부숨 (서 있거나 쌓는 중인 것)
+    // 사람이 없으면 앞에 있는 모래성(서 있거나 쌓는 중)이나 나무 상자 중 가까운 것
     if (!best) {
-      let ci = -1
-      let cd = BONK_REACH + 0.9
-      CASTLES.forEach((c, i) => {
-        const dx = c.x - p.x, dz = c.z - p.z
+      const front = (x: number, z: number, near: number, reach: number) => {
+        const dx = x - p.x, dz = z - p.z
         const d = Math.hypot(dx, dz)
-        const k = castles[i]
-        if ((k.built || k.builder) && d < cd && (d < 1.1 || (dx * fx + dz * fz) / d > 0.3)) {
-          ci = i
-          cd = d
-        }
+        return d < reach && (d < near || (dx * fx + dz * fz) / d > 0.3) ? d : Infinity
+      }
+      let kind: 'castle' | 'crate' | null = null
+      let at = -1
+      let cd = Infinity
+      CASTLES.forEach((c, i) => {
+        const d = castles[i].built || castles[i].builder ? front(c.x, c.z, 1.1, BONK_REACH + 0.9) : Infinity
+        if (d < cd) ((cd = d), (at = i), (kind = 'castle'))
       })
-      if (ci >= 0) {
-        castles[ci].built = false
-        castles[ci].builder = null
-        all({ t: 'bonk', id: p.id, to: null, castle: ci })
+      CRATES.forEach((c, i) => {
+        const d = crates[i].hp > 0 ? front(c.x, c.z, 0.9, BONK_REACH + 0.5) : Infinity
+        if (d < cd) ((cd = d), (at = i), (kind = 'crate'))
+      })
+      if (kind === 'castle') {
+        castles[at].built = false
+        castles[at].builder = null
+        all({ t: 'bonk', id: p.id, to: null, castle: at })
         return allCastles()
+      }
+      if (kind === 'crate') {
+        const c = crates[at]
+        c.hp -= 1
+        if (c.hp <= 0) c.back = now + CRATE_RESPAWN_MS
+        all({ t: 'bonk', id: p.id, to: null, crate: at })
+        return allCrates()
       }
     }
     all({ t: 'bonk', id: p.id, to: best?.id ?? null })
@@ -478,6 +500,11 @@ export function fishingReferee(_setup: unknown, ctx: RefereeContext): Referee {
           all({ t: 'st', p: pub(p) })
         }
       }
+      // 부서진 나무 상자 다시 생김
+      if (crates.some((c) => c.hp <= 0 && now >= c.back)) {
+        for (const c of crates) if (c.hp <= 0 && now >= c.back) ((c.max = rollHp()), (c.hp = c.max))
+        allCrates()
+      }
       // 다 쌓은 모래성
       if (castles.some((c) => c.builder && now >= c.buildEnd)) {
         for (const c of castles) if (c.builder && now >= c.buildEnd) ((c.built = true), (c.builder = null))
@@ -488,9 +515,30 @@ export function fishingReferee(_setup: unknown, ctx: RefereeContext): Referee {
         lastHome = now
         let moved = false
         boats.forEach((b, i) => {
-          const h = BOATS[i]
-          if (!b.rider && !b.passenger && b.used && now - b.used > BOAT_HOME_MS && (b.x !== h.x || b.z !== h.z)) {
+          const h = BOAT_SLOTS[i]
+          if (b.active && !b.rider && !b.passenger && b.used && now - b.used > BOAT_HOME_MS && (b.x !== h.x || b.z !== h.z)) {
             Object.assign(b, { x: h.x, z: h.z, r: h.r, used: 0 })
+            moved = true
+          }
+        })
+        // 바다에 탈 수 있는 배(자리가 남은 배)가 없으면 한 척 더
+        const sea = boats.filter((b, i) => b.active && BOAT_SLOTS[i].zone === 'sea')
+        const free = sea.filter((b) => !b.rider || !b.passenger)
+        if (free.length === 0) {
+          const i = boats.findIndex((b, k) => !b.active && BOAT_SLOTS[k].extra)
+          if (i >= 0) {
+            const h = BOAT_SLOTS[i]
+            Object.assign(boats[i], { active: true, x: h.x, z: h.z, r: h.r, used: 0, since: now })
+            moved = true
+          }
+        }
+        // 더 띄운 배는 아무도 안 탄 채 3분 지나고, 다른 빈 바다 배가 있으면 다시 치움
+        const emptySea = sea.filter((b) => !b.rider && !b.passenger)
+        boats.forEach((b, i) => {
+          if (!BOAT_SLOTS[i].extra || !b.active || b.rider || b.passenger || emptySea.length < 2) return
+          if (now - Math.max(b.used, b.since) > 3 * 60_000) {
+            b.active = false
+            emptySea.splice(emptySea.indexOf(b), 1)
             moved = true
           }
         })

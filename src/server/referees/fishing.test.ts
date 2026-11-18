@@ -1,15 +1,16 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import type { BagItem, ServerMsg } from '../../games/fishing/play/protocol'
-import { BOATS, BUILD_MS, CASTLES, LADDERS, shoreZ } from '../../games/fishing/play/map'
+import { BOATS, BUILD_MS, CASTLES, CRATES, CRATE_RESPAWN_MS, LADDERS, shoreZ } from '../../games/fishing/play/map'
 import { resetStore } from '../fishingStore'
 import { addToBag, fishingReferee } from './fishing'
 
-function setup() {
+function setup(extra: string[] = []) {
   let now = 1000
   const got: { to: string; m: ServerMsg }[] = []
   const members = [
     { id: 'a', role: 'host' as const, nickname: '곰', uid: 'u-a' },
     { id: 'b', role: 'guest' as const, nickname: '토끼', uid: 'u-b' },
+    ...extra.map((id) => ({ id, role: 'guest' as const, nickname: id, uid: `u-${id}` })),
   ]
   const ref = fishingReferee(null, {
     now: () => now,
@@ -88,7 +89,7 @@ describe('낚시터 심판', () => {
     }
     s.ref.input('a', { t: 'board', i: 0 })
     s.ref.input('b', { t: 'board', i: 0 })
-    expect(s.last('boats')?.l[0].slice(3)).toEqual(['a', 'b'])
+    expect(s.last('boats')?.l[0].slice(3, 5)).toEqual(['a', 'b'])
     // 셋째 자리는 없음 (빈 배가 아니면 못 탐): 같이 탄 사람은 배를 못 움직임
     s.tick(1000)
     s.ref.input('b', { t: 'mv', x: b.x, z: b.z - 5, r: 0 })
@@ -107,7 +108,7 @@ describe('낚시터 심판', () => {
     s.tick(1000)
     s.ref.input('a', { t: 'mv', x: b.x, z: b.z, r: 0 })
     s.ref.input('a', { t: 'unboard' })
-    expect(s.last('boats')?.l[0].slice(3)).toEqual(['b', null])
+    expect(s.last('boats')?.l[0].slice(3, 5)).toEqual(['b', null])
   })
 
   it('모래성: 뿅망치로 부수고, 가까이에서 쌓으면 4초 뒤 다시 서고, 움직이면 멈춤', () => {
@@ -136,6 +137,48 @@ describe('낚시터 심판', () => {
     const n = s.got.length
     s.ref.input('a', { t: 'build', i: 0 })
     expect(s.got.length).toBe(n)
+  })
+
+  it('나무 상자: 3~4번 때리면 부서지고 1분 뒤 다시 생김', () => {
+    const s = setup()
+    s.ref.input('a', { t: 'hi' })
+    const c = CRATES[0]
+    walkTo(s, 'a', c.x, c.z + 1.3)
+    s.tick(1000)
+    s.ref.input('a', { t: 'mv', x: c.x, z: c.z + 1.3, r: Math.PI })
+    const max = s.last('init')!.crates[0][1]
+    expect(max).toBeGreaterThanOrEqual(3)
+    expect(max).toBeLessThanOrEqual(4)
+    for (let k = 0; k < max; k++) {
+      s.tick(800)
+      s.ref.input('a', { t: 'bonk' })
+      expect(s.last('bonk')).toMatchObject({ crate: 0 })
+      expect(s.last('crates')!.l[0][0]).toBe(max - k - 1)
+    }
+    s.tick(CRATE_RESPAWN_MS - 5000)
+    expect(s.last('crates')!.l[0][0]).toBe(0)
+    s.tick(11_000)
+    expect(s.last('crates')!.l[0][0]).toBeGreaterThanOrEqual(3)
+  })
+
+  it('바다 배가 모두 차면 한 척 더 띄움', () => {
+    const ids = ['a', 'b', 'c', 'd', 'e', 'f']
+    const s = setup(['c', 'd', 'e', 'f'])
+    for (const id of ids) s.ref.input(id, { t: 'hi' })
+    const activeN = () => (s.last('boats')?.l ?? s.last('init')!.boats).filter((b) => b[5] === 1).length
+    expect(activeN()).toBe(BOATS.length)
+    // 바다 배 3척에 두 명씩
+    const spots: [number, number, number][] = [[8.2, -14, 0], [6.2, -11, 1], [-31.2, -22, 2]]
+    spots.forEach(([x, z, i], k) => {
+      for (const id of ids.slice(k * 2, k * 2 + 2)) {
+        walkTo(s, id, x < 0 ? -32.5 : 7.2, 2)
+        walkTo(s, id, x, z)
+        s.ref.input(id, { t: 'board', i })
+      }
+    })
+    expect(s.last('boats')!.l.slice(0, 3).every((b) => b[3] && b[4])).toBe(true)
+    s.tick(11_000)
+    expect(activeN()).toBe(BOATS.length + 1)
   })
 
   it('앉기·눕기: 아무 데서나, 움직이면 풀림, 배에선 안 됨', () => {

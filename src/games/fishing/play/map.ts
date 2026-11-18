@@ -68,8 +68,6 @@ const S: Struct[] = [
   { kind: 'fire', x: -20, z: 9, c: 1.4 },
   { kind: 'boat', x: -24, z: 4, r: 0.4, c: 1.6, color: '#e8473f' },
   { kind: 'boat', x: 18, z: 7, r: -0.3, c: 1.6, color: '#3f8fd0' },
-  { kind: 'crate', x: -29.5, z: 2.5, w: 1.6, d: 1.2 },
-  { kind: 'crate', x: 9.6, z: 1.6, w: 1.2, d: 1.2 },
   { kind: 'flag', x: 11.5, z: 3.5, c: 0.2 },
   // 산책로 벤치·가로등·표지판
   ...[-50, -36, -6, 4].map((x) => ({ kind: 'bench' as const, x, z: 17.8, w: 2, d: 0.8 })),
@@ -107,7 +105,24 @@ export const CASTLES = [
   { x: -11, z: 3 },
   { x: 5, z: 5 },
   { x: -30, z: 7 },
+  { x: -45, z: 3 },
+  { x: -17, z: 4 },
+  { x: 10, z: 7.5 },
 ]
+
+// ── 나무 상자 (뿅망치로 3~4번 때리면 부서지고 1분 뒤 다시 생김 — 사용자 요청 2026-11-18). 안 막힘 ──
+export const CRATES = [
+  { x: -29.5, z: 2.5, r: 0.3 },
+  { x: 9.6, z: 1.6, r: -0.2 },
+  { x: -33, z: -3, r: 0.1 },
+  { x: 7.2, z: -4, r: 0.6 },
+  { x: -12, z: 22.5, r: 0 },
+  { x: 30, z: 21, r: 0.4 },
+  { x: 55, z: 12.5, r: -0.5 },
+  { x: -50, z: 1, r: 0.2 },
+]
+export const CRATE_HP = { min: 3, max: 4 }
+export const CRATE_RESPAWN_MS = 60_000
 /** 모래성 쌓기를 시작할 수 있는 거리 · 걸리는 시간 */
 export const CASTLE_REACH = 2
 export const BUILD_MS = 4000
@@ -190,6 +205,14 @@ export const BOATS: BoatHome[] = [
   { x: 35.5, z: 27.6, r: 1.2, zone: 'fresh', color: '#e0b030' },
   { x: 40, z: 31, r: 2.4, zone: 'fresh', color: '#c8553d' },
 ]
+/** 바다 배가 모자랄 때(빈 배가 없을 때)만 하나씩 더 띄우는 배 — 최대 3척, 한동안 안 쓰면 다시 사라짐 (사용자 요청 2026-11-18) */
+export const EXTRA_BOATS: BoatHome[] = [
+  { x: 3.5, z: -16, r: 0.2, zone: 'sea', color: '#7a5c9e' },
+  { x: -26.5, z: -28, r: 0, zone: 'sea', color: '#c8553d' },
+  { x: 12, z: -19, r: -0.3, zone: 'sea', color: '#e0b030' },
+]
+/** 배 자리 전체 (앞 5척은 늘 있음, 뒤는 필요할 때만) */
+export const BOAT_SLOTS: (BoatHome & { extra: boolean })[] = [...BOATS.map((b) => ({ ...b, extra: false })), ...EXTRA_BOATS.map((b) => ({ ...b, extra: true }))]
 export const BOAT_SPEED = 7
 /** 배에 탈 수 있는 거리 · 내릴 땅을 찾는 거리 */
 export const BOAT_REACH = 2.8

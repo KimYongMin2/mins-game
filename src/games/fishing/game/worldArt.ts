@@ -1,5 +1,6 @@
 import * as THREE from 'three'
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
+import { gameHour, weatherNow } from './clock'
 import { kit, makeBoat, makePalm, makePine, makeSunbed, makeTree, makeUmbrella, rockGeo, waterNormals } from './props3d'
 import { BEDS, BOUNDS, BRIDGE, DOCK, type FurnKind, HOUSES, JETTY, LADDERS, LAKE, LAKE_DOCK, PIER, PIER_END, RIVER, type Rect, SEA_EAST, STRUCTS, type Struct, shoreZ, waterAt } from '../play/map'
 
@@ -13,6 +14,8 @@ import { BEDS, BOUNDS, BRIDGE, DOCK, type FurnKind, HOUSES, JETTY, LADDERS, LAKE
 /** 가리면 반투명해질 것. house = 집 번호 (그 집 안에 들어가 있으면 늘 반투명) */
 export type Occluder = { g: THREE.Object3D; r: number; y: number; house?: number }
 export type WorldArt = {
+  /** 비 알갱이를 카메라 둘레에 (매 프레임 카메라 자리) */
+  setCamera: (p: THREE.Vector3) => void
   /** 집 지붕 (안에 들어가면 숨김) — HOUSES 순서 */
   roofs: THREE.Object3D[]
   /** 해 그림자를 내 주변에 맞춤 */
@@ -111,12 +114,8 @@ function skyPhase(hour: number) {
   return { day, dusk }
 }
 
-function hourNow() {
-  const q = new URLSearchParams(location.search).get('hour')
-  if (q !== null && !Number.isNaN(Number(q))) return Number(q)
-  const d = new Date()
-  return d.getHours() + d.getMinutes() / 60
-}
+/** 낚시터 시각 (실제보다 6배 빠름 — clock.ts) */
+const hourNow = () => gameHour()
 
 /** 무리 안 메시를 재질별로 합침 (위치·방향은 무리 그대로). 합친 덩어리 = 그림자 냄 */
 function mergeByMaterial(root: THREE.Object3D, rel: THREE.Matrix4) {
@@ -1111,7 +1110,7 @@ export function buildWorld(scene: THREE.Scene, renderer: THREE.WebGLRenderer): W
   // 구름
   const cloudM = new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 1, fog: false, transparent: true, opacity: 0.95 })
   const clouds: THREE.Group[] = []
-  for (let i = 0; i < 14; i++) {
+  for (let i = 0; i < 30; i++) {
     const c = new THREE.Group()
     for (let k = 0; k < 5; k++) c.add(new THREE.Mesh(new THREE.SphereGeometry(3 + rnd() * 3, 10, 8), cloudM).translateX(k * 4 - 8).translateY(rnd() * 2).translateZ(rnd() * 4 - 2))
     c.scale.y = 0.45
@@ -1162,16 +1161,59 @@ export function buildWorld(scene: THREE.Scene, renderer: THREE.WebGLRenderer): W
   const envScene = new THREE.Scene()
   envScene.add(new THREE.Mesh(new THREE.SphereGeometry(400, 32, 16), skyMat))
   let envTex: THREE.Texture | null = null
-  let envDay = -1, envDusk = -1
+  let envDay = -1, envDusk = -1, envCloud = -1
   const C = (c: string) => new THREE.Color(c)
   const SKY = { dayTop: C('#4fa6ec'), dayHor: C('#cdeaff'), duskTop: C('#5265b0'), duskHor: C('#ffad78'), nightTop: C('#070d2c'), nightHor: C('#1f2a58') }
   const top = new THREE.Color(), hor = new THREE.Color()
   let lastPhase = -1
+  let weather = weatherNow()
+  // ── 비: 카메라 둘레 상자 안에서 떨어지는 줄 (비 오는 날씨에만) ──
+  const camPos = new THREE.Vector3()
+  const RAIN_N = 1800, RB = 26, RH = 18
+  const rainPos = new Float32Array(RAIN_N * 6)
+  const rainSeed = Array.from({ length: RAIN_N }, () => [Math.random() * 2 - 1, Math.random(), Math.random() * 2 - 1])
+  const rainGeo = new THREE.BufferGeometry().setAttribute('position', new THREE.BufferAttribute(rainPos, 3))
+  const rainMat = new THREE.LineBasicMaterial({ color: '#cfe0f0', transparent: true, opacity: 0, depthWrite: false })
+  const rain = new THREE.LineSegments(rainGeo, rainMat)
+  rain.frustumCulled = false
+  scene.add(rain)
+  disposables.push(rainGeo, rainMat)
+  dyn.push((t) => {
+    const amt = weather.rain
+    rain.visible = amt > 0.02
+    if (!rain.visible) return
+    rainMat.opacity = 0.55 * amt
+    const n = Math.floor(RAIN_N * amt)
+    for (let i = 0; i < RAIN_N; i++) {
+      const [sx, sy, sz] = rainSeed[i]
+      const o = i * 6
+      if (i >= n) {
+        rainPos.fill(0, o, o + 6)
+        continue
+      }
+      // 칸마다 제자리에서 반복해 떨어짐 (카메라를 따라 상자가 움직임)
+      const y = RH - (((t * 16 + sy * RH) % RH) + RH) % RH
+      const x = camPos.x + sx * RB, z = camPos.z + sz * RB
+      rainPos[o] = x
+      rainPos[o + 1] = y
+      rainPos[o + 2] = z
+      rainPos[o + 3] = x + 0.05
+      rainPos[o + 4] = y - 0.55
+      rainPos[o + 5] = z + 0.03
+    }
+    rainGeo.getAttribute('position').needsUpdate = true
+  })
   function applySky(t: number) {
     const h = hourNow()
     const { day, dusk } = skyPhase(h)
-    top.copy(SKY.nightTop).lerp(SKY.dayTop, day).lerp(SKY.duskTop, dusk * 0.7)
-    hor.copy(SKY.nightHor).lerp(SKY.dayHor, day).lerp(SKY.duskHor, dusk * 0.8)
+    const w = weatherNow()
+    weather = w
+    const cloud = w.cloud
+    top.copy(SKY.nightTop).lerp(SKY.dayTop, day).lerp(SKY.duskTop, dusk * 0.7 * (1 - cloud))
+    hor.copy(SKY.nightHor).lerp(SKY.dayHor, day).lerp(SKY.duskHor, dusk * 0.8 * (1 - cloud))
+    // 흐리면 회색 하늘 (밤엔 더 어둡게)
+    top.lerp(C('#7d8894').multiplyScalar(0.25 + 0.75 * day), cloud * 0.8)
+    hor.lerp(C('#b9c0c7').multiplyScalar(0.3 + 0.7 * day), cloud * 0.7)
     skyU.top.value.copy(top)
     skyU.horizon.value.copy(hor)
     ;(scene.fog as THREE.Fog).color.copy(hor)
@@ -1181,23 +1223,28 @@ export function buildWorld(scene: THREE.Scene, renderer: THREE.WebGLRenderer): W
     const sx = Math.cos(a), sy = Math.sin(a)
     sunDir.set(sx * 60, Math.max(8, sy * 70), -30).normalize()
     sun.color.set(dusk > 0.3 ? '#ffc58f' : day > 0.2 ? '#fff4dc' : '#9fb3ff')
-    sun.intensity = 0.22 + day * 1.4
+    sun.intensity = (0.22 + day * 1.4) * (1 - 0.65 * cloud)
     sunDisc.position.set(sx * 330, sy * 330 - 10, -150)
     sunDisc.lookAt(0, 0, 0)
-    ;(sunDisc.material as THREE.MeshBasicMaterial).opacity = Math.min(1, Math.max(0, sy * 4))
+    ;(sunDisc.material as THREE.MeshBasicMaterial).opacity = Math.min(1, Math.max(0, sy * 4)) * (1 - cloud * 0.9)
     ;(sunDisc.material as THREE.MeshBasicMaterial).color.set(dusk > 0.3 ? '#ffb070' : '#fff3c4')
     moon.position.set(-sx * 320, -sy * 320 + 40, -170)
     moon.lookAt(0, 0, 0)
     const night = 1 - day
-    ;(moon.material as THREE.MeshBasicMaterial).opacity = night
-    ;(stars.material as THREE.PointsMaterial).opacity = Math.max(0, night - 0.2)
+    ;(moon.material as THREE.MeshBasicMaterial).opacity = night * (1 - cloud * 0.8)
+    ;(stars.material as THREE.PointsMaterial).opacity = Math.max(0, night - 0.2) * (1 - cloud)
+    // 비가 오면 안개가 가까이
+    const fog = scene.fog as THREE.Fog
+    fog.near = 55 - 32 * w.rain
+    fog.far = 210 - 110 * w.rain
     const hm = hemi as THREE.HemisphereLight | null
     // 밤엔 확실히 어둡게 (방 반사 빛·보조 빛도 같이 줄임) — 내 주변은 따라다니는 조명이 비춤
     scene.environmentIntensity = 0.6 * (0.2 + 0.8 * day)
     // 하늘을 반사광으로 (물·유리에 하늘이 비침) — 색이 꽤 바뀌었을 때만 다시 구움
-    if (Math.abs(day - envDay) > 0.08 || Math.abs(dusk - envDusk) > 0.08 || !envTex) {
+    if (Math.abs(day - envDay) > 0.08 || Math.abs(dusk - envDusk) > 0.08 || Math.abs(cloud - envCloud) > 0.1 || !envTex) {
       envDay = day
       envDusk = dusk
+      envCloud = cloud
       const old = envTex
       envTex = pmrem.fromScene(envScene, 0, 1, 500).texture
       scene.environment = envTex
@@ -1210,9 +1257,11 @@ export function buildWorld(scene: THREE.Scene, renderer: THREE.WebGLRenderer): W
       hm.intensity = 0.14 + day * 0.71
       hm.color.set(day > 0.5 ? '#fff2e0' : '#9fb3ff')
     }
-    cloudM.color.copy(C('#4a5578')).lerp(C('#ffffff'), day).lerp(C('#ffc7a0'), dusk * 0.6)
+    cloudM.color.copy(C('#4a5578')).lerp(C('#ffffff'), day).lerp(C('#ffc7a0'), dusk * 0.6 * (1 - cloud)).lerp(C('#6d7580').multiplyScalar(0.4 + 0.6 * day), w.rain * 0.8)
+    // 흐릴수록 구름이 많이
+    clouds.forEach((c, i) => (c.visible = i < 8 + Math.round(cloud * (clouds.length - 8))))
     farMats.forEach((m, i) => m.color.copy(C(['#7fa5b8', '#93b6c6', '#6f93a8'][i])).lerp(hor, 0.35).multiplyScalar(0.25 + day * 0.75))
-    nightU.value = night * 0.75
+    nightU.value = Math.max(night * 0.75, cloud * 0.3)
     for (const m of lit) m.emissiveIntensity = night * 1.6 + 0.05
     for (const g of groundGlow) (g.material as THREE.MeshBasicMaterial).opacity = night * 0.55
     lastPhase = t
@@ -1254,6 +1303,7 @@ export function buildWorld(scene: THREE.Scene, renderer: THREE.WebGLRenderer): W
   }
 
   return {
+    setCamera: (p) => camPos.copy(p),
     roofs,
     follow(x, z) {
       // 그림자 칸에 딱 맞춰 옮김 — 걸을 때마다 그림자 가장자리가 지글지글 떨리지 않게
@@ -1270,7 +1320,7 @@ export function buildWorld(scene: THREE.Scene, renderer: THREE.WebGLRenderer): W
     minimap,
     update(t, dt) {
       time.value = t
-      if (t - lastPhase > 20) night = applySky(t)
+      if (t - lastPhase > 5) night = applySky(t)
       for (const f of dyn) f(t, dt, night)
     },
     night: () => night,

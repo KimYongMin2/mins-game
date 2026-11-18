@@ -163,3 +163,8 @@
 .fs-pose[aria-pressed='true'] { background: #ffd23f; }
 .fs-pose:active { transform: translateY(2px); box-shadow: 0 1px 0 #120e33; }
 @media (max-height: 420px) { .fs-poses { bottom: calc(140px + env(safe-area-inset-bottom, 0px)); } .fs-pose { min-width: 48px; font-size: 12px; padding: 4px 6px; } }
+
+/* 낚시터 시각·날씨 (지도 바로 아래) */
+.fs-clock { position: absolute; z-index: 3; left: calc(10px + env(safe-area-inset-left, 0px)); top: calc(58px + 150px * 0.672 + 8px + env(safe-area-inset-top, 0px)); padding: 3px 8px; border-radius: 2px; background: rgba(28, 23, 72, 0.8); color: #f4f2ff; font-size: 12px; font-weight: 800; pointer-events: none; white-space: nowrap; }
+.fs-clock--big { display: none; }
+@media (max-height: 460px) { .fs-clock { top: calc(52px + 118px * 0.672 + 8px + env(safe-area-inset-top, 0px)); font-size: 11px; } }

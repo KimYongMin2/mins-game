@@ -1,7 +1,7 @@
 import { noise, tone } from '../../shared/audio/synth'
 
 // 낚시터 효과음 (Web Audio 합성)
-type Name = 'cast' | 'bite' | 'catch' | 'big' | 'junk' | 'escape' | 'cheer' | 'bonk' | 'whiff' | 'board' | 'jump' | 'crumble' | 'built' | 'dig'
+type Name = 'cast' | 'bite' | 'catch' | 'big' | 'junk' | 'escape' | 'cheer' | 'bonk' | 'whiff' | 'board' | 'jump' | 'crumble' | 'built' | 'dig' | 'thud' | 'smash'
 
 const RECIPES: Record<Name, () => void> = {
   // 휙 — 낚싯줄 던지기, 퐁 — 찌가 물에
@@ -43,6 +43,17 @@ const RECIPES: Record<Name, () => void> = {
   crumble: () => {
     noise({ filter: 'lowpass', freq: 1400, to: 200, duration: 0.6, gain: 0.22 })
     noise({ filter: 'bandpass', freq: 600, to: 300, q: 0.8, duration: 0.4, gain: 0.12, delay: 0.12 })
+  },
+  // 나무 상자 쿵
+  thud: () => {
+    tone({ freq: 140, to: 70, type: 'sine', duration: 0.18, gain: 0.22 })
+    noise({ filter: 'lowpass', freq: 900, to: 300, duration: 0.12, gain: 0.12 })
+  },
+  // 나무 상자 와장창
+  smash: () => {
+    noise({ filter: 'bandpass', freq: 1800, to: 500, q: 0.7, duration: 0.45, gain: 0.22 })
+    tone({ freq: 120, to: 50, type: 'triangle', duration: 0.25, gain: 0.18 })
+    ;[0.08, 0.17, 0.27].forEach((d) => noise({ filter: 'highpass', freq: 2500, duration: 0.06, gain: 0.08, delay: d }))
   },
   // 모래성 다 쌓음 (반짝)
   built: () => [660, 880, 1175].forEach((f, i) => tone({ freq: f, type: 'triangle', duration: 0.14, gain: 0.08, delay: i * 0.09 })),

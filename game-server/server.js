@@ -12700,20 +12700,6 @@ const S = [
 		color: "#3f8fd0"
 	},
 	{
-		kind: "crate",
-		x: -29.5,
-		z: 2.5,
-		w: 1.6,
-		d: 1.2
-	},
-	{
-		kind: "crate",
-		x: 9.6,
-		z: 1.6,
-		w: 1.2,
-		d: 1.2
-	},
-	{
 		kind: "flag",
 		x: 11.5,
 		z: 3.5,
@@ -12957,8 +12943,67 @@ const CASTLES = [
 	{
 		x: -30,
 		z: 7
+	},
+	{
+		x: -45,
+		z: 3
+	},
+	{
+		x: -17,
+		z: 4
+	},
+	{
+		x: 10,
+		z: 7.5
 	}
 ];
+const CRATES = [
+	{
+		x: -29.5,
+		z: 2.5,
+		r: .3
+	},
+	{
+		x: 9.6,
+		z: 1.6,
+		r: -.2
+	},
+	{
+		x: -33,
+		z: -3,
+		r: .1
+	},
+	{
+		x: 7.2,
+		z: -4,
+		r: .6
+	},
+	{
+		x: -12,
+		z: 22.5,
+		r: 0
+	},
+	{
+		x: 30,
+		z: 21,
+		r: .4
+	},
+	{
+		x: 55,
+		z: 12.5,
+		r: -.5
+	},
+	{
+		x: -50,
+		z: 1,
+		r: .2
+	}
+];
+const CRATE_HP = {
+	min: 3,
+	max: 4
+};
+const CRATE_RESPAWN_MS = 6e4;
 const BUILD_MS = 4e3;
 function nearCastle(x, z, reach = 2) {
 	let best = null;
@@ -13128,6 +13173,38 @@ const BOATS = [
 		color: "#c8553d"
 	}
 ];
+/** 바다 배가 모자랄 때(빈 배가 없을 때)만 하나씩 더 띄우는 배 — 최대 3척, 한동안 안 쓰면 다시 사라짐 (사용자 요청 2026-11-18) */
+const EXTRA_BOATS = [
+	{
+		x: 3.5,
+		z: -16,
+		r: .2,
+		zone: "sea",
+		color: "#7a5c9e"
+	},
+	{
+		x: -26.5,
+		z: -28,
+		r: 0,
+		zone: "sea",
+		color: "#c8553d"
+	},
+	{
+		x: 12,
+		z: -19,
+		r: -.3,
+		zone: "sea",
+		color: "#e0b030"
+	}
+];
+/** 배 자리 전체 (앞 5척은 늘 있음, 뒤는 필요할 때만) */
+const BOAT_SLOTS = [...BOATS.map((b) => ({
+	...b,
+	extra: false
+})), ...EXTRA_BOATS.map((b) => ({
+	...b,
+	extra: true
+}))];
 /** 배가 갈 수 있는 곳: 그 물(바다·민물) 위, 배 둘레(0.9m)도 물, 판자·방파제 밑이 아님 */
 function boatable(x, z, zone) {
 	if (x < BOUNDS.minX || x > BOUNDS.maxX || z < BOUNDS.minZ || z > BOUNDS.maxZ) return false;
@@ -13413,21 +13490,38 @@ function fishingReferee(_setup, ctx) {
 	let lastPos = 0;
 	const send = (to, m) => ctx.sendTo(to, m);
 	const all = (m) => ctx.broadcast(m);
-	const boats = BOATS.map((b) => ({
+	const boats = BOAT_SLOTS.map((b) => ({
 		x: b.x,
 		z: b.z,
 		r: b.r,
 		rider: null,
 		passenger: null,
-		used: 0
+		used: 0,
+		active: !b.extra,
+		since: 0
 	}));
 	const boatsPub = () => boats.map((b) => [
 		b.x,
 		b.z,
 		b.r,
 		b.rider,
-		b.passenger
+		b.passenger,
+		b.active ? 1 : 0
 	]);
+	const rollHp = () => CRATE_HP.min + Math.floor(rand() * (CRATE_HP.max - CRATE_HP.min + 1));
+	const crates = CRATES.map(() => {
+		const hp = rollHp();
+		return {
+			hp,
+			max: hp,
+			back: 0
+		};
+	});
+	const cratesPub = () => crates.map((c) => [c.hp, c.max]);
+	const allCrates = () => all({
+		t: "crates",
+		l: cratesPub()
+	});
 	let lastHome = 0;
 	const castles = CASTLES.map(() => ({
 		built: true,
@@ -13493,7 +13587,8 @@ function fishingReferee(_setup, ctx) {
 			players: [...players.values()].map(pub),
 			saving: savingOn(),
 			boats: boatsPub(),
-			castles: castlesPub()
+			castles: castlesPub(),
+			crates: cratesPub()
 		});
 		if (p.uid) loadProfile(p.uid).then((profile) => players.has(key) && send(key, {
 			t: "profile",
@@ -13523,7 +13618,7 @@ function fishingReferee(_setup, ctx) {
 			x = p.x + (x - p.x) / far * allow;
 			z = p.z + (z - p.z) / far * allow;
 		}
-		if (!(p.ride !== null ? boatable(x, z, BOATS[p.ride].zone) : p.up !== null ? onLadderTop(p.up, x, z) : walkable(x, z))) return send(p.id, {
+		if (!(p.ride !== null ? boatable(x, z, BOAT_SLOTS[p.ride].zone) : p.up !== null ? onLadderTop(p.up, x, z) : walkable(x, z))) return send(p.id, {
 			t: "st",
 			p: pub(p)
 		});
@@ -13668,7 +13763,7 @@ function fishingReferee(_setup, ctx) {
 	function board(p, i) {
 		if (typeof i !== "number" || !Number.isInteger(i) || !boats[i]) return;
 		const b = boats[i];
-		if (p.ride !== null || p.up !== null || b.rider && b.passenger || Math.hypot(b.x - p.x, b.z - p.z) > 3.3) return bad(p);
+		if (!b.active || p.ride !== null || p.up !== null || b.rider && b.passenger || Math.hypot(b.x - p.x, b.z - p.z) > 3.3) return bad(p);
 		stopFishing(p);
 		p.bed = null;
 		p.act = null;
@@ -13802,27 +13897,44 @@ function fishingReferee(_setup, ctx) {
 			}
 		}
 		if (!best) {
-			let ci = -1;
-			let cd = 2.8;
-			CASTLES.forEach((c, i) => {
-				const dx = c.x - p.x, dz = c.z - p.z;
+			const front = (x, z, near, reach) => {
+				const dx = x - p.x, dz = z - p.z;
 				const d = Math.hypot(dx, dz);
-				const k = castles[i];
-				if ((k.built || k.builder) && d < cd && (d < 1.1 || (dx * fx + dz * fz) / d > .3)) {
-					ci = i;
-					cd = d;
-				}
+				return d < reach && (d < near || (dx * fx + dz * fz) / d > .3) ? d : Infinity;
+			};
+			let kind = null;
+			let at = -1;
+			let cd = Infinity;
+			CASTLES.forEach((c, i) => {
+				const d = castles[i].built || castles[i].builder ? front(c.x, c.z, 1.1, 2.8) : Infinity;
+				if (d < cd) cd = d, at = i, kind = "castle";
 			});
-			if (ci >= 0) {
-				castles[ci].built = false;
-				castles[ci].builder = null;
+			CRATES.forEach((c, i) => {
+				const d = crates[i].hp > 0 ? front(c.x, c.z, .9, 2.4) : Infinity;
+				if (d < cd) cd = d, at = i, kind = "crate";
+			});
+			if (kind === "castle") {
+				castles[at].built = false;
+				castles[at].builder = null;
 				all({
 					t: "bonk",
 					id: p.id,
 					to: null,
-					castle: ci
+					castle: at
 				});
 				return allCastles();
+			}
+			if (kind === "crate") {
+				const c = crates[at];
+				c.hp -= 1;
+				if (c.hp <= 0) c.back = now + CRATE_RESPAWN_MS;
+				all({
+					t: "bonk",
+					id: p.id,
+					to: null,
+					crate: at
+				});
+				return allCrates();
 			}
 		}
 		all({
@@ -13974,6 +14086,10 @@ function fishingReferee(_setup, ctx) {
 					p: pub(p)
 				});
 			}
+			if (crates.some((c) => c.hp <= 0 && now >= c.back)) {
+				for (const c of crates) if (c.hp <= 0 && now >= c.back) c.max = rollHp(), c.hp = c.max;
+				allCrates();
+			}
 			if (castles.some((c) => c.builder && now >= c.buildEnd)) {
 				for (const c of castles) if (c.builder && now >= c.buildEnd) c.built = true, c.builder = null;
 				allCastles();
@@ -13982,14 +14098,39 @@ function fishingReferee(_setup, ctx) {
 				lastHome = now;
 				let moved = false;
 				boats.forEach((b, i) => {
-					const h = BOATS[i];
-					if (!b.rider && !b.passenger && b.used && now - b.used > BOAT_HOME_MS && (b.x !== h.x || b.z !== h.z)) {
+					const h = BOAT_SLOTS[i];
+					if (b.active && !b.rider && !b.passenger && b.used && now - b.used > BOAT_HOME_MS && (b.x !== h.x || b.z !== h.z)) {
 						Object.assign(b, {
 							x: h.x,
 							z: h.z,
 							r: h.r,
 							used: 0
 						});
+						moved = true;
+					}
+				});
+				const sea = boats.filter((b, i) => b.active && BOAT_SLOTS[i].zone === "sea");
+				if (sea.filter((b) => !b.rider || !b.passenger).length === 0) {
+					const i = boats.findIndex((b, k) => !b.active && BOAT_SLOTS[k].extra);
+					if (i >= 0) {
+						const h = BOAT_SLOTS[i];
+						Object.assign(boats[i], {
+							active: true,
+							x: h.x,
+							z: h.z,
+							r: h.r,
+							used: 0,
+							since: now
+						});
+						moved = true;
+					}
+				}
+				const emptySea = sea.filter((b) => !b.rider && !b.passenger);
+				boats.forEach((b, i) => {
+					if (!BOAT_SLOTS[i].extra || !b.active || b.rider || b.passenger || emptySea.length < 2) return;
+					if (now - Math.max(b.used, b.since) > 18e4) {
+						b.active = false;
+						emptySea.splice(emptySea.indexOf(b), 1);
 						moved = true;
 					}
 				});

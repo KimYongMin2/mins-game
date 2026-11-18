@@ -4,12 +4,13 @@ import { REFEREE_FROM } from '../../../shared/online/hubProtocol'
 import { encodeLook } from '../../../shared/art3d/animalKinds'
 import { loadLook } from '../../../shared/storage/avatar'
 import { type Catch, fishById, isBig } from '../play/fish'
-import { castTarget, nearBed, moveBy, RUN_SPEED, WALK_SPEED, BEDS, BOATS, BOAT_REACH, BOAT_SPEED, CASTLES, LADDERS, nearCastle, landingSpot, moveBoat, nearLadder, onLadderTop } from '../play/map'
+import { castTarget, nearBed, moveBy, RUN_SPEED, WALK_SPEED, BEDS, BOAT_SLOTS, BOAT_REACH, BOAT_SPEED, CASTLES, CRATES, LADDERS, nearCastle, landingSpot, moveBoat, nearLadder, onLadderTop } from '../play/map'
 import {
   type Act,
   type BagItem,
   type BoatPub,
   type CastlePub,
+  type CratePub,
   type ClientMsg,
   FISHING_CAPACITY,
   FISHING_GAME,
@@ -78,7 +79,9 @@ export type World = {
    */
   cam: { yaw: number; pitch: number; dist: number; first: boolean; spin: number }
   /** 탈 수 있는 배들 (탄 사람이 있으면 그 사람 자리를 따라 그림) */
-  boats: { x: number; z: number; r: number; rider: string | null; passenger: string | null }[]
+  boats: { x: number; z: number; r: number; rider: string | null; passenger: string | null; active: boolean }[]
+  /** 나무 상자: 남은 힘·처음 힘·맞은 때 */
+  crates: { hp: number; max: number; hitAt: number }[]
   /** 모래성: 서 있는지 · 쌓는 사람 · 다 쌓는 때(내 시계) · 부서진 때(그림 효과) */
   castles: { built: boolean; builder: string | null; buildEnd: number; hitAt: number }[]
 }
@@ -137,7 +140,7 @@ export function useFishingRoom(nickname: string, active: boolean) {
   const [action, setAction] = useState<Action>('none')
   const [alt, setAlt] = useState<Alt>(null)
   const roomRef = useRef<Room<ClientMsg> | null>(null)
-  const world = useRef<World>({ me: '', players: new Map(), input: { x: 0, y: 0, run: false }, cam: { yaw: 0, pitch: 0.82, dist: 11, first: false, spin: 0 }, vel: { x: 0, z: 0 }, boats: BOATS.map((b) => ({ x: b.x, z: b.z, r: b.r, rider: null, passenger: null })), castles: CASTLES.map(() => ({ built: true, builder: null, buildEnd: 0, hitAt: 0 })) }).current
+  const world = useRef<World>({ me: '', players: new Map(), input: { x: 0, y: 0, run: false }, cam: { yaw: 0, pitch: 0.82, dist: 11, first: false, spin: 0 }, vel: { x: 0, z: 0 }, boats: BOAT_SLOTS.map((b) => ({ x: b.x, z: b.z, r: b.r, rider: null, passenger: null, active: !b.extra })), crates: CRATES.map(() => ({ hp: 3, max: 3, hitAt: 0 })), castles: CASTLES.map(() => ({ built: true, builder: null, buildEnd: 0, hitAt: 0 })) }).current
   const keySeq = useRef(0)
   // 개발 모드에서만: 브라우저 시험이 상태를 볼 수 있게
   if (import.meta.env.DEV) (window as unknown as { __fishWorld?: World }).__fishWorld = world
@@ -194,8 +197,8 @@ export function useFishingRoom(nickname: string, active: boolean) {
       if (p.fishing !== 'bite') old.biteAt = 0
     }
     const setBoats = (l: BoatPub[]) => {
-      l.forEach(([x, z, r, rider, passenger], i) => {
-        if (world.boats[i]) Object.assign(world.boats[i], { x, z, r, rider, passenger: passenger ?? null })
+      l.forEach(([x, z, r, rider, passenger, active], i) => {
+        if (world.boats[i]) Object.assign(world.boats[i], { x, z, r, rider, passenger: passenger ?? null, active: active !== 0 })
       })
     }
     const setCastles = (l: CastlePub[]) => {
@@ -211,6 +214,11 @@ export function useFishingRoom(nickname: string, active: boolean) {
         Object.assign(c, { built: !!built, builder, buildEnd: builder ? now + left : 0 })
       })
     }
+    const setCrates = (l: CratePub[]) => {
+      l.forEach(([hp, max], i) => {
+        if (world.crates[i]) Object.assign(world.crates[i], { hp, max })
+      })
+    }
     const onMsg = (raw: unknown, from?: string) => {
       if (from !== REFEREE_FROM) return
       const m = raw as ServerMsg
@@ -224,6 +232,7 @@ export function useFishingRoom(nickname: string, active: boolean) {
           setSaving(m.saving)
           setBoats(m.boats)
           if (m.castles) setCastles(m.castles)
+          if (m.crates) setCrates(m.crates)
           setCount(m.players.length)
           setStatus('ready')
           return
@@ -232,6 +241,9 @@ export function useFishingRoom(nickname: string, active: boolean) {
           return
         case 'castles':
           setCastles(m.l)
+          return
+        case 'crates':
+          setCrates(m.l)
           return
         case 'st':
           upsert(m.p)
@@ -302,6 +314,18 @@ export function useFishingRoom(nickname: string, active: boolean) {
         case 'bonk': {
           const p = world.players.get(m.id)
           if (p) p.bonkAt = now
+          // 나무 상자를 때림: 쿵 (마지막이면 와장창), 소리는 가까울 때만
+          if (m.crate !== undefined && world.crates[m.crate]) {
+            const k = world.crates[m.crate]
+            k.hitAt = now
+            const me0 = world.players.get(world.me)
+            const c = CRATES[m.crate]
+            const near = me0 && Math.hypot(c.x - me0.sx, c.z - me0.sz) < 14
+            // 서버 상태(crates)보다 먼저 올 수 있어서 남은 힘으로 짐작
+            if (near) playSound(k.hp <= 1 ? 'smash' : 'thud')
+            if (m.id === world.me && k.hp <= 1) toast('나무 상자가 와장창! 1분 뒤 다시 생겨요', '#c9a277')
+            return
+          }
           // 모래성을 부숨: 와르르 (소리는 가까울 때만)
           if (m.castle !== undefined && world.castles[m.castle]) {
             world.castles[m.castle].hitAt = now
@@ -434,7 +458,7 @@ export function useFishingRoom(nickname: string, active: boolean) {
         // 배는 그 물 위만, 사다리 위는 위 자리 안만
         const p =
           me.ride !== null
-            ? moveBoat(me.x, me.z, dx, dz, BOATS[me.ride].zone)
+            ? moveBoat(me.x, me.z, dx, dz, BOAT_SLOTS[me.ride].zone)
             : me.up !== null
               ? onLadderTop(me.up, me.x + dx, me.z + dz)
                 ? { x: me.x + dx, z: me.z + dz }
@@ -583,7 +607,7 @@ function freeBoat(world: World, me: Shown): number | null {
   let bestD = BOAT_REACH
   world.boats.forEach((b, i) => {
     const d = Math.hypot(b.x - me.x, b.z - me.z)
-    if ((!b.rider || !b.passenger) && d < bestD) {
+    if (b.active && (!b.rider || !b.passenger) && d < bestD) {
       bestD = d
       best = i
     }
