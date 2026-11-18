@@ -13406,7 +13406,10 @@ function fishingReferee(_setup, ctx) {
 				zone: null,
 				lastMv: ctx.now(),
 				lastChat: 0,
-				lastBonk: 0
+				lastBonk: 0,
+				lastJump: 0,
+				castX: 0,
+				castZ: 0
 			};
 			players.set(key, p);
 			all({
@@ -13460,7 +13463,9 @@ function fishingReferee(_setup, ctx) {
 			b.r = p.r;
 			b.used = now;
 		}
-		if (moved && (p.bed !== null || p.fishing !== "none" || p.act)) {
+		const drift = Math.hypot(p.x - p.castX, p.z - p.castZ);
+		const reelOff = p.fishing !== "none" && drift > (p.ride !== null ? 4 : 1);
+		if (moved && (p.bed !== null || p.act) || reelOff) {
 			p.bed = null;
 			p.act = null;
 			stopFishing(p);
@@ -13485,6 +13490,8 @@ function fishingReferee(_setup, ctx) {
 		p.zone = t.zone;
 		if (!bed) p.r = r2(t.r);
 		p.castAt = now;
+		p.castX = p.x;
+		p.castZ = p.z;
 		p.biteAt = now + BITE_MIN_MS + rand() * 9e3;
 		all({
 			t: "st",
@@ -13617,6 +13624,23 @@ function fishingReferee(_setup, ctx) {
 		all({
 			t: "st",
 			p: pub(p)
+		});
+	}
+	/** 점프: 배·썬베드·사다리 오르는 중엔 안 됨, 앉거나 누웠으면 일어남 */
+	function jump(p) {
+		const now = ctx.now();
+		if (p.ride !== null || p.bed !== null || now - p.lastJump < 500) return;
+		p.lastJump = now;
+		if (p.act) {
+			p.act = null;
+			all({
+				t: "st",
+				p: pub(p)
+			});
+		}
+		all({
+			t: "jump",
+			id: p.id
 		});
 	}
 	function down(p) {
@@ -13777,7 +13801,10 @@ function fishingReferee(_setup, ctx) {
 				case "down":
 					down(p);
 					break;
-				case "pose": pose(p, m.p);
+				case "pose":
+					pose(p, m.p);
+					break;
+				case "jump": jump(p);
 			}
 			return true;
 		},

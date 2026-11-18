@@ -20,6 +20,9 @@ export const CHAT_MAX = 60
 /** 뿅망치가 닿는 거리 (m)와 다시 휘두를 수 있는 간격 */
 export const BONK_REACH = 1.9
 export const BONK_MS = 700
+/** 점프 한 번 걸리는 시간 (ms) · 높이 (m) */
+export const JUMP_MS = 560
+export const JUMP_HEIGHT = 0.9
 
 export type Fishing = 'none' | 'cast' | 'bite'
 export type PlayerPub = {
@@ -65,10 +68,13 @@ export type ClientMsg =
   | { t: 'climb'; i: number }
   | { t: 'down' }
   | { t: 'pose'; p: Act }
+  /** 점프 (그림만 — 자리는 그대로) */
+  | { t: 'jump' }
 
 export type ServerMsg =
   | { t: 'init'; you: string; players: PlayerPub[]; saving: boolean; boats: BoatPub[] }
   | { t: 'boats'; l: BoatPub[] }
+  | { t: 'jump'; id: string }
   | { t: 'pos'; l: [string, number, number, number][] }
   | { t: 'st'; p: PlayerPub }
   | { t: 'gone'; id: string }

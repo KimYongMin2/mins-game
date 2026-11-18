@@ -17,6 +17,7 @@ import {
   type Profile,
   type ServerMsg,
   fishingRoomCode,
+  JUMP_MS,
 } from '../play/protocol'
 import { playSound } from '../sounds'
 
@@ -37,6 +38,8 @@ export type Shown = PlayerPub & {
   /** 뿅망치를 휘두른 때 · 맞은 때 */
   bonkAt: number
   hitAt: number
+  /** 점프한 때 */
+  jumpAt: number
   /** 사다리 오르내리는 중 (그림만): 시작 시각·걸리는 시간·위로(1)/아래로(-1)·사다리 번호 */
   climb: { start: number; dur: number; dir: 1 | -1; i: number } | null
   /** 받은 위치 기록 (다른 사람): 0.16초 늦게 그 사이를 이어 그려서 툭툭 끊기지 않게 */
@@ -155,7 +158,7 @@ export function useFishingRoom(nickname: string, active: boolean) {
     const upsert = (p: PlayerPub) => {
       const old = world.players.get(p.id)
       if (!old) {
-        world.players.set(p.id, { ...p, sx: p.x, sz: p.z, sr: p.r, walkUntil: 0, bubble: null, popup: null, biteAt: 0, bonkAt: 0, hitAt: 0, climb: null, hist: [{ t: performance.now(), x: p.x, z: p.z, r: p.r }], speed: 0 })
+        world.players.set(p.id, { ...p, sx: p.x, sz: p.z, sr: p.r, walkUntil: 0, bubble: null, popup: null, biteAt: 0, bonkAt: 0, hitAt: 0, jumpAt: 0, climb: null, hist: [{ t: performance.now(), x: p.x, z: p.z, r: p.r }], speed: 0 })
         return
       }
       const isMe = p.id === world.me
@@ -270,6 +273,12 @@ export function useFishingRoom(nickname: string, active: boolean) {
         case 'tank':
           setTankView({ who: m.who, name: m.name, items: m.items })
           return
+        case 'jump': {
+          const p = world.players.get(m.id)
+          // 내 점프는 누른 순간 이미 그렸음
+          if (p && (m.id !== world.me || now - p.jumpAt > JUMP_MS)) p.jumpAt = now
+          return
+        }
         case 'bonk': {
           const p = world.players.get(m.id)
           if (p) p.bonkAt = now
@@ -401,8 +410,8 @@ export function useFishingRoom(nickname: string, active: boolean) {
         me.x = me.sx = p.x
         me.z = me.sz = p.z
         me.walkUntil = now + 120
-        // 움직이면 일어나고 낚싯대를 거둠 (서버도 같은 판단)
-        if (me.bed !== null || me.fishing !== 'none' || me.act) {
+        // 직접 움직일 때만 일어나고 낚싯대를 거둠 (손 뗀 뒤 미끄러지는 것·배가 밀리는 것으론 안 끊김 — 서버도 같은 판단)
+        if (mag > 0.15 && (me.bed !== null || me.fishing !== 'none' || me.act)) {
           me.bed = null
           me.act = null
           me.fishing = 'none'
@@ -449,6 +458,7 @@ export function useFishingRoom(nickname: string, active: boolean) {
     if (t) {
       // 물 쪽으로 돌아서 던짐 (서버는 마지막 위치·방향으로 다시 확인)
       me.r = me.sr = t.r
+      world.vel.x = world.vel.z = 0
       send({ t: 'mv', x: round(me.x), z: round(me.z), r: round(t.r) })
       lastSent.current = { at: performance.now(), x: me.x, z: me.z, r: t.r }
       playSound('cast')
@@ -488,6 +498,18 @@ export function useFishingRoom(nickname: string, active: boolean) {
     [send, world],
   )
 
+  /** 점프 (J · 폰 [점프]) — 내 화면은 바로 뜀 */
+  const jump = useCallback(() => {
+    const me = world.players.get(world.me)
+    const now = performance.now()
+    if (!me || me.ride !== null || me.bed !== null || now - me.jumpAt < JUMP_MS) return
+    if (me.climb && now - me.climb.start < me.climb.dur) return
+    me.jumpAt = now
+    me.act = null
+    playSound('jump')
+    send({ t: 'jump' })
+  }, [send, world])
+
   /** 뿅망치 (F) — 내 화면은 바로 휘두르고, 맞았는지는 서버가 알려 줌 */
   const bonk = useCallback(() => {
     const me = world.players.get(world.me)
@@ -496,7 +518,7 @@ export function useFishingRoom(nickname: string, active: boolean) {
     send({ t: 'bonk' })
   }, [send, world])
 
-  return { status, error, roomLabel, count, profile, saving, chat, toasts, myCatch, setMyCatch, tankView, setTankView, action, act, alt, doAlt, setPose, bonk, step, send, world }
+  return { status, error, roomLabel, count, profile, saving, chat, toasts, myCatch, setMyCatch, tankView, setTankView, action, act, alt, doAlt, setPose, jump, bonk, step, send, world }
 }
 
 const round = (v: number) => Math.round(v * 100) / 100

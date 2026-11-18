@@ -8,6 +8,7 @@ import { buildWorld, makeBoat } from './worldArt'
 import { fishImageUrl } from '../field/fishArt'
 import { type Catch, fishById, IRO } from '../play/fish'
 import { CAM_LIMITS, type World } from './useFishingRoom'
+import { JUMP_HEIGHT, JUMP_MS } from '../play/protocol'
 
 // 3D 낚시터 (사용자 요청 2026-11-17). 위가 바다(부두), 오른쪽 풀밭에 개울·연못, 물가를 따라 썬베드.
 // 카메라는 나를 부드럽게 따라가기만 하고 흔들거나 돌지 않음 (사용자가 3D 멀미가 심함 — 저절로 움직이는 화면 없음).
@@ -231,6 +232,7 @@ export function Scene3D({ world, step, onTapPlayer }: { world: World; step: (dt:
     let camReady = false
     let eyeReady = false
     let eyeY = 0
+    let meJumpY = 0
     const head = new THREE.Vector3()
     const v = new THREE.Vector3()
     const tipW = new THREE.Vector3()
@@ -300,6 +302,7 @@ export function Scene3D({ world, step, onTapPlayer }: { world: World; step: (dt:
       const t = now / 1000
       // 걷기는 실제 지난 시간만큼 (느린 기기에서도 같은 빠르기, 화면을 떠났다 온 긴 틈은 빼고)
       stepRef.current(dt)
+      meJumpY = 0
 
       // 사람 맞추기
       for (const [id, a] of actors) {
@@ -320,11 +323,15 @@ export function Scene3D({ world, step, onTapPlayer }: { world: World; step: (dt:
         const moving = !lying && p.ride === null && p.speed > 0.4
         const running = moving && p.speed > 7.2
         const walking = moving || climbing
+        // 점프: 포물선으로 떴다가 내려옴 (자리는 그대로)
+        const jk = (now - p.jumpAt) / JUMP_MS
+        const jumping = jk >= 0 && jk < 1 && !lying && p.ride === null && !climbing
+        const jumpY = jumping ? JUMP_HEIGHT * 4 * jk * (1 - jk) : 0
         const sitting = !walking && p.act === 'sit' && p.ride === null
         const lyingDown = !walking && p.act === 'lie' && p.ride === null
         const holding = !!p.popup && now < p.popup.until && now - p.popup.start > (p.popup.from ? 420 : 0)
         const reeling = now - a.reelAt < 500
-        const pose = running ? 'run' : walking ? 'walk' : lyingDown ? 'lie' : holding ? 'hold' : p.fishing !== 'none' || reeling || (p.popup && now < p.popup.until) ? 'fish' : 'idle'
+        const pose = jumping ? 'jump' : running ? 'run' : walking ? 'walk' : lyingDown ? 'lie' : holding ? 'hold' : p.fishing !== 'none' || reeling || (p.popup && now < p.popup.until) ? 'fish' : 'idle'
         const dizzy = now - p.hitAt < 900
         const mood = dizzy ? 'ko' : p.popup && now < p.popup.until ? 'happy' : p.fishing === 'bite' ? 'scared' : 'calm'
         a.rig.update(t, dizzy && !lying ? 'scared' : sitting && pose !== 'hold' ? 'sit' : pose, mood)
@@ -357,7 +364,8 @@ export function Scene3D({ world, step, onTapPlayer }: { world: World; step: (dt:
             root.rotation.set(-1.5, p.sr, 0)
           } else {
             // 앉으면 엉덩이가 바닥에 닿게 몸을 내림
-            root.position.set(p.sx, gy - (sitting ? 0.5 * SCALE : 0), p.sz)
+            root.position.set(p.sx, gy - (sitting ? 0.5 * SCALE : 0) + jumpY, p.sz)
+            if (p.id === world.me) meJumpY = jumpY
             root.rotation.set(0, p.sr, 0)
           }
         }
@@ -489,8 +497,10 @@ export function Scene3D({ world, step, onTapPlayer }: { world: World; step: (dt:
           meActor.rig.head.getWorldPosition(head)
           meActor.rig.head.visible = false
           // 눈 높이는 천천히 따라감 — 걸음마다 머리가 통통 튀는 게 1인칭에선 그대로 흔들림이 돼서
-          if (!eyeReady) eyeY = head.y
-          eyeY += (head.y - eyeY) * (1 - Math.exp(-dt * 3))
+          // 점프한 높이는 빼고 (1인칭 화면이 같이 튀면 어지러워서)
+          const hy = head.y - meJumpY
+          if (!eyeReady) eyeY = hy
+          eyeY += (hy - eyeY) * (1 - Math.exp(-dt * 3))
           eyeReady = true
           head.set(me.sx, eyeY, me.sz)
           const cp = Math.cos(cam.pitch)

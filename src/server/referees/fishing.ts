@@ -10,6 +10,7 @@ import {
   BONK_MS,
   BONK_REACH,
   CHAT_MAX,
+  JUMP_MS,
   type ClientMsg,
   type PlayerPub,
   type Profile,
@@ -22,7 +23,7 @@ import { loadProfile, markDirty, savingOn, startFlushing } from '../fishingStore
 // 위치는 화면이 보내고 여기서 빠르기·물 검사, 입질 시각·잡힌 물고기·크기·이로치는 여기서만 정함 → 도감·어항에 가짜가 못 들어감.
 // 도감·어항은 계정(uid)별로 Supabase에 (fishingStore). 방장이 없어도 계속 돎(회의방처럼 방장을 넘겨받음).
 
-type P = PlayerPub & { uid: string | null; castAt: number; biteAt: number; biteUntil: number; zone: 'sea' | 'fresh' | null; lastMv: number; lastChat: number; lastBonk: number }
+type P = PlayerPub & { uid: string | null; castAt: number; biteAt: number; biteUntil: number; zone: 'sea' | 'fresh' | null; lastMv: number; lastChat: number; lastBonk: number; lastJump: number; castX: number; castZ: number }
 
 /** 가방: 최근 것 + 자랑할 만한 것, 모두 이만큼까지 */
 const BAG_RECENT = 40
@@ -79,7 +80,7 @@ export function fishingReferee(_setup: unknown, ctx: RefereeContext): Referee {
     if (!p) {
       // 빈자리 근처에서 시작 (겹치지 않게 조금씩 흩뿌림)
       const a = rand() * Math.PI * 2
-      p = { id: key, name: mem.nickname, ...(mem.avatar ? { avatar: mem.avatar } : {}), x: r2(SPAWN.x + Math.cos(a) * 2.5), z: r2(SPAWN.z + Math.sin(a) * 1.5), r: Math.PI, bed: null, fishing: 'none', bob: null, ride: null, up: null, act: null, uid: mem.uid ?? null, castAt: 0, biteAt: 0, biteUntil: 0, zone: null, lastMv: ctx.now(), lastChat: 0, lastBonk: 0 }
+      p = { id: key, name: mem.nickname, ...(mem.avatar ? { avatar: mem.avatar } : {}), x: r2(SPAWN.x + Math.cos(a) * 2.5), z: r2(SPAWN.z + Math.sin(a) * 1.5), r: Math.PI, bed: null, fishing: 'none', bob: null, ride: null, up: null, act: null, uid: mem.uid ?? null, castAt: 0, biteAt: 0, biteUntil: 0, zone: null, lastMv: ctx.now(), lastChat: 0, lastBonk: 0, lastJump: 0, castX: 0, castZ: 0 }
       players.set(key, p)
       all({ t: 'st', p: pub(p) })
     }
@@ -122,8 +123,11 @@ export function fishingReferee(_setup: unknown, ctx: RefereeContext): Referee {
       b.r = p.r
       b.used = now
     }
-    // 움직이면 일어나고 낚싯대를 거둠
-    if (moved && (p.bed !== null || p.fishing !== 'none' || p.act)) {
+    // 움직이면 일어나고, 던진 자리에서 꽤 벗어나면 낚싯대를 거둠
+    // (손을 떼도 조금 미끄러지는 것·배가 출렁 밀리는 것으론 안 끊기게 — 배에서 던지자마자 거둬지던 문제)
+    const drift = Math.hypot(p.x - p.castX, p.z - p.castZ)
+    const reelOff = p.fishing !== 'none' && drift > (p.ride !== null ? 4 : 1)
+    if ((moved && (p.bed !== null || p.act)) || reelOff) {
       p.bed = null
       p.act = null
       stopFishing(p)
@@ -143,6 +147,8 @@ export function fishingReferee(_setup: unknown, ctx: RefereeContext): Referee {
     p.zone = t.zone
     if (!bed) p.r = r2(t.r)
     p.castAt = now
+    p.castX = p.x
+    p.castZ = p.z
     p.biteAt = now + BITE_MIN_MS + rand() * (BITE_MAX_MS - BITE_MIN_MS)
     all({ t: 'st', p: pub(p) })
   }
@@ -229,6 +235,18 @@ export function fishingReferee(_setup: unknown, ctx: RefereeContext): Referee {
     if (p.act === act) return
     p.act = act
     all({ t: 'st', p: pub(p) })
+  }
+
+  /** 점프: 배·썬베드·사다리 오르는 중엔 안 됨, 앉거나 누웠으면 일어남 */
+  function jump(p: P) {
+    const now = ctx.now()
+    if (p.ride !== null || p.bed !== null || now - p.lastJump < JUMP_MS - 60) return
+    p.lastJump = now
+    if (p.act) {
+      p.act = null
+      all({ t: 'st', p: pub(p) })
+    }
+    all({ t: 'jump', id: p.id })
   }
 
   function down(p: P) {
@@ -363,6 +381,9 @@ export function fishingReferee(_setup: unknown, ctx: RefereeContext): Referee {
           break
         case 'pose':
           pose(p, m.p)
+          break
+        case 'jump':
+          jump(p)
           break
       }
       return true

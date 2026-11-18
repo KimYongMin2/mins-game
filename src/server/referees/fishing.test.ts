@@ -58,6 +58,16 @@ describe('낚시터 심판', () => {
     s.ref.input('b', { t: 'hi' })
     s.ref.input('b', { t: 'board', i: 0 })
     expect(s.last('st')?.p.ride).toBeNull()
+    // 배에서 던지면 낚시가 되고, 조금 밀려도 안 끊김
+    s.ref.input('a', { t: 'cast' })
+    expect(s.last('st')?.p.fishing).toBe('cast')
+    s.tick(500)
+    s.ref.input('a', { t: 'mv', x: b.x + 0.6, z: b.z - 10, r: 0 })
+    expect(s.last('st')?.p.fishing).toBe('cast')
+    // 멀리 저어 가면 거둠
+    s.tick(1000)
+    s.ref.input('a', { t: 'mv', x: b.x + 6, z: b.z - 10, r: 0 })
+    expect(s.last('st')?.p.fishing).toBe('none')
     // 선착장 옆으로 돌아와 내림
     s.tick(1000)
     s.ref.input('a', { t: 'mv', x: b.x, z: b.z, r: 0 })
@@ -77,6 +87,21 @@ describe('낚시터 심판', () => {
     s.tick(1000)
     s.ref.input('a', { t: 'mv', x: 1, z: 9, r: 0 })
     expect(s.last('st')?.p.act).toBeNull()
+  })
+
+  it('점프: 모두에게 알리고, 앉아 있으면 일어남, 너무 자주는 안 됨', () => {
+    const s = setup()
+    s.ref.input('a', { t: 'hi' })
+    s.ref.input('a', { t: 'pose', p: 'sit' })
+    s.ref.input('a', { t: 'jump' })
+    expect(s.last('jump')?.id).toBe('a')
+    expect(s.last('st')?.p.act).toBeNull()
+    const n = s.got.filter((g) => g.m.t === 'jump').length
+    s.ref.input('a', { t: 'jump' })
+    expect(s.got.filter((g) => g.m.t === 'jump').length).toBe(n)
+    s.tick(600)
+    s.ref.input('a', { t: 'jump' })
+    expect(s.got.filter((g) => g.m.t === 'jump').length).toBe(n + 1)
   })
 
   it('사다리: 아래에서만 오르고, 위에선 위 자리 안만', () => {

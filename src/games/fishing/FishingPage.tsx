@@ -42,7 +42,7 @@ export function FishingPage() {
   const [text, setText] = useState('')
   const [firstPerson, setFirstPerson] = useState(false)
   const chatRef = useRef<HTMLInputElement>(null)
-  const { world, act, send, bonk, doAlt, setPose } = room
+  const { world, act, send, bonk, doAlt, setPose, jump } = room
   const [running, setRunning] = useState(false)
 
   useEffect(() => {
@@ -97,6 +97,8 @@ export function FishingPage() {
         // 누르는 동안 달리기
         world.input.run = true
         setRunning(true)
+      } else if (e.code === 'KeyJ' && !e.repeat) {
+        jump()
       } else if (e.code === 'KeyC' && !e.repeat) {
         setPose('sit')
       } else if (e.code === 'KeyZ' && !e.repeat) {
@@ -148,7 +150,7 @@ export function FishingPage() {
       window.removeEventListener('blur', blur)
       window.removeEventListener('contextmenu', menu)
     }
-  }, [entered, world, act, toggleView, bonk, doAlt, setPose])
+  }, [entered, world, act, toggleView, bonk, doAlt, setPose, jump])
 
   // 잡은 물고기 카드는 잠깐만
   const { myCatch, setMyCatch } = room
@@ -269,6 +271,9 @@ export function FishingPage() {
           title="달리기 (Shift를 누르는 동안)"
         >
           달리기<small>Shift</small>
+        </button>
+        <button type="button" className="fs-pose" onPointerDown={(e) => { e.preventDefault(); if (e.button === 0) jump() }} title="점프 (J)">
+          점프<small>J</small>
         </button>
         <button type="button" className="fs-pose" onPointerDown={(e) => { e.preventDefault(); if (e.button === 0) setPose('sit') }} title="앉기 (C) — 한 번 더 누르면 일어나요">
           앉기<small>C</small>
