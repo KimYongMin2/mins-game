@@ -310,8 +310,20 @@ export const EXTRA_BOATS: BoatHome[] = [
   { x: 12, z: -19, r: -0.3, zone: 'sea', color: '#e0b030' },
 ]
 /** 배 자리 전체 (앞 5척은 늘 있음, 뒤는 필요할 때만) */
-export const BOAT_SLOTS: (BoatHome & { extra: boolean })[] = [...BOATS.map((b) => ({ ...b, extra: false })), ...EXTRA_BOATS.map((b) => ({ ...b, extra: true }))]
+/** 1인용 카약 (사용자 요청 2026-11-19 — 배 말고 혼자 타는 것): 바다 3 · 호수 2, 빠르고 한 명만 */
+export const KAYAKS: BoatHome[] = [
+  { x: -8, z: -13, r: 0.3, zone: 'sea', color: '#ff8a2a' },
+  { x: -14, z: -13, r: -0.2, zone: 'sea', color: '#ffd23f' },
+  { x: -70, z: -12.5, r: 0.1, zone: 'sea', color: '#e8473f' },
+  { x: 50, z: 17, r: 0.8, zone: 'fresh', color: '#2fb07a' },
+  { x: 52, z: 28, r: -0.6, zone: 'fresh', color: '#3f8fd0' },
+]
+/** 배 자리 전체 (앞 5척은 늘 있음, 그다음 3척은 필요할 때만, 맨 뒤는 카약) — 번호는 이 순서 그대로 */
+export const BOAT_SLOTS: (BoatHome & { extra: boolean; kayak?: boolean })[] = [...BOATS.map((b) => ({ ...b, extra: false })), ...EXTRA_BOATS.map((b) => ({ ...b, extra: true })), ...KAYAKS.map((b) => ({ ...b, extra: false, kayak: true }))]
 export const BOAT_SPEED = 7
+export const KAYAK_SPEED = 8.5
+/** 이 배의 빠르기 */
+export const boatSpeed = (i: number) => (BOAT_SLOTS[i]?.kayak ? KAYAK_SPEED : BOAT_SPEED)
 /** 배에 탈 수 있는 거리 · 내릴 땅을 찾는 거리 */
 export const BOAT_REACH = 2.8
 /** 배가 갈 수 있는 곳: 그 물(바다·민물) 위, 배 둘레(0.9m)도 물, 판자·방파제 밑이 아님 */

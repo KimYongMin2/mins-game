@@ -929,3 +929,74 @@ export function makeSandRuin() {
   })
   return g
 }
+
+// ── 1인용 카약 (사용자 요청 2026-11-19): 앞뒤가 뾰족한 날씬한 몸통, 가운데 앉는 구멍, 앞뒤 갑판 끈, 양날 노 ──
+// 뱃머리는 -z (makeBoat와 같음). userData.seatY = 엉덩이 높이, userData.paddle = 노 (탄 사람이 저으면 화면이 돌림)
+export function makeKayak(color: string) {
+  const g = new THREE.Group()
+  const L = 3.3, W = 0.36, H = 0.24
+  // 몸통: 늘린 공을 앞뒤로 갈수록 더 가늘게 (뾰족하게), 위는 살짝 볼록한 갑판
+  const hull = new THREE.SphereGeometry(1, 28, 14)
+  const p = hull.getAttribute('position') as THREE.BufferAttribute
+  for (let i = 0; i < p.count; i++) {
+    const x = p.getX(i), y = p.getY(i), z = p.getZ(i)
+    const taper = 1 - 0.45 * Math.abs(z) ** 1.6
+    p.setXYZ(i, x * W * taper, y * (y > 0 ? H * 0.75 : H) + Math.abs(z) ** 2 * 0.1, z * (L / 2))
+  }
+  hull.computeVertexNormals()
+  const hullM = new THREE.MeshStandardMaterial({ color, roughness: 0.35, metalness: 0.05 })
+  const body = new THREE.Mesh(hull, hullM)
+  body.position.y = 0.16
+  body.castShadow = true
+  g.add(body)
+  // 아래 흰 띠 (물에 닿는 쪽)
+  const keel = new THREE.Mesh(new THREE.TorusGeometry(1, 0.02, 4, 40), new THREE.MeshStandardMaterial({ color: '#f4f2ec', roughness: 0.5 }))
+  keel.scale.set(W * 1.0, L / 2 * 0.98, 1)
+  keel.rotation.x = Math.PI / 2
+  keel.position.y = 0.14
+  g.add(keel)
+  // 앉는 구멍: 테두리 + 어두운 안
+  const rim = new THREE.Mesh(new THREE.TorusGeometry(1, 0.035, 6, 28), new THREE.MeshStandardMaterial({ color: '#2a2a33', roughness: 0.6 }))
+  rim.scale.set(0.24, 0.42, 1)
+  rim.rotation.x = Math.PI / 2
+  rim.position.set(0, 0.34, 0.1)
+  const hole = new THREE.Mesh(new THREE.CircleGeometry(1, 24), new THREE.MeshStandardMaterial({ color: '#1a1a22', roughness: 0.9 }))
+  hole.scale.set(0.23, 0.41, 1)
+  hole.rotation.x = -Math.PI / 2
+  hole.position.set(0, 0.33, 0.1)
+  hole.renderOrder = 3
+  g.add(rim, hole)
+  // 갑판 끈 (앞뒤에 X자)
+  const cordM = new THREE.MeshStandardMaterial({ color: '#1f1a2e', roughness: 0.8 })
+  for (const zc of [-0.95, 1.05])
+    for (const a of [0.5, -0.5]) {
+      const c = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.012, 0.5), cordM)
+      c.position.set(0, 0.36 - Math.abs(zc) * 0.02, zc)
+      c.rotation.y = a
+      g.add(c)
+    }
+  // 손잡이 고리 (앞·뒤 끝)
+  for (const zc of [-L / 2 + 0.05, L / 2 - 0.05]) {
+    const t = new THREE.Mesh(new THREE.TorusGeometry(0.05, 0.012, 4, 10), cordM)
+    t.position.set(0, 0.42, zc)
+    g.add(t)
+  }
+  // 양날 노: 가운데 자루 + 양끝 넓적한 날
+  const paddle = new THREE.Group()
+  const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 2.1, 6), new THREE.MeshStandardMaterial({ color: '#3a3a44', roughness: 0.4, metalness: 0.4 }))
+  shaft.rotation.z = Math.PI / 2
+  paddle.add(shaft)
+  const bladeM = new THREE.MeshStandardMaterial({ color: '#f4f2ec', roughness: 0.4, side: THREE.DoubleSide })
+  for (const s of [-1, 1]) {
+    const blade = new THREE.Mesh(new THREE.SphereGeometry(1, 12, 6), bladeM)
+    blade.scale.set(0.2, 0.012, 0.085)
+    blade.position.x = s * 1.08
+    blade.rotation.x = s * 0.6
+    paddle.add(blade)
+  }
+  g.add(paddle)
+  g.userData.paddle = paddle
+  g.userData.seatY = 0.2
+  g.userData.kayak = true
+  return g
+}

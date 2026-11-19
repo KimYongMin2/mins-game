@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import type { BagItem, ServerMsg } from '../../games/fishing/play/protocol'
-import { BOATS, BUILD_MS, CASTLES, CRATES, CRATE_RESPAWN_MS, LADDERS, SEATS, shoreZ } from '../../games/fishing/play/map'
+import { BOAT_SLOTS, BOATS, BUILD_MS, KAYAKS, CASTLES, CRATES, CRATE_RESPAWN_MS, LADDERS, SEATS, shoreZ } from '../../games/fishing/play/map'
 import { resetStore } from '../fishingStore'
 import { BUGS, rollBug } from '../../games/fishing/play/bugs'
 import { IRO, RARITY } from '../../games/fishing/play/fish'
@@ -78,6 +78,22 @@ describe('낚시터 심판', () => {
     const st = s.last('st')!.p
     expect(st.ride).toBeNull()
     expect(s.last('boats')?.l[0][3]).toBeNull()
+  })
+
+  it('카약: 한 명만 탐', () => {
+    const s = setup()
+    s.ref.input('a', { t: 'hi' })
+    s.ref.input('b', { t: 'hi' })
+    const i = BOAT_SLOTS.findIndex((b) => b.kayak)
+    const k = KAYAKS[0]
+    // 물가에서 카약 옆으로
+    walkTo(s, 'a', k.x, k.z + 2.9)
+    walkTo(s, 'b', k.x + 0.6, k.z + 2.9)
+    s.ref.input('a', { t: 'board', i })
+    expect(s.last('st')?.p).toMatchObject({ id: 'a', ride: i })
+    s.ref.input('b', { t: 'board', i })
+    expect(s.last('boats')!.l[i][4]).toBeNull()
+    expect(s.last('st')?.p).toMatchObject({ id: 'b', ride: null })
   })
 
   it('배 두 명: 둘째는 같이 타서 배를 따라가고, 젓던 사람이 내리면 이어서 저음', () => {
@@ -168,7 +184,7 @@ describe('낚시터 심판', () => {
     const s = setup(['c', 'd', 'e', 'f'])
     for (const id of ids) s.ref.input(id, { t: 'hi' })
     const activeN = () => (s.last('boats')?.l ?? s.last('init')!.boats).filter((b) => b[5] === 1).length
-    expect(activeN()).toBe(BOATS.length)
+    expect(activeN()).toBe(BOATS.length + KAYAKS.length)
     // 바다 배 3척에 두 명씩
     const spots: [number, number, number][] = [[8.2, -14, 0], [6.2, -11, 1], [-31.2, -22, 2]]
     spots.forEach(([x, z, i], k) => {
@@ -180,7 +196,7 @@ describe('낚시터 심판', () => {
     })
     expect(s.last('boats')!.l.slice(0, 3).every((b) => b[3] && b[4])).toBe(true)
     s.tick(11_000)
-    expect(activeN()).toBe(BOATS.length + 1)
+    expect(activeN()).toBe(BOATS.length + KAYAKS.length + 1)
   })
 
   it('앉을 자리: 가까이에서 앉고, 다른 사람은 못 앉고, 일어나면 서는 곳으로', () => {

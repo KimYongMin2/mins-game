@@ -125,3 +125,10 @@ describe('곤충 채집 자리', () => {
     expect(bugSpot(0, 9, 0)).toBeNull()
   })
 })
+
+describe('카약', () => {
+  it('놓인 자리는 그 물 위', async () => {
+    const { KAYAKS, boatable } = await import('./map')
+    for (const k of KAYAKS) expect(boatable(k.x, k.z, k.zone), `${k.x},${k.z}`).toBe(true)
+  })
+})

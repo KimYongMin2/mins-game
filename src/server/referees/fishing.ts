@@ -2,7 +2,7 @@ import type { Referee, RefereeContext, RefereeFactory } from '../hub'
 import { type Catch, fishById, isBig, rollBugCatch, rollCatch } from '../../games/fishing/play/fish'
 import { isBugId, isNightHour } from '../../games/fishing/play/bugs'
 import { gameHour } from '../../games/fishing/game/clock'
-import { BEDS, BOAT_SLOTS, BOAT_REACH, CRATES, CRATE_HP, CRATE_RESPAWN_MS, BOAT_SPEED, BOUNDS, BUILD_MS, CASTLES, LADDERS, SEATS, nearCastle, nearSeat, RUN_SPEED, SPAWN, boatable, bugSpot, castTarget, landingSpot, nearBed, nearLadder, onLadderTop, walkable } from '../../games/fishing/play/map'
+import { BEDS, BOAT_SLOTS, BOAT_REACH, CRATES, CRATE_HP, CRATE_RESPAWN_MS, boatSpeed, BOUNDS, BUILD_MS, CASTLES, LADDERS, SEATS, nearCastle, nearSeat, RUN_SPEED, SPAWN, boatable, bugSpot, castTarget, landingSpot, nearBed, nearLadder, onLadderTop, walkable } from '../../games/fishing/play/map'
 import {
   BITE_MAX_MS,
   BITE_MIN_MS,
@@ -134,7 +134,7 @@ export function fishingReferee(_setup: unknown, ctx: RefereeContext): Referee {
     let { x, z } = m
     // 너무 빠르면 갈 수 있는 만큼만, 물·맵 밖이면 그대로
     const far = Math.hypot(x - p.x, z - p.z)
-    const allow = (p.ride !== null ? BOAT_SPEED : RUN_SPEED) * dt * 1.6 + 0.6
+    const allow = (p.ride !== null ? boatSpeed(p.ride) : RUN_SPEED) * dt * 1.6 + 0.6
     if (far > allow) {
       x = p.x + ((x - p.x) / far) * allow
       z = p.z + ((z - p.z) / far) * allow
@@ -259,8 +259,8 @@ export function fishingReferee(_setup: unknown, ctx: RefereeContext): Referee {
   function board(p: P, i: unknown) {
     if (typeof i !== 'number' || !Number.isInteger(i) || !boats[i]) return
     const b = boats[i]
-    // 비었으면 젓는 사람, 한 명 타 있으면 같이 탐
-    if (!b.active || p.ride !== null || p.up !== null || p.seat !== null || (b.rider && b.passenger) || Math.hypot(b.x - p.x, b.z - p.z) > BOAT_REACH + 0.5) return bad(p)
+    // 비었으면 젓는 사람, 한 명 타 있으면 같이 탐 (카약은 한 명만)
+    if (!b.active || (BOAT_SLOTS[i].kayak && b.rider) || p.ride !== null || p.up !== null || p.seat !== null || (b.rider && b.passenger) || Math.hypot(b.x - p.x, b.z - p.z) > BOAT_REACH + 0.5) return bad(p)
     stopFishing(p)
     p.bed = null
     p.act = null
@@ -578,7 +578,7 @@ export function fishingReferee(_setup: unknown, ctx: RefereeContext): Referee {
           }
         })
         // 바다에 탈 수 있는 배(자리가 남은 배)가 없으면 한 척 더
-        const sea = boats.filter((b, i) => b.active && BOAT_SLOTS[i].zone === 'sea')
+        const sea = boats.filter((b, i) => b.active && BOAT_SLOTS[i].zone === 'sea' && !BOAT_SLOTS[i].kayak)
         const free = sea.filter((b) => !b.rider || !b.passenger)
         if (free.length === 0) {
           const i = boats.findIndex((b, k) => !b.active && BOAT_SLOTS[k].extra)

@@ -4,7 +4,7 @@ import { REFEREE_FROM } from '../../../shared/online/hubProtocol'
 import { encodeLook } from '../../../shared/art3d/animalKinds'
 import { loadLook } from '../../../shared/storage/avatar'
 import { type Catch, fishById, isBig } from '../play/fish'
-import { bugSpot, castTarget, nearBed, moveBy, RUN_SPEED, SEATS, nearSeat, WALK_SPEED, BEDS, BOAT_SLOTS, BOAT_REACH, BOAT_SPEED, CASTLES, CRATES, LADDERS, nearCastle, landingSpot, moveBoat, nearLadder, onLadderTop } from '../play/map'
+import { bugSpot, castTarget, nearBed, moveBy, RUN_SPEED, SEATS, nearSeat, WALK_SPEED, BEDS, BOAT_SLOTS, BOAT_REACH, boatSpeed, CASTLES, CRATES, LADDERS, nearCastle, landingSpot, moveBoat, nearLadder, onLadderTop } from '../play/map'
 import {
   type Act,
   type BagItem,
@@ -95,7 +95,7 @@ export type ChatLine = { key: number; name: string; text: string; mine: boolean 
 /** 낚시 버튼 (T): 던지기 · 거두기 · 잡기, 못 하면 null (폰은 그때 버튼이 안 보임) */
 export type FishAct = 'cast' | 'net' | 'reelIn' | 'reel' | null
 /** 작은 버튼 (E): 배 타기·내리기, 사다리 오르기·내려가기 */
-export type Alt = 'board' | 'unboard' | 'climb' | 'down' | 'noLand' | 'build' | 'bed' | 'sit' | 'lieBed' | 'stand' | null
+export type Alt = 'board' | 'kayak' | 'unboard' | 'climb' | 'down' | 'noLand' | 'build' | 'bed' | 'sit' | 'lieBed' | 'stand' | null
 
 const SEND_MS = 125
 
@@ -441,7 +441,7 @@ export function useFishingRoom(nickname: string, active: boolean) {
       // 빠르기: 걷기는 바로 붙고 바로 멈춤, 배는 부드럽게
       // 달리기: PC는 Shift, 폰은 조이스틱을 끝까지 밀면
       const running = world.input.run || (!world.input.kb && mag > 0.92)
-      const top = me.ride !== null ? BOAT_SPEED : running ? RUN_SPEED : WALK_SPEED
+      const top = me.ride !== null ? boatSpeed(me.ride) : running ? RUN_SPEED : WALK_SPEED
       const want = mag > 0.15 ? top * mag : 0
       const n = Math.hypot(ix, iy) || 1
       const tvx = mag > 0.15 ? (ix / n) * want : 0, tvz = mag > 0.15 ? (iy / n) * want : 0
@@ -580,6 +580,7 @@ export function useFishingRoom(nickname: string, active: boolean) {
       case 'lieBed':
         return send({ t: 'seat', i: freeSeat(world, me)! })
       case 'board':
+      case 'kayak':
         playSound('board')
         return send({ t: 'board', i: freeBoat(world, me)! })
     }
@@ -635,7 +636,7 @@ function freeBoat(world: World, me: Shown): number | null {
   let bestD = BOAT_REACH
   world.boats.forEach((b, i) => {
     const d = Math.hypot(b.x - me.x, b.z - me.z)
-    if (b.active && (!b.rider || !b.passenger) && d < bestD) {
+    if (b.active && (!b.rider || (!b.passenger && !BOAT_SLOTS[i].kayak)) && d < bestD) {
       bestD = d
       best = i
     }
@@ -676,7 +677,8 @@ function altFor(world: World, me: Shown): Alt {
   if (freeBed(world, me) !== null) return 'bed'
   const si = freeSeat(world, me)
   if (si !== null) return SEATS[si].kind === 'lie' ? 'lieBed' : 'sit'
-  if (freeBoat(world, me) !== null) return 'board'
+  const bi = freeBoat(world, me)
+  if (bi !== null) return BOAT_SLOTS[bi].kayak ? 'kayak' : 'board'
   return null
 }
 export const iroName = (c: Catch) => (c.iro ? `${{ silver: '은빛', sakura: '벚꽃', gold: '금빛', neon: '형광', obsidian: '흑요석', ghost: '유령', rainbow: '무지개' }[c.iro]} ` : '')

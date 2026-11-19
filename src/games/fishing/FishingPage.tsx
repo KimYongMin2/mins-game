@@ -21,7 +21,7 @@ const Scene3D = lazy(() => import('./game/Scene3D').then((m) => ({ default: m.Sc
 
 // 조작 (사용자 요청 2026-11-19): PC — 걷기 WASD·방향키 · 달리기 Shift · 앉기 Ctrl · 점프 Space · 뿅망치 F · 상호작용 R · 낚시 T
 // 폰 — 왼쪽 아래 조이스틱(끝까지 밀면 달리기), 오른쪽 점프·뿅, 상호작용·낚시 버튼은 할 수 있을 때만 뜸
-const ALT_LABEL: Record<NonNullable<Alt>, string> = { board: '배 타기', unboard: '내리기', noLand: '내리기', climb: '올라가기', down: '내려가기', build: '모래성 쌓기', bed: '눕기', lieBed: '눕기', sit: '앉기', stand: '일어나기' }
+const ALT_LABEL: Record<NonNullable<Alt>, string> = { board: '배 타기', kayak: '카약 타기', unboard: '내리기', noLand: '내리기', climb: '올라가기', down: '내려가기', build: '모래성 쌓기', bed: '눕기', lieBed: '눕기', sit: '앉기', stand: '일어나기' }
 const FISH_LABEL: Record<NonNullable<FishAct>, string> = { cast: '낚시', net: '채집', reelIn: '거두기', reel: '잡기!' }
 
 const isTouch = () => typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches

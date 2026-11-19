@@ -13803,13 +13803,63 @@ const EXTRA_BOATS = [
 	}
 ];
 /** 배 자리 전체 (앞 5척은 늘 있음, 뒤는 필요할 때만) */
-const BOAT_SLOTS = [...BOATS.map((b) => ({
-	...b,
-	extra: false
-})), ...EXTRA_BOATS.map((b) => ({
-	...b,
-	extra: true
-}))];
+/** 1인용 카약 (사용자 요청 2026-11-19 — 배 말고 혼자 타는 것): 바다 3 · 호수 2, 빠르고 한 명만 */
+const KAYAKS = [
+	{
+		x: -8,
+		z: -13,
+		r: .3,
+		zone: "sea",
+		color: "#ff8a2a"
+	},
+	{
+		x: -14,
+		z: -13,
+		r: -.2,
+		zone: "sea",
+		color: "#ffd23f"
+	},
+	{
+		x: -70,
+		z: -12.5,
+		r: .1,
+		zone: "sea",
+		color: "#e8473f"
+	},
+	{
+		x: 50,
+		z: 17,
+		r: .8,
+		zone: "fresh",
+		color: "#2fb07a"
+	},
+	{
+		x: 52,
+		z: 28,
+		r: -.6,
+		zone: "fresh",
+		color: "#3f8fd0"
+	}
+];
+/** 배 자리 전체 (앞 5척은 늘 있음, 그다음 3척은 필요할 때만, 맨 뒤는 카약) — 번호는 이 순서 그대로 */
+const BOAT_SLOTS = [
+	...BOATS.map((b) => ({
+		...b,
+		extra: false
+	})),
+	...EXTRA_BOATS.map((b) => ({
+		...b,
+		extra: true
+	})),
+	...KAYAKS.map((b) => ({
+		...b,
+		extra: false,
+		kayak: true
+	}))
+];
+const KAYAK_SPEED = 8.5;
+/** 이 배의 빠르기 */
+const boatSpeed = (i) => BOAT_SLOTS[i]?.kayak ? KAYAK_SPEED : 7;
 /** 배가 갈 수 있는 곳: 그 물(바다·민물) 위, 배 둘레(0.9m)도 물, 판자·방파제 밑이 아님 */
 function boatable(x, z, zone) {
 	if (x < BOUNDS.minX || x > BOUNDS.maxX || z < BOUNDS.minZ || z > BOUNDS.maxZ) return false;
@@ -14265,7 +14315,7 @@ function fishingReferee(_setup, ctx) {
 		p.lastMv = now;
 		let { x, z } = m;
 		const far = Math.hypot(x - p.x, z - p.z);
-		const allow = (p.ride !== null ? 7 : RUN_SPEED) * dt * 1.6 + .6;
+		const allow = (p.ride !== null ? boatSpeed(p.ride) : RUN_SPEED) * dt * 1.6 + .6;
 		if (far > allow) {
 			x = p.x + (x - p.x) / far * allow;
 			z = p.z + (z - p.z) / far * allow;
@@ -14434,7 +14484,7 @@ function fishingReferee(_setup, ctx) {
 	function board(p, i) {
 		if (typeof i !== "number" || !Number.isInteger(i) || !boats[i]) return;
 		const b = boats[i];
-		if (!b.active || p.ride !== null || p.up !== null || p.seat !== null || b.rider && b.passenger || Math.hypot(b.x - p.x, b.z - p.z) > 3.3) return bad(p);
+		if (!b.active || BOAT_SLOTS[i].kayak && b.rider || p.ride !== null || p.up !== null || p.seat !== null || b.rider && b.passenger || Math.hypot(b.x - p.x, b.z - p.z) > 3.3) return bad(p);
 		stopFishing(p);
 		p.bed = null;
 		p.act = null;
@@ -14820,7 +14870,7 @@ function fishingReferee(_setup, ctx) {
 						moved = true;
 					}
 				});
-				const sea = boats.filter((b, i) => b.active && BOAT_SLOTS[i].zone === "sea");
+				const sea = boats.filter((b, i) => b.active && BOAT_SLOTS[i].zone === "sea" && !BOAT_SLOTS[i].kayak);
 				if (sea.filter((b) => !b.rider || !b.passenger).length === 0) {
 					const i = boats.findIndex((b, k) => !b.active && BOAT_SLOTS[k].extra);
 					if (i >= 0) {

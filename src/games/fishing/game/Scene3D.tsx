@@ -5,7 +5,7 @@ import { type AnimalRig, ANIMALS, RECLINE, makeAnimal, plainLook } from '../../.
 import { decodeLook } from '../../../shared/art3d/animalKinds'
 import { BEDS, BOAT_SLOTS, BOUNDS, BUILD_MS, CASTLES, CRATES, SEATS, LADDERS, bugHeightAt, groundY, houseAt } from '../play/map'
 import { buildWorld, makeBoat } from './worldArt'
-import { kit, makeSandRuin, makeSandcastle } from './props3d'
+import { kit, makeKayak, makeSandRuin, makeSandcastle } from './props3d'
 import { WEATHER_NAME, gameHour, hourLabel, weatherNow } from './clock'
 import { fishImageUrl } from '../field/fishArt'
 import { type Catch, fishById, IRO } from '../play/fish'
@@ -179,7 +179,7 @@ export function Scene3D({ world, step, onTapPlayer }: { world: World; step: (dt:
     })
     // 탈 수 있는 배 (탄 사람이 있으면 그 사람 자리)
     const boatObjs = BOAT_SLOTS.map((b) => {
-      const g = makeBoat(b.color)
+      const g = b.kayak ? makeKayak(b.color) : makeBoat(b.color)
       scene.add(g)
       return g
     })
@@ -488,6 +488,11 @@ export function Scene3D({ world, step, onTapPlayer }: { world: World; step: (dt:
           } else {
             root.position.set(p.sx, BOAT_Y + (ud.seatY ?? 0.49) - 0.5 * SCALE + Math.sin(t * 1.3 + p.sx) * 0.05, p.sz)
             root.rotation.set(0, p.sr, 0)
+            // 카약: 두 손을 앞으로 뻗어 노를 쥠
+            if ((bo?.userData as { kayak?: boolean } | undefined)?.kayak && pose !== 'fish' && pose !== 'hold') {
+              a.rig.armL.rotation.set(-1.25, 0, -0.35)
+              a.rig.armR.rotation.set(-1.25, 0, 0.35)
+            }
           }
         } else {
           const gy = p.up !== null ? LADDERS[p.up].y : groundY(p.sx, p.sz)
@@ -537,8 +542,16 @@ export function Scene3D({ world, step, onTapPlayer }: { world: World; step: (dt:
         for (const o of a.rodParts) o.visible = !netOn
         for (const o of a.netParts) o.visible = netOn
         let rodX = 0.95
-        if (netOn && p.fishing === 'bite') rodX = 1.45 + Math.sin(t * 22) * 0.1
-        else if (netOn && p.fishing === 'cast') rodX = castK < 0.2 ? 0.95 - (castK / 0.2) * 1.1 : castK < 0.45 ? -0.15 + ((castK - 0.2) / 0.25) * 1.75 : 1.6 - Math.min(1, (castK - 0.45) / 0.4) * 0.2 + Math.sin(t * 2.2) * 0.04
+        // 잠자리채는 낚싯대와 다르게 '아래에서 위로' 휘두름 (사용자 요청 2026-11-19): 0 = 머리 위로 똑바로, 1.6 = 앞으로 수평, 2 = 앞쪽 아래
+        const bugTarget = p.bob ?? a.lastBob
+        const aimX = bugTarget && bugHeightAt(bugTarget[0], bugTarget[1]) > 1 ? 1.15 : 1.75
+        const ease = (k: number) => (1 - Math.cos(Math.min(1, Math.max(0, k)) * Math.PI)) / 2
+        if (netOn && p.fishing === 'bite') rodX = aimX - 0.25 - Math.abs(Math.sin(t * 9)) * 0.55
+        else if (netOn && p.fishing === 'cast') {
+          // 앞쪽 아래로 내렸다가(0~0.18초) → 위로 휙 쓸어 올리고(~0.45초) → 곤충 쪽으로 천천히 내려 겨눔
+          rodX = castK < 0.18 ? 0.95 + ease(castK / 0.18) * 1.15 : castK < 0.45 ? 2.1 - ease((castK - 0.18) / 0.27) * 2.0 : 0.1 + ease((castK - 0.45) / 0.5) * (aimX - 0.1) + Math.sin(t * 2.2) * 0.05
+        } else if (netOn && caught) rodX = aimX - ease((now - p.popup!.start) / 220) * (aimX + 0.2)
+        else if (netOn && reelK < 0.5) rodX = 0.95 - Math.sin((reelK / 0.5) * Math.PI) * 0.9
         else if (p.fishing === 'bite') rodX = 1.22 + Math.sin(t * 26) * 0.12
         else if (p.fishing === 'cast') rodX = castAngle(castK)
         else if (caught) rodX = 0.95 - Math.min(1, (now - p.popup!.start) / 160) * 1.1
@@ -689,6 +702,19 @@ export function Scene3D({ world, step, onTapPlayer }: { world: World; step: (dt:
         const x = rider ? rider.sx : b.x, z = rider ? rider.sz : b.z, r = rider ? rider.sr : b.r
         g.position.set(x, BOAT_Y + Math.sin(t * 1.3 + x) * 0.05, z)
         g.rotation.set(Math.sin(t * 0.9 + z) * 0.03, r + Math.PI, Math.sin(t * 1.1 + x) * 0.04)
+        // 카약 노: 탄 사람이 움직이면 좌우로 번갈아 젓고, 멈추면 가슴 앞에 가로로, 아무도 없으면 갑판 위에 눕혀 둠
+        const paddle = g.userData.paddle as THREE.Group | undefined
+        if (paddle) {
+          if (rider) {
+            const rowing = rider.speed > 0.4
+            const ph = t * 4.2
+            paddle.position.set(0, 0.78, 0.05)
+            paddle.rotation.set(0, rowing ? Math.cos(ph) * 0.45 : 0, rowing ? Math.sin(ph) * 0.55 : 0)
+          } else {
+            paddle.position.set(0.05, 0.4, 0.1)
+            paddle.rotation.set(0, Math.PI / 2 - 0.15, 0)
+          }
+        }
       })
 
       // 카메라: 3인칭은 나를 부드럽게 따라가며 내가 돌린 방향·높이에서, 1인칭은 내 눈 자리에서 (저절로 흔들거나 돌지 않음)
