@@ -143,7 +143,7 @@ export function useFishingRoom(nickname: string, active: boolean) {
   const [fishAct, setFishAct] = useState<FishAct>(null)
   const [alt, setAlt] = useState<Alt>(null)
   const roomRef = useRef<Room<ClientMsg> | null>(null)
-  const world = useRef<World>({ me: '', players: new Map(), input: { x: 0, y: 0, run: false }, cam: { yaw: 0, pitch: 0.82, dist: 11, first: false, spin: 0 }, vel: { x: 0, z: 0 }, boats: BOAT_SLOTS.map((b) => ({ x: b.x, z: b.z, r: b.r, rider: null, passenger: null, active: !b.extra })), crates: CRATES.map(() => ({ hp: 3, max: 3, hitAt: 0 })), castles: CASTLES.map(() => ({ built: true, builder: null, buildEnd: 0, hitAt: 0 })) }).current
+  const world = useRef<World>({ me: '', players: new Map(), input: { x: 0, y: 0, run: false }, cam: { yaw: 0, pitch: 0.82, dist: 14, first: false, spin: 0 }, vel: { x: 0, z: 0 }, boats: BOAT_SLOTS.map((b) => ({ x: b.x, z: b.z, r: b.r, rider: null, passenger: null, active: !b.extra })), crates: CRATES.map(() => ({ hp: 3, max: 3, hitAt: 0 })), castles: CASTLES.map(() => ({ built: true, builder: null, buildEnd: 0, hitAt: 0 })) }).current
   const keySeq = useRef(0)
   // 개발 모드에서만: 브라우저 시험이 상태를 볼 수 있게
   if (import.meta.env.DEV) (window as unknown as { __fishWorld?: World }).__fishWorld = world
@@ -438,14 +438,15 @@ export function useFishingRoom(nickname: string, active: boolean) {
       }
       // 1인칭: 몸은 늘 보는 쪽을 향함 (던지는 방향 = 보는 방향)
       if (cam.first && me.bed === null) me.r = me.sr = cam.yaw + Math.PI
-      // 빠르기는 부드럽게 붙었다 줄어듦 (확 출발·확 멈춤이 어지러워서)
+      // 빠르기: 걷기는 바로 붙고 바로 멈춤, 배는 부드럽게
       // 달리기: PC는 Shift, 폰은 조이스틱을 끝까지 밀면
       const running = world.input.run || (!world.input.kb && mag > 0.92)
       const top = me.ride !== null ? BOAT_SPEED : running ? RUN_SPEED : WALK_SPEED
       const want = mag > 0.15 ? top * mag : 0
       const n = Math.hypot(ix, iy) || 1
       const tvx = mag > 0.15 ? (ix / n) * want : 0, tvz = mag > 0.15 ? (iy / n) * want : 0
-      const acc = 1 - Math.exp(-dt * (mag > 0.15 ? (me.ride !== null ? 3 : 10) : me.ride !== null ? 1.5 : 14))
+      // 걷기는 바로 서고 바로 출발 (늦게 붙고 미끄러지면 눈과 몸 느낌이 어긋나 멀미가 남 — 사용자 요청 2026-11-19), 배만 출렁 밀림
+      const acc = me.ride !== null ? 1 - Math.exp(-dt * (mag > 0.15 ? 3 : 1.5)) : 1
       const vel = world.vel
       vel.x += (tvx - vel.x) * acc
       vel.z += (tvz - vel.z) * acc

@@ -8,7 +8,9 @@ import { CHAT_MAX, FISHING_CAPACITY } from './play/protocol'
 import { IRO_FILTERS, SHADOW_FILTER, fishSvg } from './field/fishArt'
 import { type Alt, CAM_LIMITS, type FishAct, iroName, useFishingRoom } from './game/useFishingRoom'
 import { Joystick } from './game/Joystick'
-import { BragSheet, DexSheet, MyTankSheet, OtherTankSheet } from './screens/Sheets'
+import { BragSheet, DexSheet, MyTankSheet, OtherTankSheet, Sheet } from './screens/Sheets'
+import { ViewSettings } from '../../shared/ui/ViewSettings'
+import { onViewChange, viewDot } from '../../shared/storage/view3d'
 import './fishing.css'
 
 // 낚시터 (사용자 요청 2026-11-17): 바닷가 하나에 최대 16명, 조이스틱으로 걸어 다니며 물가나 썬베드에서 낚시.
@@ -40,7 +42,10 @@ export function FishingPage() {
   const nickname = loadNickname() ?? '나'
   const [entered, setEntered] = useState(false)
   const room = useFishingRoom(nickname, entered)
-  const [sheet, setSheet] = useState<'dex' | 'tank' | 'brag' | null>(null)
+  const [sheet, setSheet] = useState<'dex' | 'tank' | 'brag' | 'view' | null>(null)
+  // 화면 가운데 점 (멀미 줄이기 — 눈이 기준을 잡게, 사용자 요청 2026-11-19)
+  const [dot, setDot] = useState(viewDot)
+  useEffect(() => onViewChange(() => setDot(viewDot())), [])
   const [portrait, setPortrait] = useState(() => isTouch() && isPortrait())
   const [text, setText] = useState('')
   const [firstPerson, setFirstPerson] = useState(false)
@@ -225,6 +230,9 @@ export function FishingPage() {
         <button type="button" className="fs-key" onClick={toggleView} title="시점 바꾸기 (V) · 화면을 끌면 돌리기 · Q·E 좌우 · 휠 확대">
           {firstPerson ? '1인칭' : '3인칭'}
         </button>
+        <button type="button" className="fs-key" onClick={() => setSheet('view')} title="시야각·가운데 점 (멀미 줄이기)">
+          시야
+        </button>
         <button type="button" className="fs-key" onClick={() => setSheet('dex')}>
           도감 {myDex}/{DEX_FISH.length + DEX_BUGS.length}
         </button>
@@ -376,6 +384,14 @@ export function FishingPage() {
       )}
 
       {sheet === 'dex' && <DexSheet profile={room.profile} onClose={closeSheet} />}
+      {sheet === 'view' && (
+        <Sheet title="시야" sub="멀미가 나면 시야각을 넓히고 가운데 점을 켜 보세요" onClose={closeSheet}>
+          <div className="fs-view">
+            <ViewSettings />
+          </div>
+        </Sheet>
+      )}
+      {dot && room.status === 'ready' && <span className="fs-dot" aria-hidden="true" />}
       {sheet === 'tank' && (
         <MyTankSheet
           profile={room.profile}

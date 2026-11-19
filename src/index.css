@@ -1095,6 +1095,11 @@ html:has(.arcade) body {
   font-weight: 700;
 }
 
+/* 3D 시야각 막대 (내 정보 창·낚시터) */
+.view-pick { flex-wrap: wrap; }
+.view-pick input[type='range'] { flex: 1; min-width: 140px; accent-color: var(--brand, #ffd23f); }
+.view-pick small { width: 100%; font-size: 0.75rem; opacity: 0.75; }
+
 /* 사람 점 인원 표기 */
 .dots {
   display: inline-flex;

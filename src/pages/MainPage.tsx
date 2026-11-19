@@ -7,6 +7,7 @@ import { readLocal, writeLocal } from '../shared/storage/local'
 import { loadRecent, pushRecent } from '../shared/storage/recent'
 import { type Theme, loadTheme, saveTheme } from '../shared/storage/theme'
 import { saveScreenShake, screenShakeOn } from '../shared/storage/motion'
+import { ViewSettings } from '../shared/ui/ViewSettings'
 import { AvatarEditor } from '../shared/ui/AvatarPicker'
 import { markFromHome } from '../shared/ui/HomeLink'
 import { AvatarFace } from '../shared/ui/AvatarFace'
@@ -413,6 +414,7 @@ export function MainPage({ nickname }: { nickname: string }) {
                 </div>
                 <ThemePicker />
                 <ShakePicker />
+                <ViewSettings />
                 <MyStats />
                 <h3 className="game-sheet__label">캐릭터 꾸미기</h3>
                 <AvatarEditor onChange={setLook} onDone={() => setSheet(null)} />

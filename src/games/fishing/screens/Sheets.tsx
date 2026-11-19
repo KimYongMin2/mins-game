@@ -6,7 +6,7 @@ import { DEX_BUGS, HABITAT_NAME, TIME_NAME, isBugId } from '../play/bugs'
 
 // 도감 · 내 어항 · 남의 어항 · 자랑하기 창 (낚시터 위에 아래에서 올라옴)
 
-function Sheet({ title, sub, onClose, children }: { title: string; sub?: string; onClose: () => void; children: React.ReactNode }) {
+export function Sheet({ title, sub, onClose, children }: { title: string; sub?: string; onClose: () => void; children: React.ReactNode }) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose()
     window.addEventListener('keydown', onKey)
