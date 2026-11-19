@@ -47,7 +47,22 @@ export type PlayerPub = {
   act: Act
   /** 앉은(누운) 자리 번호 (SEATS — 집 침대·의자·벤치 등) */
   seat: number | null
+  /** 모닥불에서 굽는 중: [먹을 것(0 마시멜로·1 소시지), 알맞게 익는 데 걸리는 ms, 보낸 때까지 구운 ms] */
+  roast?: [0 | 1, number, number]
+  /** 모닥불에서 노래하는 중 */
+  sing?: 1
+  /** 네잎클로버 행운 중 */
+  luck?: 1
+  /** 연을 날리는 중이면 높이 (m) */
+  kite?: number
 }
+/** 굽기 결과 */
+export type RoastGrade = 'raw' | 'golden' | 'burnt'
+/** 알맞게 익는 시간 (서버가 이 사이에서 고름) · 노릇한 범위 (알맞은 때 ± ms) · 이만큼 지나면 탐 */
+export const ROAST_MIN_MS = 5000
+export const ROAST_MAX_MS = 8000
+export const ROAST_GOLD_MS = 900
+export const ROAST_BURN_MS = 2600
 export type Act = 'sit' | 'lie' | null
 /** 배 하나: 자리·방향·젓는 사람(가운데 판)·같이 탄 사람(앞 판) — 두 명까지 (사용자 요청 2026-11-18) */
 export type BoatPub = [number, number, number, string | null, string | null, 0 | 1]
@@ -86,9 +101,21 @@ export type ClientMsg =
   | { t: 'jump' }
   /** 무너진 모래성 다시 쌓기 시작 (움직이면 멈춤) */
   | { t: 'build'; i: number }
+  /** 모닥불: 굽기 시작 · 빼기 (같은 메시지 — 굽는 중이면 뺌) */
+  | { t: 'roast' }
+  /** 모닥불: 노래 켜기·끄기 */
+  | { t: 'sing' }
+  /** 네잎클로버 줍기 */
+  | { t: 'clover'; i: number }
+  /** 연날리기: 높이 (null = 거둠·끊어짐) */
+  | { t: 'kite'; h: number | null }
 
 export type ServerMsg =
-  | { t: 'init'; you: string; players: PlayerPub[]; saving: boolean; boats: BoatPub[]; castles: CastlePub[]; crates: CratePub[] }
+  | { t: 'init'; you: string; players: PlayerPub[]; saving: boolean; boats: BoatPub[]; castles: CastlePub[]; crates: CratePub[]; clovers?: [number, number][] }
+  | { t: 'roasted'; id: string; food: 0 | 1; grade: RoastGrade }
+  /** 네잎클로버 자리 (주우면 다른 곳에 새로) · 누가 주웠는지 */
+  | { t: 'clovers'; l: [number, number][]; by?: string }
+  | { t: 'kite'; id: string; h: number | null }
   | { t: 'crates'; l: CratePub[] }
   | { t: 'castles'; l: CastlePub[] }
   | { t: 'boats'; l: BoatPub[] }

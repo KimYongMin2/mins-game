@@ -4,7 +4,7 @@ import { REFEREE_FROM } from '../../../shared/online/hubProtocol'
 import { encodeLook } from '../../../shared/art3d/animalKinds'
 import { loadLook } from '../../../shared/storage/avatar'
 import { type Catch, fishById, isBig } from '../play/fish'
-import { bugSpot, castTarget, nearBed, moveBy, RUN_SPEED, SEATS, nearSeat, WALK_SPEED, BEDS, BOAT_SLOTS, BOAT_REACH, boatSpeed, CASTLES, CRATES, LADDERS, nearCastle, landingSpot, moveBoat, nearLadder, onLadderTop } from '../play/map'
+import { bugSpot, castTarget, nearBed, moveBy, RUN_SPEED, SEATS, nearSeat, WALK_SPEED, BEDS, BOAT_SLOTS, BOAT_REACH, boatSpeed, CASTLES, CRATES, LADDERS, nearCastle, landingSpot, moveBoat, nearLadder, onLadderTop, CLOVER_REACH, FIRES, KITE_MAX, LUCK_MS, fireOfSeat, kiteOk, onGrass } from '../play/map'
 import {
   type Act,
   type BagItem,
@@ -21,7 +21,7 @@ import {
   fishingRoomCode,
   JUMP_MS,
 } from '../play/protocol'
-import { playSound } from '../sounds'
+import { playSound, strum } from '../sounds'
 
 // 낚시터 방 들어가기 + 서버(심판)와 주고받기. 3D 화면은 world(매 프레임 읽는 바뀌는 상자)를, 버튼·창은 React 상태를 본다.
 // 내 위치는 내 기기가 정하고(조이스틱·키보드) 움직이는 동안 1초 8번 서버로. 다른 사람은 받은 위치로 부드럽게 따라감.
@@ -48,6 +48,8 @@ export type Shown = PlayerPub & {
   hist: { t: number; x: number; z: number; r: number }[]
   /** 지금 움직이는 빠르기 (m/s, 걷기·달리기 그림) */
   speed: number
+  /** 굽기 시작한 때 (내 시계) */
+  roastStart: number
 }
 
 /** 다른 사람은 이만큼 늦게 그림 (서버가 0.1초마다 보내서 그 사이를 이어 그림) */
@@ -85,7 +87,15 @@ export type World = {
   crates: { hp: number; max: number; hitAt: number }[]
   /** 모래성: 서 있는지 · 쌓는 사람 · 다 쌓는 때(내 시계) · 부서진 때(그림 효과) */
   castles: { built: boolean; builder: string | null; buildEnd: number; hitAt: number }[]
+  /** 네잎클로버 자리 (서버가 정함) */
+  clovers: [number, number][]
+  /** 내 행운이 끝나는 때 (내 시계) */
+  luckUntil: number
+  /** 내 연: 날리는 중 · 높이 · 줄 팽팽함(1 넘으면 끊어짐) · 마지막으로 보낸 때 · 이번 접속 최고 높이 */
+  kite: { on: boolean; h: number; tension: number; sent: number; best: number }
 }
+/** 바람이 세게 부는 때 (모두 같은 시각) — 이때 당기면 훨씬 높이 오름 */
+export const gustAt = (t: number) => Math.sin(t * 0.9) + Math.sin(t * 0.37 + 1.3) > 1.1
 
 // 위아래 시야 (사용자 요청 2026-11-19 — 아래에서 올려다보는 게 너무 작았음): 3인칭은 음수면 카메라가 땅에 붙어 올려다봄
 export const CAM_LIMITS = { third: { min: -0.55, max: 1.35 }, first: { min: -1.25, max: 1.2 }, dist: { min: 5, max: 24 } }
@@ -93,9 +103,13 @@ export const CAM_LIMITS = { third: { min: -0.55, max: 1.35 }, first: { min: -1.2
 export type Toast = { key: number; text: string; color: string; c?: Catch }
 export type ChatLine = { key: number; name: string; text: string; mine: boolean }
 /** 낚시 버튼 (T): 던지기 · 거두기 · 잡기, 못 하면 null (폰은 그때 버튼이 안 보임) */
-export type FishAct = 'cast' | 'net' | 'reelIn' | 'reel' | null
+export type FishAct = 'cast' | 'net' | 'reelIn' | 'reel' | 'roast' | 'pull' | 'kitePull' | null
+/** 셋째 버튼 (G): 모닥불 노래 · 연날리기 */
+export type Extra = 'sing' | 'unsing' | 'kite' | 'kiteOff' | null
+/** 화면 위 작은 표시: 행운 남은 초 · 연 높이·최고·바람 */
+export type Hud = { luck: number; kite: number | null; kiteBest: number; gust: boolean; tension: number }
 /** 작은 버튼 (E): 배 타기·내리기, 사다리 오르기·내려가기 */
-export type Alt = 'board' | 'kayak' | 'unboard' | 'climb' | 'down' | 'noLand' | 'build' | 'bed' | 'sit' | 'lieBed' | 'stand' | null
+export type Alt = 'clover' | 'board' | 'kayak' | 'unboard' | 'climb' | 'down' | 'noLand' | 'build' | 'bed' | 'sit' | 'lieBed' | 'stand' | null
 
 const SEND_MS = 125
 
@@ -142,8 +156,10 @@ export function useFishingRoom(nickname: string, active: boolean) {
   const [tankView, setTankView] = useState<{ who: string; name: string; items: BagItem[] } | null>(null)
   const [fishAct, setFishAct] = useState<FishAct>(null)
   const [alt, setAlt] = useState<Alt>(null)
+  const [extra, setExtra] = useState<Extra>(null)
+  const [hud, setHud] = useState<Hud>({ luck: 0, kite: null, kiteBest: 0, gust: false, tension: 0 })
   const roomRef = useRef<Room<ClientMsg> | null>(null)
-  const world = useRef<World>({ me: '', players: new Map(), input: { x: 0, y: 0, run: false }, cam: { yaw: 0, pitch: 0.82, dist: 14, first: false, spin: 0 }, vel: { x: 0, z: 0 }, boats: BOAT_SLOTS.map((b) => ({ x: b.x, z: b.z, r: b.r, rider: null, passenger: null, active: !b.extra })), crates: CRATES.map(() => ({ hp: 3, max: 3, hitAt: 0 })), castles: CASTLES.map(() => ({ built: true, builder: null, buildEnd: 0, hitAt: 0 })) }).current
+  const world = useRef<World>({ me: '', players: new Map(), input: { x: 0, y: 0, run: false }, cam: { yaw: 0, pitch: 0.82, dist: 14, first: false, spin: 0 }, vel: { x: 0, z: 0 }, boats: BOAT_SLOTS.map((b) => ({ x: b.x, z: b.z, r: b.r, rider: null, passenger: null, active: !b.extra })), crates: CRATES.map(() => ({ hp: 3, max: 3, hitAt: 0 })), castles: CASTLES.map(() => ({ built: true, builder: null, buildEnd: 0, hitAt: 0 })), clovers: [], luckUntil: 0, kite: { on: false, h: 0, tension: 0, sent: 0, best: 0 } }).current
   const keySeq = useRef(0)
   // 개발 모드에서만: 브라우저 시험이 상태를 볼 수 있게
   if (import.meta.env.DEV) (window as unknown as { __fishWorld?: World }).__fishWorld = world
@@ -167,7 +183,7 @@ export function useFishingRoom(nickname: string, active: boolean) {
     const upsert = (p: PlayerPub) => {
       const old = world.players.get(p.id)
       if (!old) {
-        world.players.set(p.id, { ...p, sx: p.x, sz: p.z, sr: p.r, walkUntil: 0, bubble: null, popup: null, biteAt: 0, bonkAt: 0, hitAt: 0, jumpAt: 0, climb: null, hist: [{ t: performance.now(), x: p.x, z: p.z, r: p.r }], speed: 0 })
+        world.players.set(p.id, { ...p, sx: p.x, sz: p.z, sr: p.r, walkUntil: 0, bubble: null, popup: null, biteAt: 0, bonkAt: 0, hitAt: 0, jumpAt: 0, climb: null, hist: [{ t: performance.now(), x: p.x, z: p.z, r: p.r }], speed: 0, roastStart: p.roast ? performance.now() - p.roast[2] : 0 })
         return
       }
       const isMe = p.id === world.me
@@ -179,7 +195,9 @@ export function useFishingRoom(nickname: string, active: boolean) {
       // 내 위치는 내 기기가 정함 — 서버와 많이 어긋났거나(물·막힘) 썬베드에 누웠거나 배·사다리가 바뀌었을 때만 맞춤
       const changedSpot = p.ride !== old.ride || p.up !== old.up || p.seat !== old.seat
       const snap = !isMe || p.bed !== null || changedSpot || Math.hypot(p.x - old.x, p.z - old.z) > 1.5
-      Object.assign(old, { name: p.name, avatar: p.avatar, bed: p.bed, fishing: p.fishing, bob: p.bob, net: p.net, ride: p.ride, up: p.up, act: p.act, seat: p.seat })
+      Object.assign(old, { name: p.name, avatar: p.avatar, bed: p.bed, fishing: p.fishing, bob: p.bob, net: p.net, ride: p.ride, up: p.up, act: p.act, seat: p.seat, sing: p.sing, luck: p.luck, kite: p.id === world.me ? old.kite : p.kite })
+      if (!!p.roast !== !!old.roast || (p.roast && old.roast && p.roast[1] !== old.roast[1])) old.roastStart = p.roast ? performance.now() - p.roast[2] : 0
+      old.roast = p.roast
       if (changedSpot) {
         old.sx = old.x = p.x
         old.sz = old.z = p.z
@@ -236,6 +254,7 @@ export function useFishingRoom(nickname: string, active: boolean) {
           setBoats(m.boats)
           if (m.castles) setCastles(m.castles)
           if (m.crates) setCrates(m.crates)
+          if (m.clovers) world.clovers = m.clovers
           setCount(m.players.length)
           setStatus('ready')
           return
@@ -248,6 +267,38 @@ export function useFishingRoom(nickname: string, active: boolean) {
         case 'crates':
           setCrates(m.l)
           return
+        case 'roasted': {
+          // 모닥불 굽기 결과: 머리 위 말풍선, 나면 소리·알림
+          const p = world.players.get(m.id)
+          const food = m.food === 0 ? '마시멜로' : '소시지'
+          const say = m.grade === 'golden' ? `노릇노릇 ${food}!` : m.grade === 'raw' ? '아직 덜 익었어요' : '까맣게 탔어요…'
+          if (p) p.bubble = { text: say, until: now + 2600 }
+          if (m.id === world.me) {
+            playSound(m.grade === 'golden' ? 'roastGood' : 'roastBad')
+            toast(m.grade === 'golden' ? `${food}를 노릇노릇하게 구웠어요! 냠` : m.grade === 'raw' ? `${food}가 아직 덜 익었어요. 조금 더 기다려요` : `${food}가 까맣게 탔어요… 색이 노릇할 때 빼요`, m.grade === 'golden' ? '#ffd23f' : '#c9c4f0')
+          }
+          return
+        }
+        case 'clovers': {
+          world.clovers = m.l
+          if (m.by === world.me) {
+            world.luckUntil = now + LUCK_MS
+            playSound('clover')
+            buzz(60)
+            toast('네잎클로버를 찾았어요! 3분 동안 희귀한 게 조금 더 잘 나와요', '#7dff9a')
+          } else if (m.by) {
+            const p = world.players.get(m.by)
+            if (p) p.bubble = { text: '네잎클로버!', until: now + 2400 }
+          }
+          return
+        }
+        case 'kite': {
+          const p = world.players.get(m.id)
+          if (p) p.kite = m.h ?? undefined
+          // 서버가 거절(날릴 수 없는 곳·배 위 등)하면 내 연도 거둠
+          if (m.id === world.me && m.h === null && world.kite.on) world.kite.on = false
+          return
+        }
         case 'st':
           upsert(m.p)
           setCount(world.players.size)
@@ -395,6 +446,21 @@ export function useFishingRoom(nickname: string, active: boolean) {
       if (!me) return
       const cam = world.cam
       if (cam.spin) cam.yaw += cam.spin * 2.2 * dt
+      // 연: 가만두면 천천히 내려오고 줄은 풀림, 풀밭을 벗어나면 걸려서 끝 (높이는 1초 4번쯤 서버로)
+      const kt = world.kite
+      if (kt.on) {
+        kt.h = Math.max(0, kt.h - dt * (0.6 + kt.h * 0.018))
+        kt.tension = Math.max(0, kt.tension - dt * 0.7)
+        me.kite = Math.round(kt.h * 10) / 10
+        if (!onGrass(me.x, me.z) || me.ride !== null || me.seat !== null || me.bed !== null) {
+          kt.on = false
+          send({ t: 'kite', h: null })
+          toast('연이 걸려서 거뒀어요 (풀밭에서 날려요)', '#c9c4f0')
+        } else if (performance.now() - kt.sent > 260) {
+          kt.sent = performance.now()
+          send({ t: 'kite', h: Math.round(kt.h * 10) / 10 })
+        }
+      }
       // 화면 기준 입력을 보고 있는 쪽 기준으로 돌림 (위로 밀면 보는 쪽으로 걸음)
       const sx = world.input.x, sy = world.input.y
       const c = Math.cos(cam.yaw), s = Math.sin(cam.yaw)
@@ -517,16 +583,89 @@ export function useFishingRoom(nickname: string, active: boolean) {
         setFishAct(null)
         return setAlt(null)
       }
-      setFishAct(me.fishing === 'bite' ? 'reel' : me.fishing === 'cast' ? 'reelIn' : canFish(me) ? 'cast' : canBug(me) ? 'net' : null)
+      const atFire = fireOfSeat(me.seat) !== null
+      setFishAct(world.kite.on ? 'kitePull' : atFire ? (me.roast ? 'pull' : 'roast') : me.fishing === 'bite' ? 'reel' : me.fishing === 'cast' ? 'reelIn' : canFish(me) ? 'cast' : canBug(me) ? 'net' : null)
       setAlt(altFor(world, me))
+      setExtra(atFire ? (me.sing ? 'unsing' : 'sing') : world.kite.on ? 'kiteOff' : me.fishing === 'none' && kiteOk(me.x, me.z) && me.ride === null && me.seat === null && me.bed === null && me.act === null ? 'kite' : null)
+      const nowMs = performance.now()
+      setHud((h) => {
+        const n: Hud = { luck: Math.max(0, Math.ceil((world.luckUntil - nowMs) / 1000)), kite: world.kite.on ? Math.round(world.kite.h) : null, kiteBest: Math.round(world.kite.best), gust: world.kite.on && gustAt(nowMs / 1000), tension: Math.round(world.kite.tension * 10) / 10 }
+        return n.luck === h.luck && n.kite === h.kite && n.kiteBest === h.kiteBest && n.gust === h.gust && n.tension === h.tension ? h : n
+      })
     }, 150)
     return () => clearInterval(t)
   }, [status, world])
 
-  /** 낚시 (T): 잡기 · 거두기 · 던지기 (물 쪽으로 돌아서) */
+  // 모닥불 기타: 누가 노래하면 가까운 사람에게 0.6초마다 화음 (멀수록·노래하는 사람이 적을수록 작게)
+  useEffect(() => {
+    if (status !== 'ready') return
+    let beat = 0
+    const t = setInterval(() => {
+      const me = world.players.get(world.me)
+      if (!me) return
+      const crowd = fireCrowd(world)
+      let loud = 0
+      FIRES.forEach((f, i) => {
+        if (!crowd[i].singing) return
+        const d = Math.hypot(f.x - me.sx, f.z - me.sz)
+        if (d < 22) loud = Math.max(loud, (1 - d / 22) * Math.min(1, 0.55 + crowd[i].singing * 0.15))
+      })
+      if (loud > 0.05) strum(Math.floor(beat++ / 2), 0.05 * loud)
+    }, 600)
+    return () => clearInterval(t)
+  }, [status, world])
+
+  /** 연 당기기 (T): 높이 오르고 줄이 팽팽해짐, 바람이 셀 때 당기면 훨씬 높이·덜 팽팽, 너무 자주 당기면 끊어짐 */
+  const pullKite = useCallback(() => {
+    const kt = world.kite
+    if (!kt.on) return
+    const gust = gustAt(performance.now() / 1000)
+    kt.h = Math.min(KITE_MAX, kt.h + (gust ? 4.5 : 2) * (1 - kt.h / (KITE_MAX + 8)))
+    kt.tension += gust ? 0.18 : 0.32
+    playSound('pull')
+    if (kt.tension > 1) {
+      kt.on = false
+      send({ t: 'kite', h: null })
+      playSound('snap')
+      buzz(120)
+      toast(`줄이 끊어졌어요! (${Math.round(kt.h)}m) 너무 자주 당기면 끊어져요 — 바람이 셀 때 당겨요`, '#ff8a7a')
+      return
+    }
+    if (kt.h > kt.best + 0.5 && kt.h >= 20 && Math.floor(kt.h / 10) > Math.floor(kt.best / 10)) toast(`연이 ${Math.floor(kt.h / 10) * 10}m까지 올라갔어요!`, '#5be0f0')
+    kt.best = Math.max(kt.best, kt.h)
+  }, [send, world, toast])
+
+  /** 셋째 버튼 (G): 모닥불 노래 켜기·끄기 · 연날리기 시작·거두기 */
+  const doExtra = useCallback(() => {
+    const me = world.players.get(world.me)
+    if (!me) return
+    if (fireOfSeat(me.seat) !== null) {
+      if (!me.sing) playSound('strum')
+      return send({ t: 'sing' })
+    }
+    const kt = world.kite
+    if (kt.on) {
+      kt.on = false
+      me.kite = undefined
+      return send({ t: 'kite', h: null })
+    }
+    if (!kiteOk(me.x, me.z)) return toast('나무 없는 풀밭에서 연을 날려요', '#c9c4f0')
+    Object.assign(kt, { on: true, h: 4, tension: 0, sent: performance.now() })
+    me.kite = 4
+    world.vel.x = world.vel.z = 0
+    send({ t: 'kite', h: 4 })
+    toast('연을 띄웠어요! 바람이 셀 때 [당기기]', '#5be0f0')
+  }, [send, world, toast])
+
+  /** 낚시 (T): 잡기 · 거두기 · 던지기 (물 쪽으로 돌아서) — 연을 날리면 당기기, 모닥불이면 굽기·빼기 */
   const fish = useCallback(() => {
     const me = world.players.get(world.me)
     if (!me) return
+    if (world.kite.on) return pullKite()
+    if (fireOfSeat(me.seat) !== null) {
+      if (!me.roast) playSound('sizzle')
+      return send({ t: 'roast' })
+    }
     if (me.fishing === 'bite' || me.fishing === 'cast') return send({ t: 'reel' })
     if (me.bed !== null || me.seat !== null) {
       if (!canFish(me)) return
@@ -543,7 +682,7 @@ export function useFishingRoom(nickname: string, active: boolean) {
     lastSent.current = { at: performance.now(), x: me.x, z: me.z, r: t.r }
     playSound('zone' in t && (t.zone === 'forest' || t.zone === 'meadow') ? 'net' : 'cast')
     send({ t: 'cast' })
-  }, [send, world, toast])
+  }, [send, world, toast, pullKite])
 
   /** 상호작용 (R): 지금 할 수 있는 것 하나 (altFor와 같은 순서) */
   const doAlt = useCallback(() => {
@@ -554,6 +693,10 @@ export function useFishingRoom(nickname: string, active: boolean) {
     switch (what) {
       case 'noLand':
         return toast('물가나 부두 가까이 가서 내려요', '#c9c4f0')
+      case 'clover': {
+        const i = nearClover(world, me)
+        return i !== null ? send({ t: 'clover', i }) : undefined
+      }
       case 'unboard':
         playSound('board')
         return send({ t: 'unboard' })
@@ -619,10 +762,31 @@ export function useFishingRoom(nickname: string, active: boolean) {
     send({ t: 'bonk' })
   }, [send, world])
 
-  return { status, error, roomLabel, count, profile, saving, chat, toasts, myCatch, setMyCatch, tankView, setTankView, fishAct, fish, alt, doAlt, setPose, jump, bonk, step, send, world }
+  return { status, error, roomLabel, count, profile, saving, chat, toasts, myCatch, setMyCatch, tankView, setTankView, fishAct, fish, alt, doAlt, extra, doExtra, hud, setPose, jump, bonk, step, send, world }
 }
 
 const round = (v: number) => Math.round(v * 100) / 100
+/** 가까운 네잎클로버 */
+function nearClover(world: World, me: Shown): number | null {
+  let best: number | null = null
+  let bestD = CLOVER_REACH
+  world.clovers.forEach(([x, z], i) => {
+    const d = Math.hypot(x - me.x, z - me.z)
+    if (d < bestD) ((bestD = d), (best = i))
+  })
+  return best
+}
+/** 모닥불마다 앉은 사람 수 · 노래하는 사람 수 (불 크기·기타 소리) */
+export function fireCrowd(world: World): { seated: number; singing: number }[] {
+  const out = FIRES.map(() => ({ seated: 0, singing: 0 }))
+  for (const p of world.players.values()) {
+    const f = fireOfSeat(p.seat)
+    if (f === null || !out[f]) continue
+    out[f].seated++
+    if (p.sing) out[f].singing++
+  }
+  return out
+}
 /** 가까운 빈 썬베드 (다른 사람이 누워 있으면 없음) */
 function freeBed(world: World, me: Shown): number | null {
   const i = nearBed(me.x, me.z)
@@ -671,6 +835,7 @@ function altFor(world: World, me: Shown): Alt {
   if (me.ride !== null) return landingSpot(me.x, me.z) ? 'unboard' : 'noLand'
   if (me.up !== null) return 'down'
   if (me.seat !== null || me.bed !== null) return 'stand'
+  if (nearClover(world, me) !== null) return 'clover'
   if (nearLadder(me.x, me.z) !== null) return 'climb'
   const ci = nearCastle(me.x, me.z)
   if (ci !== null && !world.castles[ci].built && !world.castles[ci].builder) return 'build'

@@ -2,7 +2,7 @@ import type { Referee, RefereeContext, RefereeFactory } from '../hub'
 import { type Catch, fishById, isBig, rollBugCatch, rollCatch } from '../../games/fishing/play/fish'
 import { isBugId, isNightHour } from '../../games/fishing/play/bugs'
 import { gameHour } from '../../games/fishing/game/clock'
-import { BEDS, BOAT_SLOTS, BOAT_REACH, CRATES, CRATE_HP, CRATE_RESPAWN_MS, boatSpeed, BOUNDS, BUILD_MS, CASTLES, LADDERS, SEATS, nearCastle, nearSeat, RUN_SPEED, SPAWN, boatable, bugSpot, castTarget, landingSpot, nearBed, nearLadder, onLadderTop, walkable } from '../../games/fishing/play/map'
+import { BEDS, BOAT_SLOTS, BOAT_REACH, CRATES, CRATE_HP, CRATE_RESPAWN_MS, boatSpeed, BOUNDS, BUILD_MS, CASTLES, LADDERS, SEATS, nearCastle, nearSeat, RUN_SPEED, SPAWN, boatable, bugSpot, castTarget, CLOVER_COUNT, CLOVER_REACH, KITE_MAX, LUCK_MS, fireOfSeat, kiteOk, onGrass, landingSpot, nearBed, nearLadder, onLadderTop, walkable } from '../../games/fishing/play/map'
 import {
   BITE_MAX_MS,
   BITE_MIN_MS,
@@ -19,6 +19,10 @@ import {
   JUMP_MS,
   type ClientMsg,
   type PlayerPub,
+  ROAST_GOLD_MS,
+  ROAST_MAX_MS,
+  ROAST_MIN_MS,
+  type RoastGrade,
   type Profile,
   type ServerMsg,
   TANK_MAX,
@@ -29,7 +33,7 @@ import { loadProfile, markDirty, savingOn, startFlushing } from '../fishingStore
 // 위치는 화면이 보내고 여기서 빠르기·물 검사, 입질 시각·잡힌 물고기·크기·이로치는 여기서만 정함 → 도감·어항에 가짜가 못 들어감.
 // 도감·어항은 계정(uid)별로 Supabase에 (fishingStore). 방장이 없어도 계속 돎(회의방처럼 방장을 넘겨받음).
 
-type P = PlayerPub & { uid: string | null; castAt: number; biteAt: number; biteUntil: number; zone: 'sea' | 'fresh' | 'forest' | 'meadow' | null; lastMv: number; lastChat: number; lastBonk: number; lastJump: number; castX: number; castZ: number }
+type P = PlayerPub & { uid: string | null; castAt: number; biteAt: number; biteUntil: number; zone: 'sea' | 'fresh' | 'forest' | 'meadow' | null; lastMv: number; lastChat: number; lastBonk: number; lastJump: number; castX: number; castZ: number; roastAt: number; roastFood: 0 | 1; roastCook: number; singing: boolean; luckUntil: number; kiteH: number | null; lastKite: number }
 
 /** 가방: 최근 것 + 자랑할 만한 것, 모두 이만큼까지 */
 const BAG_RECENT = 40
@@ -43,7 +47,14 @@ const num = (v: unknown, lo: number, hi: number) => typeof v === 'number' && Num
 const cleanText = (v: unknown) => (typeof v === 'string' ? [...v.replace(/[\u0000-\u001f\u007f]/g, ' ').trim()].slice(0, CHAT_MAX).join('') : '')
 const r2 = (v: number) => Math.round(v * 100) / 100
 
-const pub = (p: P): PlayerPub => ({ id: p.id, name: p.name, ...(p.avatar ? { avatar: p.avatar } : {}), x: p.x, z: p.z, r: p.r, bed: p.bed, fishing: p.fishing, bob: p.bob, ...(p.net ? { net: 1 as const } : {}), ride: p.ride, up: p.up, act: p.act, seat: p.seat })
+let clock = () => Date.now()
+const pub = (p: P): PlayerPub => ({
+  id: p.id, name: p.name, ...(p.avatar ? { avatar: p.avatar } : {}), x: p.x, z: p.z, r: p.r, bed: p.bed, fishing: p.fishing, bob: p.bob, ...(p.net ? { net: 1 as const } : {}), ride: p.ride, up: p.up, act: p.act, seat: p.seat,
+  ...(p.roastAt ? { roast: [p.roastFood, p.roastCook, clock() - p.roastAt] as [0 | 1, number, number] } : {}),
+  ...(p.singing ? { sing: 1 as const } : {}),
+  ...(p.luckUntil > clock() ? { luck: 1 as const } : {}),
+  ...(p.kiteH !== null ? { kite: p.kiteH } : {}),
+})
 /** 아무도 안 탄 배가 이만큼 그대로면 제자리로 */
 const BOAT_HOME_MS = 10 * 60_000
 
@@ -69,6 +80,16 @@ export function addToDex(p: Profile, c: Catch): boolean {
 
 export function fishingReferee(_setup: unknown, ctx: RefereeContext): Referee {
   startFlushing()
+  clock = ctx.now
+  // 네잎클로버: 풀밭 아무 데나 숨어 있다가 누가 주우면 다른 곳에 새로 (사용자 요청 2026-11-19)
+  const cloverSpot = (): [number, number] => {
+    for (let i = 0; i < 400; i++) {
+      const x = -125 + rand() * 250, z = 18 + rand() * 80
+      if (onGrass(x, z) && onGrass(x + 0.5, z) && onGrass(x, z + 0.5)) return [r2(x), r2(z)]
+    }
+    return [0, 30]
+  }
+  const clovers: [number, number][] = Array.from({ length: CLOVER_COUNT }, cloverSpot)
   const players = new Map<string, P>()
   const posDirty = new Set<string>()
   let lastPos = 0
@@ -104,11 +125,11 @@ export function fishingReferee(_setup: unknown, ctx: RefereeContext): Referee {
     if (!p) {
       // 빈자리 근처에서 시작 (겹치지 않게 조금씩 흩뿌림)
       const a = rand() * Math.PI * 2
-      p = { id: key, name: mem.nickname, ...(mem.avatar ? { avatar: mem.avatar } : {}), x: r2(SPAWN.x + Math.cos(a) * 2.5), z: r2(SPAWN.z + Math.sin(a) * 1.5), r: Math.PI, bed: null, fishing: 'none', bob: null, ride: null, up: null, act: null, seat: null, uid: mem.uid ?? null, castAt: 0, biteAt: 0, biteUntil: 0, zone: null, lastMv: ctx.now(), lastChat: 0, lastBonk: 0, lastJump: 0, castX: 0, castZ: 0 }
+      p = { id: key, name: mem.nickname, ...(mem.avatar ? { avatar: mem.avatar } : {}), x: r2(SPAWN.x + Math.cos(a) * 2.5), z: r2(SPAWN.z + Math.sin(a) * 1.5), r: Math.PI, bed: null, fishing: 'none', bob: null, ride: null, up: null, act: null, seat: null, uid: mem.uid ?? null, castAt: 0, biteAt: 0, biteUntil: 0, zone: null, lastMv: ctx.now(), lastChat: 0, lastBonk: 0, lastJump: 0, castX: 0, castZ: 0, roastAt: 0, roastFood: 0, roastCook: 0, singing: false, luckUntil: 0, kiteH: null, lastKite: 0 }
       players.set(key, p)
       all({ t: 'st', p: pub(p) })
     }
-    send(key, { t: 'init', you: key, players: [...players.values()].map(pub), saving: savingOn(), boats: boatsPub(), castles: castlesPub(), crates: cratesPub() })
+    send(key, { t: 'init', you: key, players: [...players.values()].map(pub), saving: savingOn(), boats: boatsPub(), castles: castlesPub(), crates: cratesPub(), clovers })
     if (p.uid) void loadProfile(p.uid).then((profile) => players.has(key) && send(key, { t: 'profile', profile }))
   }
 
@@ -220,7 +241,8 @@ export function fishingReferee(_setup: unknown, ctx: RefereeContext): Referee {
       return all({ t: 'st', p: pub(p) })
     }
     if (p.fishing !== 'bite' || !p.zone) return
-    const c = p.zone === 'forest' || p.zone === 'meadow' ? rollBugCatch(rand, p.zone, isNightHour(gameHour(Date.now()))) : rollCatch(rand, p.zone)
+    const lucky = p.luckUntil > ctx.now()
+    const c = p.zone === 'forest' || p.zone === 'meadow' ? rollBugCatch(rand, p.zone, isNightHour(gameHour(Date.now())), lucky) : rollCatch(rand, p.zone, lucky)
     stopFishing(p)
     const item: BagItem = { k: crypto.randomUUID().slice(0, 12), f: c.fish, i: c.iro, s: c.size, at: Date.now() }
     let best = false
@@ -448,6 +470,57 @@ export function fishingReferee(_setup: unknown, ctx: RefereeContext): Referee {
     allCastles()
   }
 
+  /** 모닥불 굽기: 모닥불 통나무에 앉아 있을 때 시작, 다시 보내면 빼서 익은 정도를 정함 (알맞은 때는 굽는 사람마다 무작위) */
+  function roast(p: P) {
+    if (fireOfSeat(p.seat) === null) return bad(p)
+    const now = ctx.now()
+    if (!p.roastAt) {
+      p.roastAt = now
+      p.roastFood = rand() < 0.5 ? 0 : 1
+      p.roastCook = Math.round(ROAST_MIN_MS + rand() * (ROAST_MAX_MS - ROAST_MIN_MS))
+      return all({ t: 'st', p: pub(p) })
+    }
+    const off = now - p.roastAt - p.roastCook
+    const grade: RoastGrade = off < -ROAST_GOLD_MS ? 'raw' : off <= ROAST_GOLD_MS ? 'golden' : 'burnt'
+    const food = p.roastFood
+    p.roastAt = 0
+    all({ t: 'roasted', id: p.id, food, grade })
+    all({ t: 'st', p: pub(p) })
+  }
+
+  /** 모닥불 노래: 통나무에 앉아 있을 때만 켜고 끔 (앉은 사람·노래하는 사람 수만큼 불이 커지는 건 화면이) */
+  function sing(p: P) {
+    if (fireOfSeat(p.seat) === null && !p.singing) return bad(p)
+    p.singing = !p.singing
+    all({ t: 'st', p: pub(p) })
+  }
+
+  /** 네잎클로버 줍기: 가까이 있을 때만 → 3분 행운, 그 자리엔 다른 곳에 새로 숨김 */
+  function clover(p: P, i: unknown) {
+    if (typeof i !== 'number' || !Number.isInteger(i) || !clovers[i]) return
+    const [x, z] = clovers[i]
+    if (p.ride !== null || Math.hypot(x - p.x, z - p.z) > CLOVER_REACH + 0.6) return
+    clovers[i] = cloverSpot()
+    p.luckUntil = ctx.now() + LUCK_MS
+    all({ t: 'clovers', l: clovers, by: p.id })
+    all({ t: 'st', p: pub(p) })
+  }
+
+  /** 연날리기: 높이는 화면이 정함(장난감이라) — 서버는 날릴 수 있는 곳·범위만 보고 모두에게 넘김 (1초에 4번까지) */
+  function kite(p: P, h: unknown) {
+    const now = ctx.now()
+    if (h === null) {
+      if (p.kiteH === null) return
+      p.kiteH = null
+      return all({ t: 'kite', id: p.id, h: null })
+    }
+    if (!num(h, 0, KITE_MAX) || now - p.lastKite < 220) return
+    if (p.kiteH === null && (p.ride !== null || p.seat !== null || p.bed !== null || !kiteOk(p.x, p.z))) return bad(p)
+    p.lastKite = now
+    p.kiteH = Math.round((h as number) * 10) / 10
+    all({ t: 'kite', id: p.id, h: p.kiteH })
+  }
+
   async function setTank(p: P, keys: unknown) {
     if (!p.uid || !Array.isArray(keys)) return
     const uid = p.uid
@@ -540,11 +613,37 @@ export function fishingReferee(_setup: unknown, ctx: RefereeContext): Referee {
         case 'build':
           build(p, m.i)
           break
+        case 'roast':
+          roast(p)
+          break
+        case 'sing':
+          sing(p)
+          break
+        case 'clover':
+          clover(p, m.i)
+          break
+        case 'kite':
+          kite(p, m.h)
+          break
       }
       return true
     },
     tick(now) {
       for (const p of players.values()) {
+        // 모닥불을 떠나면 굽기·노래 끝, 배·자리에 들면 연도 거둠, 행운이 끝나면 알림
+        if ((p.roastAt || p.singing) && fireOfSeat(p.seat) === null) {
+          p.roastAt = 0
+          p.singing = false
+          all({ t: 'st', p: pub(p) })
+        }
+        if (p.kiteH !== null && (p.ride !== null || p.seat !== null || p.bed !== null || p.up !== null)) {
+          p.kiteH = null
+          all({ t: 'kite', id: p.id, h: null })
+        }
+        if (p.luckUntil && p.luckUntil <= now) {
+          p.luckUntil = 0
+          all({ t: 'st', p: pub(p) })
+        }
         if (p.fishing === 'cast' && now >= p.biteAt) {
           p.fishing = 'bite'
           p.biteUntil = now + BITE_WINDOW_MS

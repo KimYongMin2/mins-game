@@ -113,6 +113,14 @@
 .fs-view .filters__chip--on { background: #ffd23f; color: #1c1748; }
 /* 화면 가운데 고정 점 (멀미 줄이기): 작은 흰 점 + 먹 테두리, 누르기는 통과 */
 .fs-dot { position: absolute; left: 50%; top: 50%; z-index: 2; width: 7px; height: 7px; margin: -3.5px 0 0 -3.5px; border-radius: 50%; background: rgba(255, 255, 255, 0.85); box-shadow: 0 0 0 1.5px rgba(31, 26, 77, 0.7); pointer-events: none; }
+.fs-ctx__btn--extra { background: #c79bff; box-shadow: 0 4px 0 #6f4ab0; }
+/* 행운·연 높이 (위 가운데) */
+.fs-status { position: absolute; z-index: 3; left: 50%; top: calc(54px + env(safe-area-inset-top, 0px)); transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 6px; pointer-events: none; }
+.fs-status > span { padding: 4px 10px; border-radius: 2px; background: rgba(28, 23, 72, 0.85); color: #f4f2ff; font-size: 13px; font-weight: 800; white-space: nowrap; }
+.fs-status__luck { color: #7dff9a !important; border: 2px solid #3f9e5a; }
+.fs-status__kite { position: relative; display: flex; flex-direction: column; align-items: center; gap: 3px; min-width: 170px; }
+.fs-status__kite b { font-size: 12px; color: #ffd23f; }
+.fs-status__tension { display: block; height: 4px; align-self: flex-start; border-radius: 2px; transition: width 0.15s; }
 .fs-dex__tabs { display: flex; gap: 6px; margin-bottom: 10px; }
 .fs-dex__tabs .fs-key[aria-selected="true"] { background: #ffd23f; color: #1c1748; }
 .fs-dex { margin: 0; padding: 0; list-style: none; display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 8px; }

@@ -74,12 +74,17 @@ export const iroById = (id: string | null | undefined) => IRO.find((x) => x.id =
 export type Catch = { fish: string; iro: Iro | null; size: number }
 
 /** 잡힌 것 정하기 (rand = 0~1 난수, 서버 것): 등급 → 그 물가에 사는 그 등급 물고기 중 하나 → 크기 → 이로치 */
-export function rollCatch(rand: () => number, zone: Zone): Catch {
-  const total = Object.values(RARITY).reduce((a, r) => a + r.weight, 0)
+/** 네잎클로버 행운이면 희귀 이상이 조금 더 (희귀 ×1.5 · 영웅 ×1.8 · 전설 ×2) — 사용자 요청 2026-11-19 */
+const LUCK_MUL: Record<Rarity, number> = { common: 1, normal: 1, rare: 1.5, epic: 1.8, legend: 2, junk: 0.6 }
+export const rarityWeights = (lucky = false) => Object.fromEntries(Object.entries(RARITY).map(([k, r]) => [k, r.weight * (lucky ? LUCK_MUL[k as Rarity] : 1)])) as Record<Rarity, number>
+
+export function rollCatch(rand: () => number, zone: Zone, lucky = false): Catch {
+  const W = rarityWeights(lucky)
+  const total = Object.values(W).reduce((a, w) => a + w, 0)
   let pick = rand() * total
   let rarity: Rarity = 'common'
-  for (const [k, r] of Object.entries(RARITY) as [Rarity, (typeof RARITY)[Rarity]][]) {
-    pick -= r.weight
+  for (const k of Object.keys(RARITY) as Rarity[]) {
+    pick -= W[k]
     if (pick < 0) {
       rarity = k
       break
@@ -110,5 +115,4 @@ export function rollCatch(rand: () => number, zone: Zone): Catch {
 export const isBig = (c: Catch) => !!c.iro || ['rare', 'epic', 'legend'].includes(fishById(c.fish)?.rarity ?? '')
 
 /** 잡힌 곤충 정하기 (물고기와 같은 등급 비율·이로치) */
-export const rollBugCatch = (rand: () => number, zone: Habitat, night: boolean): Catch =>
-  rollBug(rand, zone, night, Object.fromEntries(Object.entries(RARITY).map(([k, r]) => [k, r.weight])) as Record<Rarity, number>, IRO)
+export const rollBugCatch = (rand: () => number, zone: Habitat, night: boolean, lucky = false): Catch => rollBug(rand, zone, night, rarityWeights(lucky), IRO)

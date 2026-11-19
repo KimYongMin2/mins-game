@@ -6,7 +6,7 @@ import { DEX_FISH, RARITY, fishById } from './play/fish'
 import { DEX_BUGS } from './play/bugs'
 import { CHAT_MAX, FISHING_CAPACITY } from './play/protocol'
 import { IRO_FILTERS, SHADOW_FILTER, fishSvg } from './field/fishArt'
-import { type Alt, CAM_LIMITS, type FishAct, iroName, useFishingRoom } from './game/useFishingRoom'
+import { type Alt, CAM_LIMITS, type Extra, type FishAct, iroName, useFishingRoom } from './game/useFishingRoom'
 import { Joystick } from './game/Joystick'
 import { BragSheet, DexSheet, MyTankSheet, OtherTankSheet, Sheet } from './screens/Sheets'
 import { ViewSettings } from '../../shared/ui/ViewSettings'
@@ -21,8 +21,9 @@ const Scene3D = lazy(() => import('./game/Scene3D').then((m) => ({ default: m.Sc
 
 // 조작 (사용자 요청 2026-11-19): PC — 걷기 WASD·방향키 · 달리기 Shift · 앉기 Ctrl · 점프 Space · 뿅망치 F · 상호작용 R · 낚시 T
 // 폰 — 왼쪽 아래 조이스틱(끝까지 밀면 달리기), 오른쪽 점프·뿅, 상호작용·낚시 버튼은 할 수 있을 때만 뜸
-const ALT_LABEL: Record<NonNullable<Alt>, string> = { board: '배 타기', kayak: '카약 타기', unboard: '내리기', noLand: '내리기', climb: '올라가기', down: '내려가기', build: '모래성 쌓기', bed: '눕기', lieBed: '눕기', sit: '앉기', stand: '일어나기' }
-const FISH_LABEL: Record<NonNullable<FishAct>, string> = { cast: '낚시', net: '채집', reelIn: '거두기', reel: '잡기!' }
+const ALT_LABEL: Record<NonNullable<Alt>, string> = { clover: '네잎클로버 줍기', board: '배 타기', kayak: '카약 타기', unboard: '내리기', noLand: '내리기', climb: '올라가기', down: '내려가기', build: '모래성 쌓기', bed: '눕기', lieBed: '눕기', sit: '앉기', stand: '일어나기' }
+const EXTRA_LABEL: Record<NonNullable<Extra>, string> = { sing: '노래', unsing: '노래 그만', kite: '연날리기', kiteOff: '연 거두기' }
+const FISH_LABEL: Record<NonNullable<FishAct>, string> = { cast: '낚시', net: '채집', reelIn: '거두기', reel: '잡기!', roast: '굽기', pull: '빼기!', kitePull: '당기기' }
 
 const isTouch = () => typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches
 const isPortrait = () => window.innerHeight > window.innerWidth
@@ -50,7 +51,7 @@ export function FishingPage() {
   const [text, setText] = useState('')
   const [firstPerson, setFirstPerson] = useState(false)
   const chatRef = useRef<HTMLInputElement>(null)
-  const { world, fish, send, bonk, doAlt, setPose, jump } = room
+  const { world, fish, send, bonk, doAlt, doExtra, setPose, jump } = room
 
   useEffect(() => {
     const on = () => setPortrait(isTouch() && isPortrait())
@@ -107,6 +108,9 @@ export function FishingPage() {
       } else if (e.code === 'KeyT') {
         e.preventDefault()
         if (!e.repeat) fish()
+      } else if (e.code === 'KeyG') {
+        e.preventDefault()
+        if (!e.repeat) doExtra()
       } else if (e.code === 'Space') {
         e.preventDefault()
         if (!e.repeat) jump()
@@ -159,7 +163,7 @@ export function FishingPage() {
       window.removeEventListener('blur', blur)
       window.removeEventListener('contextmenu', menu)
     }
-  }, [entered, world, fish, toggleView, bonk, doAlt, setPose, jump])
+  }, [entered, world, fish, toggleView, bonk, doAlt, doExtra, setPose, jump])
 
   // 잡은 물고기 카드는 잠깐만
   const { myCatch, setMyCatch } = room
@@ -189,7 +193,7 @@ export function FishingPage() {
           <li>숲 나무 가까이·꽃밭에선 잠자리채로 곤충 채집 — {DEX_BUGS.length}종 + 꽝, 밤에만 나오는 곤충도 있어요</li>
           <li>어떤 물고기·곤충이든 아주 드물게 다른 색(이로치)으로 나와요</li>
           <li>잡은 것 중 10마리를 어항에 넣으면 다른 사람이 나를 눌러 구경해요</li>
-          <li>한 낚시터에 {FISHING_CAPACITY}명까지 · PC: WASD·방향키 걷기 · Shift 달리기 · Ctrl 앉기 · Space 점프 · F 뿅망치 · R 상호작용(배·사다리·눕기·앉기·모래성) · T 낚시·채집 · Q·E·화면 끌기 시점 · V 1인칭</li>
+          <li>한 낚시터에 {FISHING_CAPACITY}명까지 · PC: WASD·방향키 걷기 · Shift 달리기 · Ctrl 앉기 · Space 점프 · F 뿅망치 · R 상호작용(배·카약·사다리·눕기·앉기·모래성·네잎클로버) · T 낚시·채집·굽기·연 당기기 · G 노래·연날리기 · Q·E·화면 끌기 시점 · V 1인칭</li>
           <li>폰: 왼쪽 아래 조이스틱(끝까지 밀면 달리기) · 오른쪽 점프·뿅 · 낚시·상호작용 버튼은 할 수 있을 때만 떠요</li>
         </ul>
         {!canWebGL() && <p className="error">이 기기는 3D 화면을 그릴 수 없어서 낚시터에 들어갈 수 없어요</p>}
@@ -268,6 +272,23 @@ export function FishingPage() {
         </div>
       )}
 
+      {/* 행운(네잎클로버)·연 높이 */}
+      {(room.hud.luck > 0 || room.hud.kite !== null) && (
+        <div className="fs-status">
+          {room.hud.luck > 0 && (
+            <span className="fs-status__luck">
+              행운 {Math.floor(room.hud.luck / 60)}:{String(room.hud.luck % 60).padStart(2, '0')}
+            </span>
+          )}
+          {room.hud.kite !== null && (
+            <span className="fs-status__kite">
+              연 {room.hud.kite}m · 최고 {room.hud.kiteBest}m
+              <i className="fs-status__tension" style={{ width: `${Math.min(100, room.hud.tension * 100)}%`, background: room.hud.tension > 0.7 ? '#ff6b5e' : '#ffd23f' }} />
+              <b>{room.hud.gust ? '바람이 세요! 지금 당겨요' : '바람을 기다려요'}</b>
+            </span>
+          )}
+        </div>
+      )}
       <Joystick out={world.input} />
       {/* 조이스틱 위: 아무 데서나 앉기·눕기 (같은 걸 다시 누르거나 움직이면 일어남) — 사용자 요청 2026-11-19 */}
       <div className="fs-poses">
@@ -289,10 +310,23 @@ export function FishingPage() {
       {/* 오른쪽: 점프·뿅은 늘, 낚시·상호작용은 할 수 있을 때만 */}
       <div className="fs-pad">
         <div className="fs-ctx">
+          {room.extra && (
+            <button
+              type="button"
+              className="fs-ctx__btn fs-ctx__btn--extra"
+              onPointerDown={(e) => {
+                e.preventDefault()
+                if (e.button === 0) doExtra()
+              }}
+            >
+              {EXTRA_LABEL[room.extra]}
+              <small>G</small>
+            </button>
+          )}
           {room.fishAct && (
             <button
               type="button"
-              className={`fs-ctx__btn fs-ctx__btn--fish${room.fishAct === 'reel' ? ' fs-ctx__btn--now' : ''}`}
+              className={`fs-ctx__btn fs-ctx__btn--fish${room.fishAct === 'reel' || room.fishAct === 'pull' || (room.fishAct === 'kitePull' && room.hud.gust) ? ' fs-ctx__btn--now' : ''}`}
               onPointerDown={(e) => {
                 e.preventDefault()
                 if (e.button === 0) fish()

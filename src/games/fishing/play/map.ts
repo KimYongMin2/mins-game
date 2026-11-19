@@ -132,6 +132,8 @@ const S: Struct[] = [
   ...[-17, -9, -1, 3].map((x, i) => ({ kind: 'umbrella' as const, x: x - 2, z: shoreZ(x - 2) + 1.4, c: 0, color: ['#e8473f', '#3f8fd0', '#ffd23f', '#2f9e6a'][i] })),
 ]
 export const STRUCTS: readonly Struct[] = S
+/** 모닥불 (그림·앉을 자리·굽기·노래가 같은 번호) */
+export const FIRES = S.filter((s) => s.kind === 'fire')
 
 export type Bed = { x: number; z: number; r: number }
 /** 썬베드: 바닷가 물가를 따라 8개(바다 쪽을 봄) + 호숫가 2개 + 부두 끝 1개 */
@@ -217,7 +219,7 @@ export const HOUSES = S.filter((s) => s.kind === 'house' || s.kind === 'cabin').
 
 // ── 앉을 자리·누울 자리 (상호작용 R — 사용자 요청 2026-11-19): 집 침대·소파·식탁 의자, 벤치, 피크닉 탁자, 모닥불 통나무 ──
 // x·z = 앉는(눕는) 자리, r = 앉은 사람이 보는 쪽(누우면 머리 → 발 쪽), y = 앉는 면 높이, stand = 일어나면 서는 곳(걸을 수 있는 곳)
-export type Seat = { x: number; z: number; r: number; y: number; kind: 'sit' | 'lie'; stand: { x: number; z: number } }
+export type Seat = { x: number; z: number; r: number; y: number; kind: 'sit' | 'lie'; stand: { x: number; z: number }; /** 모닥불 통나무면 그 모닥불 번호 (FIRES) */ fire?: number }
 function buildSeats(): Seat[] {
   const out: Seat[] = []
   const T = 0.25
@@ -248,7 +250,7 @@ function buildSeats(): Seat[] {
     if (s.kind === 'fire')
       for (const a of [0.4, 2.1, 3.9]) {
         const x = s.x + Math.cos(a) * 2.3, z = s.z + Math.sin(a) * 2.3
-        out.push({ x, z, r: Math.atan2(s.x - x, s.z - z), y: 0.42, kind: 'sit', stand: { x: s.x + Math.cos(a) * 3.1, z: s.z + Math.sin(a) * 3.1 } })
+        out.push({ x, z, r: Math.atan2(s.x - x, s.z - z), y: 0.42, kind: 'sit', stand: { x: s.x + Math.cos(a) * 3.1, z: s.z + Math.sin(a) * 3.1 }, fire: FIRES.indexOf(s) })
       }
   }
   return out
@@ -498,3 +500,25 @@ export function bugSpot(x: number, z: number, r: number): { zone: 'forest' | 'me
 export function bugHeightAt(x: number, z: number): number {
   return BUG_TREES.some((t) => Math.hypot(t.x - x, t.z - z) < (t.c ?? 0.5) + 0.6) ? BUG_Y.forest : BUG_Y.meadow
 }
+
+// ── 모닥불에서 굽기·노래, 네잎클로버, 연날리기 (사용자 요청 2026-11-19) ──
+/** 앉은 자리가 모닥불 통나무면 그 모닥불 번호 */
+export const fireOfSeat = (i: number | null) => (i === null ? null : (SEATS[i]?.fire ?? null))
+/** 풀밭인지 (네잎클로버·연날리기): 산책로 뒤 마을 쪽이나 동쪽 풀밭, 물·판자·집 안·밭이 아니고 걸을 수 있는 곳 */
+export function onGrass(x: number, z: number): boolean {
+  if (!(z > 17.5 || x > SEA_EAST + 1)) return false
+  if (!walkable(x, z) || onBoards(x, z) || houseAt(x, z) !== null) return false
+  return !S.some((s) => s.kind === 'field' && Math.abs(x - s.x) < s.w! / 2 && Math.abs(z - s.z) < s.d! / 2)
+}
+/** 연을 날릴 수 있는 곳: 풀밭이고 둘레 3m 안에 나무가 없음 (나무에 걸리니까) */
+export function kiteOk(x: number, z: number): boolean {
+  return onGrass(x, z) && !BUG_TREES.some((t) => Math.hypot(t.x - x, t.z - z) < (t.c ?? 0.5) + 3)
+}
+/** 네잎클로버를 주울 수 있는 거리 · 한 번에 숨어 있는 수 */
+export const CLOVER_REACH = 1.5
+export const CLOVER_COUNT = 6
+/** 행운 (네잎클로버): 3분 동안 희귀 이상이 조금 더 잘 나옴 */
+export const LUCK_MS = 3 * 60_000
+/** 바람 방향 (연이 날아가는 쪽, 바다에서 육지로 = 남쪽 조금 동쪽) */
+export const WIND = { x: 0.35, z: 0.94 }
+export const KITE_MAX = 60

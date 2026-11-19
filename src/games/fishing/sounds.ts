@@ -1,7 +1,7 @@
 import { noise, tone } from '../../shared/audio/synth'
 
 // 낚시터 효과음 (Web Audio 합성)
-type Name = 'cast' | 'bite' | 'catch' | 'big' | 'junk' | 'escape' | 'cheer' | 'bonk' | 'whiff' | 'board' | 'jump' | 'crumble' | 'built' | 'dig' | 'thud' | 'smash' | 'net' | 'bug'
+type Name = 'cast' | 'bite' | 'catch' | 'big' | 'junk' | 'escape' | 'cheer' | 'bonk' | 'whiff' | 'board' | 'jump' | 'crumble' | 'built' | 'dig' | 'thud' | 'smash' | 'net' | 'bug' | 'sizzle' | 'roastGood' | 'roastBad' | 'clover' | 'pull' | 'snap' | 'strum'
 
 const RECIPES: Record<Name, () => void> = {
   // 휙 — 낚싯줄 던지기, 퐁 — 찌가 물에
@@ -70,8 +70,36 @@ const RECIPES: Record<Name, () => void> = {
   jump: () => tone({ freq: 300, to: 620, type: 'sine', duration: 0.13, gain: 0.07 }),
   // 허공에 휘두름
   whiff: () => noise({ filter: 'bandpass', freq: 1200, to: 500, q: 1.3, duration: 0.14, gain: 0.12 }),
+  // 모닥불: 지글지글 (굽기 시작) · 노릇 성공 · 덜 익음/탐
+  sizzle: () => [0, 0.12, 0.25, 0.4].forEach((d) => noise({ filter: 'highpass', freq: 3000, duration: 0.12, gain: 0.06, delay: d })),
+  roastGood: () => [523, 659, 784].forEach((f, i) => tone({ freq: f, type: 'triangle', duration: 0.15, gain: 0.1, delay: i * 0.08 })),
+  roastBad: () => tone({ freq: 330, to: 220, type: 'triangle', duration: 0.3, gain: 0.08 }),
+  // 네잎클로버 (반짝반짝)
+  clover: () => [988, 1319, 1568, 1976].forEach((f, i) => tone({ freq: f, type: 'sine', duration: 0.12, gain: 0.07, delay: i * 0.07 })),
+  // 연줄 당김 · 끊어짐
+  pull: () => noise({ filter: 'bandpass', freq: 1600, to: 2400, q: 2, duration: 0.08, gain: 0.06 }),
+  snap: () => {
+    tone({ freq: 900, to: 140, type: 'square', duration: 0.18, gain: 0.07 })
+    noise({ filter: 'highpass', freq: 2000, duration: 0.1, gain: 0.1 })
+  },
+  // 기타 한 번 (노래 시작)
+  strum: () => strum(0),
   // 다른 사람이 큰 걸 잡았을 때 작은 팡파르
   cheer: () => [784, 1046].forEach((f, i) => tone({ freq: f, type: 'sine', duration: 0.12, gain: 0.07, delay: i * 0.1 })),
 }
 
 export const playSound = (name: Name) => RECIPES[name]()
+
+/** 모닥불 기타 (모닥불에서 누가 노래하면 0.6초마다 화음을 바꿔 가며 퉁): C · G · Am · F */
+const CHORDS = [
+  [130.8, 196, 261.6, 329.6, 392],
+  [98, 146.8, 196, 246.9, 293.7],
+  [110, 164.8, 220, 261.6, 329.6],
+  [87.3, 130.8, 174.6, 220, 261.6],
+]
+export function strum(i: number, gain = 0.05) {
+  CHORDS[((i % 4) + 4) % 4].forEach((f, k) => {
+    tone({ freq: f, type: 'triangle', duration: 0.9, gain, delay: k * 0.018 })
+    tone({ freq: f * 2, type: 'sine', duration: 0.5, gain: gain * 0.3, delay: k * 0.018 })
+  })
+}

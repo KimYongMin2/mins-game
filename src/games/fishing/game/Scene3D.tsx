@@ -3,14 +3,14 @@ import * as THREE from 'three'
 import { createStage, nearestOnScreen } from '../../../shared/art3d/stage'
 import { type AnimalRig, ANIMALS, RECLINE, makeAnimal, plainLook } from '../../../shared/art3d/animals'
 import { decodeLook } from '../../../shared/art3d/animalKinds'
-import { BEDS, BOAT_SLOTS, BOUNDS, BUILD_MS, CASTLES, CRATES, SEATS, LADDERS, bugHeightAt, groundY, houseAt } from '../play/map'
+import { BEDS, BOAT_SLOTS, BOUNDS, BUILD_MS, CASTLES, CRATES, SEATS, LADDERS, WIND, bugHeightAt, groundY, houseAt } from '../play/map'
 import { buildWorld, makeBoat } from './worldArt'
 import { kit, makeKayak, makeSandRuin, makeSandcastle } from './props3d'
 import { WEATHER_NAME, gameHour, hourLabel, weatherNow } from './clock'
 import { fishImageUrl } from '../field/fishArt'
 import { type Catch, fishById, IRO } from '../play/fish'
-import { CAM_LIMITS, type World } from './useFishingRoom'
-import { JUMP_HEIGHT, JUMP_MS } from '../play/protocol'
+import { CAM_LIMITS, type World, fireCrowd } from './useFishingRoom'
+import { JUMP_HEIGHT, JUMP_MS, ROAST_BURN_MS, ROAST_GOLD_MS } from '../play/protocol'
 import { viewFov } from '../../../shared/storage/view3d'
 
 // 3D 낚시터 (사용자 요청 2026-11-17). 위가 바다(부두), 오른쪽 풀밭에 개울·연못, 물가를 따라 썬베드.
@@ -59,6 +59,26 @@ type Actor = {
   /** 뿅망치 (오른손) · 마지막으로 맞은 때(별 한 번만) */
   hammer: THREE.Group
   lastHit: number
+  /** 모닥불 꼬치 (마시멜로·소시지, 익을수록 색이 바뀜) */
+  skewer: THREE.Group
+  foods: [THREE.Mesh, THREE.Mesh]
+  foodMat: THREE.MeshStandardMaterial
+  /** 연 + 연줄 · 보이는 높이 · 마지막 노래 음표 · 행운 반짝 */
+  kite: THREE.Group
+  kiteLine: THREE.Line
+  kiteH: number
+  lastNote: number
+  lastLuck: number
+}
+/** 굽는 색: 날것 → 노릇 → 탐 (off = 알맞은 때에서 지난 ms) */
+const RAW = [new THREE.Color('#fbf6ee'), new THREE.Color('#e88a7a')]
+const GOLD = new THREE.Color('#d9902e')
+const BURNT = new THREE.Color('#2a1a10')
+function roastColor(out: THREE.Color, food: 0 | 1, off: number) {
+  if (off < -2200) return out.copy(RAW[food])
+  if (off < -ROAST_GOLD_MS * 0.5) return out.copy(RAW[food]).lerp(GOLD, (off + 2200) / (2200 - ROAST_GOLD_MS * 0.5))
+  if (off <= ROAST_GOLD_MS) return out.copy(GOLD)
+  return out.copy(GOLD).lerp(BURNT, Math.min(1, (off - ROAST_GOLD_MS) / (ROAST_BURN_MS - ROAST_GOLD_MS)))
 }
 
 /** 잡은 물고기를 들었을 때 그림 너비 (m): 실제 크기를 따르되 너무 작거나 크지 않게 (캐릭터 키 약 1.6m) */
@@ -209,6 +229,47 @@ export function Scene3D({ world, step, onTapPlayer }: { world: World; step: (dt:
     const bugBodyMat = mat('#3a2f2a', 0.6)
     const bugWingGeo = new THREE.CircleGeometry(0.09, 10).translate(-0.08, 0, 0)
     const bugWingMat = new THREE.MeshBasicMaterial({ color: '#ffe9a8', side: THREE.DoubleSide, transparent: true, opacity: 0.92 })
+    // 모닥불 꼬치·연·네잎클로버 (모두 같이 씀)
+    const skewerGeo = new THREE.CylinderGeometry(0.02, 0.03, 2.6, 5)
+    const skewerMat = mat('#c9a06a', 0.8)
+    const mallowGeo = new THREE.CylinderGeometry(0.16, 0.16, 0.3, 12)
+    const sausageGeo = new THREE.CapsuleGeometry(0.1, 0.42, 4, 8)
+    const kiteShape = new THREE.Shape([new THREE.Vector2(0, 0.85), new THREE.Vector2(0.55, 0.1), new THREE.Vector2(0, -0.75), new THREE.Vector2(-0.55, 0.1)])
+    const kiteGeo = new THREE.ShapeGeometry(kiteShape)
+    const kiteGeo2 = new THREE.ShapeGeometry(new THREE.Shape([new THREE.Vector2(0, 0.85), new THREE.Vector2(0.55, 0.1), new THREE.Vector2(0, 0.1)]))
+    const kiteAccentMat = new THREE.MeshStandardMaterial({ color: '#ffd23f', side: THREE.DoubleSide, roughness: 0.6 })
+    const kiteSparGeo = new THREE.BoxGeometry(0.03, 1.6, 0.03)
+    const kiteSparGeo2 = new THREE.BoxGeometry(1.1, 0.03, 0.03).translate(0, 0.1, 0)
+    const kiteBowGeo = new THREE.PlaneGeometry(0.26, 0.12)
+    const kiteLineMat = new THREE.LineBasicMaterial({ color: '#f4f2ec', transparent: true, opacity: 0.85 })
+    const kitePos = new THREE.Vector3()
+    const tmpColor = new THREE.Color()
+    // 네잎클로버: 잎 넷 + 줄기, 몇 초마다 반짝 (찾을 수 있게 — 가까이 가야 보일 만큼 작음)
+    const cloverLeafGeo = new THREE.CircleGeometry(0.075, 10)
+    const cloverMat = new THREE.MeshStandardMaterial({ color: '#3fae4a', roughness: 0.6, side: THREE.DoubleSide })
+    const glintMat = new THREE.SpriteMaterial({ color: '#eaffc8', transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending })
+    const makeClover = () => {
+      const g = new THREE.Group()
+      for (let k = 0; k < 4; k++) {
+        const a = (k / 4) * Math.PI * 2 + 0.4
+        for (const s of [-1, 1]) {
+          const leaf = new THREE.Mesh(cloverLeafGeo, cloverMat)
+          leaf.rotation.x = -Math.PI / 2 + 0.25
+          leaf.position.set(Math.cos(a) * 0.09 + Math.cos(a + (s * Math.PI) / 2) * 0.035, 0.16, Math.sin(a) * 0.09 + Math.sin(a + (s * Math.PI) / 2) * 0.035)
+          g.add(leaf)
+        }
+      }
+      const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.01, 0.012, 0.16, 4).translate(0, 0.08, 0), cloverMat)
+      const glint = new THREE.Sprite(glintMat.clone())
+      glint.position.y = 0.3
+      glint.scale.setScalar(0.5)
+      g.add(stem, glint)
+      g.userData.glint = glint
+      scene.add(g)
+      return g
+    }
+    let cloverObjs: THREE.Group[] = []
+    let cloverSrc: [number, number][] | null = null
     // 물고기 그림 (종류·이로치마다 한 번만 읽음)
     const textures = new Map<string, THREE.Texture>()
     const textureOf = (c: Catch) => {
@@ -290,6 +351,38 @@ export function Scene3D({ world, step, onTapPlayer }: { world: World; step: (dt:
       hammer.add(handle, headM)
       hammer.visible = false
       rig.root.add(hammer)
+      // 모닥불 꼬치: 두 손에서 앞쪽 아래(불 쪽)로
+      const skewer = new THREE.Group()
+      skewer.position.set(0, 1.25, 0.5)
+      skewer.rotation.x = 1.95
+      const skStick = new THREE.Mesh(skewerGeo, skewerMat)
+      skStick.position.y = 1.3
+      const foodMat = new THREE.MeshStandardMaterial({ color: '#fbf6ee', roughness: 0.7 })
+      const mallow = new THREE.Mesh(mallowGeo, foodMat)
+      mallow.position.y = 2.45
+      const sausage = new THREE.Mesh(sausageGeo, foodMat)
+      sausage.position.y = 2.35
+      skewer.add(skStick, mallow, sausage)
+      skewer.visible = false
+      rig.root.add(skewer)
+      // 연: 마름모 + 십자 살 + 꼬리 리본, 손에서 이어지는 줄
+      const kite = new THREE.Group()
+      const kiteMat = new THREE.MeshStandardMaterial({ color: SHIRTS[hash(id) % SHIRTS.length], side: THREE.DoubleSide, roughness: 0.6 })
+      const sail = new THREE.Mesh(kiteGeo, kiteMat)
+      const sail2 = new THREE.Mesh(kiteGeo2, kiteAccentMat)
+      sail2.position.z = 0.005
+      kite.add(sail, sail2, new THREE.Mesh(kiteSparGeo, skewerMat), new THREE.Mesh(kiteSparGeo2, skewerMat))
+      for (let k = 0; k < 5; k++) {
+        const bow = new THREE.Mesh(kiteBowGeo, k % 2 ? kiteMat : kiteAccentMat)
+        bow.position.y = -0.75 - k * 0.32
+        kite.add(bow)
+      }
+      kite.userData.bows = kite.children.slice(4)
+      kite.visible = false
+      const kiteLine = new THREE.Line(new THREE.BufferGeometry().setFromPoints(Array.from({ length: 14 }, () => new THREE.Vector3())), kiteLineMat)
+      kiteLine.frustumCulled = false
+      kiteLine.visible = false
+      scene.add(kite, kiteLine)
       const line = new THREE.Line(new THREE.BufferGeometry().setFromPoints(Array.from({ length: LINE_PTS }, () => new THREE.Vector3())), lineMat)
       line.frustumCulled = false
       line.visible = false
@@ -317,11 +410,14 @@ export function Scene3D({ world, step, onTapPlayer }: { world: World; step: (dt:
       // 위에서부터 말풍선 · ! · 들고 있는 물고기 이름 · 내 이름 (기준점이 맨 아래 = 머리 위)
       tag.append(bubble, bang, pop, name)
       layer!.appendChild(tag)
-      return { id, rig, rod, rodParts: [stick, reel], netParts, bug, tip, line, bob, ring, tag, bubble, bang, pop, popKey: '', avatar, held, heldKey: '', prev: 'none', castAt: -9e9, reelAt: -9e9, lastBob: null, ringMat, hammer, lastHit: 0 }
+      return { id, rig, rod, rodParts: [stick, reel], netParts, bug, tip, line, bob, ring, tag, bubble, bang, pop, popKey: '', avatar, held, heldKey: '', prev: 'none', castAt: -9e9, reelAt: -9e9, lastBob: null, ringMat, hammer, lastHit: 0, skewer, foods: [mallow, sausage], foodMat, kite, kiteLine, kiteH: 0, lastNote: 0, lastLuck: 0 }
     }
 
     function removeActor(a: Actor) {
-      scene.remove(a.rig.root, a.line, a.bob, a.ring, a.held, a.bug)
+      scene.remove(a.rig.root, a.line, a.bob, a.ring, a.held, a.bug, a.kite, a.kiteLine)
+      a.foodMat.dispose()
+      a.kiteLine.geometry.dispose()
+      ;((a.kite.children[0] as THREE.Mesh).material as THREE.Material).dispose()
       a.held.material.dispose()
       a.ringMat.dispose()
       a.rig.dispose()
@@ -625,6 +721,58 @@ export function Scene3D({ world, step, onTapPlayer }: { world: World; step: (dt:
           a.ring.scale.setScalar(1 + k * 3)
           a.ringMat.opacity = 0.8 * (1 - k)
         }
+        // 모닥불 꼬치: 익을수록 색이 노릇 → 까맣게, 타면 연기
+        a.skewer.visible = !!p.roast && !holding
+        if (p.roast) {
+          const [food, cook] = p.roast
+          a.foods[0].visible = food === 0
+          a.foods[1].visible = food === 1
+          const off = now - p.roastStart - cook
+          a.foodMat.color.copy(roastColor(tmpColor, food, off))
+          a.rig.armL.rotation.set(-1.15, 0, -0.2)
+          a.rig.armR.rotation.set(-1.15, 0, 0.2)
+          if (off > ROAST_GOLD_MS && Math.random() < dt * 4) {
+            a.foods[food].getWorldPosition(v)
+            stage.burst(v.clone(), { color: '#5a5a5a', count: 3, speed: 0.4, size: 0.12, gravity: -1.2, life: 1 })
+          }
+        }
+        // 노래: 몸을 살랑살랑 + 머리 위 음표
+        if (p.sing) {
+          root.rotation.z = Math.sin(t * 2.6 + hash(p.id)) * 0.07
+          if (now - a.lastNote > 1500 && (!p.bubble || now > p.bubble.until)) {
+            a.lastNote = now
+            p.bubble = { text: ['♪', '♫', '♪ ♪', '♬'][Math.floor(now / 1500) % 4], until: now + 1100 }
+          }
+        }
+        // 네잎클로버 행운: 가끔 초록 반짝
+        if (p.luck && now - a.lastLuck > 1300) {
+          a.lastLuck = now
+          a.rig.head.getWorldPosition(v)
+          stage.burst(v.clone().setY(v.y + 0.25), { color: '#7dff9a', count: 5, speed: 0.6, size: 0.08, gravity: -0.6, life: 0.8 })
+        }
+        // 연: 바람 부는 쪽으로 높이만큼 멀리, 줄은 손에서 처지며 이어짐 (내 것은 내 기기 높이)
+        const kh = p.id === world.me ? (world.kite.on ? world.kite.h : null) : (p.kite ?? null)
+        a.kite.visible = a.kiteLine.visible = kh !== null
+        if (kh !== null) {
+          a.kiteH += (kh - a.kiteH) * Math.min(1, dt * 3)
+          const far = 3 + a.kiteH * 0.75
+          kitePos.set(p.sx + WIND.x * far + Math.sin(t * 0.7 + hash(p.id)) * 0.6, 1.6 + a.kiteH + Math.sin(t * 1.1 + hash(p.id)) * 0.35, p.sz + WIND.z * far)
+          a.kite.position.copy(kitePos)
+          a.kite.lookAt(p.sx, kitePos.y * 0.6, p.sz)
+          a.kite.rotateZ(Math.sin(t * 1.7 + hash(p.id)) * 0.25)
+          ;(a.kite.userData.bows as THREE.Object3D[]).forEach((b, k) => (b.position.x = Math.sin(t * 3 + k * 0.9) * 0.12 * (k + 1)))
+          hands.copy(a.rig.handsAt)
+          a.rig.root.localToWorld(hands)
+          const pos = a.kiteLine.geometry.getAttribute('position') as THREE.BufferAttribute
+          const sag = Math.min(4, far * 0.12)
+          for (let k = 0; k < 14; k++) {
+            const u = k / 13
+            pos.setXYZ(k, hands.x + (kitePos.x - hands.x) * u, hands.y + (kitePos.y - hands.y) * u - Math.sin(u * Math.PI) * sag, hands.z + (kitePos.z - hands.z) * u)
+          }
+          pos.needsUpdate = true
+          // 연 줄을 쥔 손 (한 손 위로)
+          if (!p.roast && pose !== 'fish') a.rig.armR.rotation.set(-2.2, 0, 0.25)
+        } else a.kiteH = 0
         // 머리 위로 든 물고기 (잡았으면 물에서 날아옴)
         const popOn = !!p.popup && now < p.popup.until
         a.held.visible = popOn
@@ -651,6 +799,31 @@ export function Scene3D({ world, step, onTapPlayer }: { world: World; step: (dt:
           }
         }
       }
+
+      // 모닥불: 앉은 사람·노래하는 사람이 많을수록 불이 커짐
+      fireCrowd(world).forEach((c, i) => (art.fireBoost[i] = c.seated + c.singing * 1.5))
+
+      // 네잎클로버: 서버가 정한 자리에, 3초마다 잠깐 반짝 (가까이 25m 안만 그림)
+      if (cloverSrc !== world.clovers) {
+        cloverSrc = world.clovers
+        while (cloverObjs.length < world.clovers.length) cloverObjs.push(makeClover())
+        cloverObjs = cloverObjs.filter((g, i) => {
+          if (i < world.clovers.length) return true
+          scene.remove(g)
+          return false
+        })
+        world.clovers.forEach(([x, z], i) => {
+          cloverObjs[i].position.set(x, 0.01, z)
+          cloverObjs[i].rotation.y = x * 3.1 + z
+        })
+      }
+      const meP = world.players.get(world.me)
+      cloverObjs.forEach((g, i) => {
+        g.visible = !!meP && Math.hypot(g.position.x - meP.sx, g.position.z - meP.sz) < 25
+        const glint = g.userData.glint as THREE.Sprite
+        const ph = (t * 0.33 + i * 0.37) % 1
+        ;(glint.material as THREE.SpriteMaterial).opacity = ph < 0.12 ? Math.sin((ph / 0.12) * Math.PI) * 0.9 : 0
+      })
 
       // 모래성: 서 있음 / 무너짐 / 쌓는 중(무너진 더미 위로 점점 솟음), 부서지는 순간 모래 알갱이
       castleObjs.forEach((o, i) => {
@@ -867,7 +1040,8 @@ export function Scene3D({ world, step, onTapPlayer }: { world: World; step: (dt:
       for (const a of actors.values()) removeActor(a)
       art.dispose()
       bobGeo.dispose()
-      for (const d of [netHoopGeo, netHoopMat, netBagGeo, netBagMat, bugBodyGeo, bugBodyMat, bugWingGeo, bugWingMat]) d.dispose()
+      for (const d of [netHoopGeo, netHoopMat, netBagGeo, netBagMat, bugBodyGeo, bugBodyMat, bugWingGeo, bugWingMat, skewerGeo, mallowGeo, sausageGeo, kiteGeo, kiteGeo2, kiteAccentMat, kiteSparGeo, kiteSparGeo2, kiteBowGeo, kiteLineMat, cloverLeafGeo, cloverMat, glintMat]) d.dispose()
+      for (const g of cloverObjs) scene.remove(g)
       ringGeo.dispose()
       stage.dispose()
     }

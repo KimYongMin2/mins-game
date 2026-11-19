@@ -20,6 +20,8 @@ export type WorldArt = {
   roofs: THREE.Object3D[]
   /** 해 그림자를 내 주변에 맞춤 */
   follow: (x: number, z: number) => void
+  /** 모닥불 크기 (FIRES 순서, 0 = 보통 — 앉은 사람·노래하는 사람이 많을수록 큼, 화면이 매 프레임 넣음) */
+  fireBoost: number[]
   occluders: Occluder[]; update: (t: number, dt: number) => void; minimap: HTMLCanvasElement; dispose: () => void; /** 0 낮 ~ 1 밤 */ night: () => number }
 
 const matCache = new Map<string, THREE.MeshStandardMaterial>()
@@ -195,6 +197,7 @@ export function buildWorld(scene: THREE.Scene, renderer: THREE.WebGLRenderer): W
   const disposables: { dispose: () => void }[] = []
   const statics = new THREE.Group() // 합칠 것 (그림자 냄)
   const dyn: ((t: number, dt: number, night: number) => void)[] = []
+  const fireBoost: number[] = []
   const time = { value: 0 }
   const nightU = { value: 0 }
 
@@ -996,6 +999,9 @@ export function buildWorld(scene: THREE.Scene, renderer: THREE.WebGLRenderer): W
           lg.rotation.set(Math.PI / 2, 0, a)
           statics.add(lg)
         }
+        const fi = fireBoost.length
+        fireBoost.push(0)
+        let shown = 0
         const flames = new THREE.Group()
         flames.position.set(s.x, 0.25, s.z)
         const fm = [new THREE.MeshBasicMaterial({ color: '#ff9a3c', transparent: true, opacity: 0.9 }), new THREE.MeshBasicMaterial({ color: '#ffe066', transparent: true, opacity: 0.95 })]
@@ -1009,12 +1015,16 @@ export function buildWorld(scene: THREE.Scene, renderer: THREE.WebGLRenderer): W
         const light = new THREE.PointLight('#ff9a4a', 0, 14, 1.6)
         light.position.set(s.x, 1.2, s.z)
         scene.add(light)
-        dyn.push((t, _dt, night) => {
+        dyn.push((t, dt, night) => {
+          // 사람이 모일수록 불이 천천히 커짐 (최대 약 1.9배)
+          shown += (Math.min(1, fireBoost[fi] / 5) - shown) * Math.min(1, dt * 1.5)
+          const big = 1 + shown * 0.9
+          flames.scale.setScalar(big)
           fl.forEach((f, i) => {
             const k = 0.85 + Math.sin(t * (9 + i * 2.3) + i) * 0.15
             f.scale.set(k, 0.8 + Math.sin(t * (7 + i) + i * 2) * 0.25, k)
           })
-          light.intensity = (6 + night * 30) * (0.9 + Math.sin(t * 13) * 0.1)
+          light.intensity = (6 + night * 30) * (0.9 + Math.sin(t * 13) * 0.1) * big
         })
         return null
       }
@@ -1444,6 +1454,7 @@ export function buildWorld(scene: THREE.Scene, renderer: THREE.WebGLRenderer): W
       sun.position.copy(snapP).addScaledVector(sunDir, 80)
     },
     occluders,
+    fireBoost,
     minimap,
     update(t, dt) {
       time.value = t
