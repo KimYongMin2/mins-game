@@ -87,7 +87,8 @@ export type World = {
   castles: { built: boolean; builder: string | null; buildEnd: number; hitAt: number }[]
 }
 
-export const CAM_LIMITS = { third: { min: 0.2, max: 1.35 }, first: { min: -0.7, max: 1.0 }, dist: { min: 5, max: 24 } }
+// 위아래 시야 (사용자 요청 2026-11-19 — 아래에서 올려다보는 게 너무 작았음): 3인칭은 음수면 카메라가 땅에 붙어 올려다봄
+export const CAM_LIMITS = { third: { min: -0.55, max: 1.35 }, first: { min: -1.25, max: 1.2 }, dist: { min: 5, max: 24 } }
 
 export type Toast = { key: number; text: string; color: string; c?: Catch }
 export type ChatLine = { key: number; name: string; text: string; mine: boolean }

@@ -20,6 +20,9 @@ const SKY = '#a7dcff'
 const SHIRTS = ['#5b8cff', '#ff8ab0', '#7cc8ff', '#9be08a', '#ffd23f', '#c79bff', '#ff9a5a', '#5be0f0']
 /** 캐릭터 크기 (모델 키 약 2.9 → 1.6m쯤) */
 const SCALE = 0.62
+/** 시야각 (3인칭 · 1인칭) */
+const FOV_THIRD = 58
+const FOV_FIRST = 72
 /** 낚싯줄 점 수 (처지는 곡선) */
 const LINE_PTS = 16
 /** 배 높이 (물에 조금 잠기게) */
@@ -113,10 +116,16 @@ export function Scene3D({ world, step, onTapPlayer }: { world: World; step: (dt:
     const host = hostRef.current
     const layer = layerRef.current
     if (!host || !layer) return
-    const stage = createStage(host, { background: SKY, fov: 42, sway: 0 })
+    // 시야각: 좁으면(예전 42°) 화면이 조금만 움직여도 크게 휙 지나가 멀미가 심해서 넓게 (사용자 3D 멀미 — 2026-11-19)
+    const stage = createStage(host, { background: SKY, fov: FOV_THIRD, sway: 0 })
     const { scene, camera, lamp } = stage
     camera.far = 460
     camera.updateProjectionMatrix()
+    const setFov = (f: number) => {
+      if (camera.fov === f) return
+      camera.fov = f
+      camera.updateProjectionMatrix()
+    }
     // 하늘·해·바다·땅·구조물 (시각 따라 낮·노을·밤) + 나를 따라다니며 그림자를 만드는 조명
     lamp.intensity = 260
     lamp.distance = 50
@@ -702,6 +711,7 @@ export function Scene3D({ world, step, onTapPlayer }: { world: World; step: (dt:
           eyeReady = true
           head.set(me.sx, eyeY, me.sz)
           const cp = Math.cos(cam.pitch)
+          setFov(FOV_FIRST)
           camera.position.set(head.x - fx * 0.15, head.y + 0.12, head.z - fz * 0.15)
           camera.lookAt(head.x - fx * cp * 10, head.y + 0.12 - Math.sin(cam.pitch) * 10, head.z - fz * cp * 10)
           camReady = false
@@ -710,11 +720,15 @@ export function Scene3D({ world, step, onTapPlayer }: { world: World; step: (dt:
           if (!camReady) {
             follow.copy(want)
             camReady = true
-          } else follow.lerp(want, 1 - Math.exp(-dt * 7))
+          } else follow.lerp(want, 1 - Math.exp(-dt * 11))
           eyeReady = false
-          const d = cam.dist, cp = Math.cos(cam.pitch)
-          camera.position.set(follow.x + fx * d * cp, follow.y + Math.sin(cam.pitch) * d, follow.z + fz * d * cp)
-          camera.lookAt(follow)
+          setFov(FOV_THIRD)
+          // 높이가 낮아지면 카메라는 땅 위(0.35m)에 붙고, 그보다 더 내리면 보는 곳을 올려 하늘 쪽을 올려다봄
+          const d = cam.dist, cp = Math.cos(Math.max(0, cam.pitch))
+          const camY = Math.max(follow.y + Math.sin(cam.pitch) * d, 0.35)
+          camera.position.set(follow.x + fx * d * cp, camY, follow.z + fz * d * cp)
+          const up = cam.pitch < 0.1 ? (0.1 - cam.pitch) * d * 1.1 : 0
+          camera.lookAt(follow.x, follow.y + up, follow.z)
         }
         // 밤엔 손전등처럼 내 주변만 따뜻하게 (낮엔 끔 — 해가 비춤)
         art.follow(me.sx, me.sz)

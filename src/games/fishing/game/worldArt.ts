@@ -426,7 +426,7 @@ export function buildWorld(scene: THREE.Scene, renderer: THREE.WebGLRenderer): W
   const tufts: { x: number; z: number; s: number }[] = []
   const flowers: { x: number; z: number; s: number; color: string }[] = []
   const FLOWER = ['#ffffff', '#ffd23f', '#ff8ab0', '#c79bff', '#ff6b5a']
-  for (let i = 0; i < 18000 && tufts.length < 4800; i++) {
+  for (let i = 0; i < 26000 && tufts.length < 6200; i++) {
     const x = BOUNDS.minX - 10 + rnd() * (BOUNDS.maxX - BOUNDS.minX + 20), z = BOUNDS.minZ - 10 + rnd() * (BOUNDS.maxZ - BOUNDS.minZ + 20)
     if (!isGrass(x, z) || onPath(x, z) || nearStruct(x, z, 0.4)) continue
     if (rnd() < 0.13) flowers.push({ x, z, s: 0.8 + rnd() * 0.6, color: FLOWER[Math.floor(rnd() * FLOWER.length)] })
