@@ -416,8 +416,8 @@ export function Scene3D({ world, step, onTapPlayer }: { world: World; step: (dt:
             root.position.set(seat.x, seat.y + 0.2 * SCALE, seat.z)
             root.rotation.set(-1.5, seat.r, 0)
           } else {
-            // 의자·벤치·통나무: 엉덩이가 앉는 면에
-            root.position.set(seat.x, seat.y - 0.05 * SCALE, seat.z)
+            // 의자·벤치·통나무: 엉덩이가 앉는 면에 (바닥에 앉을 때·배와 같게 sit 자세 엉덩이 높이만큼 내림)
+            root.position.set(seat.x, seat.y - 0.5 * SCALE, seat.z)
             root.rotation.set(0, seat.r, 0)
           }
         } else if (climbing && p.climb) {

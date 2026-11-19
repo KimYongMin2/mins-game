@@ -990,10 +990,10 @@ export function buildWorld(scene: THREE.Scene, renderer: THREE.WebGLRenderer): W
           g.add(l)
         }
         statics.add(g)
-        // 앉는 통나무 (그림만)
+        // 앉는 통나무 (그림만) — 모닥불을 둘러 가로로 눕힘 (앉는 사람 양옆으로 길게)
         for (const a of [0.4, 2.1, 3.9]) {
           const lg = cyl(0.22, 0.22, 1.6, mat('#7a4e2a'), s.x + Math.cos(a) * 2.3, 0.22, s.z + Math.sin(a) * 2.3, 10)
-          lg.rotation.set(Math.PI / 2, 0, a + Math.PI / 2)
+          lg.rotation.set(Math.PI / 2, 0, a)
           statics.add(lg)
         }
         const flames = new THREE.Group()
