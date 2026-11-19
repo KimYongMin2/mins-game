@@ -1,10 +1,14 @@
 import type { Referee, RefereeContext, RefereeFactory } from '../hub'
-import { type Catch, fishById, isBig, rollCatch } from '../../games/fishing/play/fish'
-import { BEDS, BOAT_SLOTS, BOAT_REACH, CRATES, CRATE_HP, CRATE_RESPAWN_MS, BOAT_SPEED, BOUNDS, BUILD_MS, CASTLES, LADDERS, SEATS, nearCastle, nearSeat, RUN_SPEED, SPAWN, boatable, castTarget, landingSpot, nearBed, nearLadder, onLadderTop, walkable } from '../../games/fishing/play/map'
+import { type Catch, fishById, isBig, rollBugCatch, rollCatch } from '../../games/fishing/play/fish'
+import { isBugId, isNightHour } from '../../games/fishing/play/bugs'
+import { gameHour } from '../../games/fishing/game/clock'
+import { BEDS, BOAT_SLOTS, BOAT_REACH, CRATES, CRATE_HP, CRATE_RESPAWN_MS, BOAT_SPEED, BOUNDS, BUILD_MS, CASTLES, LADDERS, SEATS, nearCastle, nearSeat, RUN_SPEED, SPAWN, boatable, bugSpot, castTarget, landingSpot, nearBed, nearLadder, onLadderTop, walkable } from '../../games/fishing/play/map'
 import {
   BITE_MAX_MS,
   BITE_MIN_MS,
   BITE_WINDOW_MS,
+  BUG_MAX_MS,
+  BUG_MIN_MS,
   type BagItem,
   type BoatPub,
   type CastlePub,
@@ -25,7 +29,7 @@ import { loadProfile, markDirty, savingOn, startFlushing } from '../fishingStore
 // 위치는 화면이 보내고 여기서 빠르기·물 검사, 입질 시각·잡힌 물고기·크기·이로치는 여기서만 정함 → 도감·어항에 가짜가 못 들어감.
 // 도감·어항은 계정(uid)별로 Supabase에 (fishingStore). 방장이 없어도 계속 돎(회의방처럼 방장을 넘겨받음).
 
-type P = PlayerPub & { uid: string | null; castAt: number; biteAt: number; biteUntil: number; zone: 'sea' | 'fresh' | null; lastMv: number; lastChat: number; lastBonk: number; lastJump: number; castX: number; castZ: number }
+type P = PlayerPub & { uid: string | null; castAt: number; biteAt: number; biteUntil: number; zone: 'sea' | 'fresh' | 'forest' | 'meadow' | null; lastMv: number; lastChat: number; lastBonk: number; lastJump: number; castX: number; castZ: number }
 
 /** 가방: 최근 것 + 자랑할 만한 것, 모두 이만큼까지 */
 const BAG_RECENT = 40
@@ -39,7 +43,7 @@ const num = (v: unknown, lo: number, hi: number) => typeof v === 'number' && Num
 const cleanText = (v: unknown) => (typeof v === 'string' ? [...v.replace(/[\u0000-\u001f\u007f]/g, ' ').trim()].slice(0, CHAT_MAX).join('') : '')
 const r2 = (v: number) => Math.round(v * 100) / 100
 
-const pub = (p: P): PlayerPub => ({ id: p.id, name: p.name, ...(p.avatar ? { avatar: p.avatar } : {}), x: p.x, z: p.z, r: p.r, bed: p.bed, fishing: p.fishing, bob: p.bob, ride: p.ride, up: p.up, act: p.act, seat: p.seat })
+const pub = (p: P): PlayerPub => ({ id: p.id, name: p.name, ...(p.avatar ? { avatar: p.avatar } : {}), x: p.x, z: p.z, r: p.r, bed: p.bed, fishing: p.fishing, bob: p.bob, ...(p.net ? { net: 1 as const } : {}), ride: p.ride, up: p.up, act: p.act, seat: p.seat })
 /** 아무도 안 탄 배가 이만큼 그대로면 제자리로 */
 const BOAT_HOME_MS = 10 * 60_000
 
@@ -113,6 +117,7 @@ export function fishingReferee(_setup: unknown, ctx: RefereeContext): Referee {
     p.fishing = 'none'
     p.bob = null
     p.zone = null
+    delete p.net
     return true
   }
 
@@ -190,17 +195,22 @@ export function fishingReferee(_setup: unknown, ctx: RefereeContext): Referee {
   function cast(p: P) {
     if (p.fishing !== 'none') return
     const bed = p.bed !== null ? BEDS[p.bed] : null
-    const t = bed ? castTarget(bed.x, bed.z, bed.r) : castTarget(p.x, p.z, p.r)
+    const water = bed ? castTarget(bed.x, bed.z, bed.r) : castTarget(p.x, p.z, p.r)
+    // 물이 없으면 곤충 채집 (숲·꽃밭, 걸어 다닐 때만)
+    const bug = !water && !bed && p.ride === null && p.up === null && p.seat === null ? bugSpot(p.x, p.z, p.r) : null
+    const t = water ?? bug
     if (!t) return send(p.id, { t: 'st', p: pub(p) })
     const now = ctx.now()
     p.fishing = 'cast'
     p.bob = t.bob
     p.zone = t.zone
+    if (bug) p.net = 1
+    else delete p.net
     if (!bed) p.r = r2(t.r)
     p.castAt = now
     p.castX = p.x
     p.castZ = p.z
-    p.biteAt = now + BITE_MIN_MS + rand() * (BITE_MAX_MS - BITE_MIN_MS)
+    p.biteAt = now + (bug ? BUG_MIN_MS + rand() * (BUG_MAX_MS - BUG_MIN_MS) : BITE_MIN_MS + rand() * (BITE_MAX_MS - BITE_MIN_MS))
     all({ t: 'st', p: pub(p) })
   }
 
@@ -210,7 +220,7 @@ export function fishingReferee(_setup: unknown, ctx: RefereeContext): Referee {
       return all({ t: 'st', p: pub(p) })
     }
     if (p.fishing !== 'bite' || !p.zone) return
-    const c = rollCatch(rand, p.zone)
+    const c = p.zone === 'forest' || p.zone === 'meadow' ? rollBugCatch(rand, p.zone, isNightHour(gameHour(Date.now()))) : rollCatch(rand, p.zone)
     stopFishing(p)
     const item: BagItem = { k: crypto.randomUUID().slice(0, 12), f: c.fish, i: c.iro, s: c.size, at: Date.now() }
     let best = false
@@ -443,7 +453,7 @@ export function fishingReferee(_setup: unknown, ctx: RefereeContext): Referee {
     const uid = p.uid
     const profile = await loadProfile(uid)
     const have = new Set(profile.bag.map((x) => x.k))
-    profile.tank = [...new Set(keys.filter((k): k is string => typeof k === 'string' && have.has(k)))].slice(0, TANK_MAX)
+    profile.tank = [...new Set(keys.filter((k): k is string => typeof k === 'string' && have.has(k) && !isBugId(profile.bag.find((x) => x.k === k)!.f)))].slice(0, TANK_MAX)
     markDirty(uid, p.name)
     send(p.id, { t: 'profile', profile })
   }

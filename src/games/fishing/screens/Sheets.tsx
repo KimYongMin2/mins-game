@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { DEX_FISH, IRO, RARITY, fishById, isBig } from '../play/fish'
 import { type BagItem, type Profile, TANK_MAX } from '../play/protocol'
 import { fishSvg } from '../field/fishArt'
+import { DEX_BUGS, HABITAT_NAME, TIME_NAME, isBugId } from '../play/bugs'
 
 // 도감 · 내 어항 · 남의 어항 · 자랑하기 창 (낚시터 위에 아래에서 올라옴)
 
@@ -27,7 +28,7 @@ function Sheet({ title, sub, onClose, children }: { title: string; sub?: string;
   )
 }
 
-const Art = ({ id, iro = null, silhouette = false, bg }: { id: string; iro?: BagItem['i']; silhouette?: boolean; bg?: 'sea' | 'fresh' }) => (
+const Art = ({ id, iro = null, silhouette = false, bg }: { id: string; iro?: BagItem['i']; silhouette?: boolean; bg?: 'sea' | 'fresh' | 'forest' | 'meadow' }) => (
   <span className="fs-art" dangerouslySetInnerHTML={{ __html: fishSvg(id, iro, { silhouette, bg: bg ?? null }) }} />
 )
 
@@ -37,24 +38,36 @@ const sortBag = (bag: BagItem[]) => [...bag].sort((a, b) => Number(isBig({ fish:
 
 export function DexSheet({ profile, onClose }: { profile: Profile | null; onClose: () => void }) {
   const dex = profile?.dex ?? {}
-  const caught = DEX_FISH.filter((f) => dex[f.id]).length
-  const iros = Object.values(dex).reduce((a, e) => a + e.iros.length, 0)
+  // 물고기 / 곤충 탭 (곤충 채집 — 사용자 요청 2026-11-19)
+  const [tab, setTab] = useState<'fish' | 'bug'>('fish')
+  const list = tab === 'fish' ? DEX_FISH : DEX_BUGS
+  const caught = list.filter((f) => dex[f.id]).length
+  const iros = list.reduce((a, f) => a + (dex[f.id]?.iros.length ?? 0), 0)
   return (
-    <Sheet title="도감" sub={`${caught}/${DEX_FISH.length}종 · 이로치 ${iros}개`} onClose={onClose}>
+    <Sheet title="도감" sub={`${caught}/${list.length}종 · 이로치 ${iros}개`} onClose={onClose}>
+      <div className="fs-dex__tabs" role="tablist">
+        {(['fish', 'bug'] as const).map((k) => (
+          <button key={k} type="button" role="tab" className="fs-key" aria-selected={tab === k} onClick={() => setTab(k)}>
+            {k === 'fish' ? `물고기 ${DEX_FISH.filter((f) => dex[f.id]).length}/${DEX_FISH.length}` : `곤충 ${DEX_BUGS.filter((f) => dex[f.id]).length}/${DEX_BUGS.length}`}
+          </button>
+        ))}
+      </div>
       <ul className="fs-dex">
-        {DEX_FISH.map((f) => {
+        {list.map((f) => {
           const e = dex[f.id]
           const r = RARITY[f.rarity]
+          const bug = 'bug' in f ? f : null
+          const where = bug ? `${bug.zone === 'both' ? '' : HABITAT_NAME[bug.zone]} · ${TIME_NAME[bug.time]}` : f.zone === 'fresh' ? '민물' : '바다'
           return (
             <li key={f.id} className={`fs-dex__item${e ? '' : ' fs-dex__item--none'}`}>
-              <Art id={f.id} silhouette={!e} bg={f.zone === 'fresh' ? 'fresh' : 'sea'} />
+              <Art id={f.id} silhouette={!e} bg={bug ? (bug.zone === 'meadow' ? 'meadow' : 'forest') : f.zone === 'fresh' ? 'fresh' : 'sea'} />
               <div className="fs-dex__info">
                 <b>{e ? f.name : '???'}</b>
                 <span className="fs-chip" style={{ background: r.color }}>
                   {r.name}
                 </span>
               </div>
-              <small>{e ? `${e.n}마리 · 최고 ${e.best}cm` : f.zone === 'fresh' ? '민물' : '바다'}</small>
+              <small>{e ? `${e.n}마리 · 최고 ${e.best}cm` : where}</small>
               {e && e.iros.length > 0 && (
                 <span className="fs-dex__iros">
                   {e.iros.map((i) => (
@@ -96,7 +109,7 @@ export function TankView({ items }: { items: BagItem[] }) {
 }
 
 export function MyTankSheet({ profile, onSave, onClose }: { profile: Profile | null; onSave: (keys: string[]) => void; onClose: () => void }) {
-  const bag = useMemo(() => sortBag(profile?.bag ?? []), [profile])
+  const bag = useMemo(() => sortBag(profile?.bag ?? []).filter((x) => !isBugId(x.f)), [profile])
   const [pick, setPick] = useState<string[]>(() => profile?.tank ?? [])
   const byKey = new Map(bag.map((x) => [x.k, x]))
   const toggle = (k: string) => setPick((p) => (p.includes(k) ? p.filter((x) => x !== k) : p.length >= TANK_MAX ? p : [...p, k]))
@@ -146,7 +159,7 @@ export function BragSheet({ profile, onBrag, onClose }: { profile: Profile | nul
   return (
     <Sheet title="자랑하기" sub="고르면 낚시터 모두에게 보여요" onClose={onClose}>
       {bag.length === 0 ? (
-        <p className="fs-sheet__hint">아직 자랑할 물고기가 없어요</p>
+        <p className="fs-sheet__hint">아직 자랑할 물고기·곤충이 없어요</p>
       ) : (
         <ul className="fs-bag">
           {bag.map((it) => (

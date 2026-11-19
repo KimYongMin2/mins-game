@@ -3,7 +3,7 @@ import * as THREE from 'three'
 import { createStage, nearestOnScreen } from '../../../shared/art3d/stage'
 import { type AnimalRig, ANIMALS, RECLINE, makeAnimal, plainLook } from '../../../shared/art3d/animals'
 import { decodeLook } from '../../../shared/art3d/animalKinds'
-import { BEDS, BOAT_SLOTS, BOUNDS, BUILD_MS, CASTLES, CRATES, SEATS, LADDERS, groundY, houseAt } from '../play/map'
+import { BEDS, BOAT_SLOTS, BOUNDS, BUILD_MS, CASTLES, CRATES, SEATS, LADDERS, bugHeightAt, groundY, houseAt } from '../play/map'
 import { buildWorld, makeBoat } from './worldArt'
 import { kit, makeSandRuin, makeSandcastle } from './props3d'
 import { WEATHER_NAME, gameHour, hourLabel, weatherNow } from './clock'
@@ -31,6 +31,11 @@ type Actor = {
   id: string
   rig: AnimalRig
   rod: THREE.Group
+  /** 낚싯대 부분(대·릴) · 잠자리채 부분(자루·테·그물) — 곤충 채집이면 잠자리채만 보임 */
+  rodParts: THREE.Object3D[]
+  netParts: THREE.Object3D[]
+  /** 잠자리채 앞에서 팔랑이는 곤충 */
+  bug: THREE.Group
   tip: THREE.Object3D
   line: THREE.Line
   bob: THREE.Mesh
@@ -57,7 +62,10 @@ type Actor = {
 
 /** 잡은 물고기를 들었을 때 그림 너비 (m): 실제 크기를 따르되 너무 작거나 크지 않게 (캐릭터 키 약 1.6m) */
 export function heldWidth(c: Catch) {
-  if (fishById(c.fish)?.rarity === 'junk') return 0.7
+  const def = fishById(c.fish)
+  if (def?.rarity === 'junk') return 0.7
+  // 곤충은 작아서 크게 보이게: 1cm → 0.5m · 10cm → 0.65m · 28cm → 0.95m
+  if (def && 'bug' in def) return Math.min(1, 0.48 + (c.size / 100) * 1.7)
   // 예: 30cm → 0.7m · 60cm → 1m · 2m → 2.6m · 4m → 3.6m (화면에서 작은 물고기도 보이게 실제보다 조금 크게)
   return Math.min(3.6, Math.max(0.6, 0.35 + (c.size / 100) * 1.1))
 }
@@ -185,6 +193,15 @@ export function Scene3D({ world, step, onTapPlayer }: { world: World; step: (dt:
     const bobGeo = new THREE.SphereGeometry(0.12, 12, 10)
     const bobMat = mat('#e8473f', 0.4)
     const ringGeo = new THREE.RingGeometry(0.25, 0.32, 24)
+    // 잠자리채·곤충 (모든 사람이 같이 씀)
+    const netHoopGeo = new THREE.TorusGeometry(0.42, 0.03, 6, 20)
+    const netHoopMat = mat('#8a8f9c', 0.4)
+    const netBagGeo = new THREE.ConeGeometry(0.4, 0.75, 14, 1, true)
+    const netBagMat = new THREE.MeshStandardMaterial({ color: '#ffffff', transparent: true, opacity: 0.5, side: THREE.DoubleSide, depthWrite: false })
+    const bugBodyGeo = new THREE.CapsuleGeometry(0.025, 0.08, 3, 6)
+    const bugBodyMat = mat('#3a2f2a', 0.6)
+    const bugWingGeo = new THREE.CircleGeometry(0.09, 10).translate(-0.08, 0, 0)
+    const bugWingMat = new THREE.MeshBasicMaterial({ color: '#ffe9a8', side: THREE.DoubleSide, transparent: true, opacity: 0.92 })
     // 물고기 그림 (종류·이로치마다 한 번만 읽음)
     const textures = new Map<string, THREE.Texture>()
     const textureOf = (c: Catch) => {
@@ -223,8 +240,31 @@ export function Scene3D({ world, step, onTapPlayer }: { world: World; step: (dt:
       reel.position.y = 0.4
       const tip = new THREE.Object3D()
       tip.position.y = 3.2
-      rod.add(stick, reel, tip)
+      // 잠자리채: 긴 자루 + 끝에 테 + 하얀 그물 (곤충 채집)
+      const netHandle = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.045, 2.6, 6), mat('#e8c27a', 0.6))
+      netHandle.position.y = 1.3
+      const hoop = new THREE.Mesh(netHoopGeo, netHoopMat)
+      hoop.position.y = 3.05
+      hoop.rotation.x = Math.PI / 2
+      const bag = new THREE.Mesh(netBagGeo, netBagMat)
+      bag.position.set(0, 3.05, -0.32)
+      bag.rotation.x = -Math.PI / 2
+      const netParts = [netHandle, hoop, bag]
+      for (const o of netParts) (o.visible = false)
+      rod.add(stick, reel, tip, ...netParts)
       rod.visible = false
+      // 팔랑이는 곤충 (몸 + 날개 둘)
+      const bug = new THREE.Group()
+      const bugBody = new THREE.Mesh(bugBodyGeo, bugBodyMat)
+      bugBody.rotation.z = Math.PI / 2
+      const wl = new THREE.Mesh(bugWingGeo, bugWingMat)
+      const wr = new THREE.Mesh(bugWingGeo, bugWingMat)
+      wl.position.x = -0.06
+      wr.position.x = 0.06
+      wr.scale.x = -1
+      bug.add(bugBody, wl, wr)
+      bug.userData.wings = [wl, wr]
+      bug.visible = false
       rig.root.add(rod)
       // 뿅망치: 빨강·노랑 장난감 망치 (평소엔 숨김, 휘두를 때만)
       const hammer = new THREE.Group()
@@ -255,7 +295,7 @@ export function Scene3D({ world, step, onTapPlayer }: { world: World; step: (dt:
       const held = new THREE.Sprite(new THREE.SpriteMaterial({ transparent: true, depthWrite: false }))
       held.visible = false
       held.renderOrder = 2
-      scene.add(line, bob, ring, held)
+      scene.add(line, bob, ring, held, bug)
       const tag = document.createElement('div')
       tag.className = 'fs-tag'
       const bubble = document.createElement('div')
@@ -270,11 +310,11 @@ export function Scene3D({ world, step, onTapPlayer }: { world: World; step: (dt:
       // 위에서부터 말풍선 · ! · 들고 있는 물고기 이름 · 내 이름 (기준점이 맨 아래 = 머리 위)
       tag.append(bubble, bang, pop, name)
       layer!.appendChild(tag)
-      return { id, rig, rod, tip, line, bob, ring, tag, bubble, bang, pop, popKey: '', avatar, held, heldKey: '', prev: 'none', castAt: -9e9, reelAt: -9e9, lastBob: null, ringMat, hammer, lastHit: 0 }
+      return { id, rig, rod, rodParts: [stick, reel], netParts, bug, tip, line, bob, ring, tag, bubble, bang, pop, popKey: '', avatar, held, heldKey: '', prev: 'none', castAt: -9e9, reelAt: -9e9, lastBob: null, ringMat, hammer, lastHit: 0 }
     }
 
     function removeActor(a: Actor) {
-      scene.remove(a.rig.root, a.line, a.bob, a.ring, a.held)
+      scene.remove(a.rig.root, a.line, a.bob, a.ring, a.held, a.bug)
       a.held.material.dispose()
       a.ringMat.dispose()
       a.rig.dispose()
@@ -485,8 +525,14 @@ export function Scene3D({ world, step, onTapPlayer }: { world: World; step: (dt:
         const caught = !!p.popup && !!p.popup.from && now - p.popup.start < 420
         const showRod = p.fishing !== 'none' || reelK < 0.5 || caught
         a.rod.visible = showRod && !holding
+        const netOn = !!(p.net ?? a.rod.userData.net)
+        if (p.fishing !== 'none') a.rod.userData.net = !!p.net
+        for (const o of a.rodParts) o.visible = !netOn
+        for (const o of a.netParts) o.visible = netOn
         let rodX = 0.95
-        if (p.fishing === 'bite') rodX = 1.22 + Math.sin(t * 26) * 0.12
+        if (netOn && p.fishing === 'bite') rodX = 1.45 + Math.sin(t * 22) * 0.1
+        else if (netOn && p.fishing === 'cast') rodX = castK < 0.2 ? 0.95 - (castK / 0.2) * 1.1 : castK < 0.45 ? -0.15 + ((castK - 0.2) / 0.25) * 1.75 : 1.6 - Math.min(1, (castK - 0.45) / 0.4) * 0.2 + Math.sin(t * 2.2) * 0.04
+        else if (p.fishing === 'bite') rodX = 1.22 + Math.sin(t * 26) * 0.12
         else if (p.fishing === 'cast') rodX = castAngle(castK)
         else if (caught) rodX = 0.95 - Math.min(1, (now - p.popup!.start) / 160) * 1.1
         else if (reelK < 0.5) rodX = 0.95 - Math.sin((reelK / 0.5) * Math.PI) * 0.55
@@ -498,7 +544,25 @@ export function Scene3D({ world, step, onTapPlayer }: { world: World; step: (dt:
         let bobVisible = false
         let sag = 0.5
         const target = p.bob ?? a.lastBob
-        if (p.fishing !== 'none' && target) {
+        // 곤충 채집: 줄·찌 대신 곤충이 그 자리에서 팔랑 (걸리면 파닥파닥)
+        a.bug.visible = netOn && p.fishing !== 'none' && !!target
+        if (a.bug.visible && target) {
+          const biting = p.fishing === 'bite'
+          const hy = bugHeightAt(target[0], target[1])
+          const ph = t * (biting ? 3.5 : 1.3) + hash(p.id)
+          const rad = biting ? 0.06 : 0.22
+          a.bug.position.set(target[0] + Math.cos(ph) * rad, hy + Math.sin(ph * 1.7) * (biting ? 0.04 : 0.12), target[1] + Math.sin(ph) * rad)
+          a.bug.rotation.y = -ph
+          const flap = Math.sin(t * (biting ? 60 : 22)) * 0.9
+          const [wl, wr] = a.bug.userData.wings as THREE.Mesh[]
+          wl.rotation.z = flap
+          wr.rotation.z = -flap
+        }
+        if (netOn) {
+          a.bob.visible = false
+          a.line.visible = false
+          a.ring.visible = false
+        } else if (p.fishing !== 'none' && target) {
           bobVisible = true
           const fly = (castK - 0.32) / 0.45
           if (fly < 0) {
@@ -534,7 +598,7 @@ export function Scene3D({ world, step, onTapPlayer }: { world: World; step: (dt:
         // 물결: 입질 중엔 계속, 찌가 떨어진 순간엔 한 번 퐁
         const landK = castK - 0.77
         const splash = p.fishing !== 'none' && landK >= 0 && landK < 0.6
-        a.ring.visible = !!target && (p.fishing === 'bite' || splash)
+        a.ring.visible = !netOn && !!target && (p.fishing === 'bite' || splash)
         if (a.ring.visible && target) {
           const k = p.fishing === 'bite' ? (t * 1.6) % 1 : landK / 0.6
           a.ring.position.set(target[0], 0.02, target[1])
@@ -765,6 +829,7 @@ export function Scene3D({ world, step, onTapPlayer }: { world: World; step: (dt:
       for (const a of actors.values()) removeActor(a)
       art.dispose()
       bobGeo.dispose()
+      for (const d of [netHoopGeo, netHoopMat, netBagGeo, netBagMat, bugBodyGeo, bugBodyMat, bugWingGeo, bugWingMat]) d.dispose()
       ringGeo.dispose()
       stage.dispose()
     }

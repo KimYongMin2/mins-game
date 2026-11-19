@@ -1,6 +1,8 @@
 // 낚시터 물고기 (사용자와 정함 2026-11-17): 25종 + 꽝 3개, 이로치 7가지. 그림은 field/fishArt.ts.
 // 잡히는 물고기·크기·이로치는 서버가 정한다(가짜 물고기 막기) — 이 파일은 서버 심판과 화면이 같이 씀.
 
+import { BUGS, type BugDef, type Habitat, rollBug } from './bugs'
+
 export type Zone = 'sea' | 'fresh'
 export type Rarity = 'common' | 'normal' | 'rare' | 'epic' | 'legend' | 'junk'
 export type FishDef = { id: string; name: string; rarity: Rarity; zone: Zone | 'both'; min: number; max: number }
@@ -42,7 +44,8 @@ export const FISH: FishDef[] = [
   { id: 'kelp', name: '미역', rarity: 'junk', zone: 'both', min: 0, max: 0 },
 ]
 
-export const fishById = (id: string) => FISH.find((f) => f.id === id)
+/** 물고기나 곤충 (곤충 채집도 같은 도감·가방·자랑을 씀 — id가 겹치지 않음) */
+export const fishById = (id: string): FishDef | BugDef | undefined => FISH.find((f) => f.id === id) ?? BUGS.find((x) => x.id === id)
 /** 도감에 칸이 있는 물고기 (꽝 빼고) */
 export const DEX_FISH = FISH.filter((f) => f.rarity !== 'junk')
 
@@ -105,3 +108,7 @@ export function rollCatch(rand: () => number, zone: Zone): Catch {
 
 /** 자랑할 만한지: 희귀 이상이거나 이로치 */
 export const isBig = (c: Catch) => !!c.iro || ['rare', 'epic', 'legend'].includes(fishById(c.fish)?.rarity ?? '')
+
+/** 잡힌 곤충 정하기 (물고기와 같은 등급 비율·이로치) */
+export const rollBugCatch = (rand: () => number, zone: Habitat, night: boolean): Catch =>
+  rollBug(rand, zone, night, Object.fromEntries(Object.entries(RARITY).map(([k, r]) => [k, r.weight])) as Record<Rarity, number>, IRO)

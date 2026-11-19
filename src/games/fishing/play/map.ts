@@ -430,3 +430,44 @@ export function nearBed(x: number, z: number): number | null {
 }
 
 const round = (v: number) => Math.round(v * 100) / 100
+
+// ── 곤충 채집 (사용자 요청 2026-11-19): 나무(소나무·둥근 나무) 가까이 = 숲, 꽃밭·밭 안이나 가 = 꽃밭 ──
+/** 나무 둘레에서 이만큼 안이면 채집할 수 있음 (m) */
+export const BUG_REACH = 2.4
+const BUG_TREES = S.filter((s) => s.kind === 'pine' || s.kind === 'tree')
+const MEADOWS = S.filter((s) => s.kind === 'flowers' || s.kind === 'field')
+/** 곤충이 있는 높이 (그림용) */
+export const BUG_Y = { forest: 1.25, meadow: 0.45 } as const
+/**
+ * 채집할 곳: 가까운 나무 줄기(숲) 또는 바라보는 쪽 꽃밭(꽃밭). 둘 다 없으면 null.
+ * bob = 곤충이 앉은 자리, r = 그쪽을 보는 방향
+ */
+export function bugSpot(x: number, z: number, r: number): { zone: 'forest' | 'meadow'; bob: [number, number]; r: number } | null {
+  let best: Struct | null = null
+  let bestD = BUG_REACH
+  for (const t of BUG_TREES) {
+    const d = Math.hypot(t.x - x, t.z - z) - (t.c ?? 0)
+    if (d < bestD) {
+      bestD = d
+      best = t
+    }
+  }
+  if (best) {
+    const dx = x - best.x, dz = z - best.z
+    const len = Math.hypot(dx, dz) || 1
+    const rr = (best.c ?? 0.5) * 0.45 + 0.12
+    return { zone: 'forest', bob: [round(best.x + (dx / len) * rr), round(best.z + (dz / len) * rr)], r: Math.atan2(-dx, -dz) }
+  }
+  for (const m of MEADOWS) {
+    const hw = m.w! / 2, hd = m.d! / 2
+    if (Math.abs(x - m.x) > hw + 1.5 || Math.abs(z - m.z) > hd + 1.5) continue
+    const bx = Math.max(m.x - hw + 0.3, Math.min(m.x + hw - 0.3, x + Math.sin(r) * 1.4))
+    const bz = Math.max(m.z - hd + 0.3, Math.min(m.z + hd - 0.3, z + Math.cos(r) * 1.4))
+    return { zone: 'meadow', bob: [round(bx), round(bz)], r: Math.hypot(bx - x, bz - z) > 0.3 ? Math.atan2(bx - x, bz - z) : r }
+  }
+  return null
+}
+/** 곤충 자리의 높이 (나무 줄기에 붙었으면 숲 높이, 아니면 꽃 높이) — 그림용 */
+export function bugHeightAt(x: number, z: number): number {
+  return BUG_TREES.some((t) => Math.hypot(t.x - x, t.z - z) < (t.c ?? 0.5) + 0.6) ? BUG_Y.forest : BUG_Y.meadow
+}

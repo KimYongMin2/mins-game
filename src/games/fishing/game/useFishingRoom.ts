@@ -4,7 +4,7 @@ import { REFEREE_FROM } from '../../../shared/online/hubProtocol'
 import { encodeLook } from '../../../shared/art3d/animalKinds'
 import { loadLook } from '../../../shared/storage/avatar'
 import { type Catch, fishById, isBig } from '../play/fish'
-import { castTarget, nearBed, moveBy, RUN_SPEED, SEATS, nearSeat, WALK_SPEED, BEDS, BOAT_SLOTS, BOAT_REACH, BOAT_SPEED, CASTLES, CRATES, LADDERS, nearCastle, landingSpot, moveBoat, nearLadder, onLadderTop } from '../play/map'
+import { bugSpot, castTarget, nearBed, moveBy, RUN_SPEED, SEATS, nearSeat, WALK_SPEED, BEDS, BOAT_SLOTS, BOAT_REACH, BOAT_SPEED, CASTLES, CRATES, LADDERS, nearCastle, landingSpot, moveBoat, nearLadder, onLadderTop } from '../play/map'
 import {
   type Act,
   type BagItem,
@@ -92,7 +92,7 @@ export const CAM_LIMITS = { third: { min: 0.2, max: 1.35 }, first: { min: -0.7, 
 export type Toast = { key: number; text: string; color: string; c?: Catch }
 export type ChatLine = { key: number; name: string; text: string; mine: boolean }
 /** 낚시 버튼 (T): 던지기 · 거두기 · 잡기, 못 하면 null (폰은 그때 버튼이 안 보임) */
-export type FishAct = 'cast' | 'reelIn' | 'reel' | null
+export type FishAct = 'cast' | 'net' | 'reelIn' | 'reel' | null
 /** 작은 버튼 (E): 배 타기·내리기, 사다리 오르기·내려가기 */
 export type Alt = 'board' | 'unboard' | 'climb' | 'down' | 'noLand' | 'build' | 'bed' | 'sit' | 'lieBed' | 'stand' | null
 
@@ -178,7 +178,7 @@ export function useFishingRoom(nickname: string, active: boolean) {
       // 내 위치는 내 기기가 정함 — 서버와 많이 어긋났거나(물·막힘) 썬베드에 누웠거나 배·사다리가 바뀌었을 때만 맞춤
       const changedSpot = p.ride !== old.ride || p.up !== old.up || p.seat !== old.seat
       const snap = !isMe || p.bed !== null || changedSpot || Math.hypot(p.x - old.x, p.z - old.z) > 1.5
-      Object.assign(old, { name: p.name, avatar: p.avatar, bed: p.bed, fishing: p.fishing, bob: p.bob, ride: p.ride, up: p.up, act: p.act, seat: p.seat })
+      Object.assign(old, { name: p.name, avatar: p.avatar, bed: p.bed, fishing: p.fishing, bob: p.bob, net: p.net, ride: p.ride, up: p.up, act: p.act, seat: p.seat })
       if (changedSpot) {
         old.sx = old.x = p.x
         old.sz = old.z = p.z
@@ -280,7 +280,7 @@ export function useFishingRoom(nickname: string, active: boolean) {
         case 'escape':
           if (m.id === world.me) {
             playSound('escape')
-            toast('놓쳤어요… 입질이 오면 5초 안에 눌러요', '#c9c4f0')
+            toast(world.players.get(m.id)?.net ? '곤충이 날아갔어요… ! 가 뜨면 5초 안에 눌러요' : '놓쳤어요… 입질이 오면 5초 안에 눌러요', '#c9c4f0')
           }
           return
         case 'catch': {
@@ -288,11 +288,11 @@ export function useFishingRoom(nickname: string, active: boolean) {
           if (p) p.popup = { c: m.c, start: now, until: now + 3800, from: p.bob ? [p.bob[0], p.bob[1]] : null }
           const f = fishById(m.c.fish)
           if (m.id === world.me) {
-            playSound(isBig(m.c) ? 'big' : f?.rarity === 'junk' ? 'junk' : 'catch')
+            playSound(isBig(m.c) ? 'big' : f?.rarity === 'junk' ? 'junk' : f && 'bug' in f ? 'bug' : 'catch')
             buzz(isBig(m.c) ? [60, 40, 60, 40, 260] : 70)
             setMyCatch({ c: m.c, best: m.best, key: ++keySeq.current })
           } else if (m.big) playSound('cheer')
-          if (m.big) toast(`${m.name}님이 ${iroName(m.c)}${f?.name ?? ''}${m.c.size ? ` ${m.c.size}cm` : ''}를 낚았어요!`, '#ffd23f', m.c)
+          if (m.big) toast(`${m.name}님이 ${iroName(m.c)}${f?.name ?? ''}${m.c.size ? ` ${m.c.size}cm` : ''}를 ${f && 'bug' in f ? '잡았어요' : '낚았어요'}!`, '#ffd23f', m.c)
           return
         }
         case 'chat': {
@@ -515,7 +515,7 @@ export function useFishingRoom(nickname: string, active: boolean) {
         setFishAct(null)
         return setAlt(null)
       }
-      setFishAct(me.fishing === 'bite' ? 'reel' : me.fishing === 'cast' ? 'reelIn' : canFish(me) ? 'cast' : null)
+      setFishAct(me.fishing === 'bite' ? 'reel' : me.fishing === 'cast' ? 'reelIn' : canFish(me) ? 'cast' : canBug(me) ? 'net' : null)
       setAlt(altFor(world, me))
     }, 150)
     return () => clearInterval(t)
@@ -531,14 +531,15 @@ export function useFishingRoom(nickname: string, active: boolean) {
       playSound('cast')
       return send({ t: 'cast' })
     }
-    const t = castTarget(me.x, me.z, me.r) ?? castTarget(me.x, me.z, me.r + Math.PI)
-    if (!t) return toast('물가로 가서 던져요', '#c9c4f0')
+    // 물이 없으면 곤충 채집 (숲 나무 가까이·꽃밭)
+    const t = castTarget(me.x, me.z, me.r) ?? castTarget(me.x, me.z, me.r + Math.PI) ?? (canBug(me) ? bugSpot(me.x, me.z, me.r) : null)
+    if (!t) return toast('물가로 가면 낚시, 숲 나무 가까이·꽃밭에선 곤충 채집', '#c9c4f0')
     // 물 쪽으로 돌아서 던짐 (서버는 마지막 위치·방향으로 다시 확인)
     me.r = me.sr = t.r
     world.vel.x = world.vel.z = 0
     send({ t: 'mv', x: round(me.x), z: round(me.z), r: round(t.r) })
     lastSent.current = { at: performance.now(), x: me.x, z: me.z, r: t.r }
-    playSound('cast')
+    playSound('zone' in t && (t.zone === 'forest' || t.zone === 'meadow') ? 'net' : 'cast')
     send({ t: 'cast' })
   }, [send, world, toast])
 
@@ -649,6 +650,11 @@ function canFish(me: Shown): boolean {
   }
   if (me.seat !== null) return !!castTarget(me.x, me.z, me.r)
   return canCast(me)
+}
+/** 곤충 채집할 수 있는지 (걸어 다닐 때, 숲 나무 가까이·꽃밭) */
+function canBug(me: Shown): boolean {
+  if (me.bed !== null || me.seat !== null || me.ride !== null || me.up !== null) return false
+  return !!bugSpot(me.x, me.z, me.r)
 }
 /** 가까운 빈 자리 (집 침대·의자·벤치·통나무) */
 function freeSeat(world: World, me: Shown): number | null {

@@ -1,5 +1,6 @@
 // @ts-nocheck — SVG 그림 글자를 만드는 코드 (물고기 시안 https://claude.ai/artifact/7sSYAiXXQZnqB2P9NtqtCE 에서 옮김). 숫자·글자만 다뤄서 타입 검사는 생략
 import type { Iro } from '../play/fish'
+import { BUG_ART } from './bugArt'
 
 // 낚시터 물고기 그림: 몸 틀 8가지에 색·무늬·지느러미를 바꿔 25종 + 꽝 3개. 굵은 먹선 만화풍 2D(SVG).
 // 이로치는 밝기에 따라 다시 칠하는 SVG 필터(IRO_FILTERS를 페이지에 한 번 넣어 둠).
@@ -354,7 +355,7 @@ const coelacanth = () => stdFish({
   extra: (c, h) => lobe(98, c + h * 0.62, 70) + lobe(76, c + h * 0.5, 80) + lobe(92, c - h * 0.72, -100) +  `<path d="M16,${c - 6} q-8,6 0,12" fill="#7a3a8f" stroke="${INK}" stroke-width="2.5"/>`,
 })
 
-const ART: Record<string, () => string> = {
+const FISH_ART: Record<string, () => string> = {
   crucian: () => stdFish({ h: 34, top: '#8a7a3a', belly: '#e9dca2', fin: '#9c8a44', tail: 'round', pattern: [scales()] }),
   carp: () => stdFish({ h: 28, top: '#6c6a4a', belly: '#d9cf9a', fin: '#a4664a', tail: 'fork', barbels: true, pattern: [scales('rgba(31,26,77,0.25)')] }),
   mackerel: () => stdFish({ h: 22, top: '#2f7f8a', belly: '#e8eef4', fin: '#4a8a94', nose: 'pointed', finlets: '#8fc6cc', pattern: [waves('#173a3f')] }),
@@ -386,6 +387,9 @@ const ART: Record<string, () => string> = {
 }
 
 /** 이로치 필터 정의 (페이지에 한 번: <svg width=0 height=0>{IRO_FILTERS}</svg>) */
+/** 물고기 + 곤충 (곤충 그림은 bugArt.ts) */
+const ART: Record<string, () => string> = { ...FISH_ART, ...BUG_ART }
+
 export const IRO_FILTERS = `<filter id="iro-gold" color-interpolation-filters="sRGB">
       <feColorMatrix type="matrix" values="0.3 0.59 0.11 0 0  0.3 0.59 0.11 0 0  0.3 0.59 0.11 0 0  0 0 0 1 0"/>
       <feComponentTransfer><feFuncR type="table" tableValues="0.12 0.62 0.95 1"/><feFuncG type="table" tableValues="0.08 0.42 0.78 0.98"/><feFuncB type="table" tableValues="0.18 0.08 0.25 0.72"/></feComponentTransfer>
@@ -424,12 +428,13 @@ export const IRO_FILTERS = `<filter id="iro-gold" color-interpolation-filters="s
   `
 
 /** 물고기 그림 (viewBox 200×130 SVG 글자). bg = 바다·민물 바탕을 깔지 */
-export function fishSvg(id: string, iro: Iro | null = null, opts: { bg?: 'sea' | 'fresh' | null; silhouette?: boolean } = {}): string {
+export function fishSvg(id: string, iro: Iro | null = null, opts: { bg?: 'sea' | 'fresh' | 'forest' | 'meadow' | null; silhouette?: boolean } = {}): string {
   const draw = ART[id]
   if (!draw) return ''
   const bgId = `bg${uid++}`
+  const BG = { sea: ['#2d5f9e', '#173a6b'], fresh: ['#3f7a5a', '#1f4a37'], forest: ['#4a6a3a', '#26381e'], meadow: ['#7a9a4a', '#4a6a2a'] }
   const bg = opts.bg
-    ? `<defs>${lg(bgId, opts.bg === 'sea' ? '#2d5f9e' : '#3f7a5a', opts.bg === 'sea' ? '#173a6b' : '#1f4a37')}</defs><rect width="200" height="130" fill="url(#${bgId})"/>`
+    ? `<defs>${lg(bgId, BG[opts.bg][0], BG[opts.bg][1])}</defs><rect width="200" height="130" fill="url(#${bgId})"/>`
     : ''
   const filter = opts.silhouette ? ' filter="url(#fish-shadow)"' : iro ? ` filter="url(#iro-${iro})"` : ''
   return `<svg viewBox="0 0 200 130" xmlns="http://www.w3.org/2000/svg">${bg}<g${filter}>${draw()}</g></svg>`

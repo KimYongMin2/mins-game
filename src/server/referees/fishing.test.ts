@@ -2,6 +2,8 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import type { BagItem, ServerMsg } from '../../games/fishing/play/protocol'
 import { BOATS, BUILD_MS, CASTLES, CRATES, CRATE_RESPAWN_MS, LADDERS, SEATS, shoreZ } from '../../games/fishing/play/map'
 import { resetStore } from '../fishingStore'
+import { BUGS, rollBug } from '../../games/fishing/play/bugs'
+import { IRO, RARITY } from '../../games/fishing/play/fish'
 import { addToBag, fishingReferee } from './fishing'
 
 function setup(extra: string[] = []) {
@@ -298,6 +300,28 @@ describe('낚시터 심판', () => {
     expect(prof.bag).toHaveLength(1)
   })
 
+  it('곤충 채집: 숲 나무 가까이에서 잠자리채 → 4~10초 뒤 걸림 → 잡으면 곤충 (어항엔 못 넣음)', async () => {
+    const s = setup()
+    s.ref.input('a', { t: 'hi' })
+    walkTo(s, 'a', 0, 10)
+    walkTo(s, 'a', 24.5, 10)
+    walkTo(s, 'a', 24.8, 3.5)
+    expect(s.last('pos')!.l.find((x) => x[0] === 'a')![2]).toBeCloseTo(3.5)
+    s.ref.input('a', { t: 'cast' })
+    expect(s.last('st')?.p).toMatchObject({ fishing: 'cast', net: 1 })
+    for (let i = 0; i < 110 && !s.last('bite'); i++) s.tick(100)
+    expect(s.last('bite')?.id).toBe('a')
+    s.ref.input('a', { t: 'reel' })
+    await s.flushAsync()
+    const c = s.last('catch')!
+    expect(BUGS.some((b) => b.id === c.c.fish && (b.zone === 'forest' || b.zone === 'both'))).toBe(true)
+    expect(s.last('st')?.p.net).toBeUndefined()
+    const key = s.last('profile')!.profile.bag[0].k
+    s.ref.input('a', { t: 'tank', keys: [key] })
+    await s.flushAsync()
+    expect(s.last('profile')!.profile.tank).toEqual([])
+  })
+
   it('입질 뒤 5초가 지나면 도망', () => {
     const s = setup()
     s.ref.input('a', { t: 'hi' })
@@ -349,5 +373,25 @@ describe('낚시터 심판', () => {
     s.ref.input('a', { t: 'mv', x: b.x - Math.sin(r) * 1, z: b.z - Math.cos(r) * 1, r: r + Math.PI })
     s.ref.input('a', { t: 'bonk' })
     expect(s.last('bonk')?.to).toBeNull()
+  })
+})
+
+describe('곤충 고르기', () => {
+  const W = Object.fromEntries(Object.entries(RARITY).map(([k, r]) => [k, r.weight])) as Parameters<typeof rollBug>[3]
+  it('그곳·그 시간 곤충만, 크기는 범위 안', () => {
+    let seed = 7
+    const rand = () => ((seed = (seed * 16807) % 2147483647) / 2147483647)
+    for (const zone of ['forest', 'meadow'] as const)
+      for (const night of [false, true])
+        for (let i = 0; i < 400; i++) {
+          const c = rollBug(rand, zone, night, W, IRO)
+          const b = BUGS.find((x) => x.id === c.fish)!
+          expect(b.zone === zone || b.zone === 'both').toBe(true)
+          if (b.rarity !== 'junk') {
+            expect(b.time === 'any' || (b.time === 'night') === night, `${b.id} ${night}`).toBe(true)
+            expect(c.size).toBeGreaterThanOrEqual(b.min)
+            expect(c.size).toBeLessThanOrEqual(b.max)
+          }
+        }
   })
 })

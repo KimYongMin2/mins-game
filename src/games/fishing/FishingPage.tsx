@@ -3,6 +3,7 @@ import { HomeLink } from '../../shared/ui/HomeLink'
 import { canWebGL } from '../../shared/art3d/webgl'
 import { loadNickname } from '../../shared/storage/nickname'
 import { DEX_FISH, RARITY, fishById } from './play/fish'
+import { DEX_BUGS } from './play/bugs'
 import { CHAT_MAX, FISHING_CAPACITY } from './play/protocol'
 import { IRO_FILTERS, SHADOW_FILTER, fishSvg } from './field/fishArt'
 import { type Alt, CAM_LIMITS, type FishAct, iroName, useFishingRoom } from './game/useFishingRoom'
@@ -19,7 +20,7 @@ const Scene3D = lazy(() => import('./game/Scene3D').then((m) => ({ default: m.Sc
 // 조작 (사용자 요청 2026-11-19): PC — 걷기 WASD·방향키 · 달리기 Shift · 앉기 Ctrl · 점프 Space · 뿅망치 F · 상호작용 R · 낚시 T
 // 폰 — 왼쪽 아래 조이스틱(끝까지 밀면 달리기), 오른쪽 점프·뿅, 상호작용·낚시 버튼은 할 수 있을 때만 뜸
 const ALT_LABEL: Record<NonNullable<Alt>, string> = { board: '배 타기', unboard: '내리기', noLand: '내리기', climb: '올라가기', down: '내려가기', build: '모래성 쌓기', bed: '눕기', lieBed: '눕기', sit: '앉기', stand: '일어나기' }
-const FISH_LABEL: Record<NonNullable<FishAct>, string> = { cast: '낚시', reelIn: '거두기', reel: '잡기!' }
+const FISH_LABEL: Record<NonNullable<FishAct>, string> = { cast: '낚시', net: '채집', reelIn: '거두기', reel: '잡기!' }
 
 const isTouch = () => typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches
 const isPortrait = () => window.innerHeight > window.innerWidth
@@ -180,9 +181,10 @@ export function FishingPage() {
         <p className="fs-start__lead">바닷가에서 친구들과 같이 낚시해요. 조이스틱으로 걸어 다니다가 물가나 썬베드에서 낚싯대를 던지고, 입질이 오면 5초 안에 한 번 눌러요.</p>
         <ul className="fs-start__rules">
           <li>바다(부두·바닷가)와 민물(개울·연못)에서 잡히는 물고기가 달라요 — 모두 {DEX_FISH.length}종 + 꽝</li>
-          <li>어떤 물고기든 아주 드물게 다른 색(이로치)으로 나와요</li>
+          <li>숲 나무 가까이·꽃밭에선 잠자리채로 곤충 채집 — {DEX_BUGS.length}종 + 꽝, 밤에만 나오는 곤충도 있어요</li>
+          <li>어떤 물고기·곤충이든 아주 드물게 다른 색(이로치)으로 나와요</li>
           <li>잡은 것 중 10마리를 어항에 넣으면 다른 사람이 나를 눌러 구경해요</li>
-          <li>한 낚시터에 {FISHING_CAPACITY}명까지 · PC: WASD·방향키 걷기 · Shift 달리기 · Ctrl 앉기 · Space 점프 · F 뿅망치 · R 상호작용(배·사다리·눕기·앉기·모래성) · T 낚시 · Q·E·화면 끌기 시점 · V 1인칭</li>
+          <li>한 낚시터에 {FISHING_CAPACITY}명까지 · PC: WASD·방향키 걷기 · Shift 달리기 · Ctrl 앉기 · Space 점프 · F 뿅망치 · R 상호작용(배·사다리·눕기·앉기·모래성) · T 낚시·채집 · Q·E·화면 끌기 시점 · V 1인칭</li>
           <li>폰: 왼쪽 아래 조이스틱(끝까지 밀면 달리기) · 오른쪽 점프·뿅 · 낚시·상호작용 버튼은 할 수 있을 때만 떠요</li>
         </ul>
         {!canWebGL() && <p className="error">이 기기는 3D 화면을 그릴 수 없어서 낚시터에 들어갈 수 없어요</p>}
@@ -200,7 +202,7 @@ export function FishingPage() {
       </main>
     )
 
-  const myDex = room.profile ? DEX_FISH.filter((f) => room.profile!.dex[f.id]).length : 0
+  const myDex = room.profile ? [...DEX_FISH, ...DEX_BUGS].filter((f) => room.profile!.dex[f.id]).length : 0
 
   return (
     <main className="fs-game">
@@ -224,7 +226,7 @@ export function FishingPage() {
           {firstPerson ? '1인칭' : '3인칭'}
         </button>
         <button type="button" className="fs-key" onClick={() => setSheet('dex')}>
-          도감 {myDex}/{DEX_FISH.length}
+          도감 {myDex}/{DEX_FISH.length + DEX_BUGS.length}
         </button>
         <button type="button" className="fs-key" onClick={() => setSheet('tank')}>
           내 어항

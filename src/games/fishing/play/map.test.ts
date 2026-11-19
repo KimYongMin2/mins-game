@@ -116,3 +116,12 @@ describe('낚시터 맵', () => {
     expect(castTarget(-82, PIER2_END.minZ + 0.5, Math.PI)?.zone).toBe('sea')
   })
 })
+
+describe('곤충 채집 자리', () => {
+  it('나무 가까이는 숲, 꽃밭은 꽃밭, 모래사장은 없음', async () => {
+    const { bugSpot } = await import('./map')
+    expect(bugSpot(24.8, 3.5, 0)?.zone).toBe('forest')
+    expect(bugSpot(52, 70, 0)?.zone).toBe('meadow')
+    expect(bugSpot(0, 9, 0)).toBeNull()
+  })
+})

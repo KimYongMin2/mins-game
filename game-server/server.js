@@ -12154,6 +12154,101 @@ function fightReferee(_setup, ctx) {
 	};
 }
 //#endregion
+//#region src/games/fishing/play/bugs.ts
+const b = (id, name, rarity, zone, time, min, max) => ({
+	id,
+	name,
+	rarity,
+	zone,
+	time,
+	min,
+	max,
+	bug: true
+});
+const BUGS = [
+	b("whitebfly", "배추흰나비", "common", "meadow", "day", 4, 6),
+	b("ladybug", "무당벌레", "common", "meadow", "any", .5, 1),
+	b("reddfly", "고추잠자리", "common", "meadow", "day", 4, 5),
+	b("grasshopper", "메뚜기", "common", "meadow", "day", 3, 6),
+	b("cricket", "귀뚜라미", "common", "meadow", "night", 1.5, 3),
+	b("honeybee", "꿀벌", "common", "meadow", "day", 1, 1.6),
+	b("ant", "개미", "common", "forest", "any", .5, 1.5),
+	b("cicada", "매미", "common", "forest", "day", 3, 6),
+	b("swallowtail", "호랑나비", "normal", "meadow", "day", 8, 12),
+	b("mantis", "사마귀", "normal", "meadow", "any", 6, 10),
+	b("longhopper", "방아깨비", "normal", "meadow", "day", 4, 10),
+	b("bigdfly", "왕잠자리", "normal", "meadow", "day", 7, 9),
+	b("chafer", "풍뎅이", "normal", "forest", "day", 1.5, 3),
+	b("firefly", "반딧불이", "normal", "forest", "night", 1, 1.8),
+	b("stick", "대벌레", "normal", "forest", "any", 7, 12),
+	b("stag", "사슴벌레", "rare", "forest", "night", 3, 8),
+	b("rhino", "장수풍뎅이", "rare", "forest", "night", 4, 8.5),
+	b("longhorn", "하늘소", "rare", "forest", "day", 3, 5),
+	b("jewel", "비단벌레", "rare", "forest", "day", 3, 4),
+	b("morpho", "모르포나비", "rare", "meadow", "day", 10, 15),
+	b("bighorn", "장수하늘소", "epic", "forest", "day", 7, 11),
+	b("atlas", "아틀라스나방", "epic", "forest", "night", 20, 28),
+	b("goliath", "골리앗꽃무지", "epic", "forest", "any", 6, 11),
+	b("hercules", "헤라클레스장수풍뎅이", "legend", "forest", "night", 12, 17),
+	b("birdwing", "여왕새날개나비", "legend", "meadow", "day", 20, 28),
+	b("leaf", "나뭇잎", "junk", "both", "any", 0, 0),
+	b("twig", "나뭇가지", "junk", "both", "any", 0, 0),
+	b("web", "거미줄", "junk", "both", "any", 0, 0)
+];
+const bugById = (id) => BUGS.find((x) => x.id === id);
+const isBugId = (id) => !!bugById(id);
+BUGS.filter((x) => x.rarity !== "junk");
+/** 밤 = 낚시터 시계로 저녁 7시 ~ 아침 5시 */
+const isNightHour = (h) => h >= 19 || h < 5;
+/**
+* 잡힌 곤충 정하기 (서버 난수): 등급(물고기와 같은 비율) → 그곳·그 시간에 나오는 그 등급 곤충 → 크기 → 이로치.
+* 그 등급이 없으면 한 단계 아래로.
+*/
+function rollBug(rand, zone, night, weights, iros) {
+	const total = Object.values(weights).reduce((a, w) => a + w, 0);
+	let pick = rand() * total;
+	let rarity = "common";
+	for (const [k, w] of Object.entries(weights)) {
+		pick -= w;
+		if (pick < 0) {
+			rarity = k;
+			break;
+		}
+	}
+	const fits = (x) => (x.zone === zone || x.zone === "both") && (x.time === "any" || x.time === "night" === night);
+	let pool = BUGS.filter((x) => x.rarity === rarity && fits(x));
+	const order = [
+		"legend",
+		"epic",
+		"rare",
+		"normal",
+		"common"
+	];
+	for (let i = order.indexOf(rarity); pool.length === 0 && i >= 0 && i < order.length - 1; i++) pool = BUGS.filter((x) => x.rarity === order[i + 1] && fits(x));
+	if (pool.length === 0) pool = BUGS.filter((x) => x.rarity === "common" && x.zone === zone);
+	const bug = pool[Math.floor(rand() * pool.length)];
+	if (bug.rarity === "junk") return {
+		fish: bug.id,
+		iro: null,
+		size: 0
+	};
+	const size = Math.round((bug.min + (bug.max - bug.min) * Math.pow(rand(), 1.6)) * 10) / 10;
+	let r = rand() * 100;
+	let iro = null;
+	for (const x of iros) {
+		r -= x.odds;
+		if (r < 0) {
+			iro = x.id;
+			break;
+		}
+	}
+	return {
+		fish: bug.id,
+		iro,
+		size
+	};
+}
+//#endregion
 //#region src/games/fishing/play/fish.ts
 const FISH = [
 	{
@@ -12381,7 +12476,8 @@ const FISH = [
 		max: 0
 	}
 ];
-const fishById = (id) => FISH.find((f) => f.id === id);
+/** 물고기나 곤충 (곤충 채집도 같은 도감·가방·자랑을 씀 — id가 겹치지 않음) */
+const fishById = (id) => FISH.find((f) => f.id === id) ?? BUGS.find((x) => x.id === id);
 FISH.filter((f) => f.rarity !== "junk");
 const RARITY = {
 	common: {
@@ -12509,6 +12605,15 @@ const isBig = (c) => !!c.iro || [
 	"epic",
 	"legend"
 ].includes(fishById(c.fish)?.rarity ?? "");
+/** 잡힌 곤충 정하기 (물고기와 같은 등급 비율·이로치) */
+const rollBugCatch = (rand, zone, night) => rollBug(rand, zone, night, Object.fromEntries(Object.entries(RARITY).map(([k, r]) => [k, r.weight])), IRO);
+const KST = 324e5;
+/** 낚시터 시각 (0~24). 주소 꼬리 ?hour=21 이면 그 시각으로 고정 (확인용) */
+function gameHour(now = Date.now()) {
+	const q = typeof location !== "undefined" ? new URLSearchParams(location.search).get("hour") : null;
+	if (q !== null && !Number.isNaN(Number(q))) return Number(q);
+	return ((now + KST) / 36e5 * 6 % 24 + 24) % 24;
+}
 //#endregion
 //#region src/games/fishing/play/map.ts
 const BOUNDS = {
@@ -13633,10 +13738,53 @@ function nearBed(x, z) {
 	return best;
 }
 const round = (v) => Math.round(v * 100) / 100;
+/** 나무 둘레에서 이만큼 안이면 채집할 수 있음 (m) */
+const BUG_REACH = 2.4;
+const BUG_TREES = S.filter((s) => s.kind === "pine" || s.kind === "tree");
+const MEADOWS = S.filter((s) => s.kind === "flowers" || s.kind === "field");
+/**
+* 채집할 곳: 가까운 나무 줄기(숲) 또는 바라보는 쪽 꽃밭(꽃밭). 둘 다 없으면 null.
+* bob = 곤충이 앉은 자리, r = 그쪽을 보는 방향
+*/
+function bugSpot(x, z, r) {
+	let best = null;
+	let bestD = BUG_REACH;
+	for (const t of BUG_TREES) {
+		const d = Math.hypot(t.x - x, t.z - z) - (t.c ?? 0);
+		if (d < bestD) {
+			bestD = d;
+			best = t;
+		}
+	}
+	if (best) {
+		const dx = x - best.x, dz = z - best.z;
+		const len = Math.hypot(dx, dz) || 1;
+		const rr = (best.c ?? .5) * .45 + .12;
+		return {
+			zone: "forest",
+			bob: [round(best.x + dx / len * rr), round(best.z + dz / len * rr)],
+			r: Math.atan2(-dx, -dz)
+		};
+	}
+	for (const m of MEADOWS) {
+		const hw = m.w / 2, hd = m.d / 2;
+		if (Math.abs(x - m.x) > hw + 1.5 || Math.abs(z - m.z) > hd + 1.5) continue;
+		const bx = Math.max(m.x - hw + .3, Math.min(m.x + hw - .3, x + Math.sin(r) * 1.4));
+		const bz = Math.max(m.z - hd + .3, Math.min(m.z + hd - .3, z + Math.cos(r) * 1.4));
+		return {
+			zone: "meadow",
+			bob: [round(bx), round(bz)],
+			r: Math.hypot(bx - x, bz - z) > .3 ? Math.atan2(bx - x, bz - z) : r
+		};
+	}
+	return null;
+}
 //#endregion
 //#region src/games/fishing/play/protocol.ts
 /** 입질까지 (ms) */
 const BITE_MIN_MS = 7e3;
+/** 곤충 채집: 잠자리채를 대고 곤충이 걸리기까지 (ms) — 낚시보다 조금 빨리 */
+const BUG_MIN_MS = 4e3;
 /** 입질 뒤 이만큼 안에 눌러야 잡힘 */
 const BITE_WINDOW_MS = 5e3;
 /** 뿅망치가 닿는 거리 (m)와 다시 휘두를 수 있는 간격 */
@@ -13760,6 +13908,7 @@ const pub = (p) => ({
 	bed: p.bed,
 	fishing: p.fishing,
 	bob: p.bob,
+	...p.net ? { net: 1 } : {},
 	ride: p.ride,
 	up: p.up,
 	act: p.act,
@@ -13915,6 +14064,7 @@ function fishingReferee(_setup, ctx) {
 		p.fishing = "none";
 		p.bob = null;
 		p.zone = null;
+		delete p.net;
 		return true;
 	}
 	function move(p, m) {
@@ -13994,7 +14144,9 @@ function fishingReferee(_setup, ctx) {
 	function cast(p) {
 		if (p.fishing !== "none") return;
 		const bed = p.bed !== null ? BEDS[p.bed] : null;
-		const t = bed ? castTarget(bed.x, bed.z, bed.r) : castTarget(p.x, p.z, p.r);
+		const water = bed ? castTarget(bed.x, bed.z, bed.r) : castTarget(p.x, p.z, p.r);
+		const bug = !water && !bed && p.ride === null && p.up === null && p.seat === null ? bugSpot(p.x, p.z, p.r) : null;
+		const t = water ?? bug;
 		if (!t) return send(p.id, {
 			t: "st",
 			p: pub(p)
@@ -14003,11 +14155,13 @@ function fishingReferee(_setup, ctx) {
 		p.fishing = "cast";
 		p.bob = t.bob;
 		p.zone = t.zone;
+		if (bug) p.net = 1;
+		else delete p.net;
 		if (!bed) p.r = r2(t.r);
 		p.castAt = now;
 		p.castX = p.x;
 		p.castZ = p.z;
-		p.biteAt = now + BITE_MIN_MS + rand() * 9e3;
+		p.biteAt = now + (bug ? BUG_MIN_MS + rand() * 6e3 : BITE_MIN_MS + rand() * 9e3);
 		all({
 			t: "st",
 			p: pub(p)
@@ -14022,7 +14176,7 @@ function fishingReferee(_setup, ctx) {
 			});
 		}
 		if (p.fishing !== "bite" || !p.zone) return;
-		const c = rollCatch(rand, p.zone);
+		const c = p.zone === "forest" || p.zone === "meadow" ? rollBugCatch(rand, p.zone, isNightHour(gameHour(Date.now()))) : rollCatch(rand, p.zone);
 		stopFishing(p);
 		const item = {
 			k: crypto.randomUUID().slice(0, 12),
@@ -14331,7 +14485,7 @@ function fishingReferee(_setup, ctx) {
 		const uid = p.uid;
 		const profile = await loadProfile(uid);
 		const have = new Set(profile.bag.map((x) => x.k));
-		profile.tank = [...new Set(keys.filter((k) => typeof k === "string" && have.has(k)))].slice(0, 10);
+		profile.tank = [...new Set(keys.filter((k) => typeof k === "string" && have.has(k) && !isBugId(profile.bag.find((x) => x.k === k).f)))].slice(0, 10);
 		markDirty(uid, p.name);
 		send(p.id, {
 			t: "profile",

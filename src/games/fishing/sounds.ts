@@ -1,13 +1,20 @@
 import { noise, tone } from '../../shared/audio/synth'
 
 // 낚시터 효과음 (Web Audio 합성)
-type Name = 'cast' | 'bite' | 'catch' | 'big' | 'junk' | 'escape' | 'cheer' | 'bonk' | 'whiff' | 'board' | 'jump' | 'crumble' | 'built' | 'dig' | 'thud' | 'smash'
+type Name = 'cast' | 'bite' | 'catch' | 'big' | 'junk' | 'escape' | 'cheer' | 'bonk' | 'whiff' | 'board' | 'jump' | 'crumble' | 'built' | 'dig' | 'thud' | 'smash' | 'net' | 'bug'
 
 const RECIPES: Record<Name, () => void> = {
   // 휙 — 낚싯줄 던지기, 퐁 — 찌가 물에
   cast: () => {
     noise({ filter: 'bandpass', freq: 700, to: 2600, q: 1.1, duration: 0.25, gain: 0.18 })
     tone({ freq: 520, to: 260, type: 'sine', duration: 0.12, gain: 0.1, delay: 0.35 })
+  },
+  // 잠자리채 휙 (곤충 채집)
+  net: () => noise({ filter: 'bandpass', freq: 500, to: 1800, q: 0.9, duration: 0.3, gain: 0.16 }),
+  // 사각 + 딩동 — 곤충 잡음
+  bug: () => {
+    noise({ filter: 'highpass', freq: 2500, duration: 0.18, gain: 0.12 })
+    ;[784, 1046].forEach((f, i) => tone({ freq: f, type: 'triangle', duration: 0.14, gain: 0.12, delay: 0.15 + i * 0.1 }))
   },
   // 퐁퐁 — 입질
   bite: () => {

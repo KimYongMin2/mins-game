@@ -12,6 +12,9 @@ export const MAX_ROOMS = 5
 /** 입질까지 (ms) */
 export const BITE_MIN_MS = 7000
 export const BITE_MAX_MS = 16000
+/** 곤충 채집: 잠자리채를 대고 곤충이 걸리기까지 (ms) — 낚시보다 조금 빨리 */
+export const BUG_MIN_MS = 4000
+export const BUG_MAX_MS = 10000
 /** 입질 뒤 이만큼 안에 눌러야 잡힘 */
 export const BITE_WINDOW_MS = 5000
 /** 어항 칸 */
@@ -35,6 +38,8 @@ export type PlayerPub = {
   bed: number | null
   fishing: Fishing
   bob: [number, number] | null
+  /** 1 = 낚싯대가 아니라 잠자리채 (곤충 채집 — bob이 곤충 자리, zone은 숲·꽃밭) */
+  net?: 1
   /** 타고 있는 배 번호 (BOATS) · 올라가 있는 사다리 번호 (LADDERS) */
   ride: number | null
   up: number | null
