@@ -170,7 +170,7 @@
 @media (max-height: 460px) { .fs-clock { top: calc(52px + 118px * 0.6 + 8px + env(safe-area-inset-top, 0px)); font-size: 11px; } }
 
 /* 오른쪽 조작 (2026-11-19): 점프·뿅은 늘, 낚시·상호작용은 할 수 있을 때만 위에 뜸 */
-.fs-act, .fs-bonk, .fs-alt, .fs-poses { display: none !important; }
+.fs-act, .fs-bonk, .fs-alt { display: none !important; }
 .fs-pad { position: absolute; z-index: 3; right: calc(14px + env(safe-area-inset-right, 0px)); bottom: calc(18px + env(safe-area-inset-bottom, 0px)); width: 170px; height: 230px; pointer-events: none; }
 .fs-pad > * { pointer-events: auto; }
 .fs-round { position: absolute; display: flex; flex-direction: column; align-items: center; justify-content: center; border-radius: 50%; border: 3px solid #1f1a4d; font: inherit; font-family: 'Black Han Sans', sans-serif; line-height: 1; cursor: pointer; touch-action: none; }

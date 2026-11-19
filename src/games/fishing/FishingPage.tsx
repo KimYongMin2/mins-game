@@ -259,6 +259,23 @@ export function FishingPage() {
       )}
 
       <Joystick out={world.input} />
+      {/* 조이스틱 위: 아무 데서나 앉기·눕기 (같은 걸 다시 누르거나 움직이면 일어남) — 사용자 요청 2026-11-19 */}
+      <div className="fs-poses">
+        {(['sit', 'lie'] as const).map((a) => (
+          <button
+            key={a}
+            type="button"
+            className="fs-pose"
+            onPointerDown={(e) => {
+              e.preventDefault()
+              if (e.button === 0) setPose(a)
+            }}
+          >
+            {a === 'sit' ? '앉기' : '눕기'}
+            <small>{a === 'sit' ? 'Ctrl' : 'Z'}</small>
+          </button>
+        ))}
+      </div>
       {/* 오른쪽: 점프·뿅은 늘, 낚시·상호작용은 할 수 있을 때만 */}
       <div className="fs-pad">
         <div className="fs-ctx">
