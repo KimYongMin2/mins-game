@@ -3,7 +3,7 @@ import * as THREE from 'three'
 import { createStage, nearestOnScreen } from '../../../shared/art3d/stage'
 import { type AnimalRig, ANIMALS, RECLINE, makeAnimal, plainLook } from '../../../shared/art3d/animals'
 import { decodeLook } from '../../../shared/art3d/animalKinds'
-import { BEDS, BOAT_SLOTS, BOUNDS, BUILD_MS, CASTLES, CRATES, LADDERS, groundY, houseAt } from '../play/map'
+import { BEDS, BOAT_SLOTS, BOUNDS, BUILD_MS, CASTLES, CRATES, SEATS, LADDERS, groundY, houseAt } from '../play/map'
 import { buildWorld, makeBoat } from './worldArt'
 import { kit, makeSandRuin, makeSandcastle } from './props3d'
 import { WEATHER_NAME, gameHour, hourLabel, weatherNow } from './clock'
@@ -384,8 +384,10 @@ export function Scene3D({ world, step, onTapPlayer }: { world: World; step: (dt:
         // 모래성 쌓는 중: 모래성 쪽을 보고 앉아서 토닥토닥
         const buildingAt = world.castles.findIndex((c) => c.builder === p.id)
         const building = buildingAt >= 0 && !walking
-        const sitting = (!walking && p.act === 'sit' && p.ride === null) || building
-        const lyingDown = !walking && p.act === 'lie' && p.ride === null
+        // 집 의자·벤치·통나무에 앉음 / 집 침대에 누움
+        const seat = p.seat !== null && !walking ? SEATS[p.seat] : null
+        const sitting = (!walking && p.act === 'sit' && p.ride === null) || building || seat?.kind === 'sit'
+        const lyingDown = (!walking && p.act === 'lie' && p.ride === null) || seat?.kind === 'lie'
         const holding = !!p.popup && now < p.popup.until && now - p.popup.start > (p.popup.from ? 420 : 0)
         const reeling = now - a.reelAt < 500
         const pose = jumping ? 'jump' : running ? 'run' : walking ? 'walk' : lyingDown ? 'lie' : holding ? 'hold' : p.fishing !== 'none' || reeling || (p.popup && now < p.popup.until) ? 'fish' : 'idle'
@@ -408,6 +410,16 @@ export function Scene3D({ world, step, onTapPlayer }: { world: World; step: (dt:
           const up = hipY * Math.cos(lean), back = hipY * Math.sin(lean)
           root.position.set(hx - Math.sin(b.r) * back, hy - up, hz - Math.cos(b.r) * back)
           root.rotation.set(lean, b.r, 0)
+        } else if (seat) {
+          if (seat.kind === 'lie') {
+            // 침대: 발끝이 자리, 머리는 머리판 쪽으로 반듯이
+            root.position.set(seat.x, seat.y + 0.2 * SCALE, seat.z)
+            root.rotation.set(-1.5, seat.r, 0)
+          } else {
+            // 의자·벤치·통나무: 엉덩이가 앉는 면에
+            root.position.set(seat.x, seat.y - 0.05 * SCALE, seat.z)
+            root.rotation.set(0, seat.r, 0)
+          }
         } else if (climbing && p.climb) {
           // 사다리: 아래 ↔ 위 (사다리 쪽을 보고)
           const l = LADDERS[p.climb.i]

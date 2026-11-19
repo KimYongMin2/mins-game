@@ -2,7 +2,7 @@ import * as THREE from 'three'
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 import { gameHour, weatherNow } from './clock'
 import { kit, makeBoat, makeFlipFlops, makePalm, makePine, makeSideTable, makeSunbed, makeTree, makeUmbrella, rockGeo, waterNormals } from './props3d'
-import { BEDS, BOUNDS, BRIDGE, DOCK, type FurnKind, HOUSES, JETTY, LADDERS, LAKE, LAKE_DOCK, PIER, PIER_END, RIVER, type Rect, SEA_EAST, STRUCTS, type Struct, shoreZ, waterAt } from '../play/map'
+import { BEDS, BOUNDS, BRIDGE, DOCK, PIER2, PIER2_END, type FurnKind, HOUSES, JETTY, LADDERS, LAKE, LAKE_DOCK, PIER, PIER_END, RIVER, type Rect, SEA_EAST, STRUCTS, type Struct, shoreZ, waterAt } from '../play/map'
 
 // 낚시터 3D 맵 그림 (2026-11-18 사용자 요청 — 더 사실적이고 넓게, 구조물 많이, 추가할 만한 것 다).
 // 좌표·막힘은 play/map.ts(서버와 같이 씀), 여기는 그림만.
@@ -426,7 +426,7 @@ export function buildWorld(scene: THREE.Scene, renderer: THREE.WebGLRenderer): W
   const tufts: { x: number; z: number; s: number }[] = []
   const flowers: { x: number; z: number; s: number; color: string }[] = []
   const FLOWER = ['#ffffff', '#ffd23f', '#ff8ab0', '#c79bff', '#ff6b5a']
-  for (let i = 0; i < 9000 && tufts.length < 2600; i++) {
+  for (let i = 0; i < 18000 && tufts.length < 4800; i++) {
     const x = BOUNDS.minX - 10 + rnd() * (BOUNDS.maxX - BOUNDS.minX + 20), z = BOUNDS.minZ - 10 + rnd() * (BOUNDS.maxZ - BOUNDS.minZ + 20)
     if (!isGrass(x, z) || onPath(x, z) || nearStruct(x, z, 0.4)) continue
     if (rnd() < 0.13) flowers.push({ x, z, s: 0.8 + rnd() * 0.6, color: FLOWER[Math.floor(rnd() * FLOWER.length)] })
@@ -523,6 +523,9 @@ export function buildWorld(scene: THREE.Scene, renderer: THREE.WebGLRenderer): W
   const pierEndZ = shoreZ((PIER.minX + PIER.maxX) / 2) + 1
   deck({ ...PIER, maxZ: pierEndZ }, 0.21, 'z')
   deck(PIER_END, 0.21, 'z')
+  // 서쪽 만 둘째 부두 (T자 끝)
+  deck({ ...PIER2, maxZ: shoreZ((PIER2.minX + PIER2.maxX) / 2) + 1 }, 0.21, 'z')
+  deck(PIER2_END, 0.21, 'z')
   // 부두 끝 난간
   for (const [ax, az, bx, bz] of [[PIER_END.minX, PIER_END.minZ, PIER_END.maxX, PIER_END.minZ], [PIER_END.minX, PIER_END.minZ, PIER_END.minX, PIER_END.maxZ], [PIER_END.maxX, PIER_END.minZ, PIER_END.maxX, PIER_END.maxZ]] as const) {
     const len = Math.hypot(bx - ax, bz - az), n = Math.round(len / 1.6)
@@ -772,6 +775,114 @@ export function buildWorld(scene: THREE.Scene, renderer: THREE.WebGLRenderer): W
     g.rotation.y = s.r ?? 0
     const sc = s.s ?? 1
     switch (s.kind) {
+      case 'tent': {
+        // 텐트: 세모 천(앞 문 열림) + 기둥 + 줄·말뚝
+        const fab = new THREE.MeshStandardMaterial({ color: s.color ?? '#e8743a', roughness: 0.85, side: THREE.DoubleSide })
+        const tent = new THREE.Mesh(roofGeo(s.d!, s.w!, 1.7), fab)
+        g.add(tent)
+        g.add(new THREE.Mesh(new THREE.ConeGeometry(0.55, 1.2, 3, 1, true), new THREE.MeshStandardMaterial({ color: '#2a2a35', side: THREE.DoubleSide })).translateY(0.6).translateZ(s.d! / 2 - 0.02).rotateY(Math.PI))
+        for (const z of [-s.d! / 2 - 0.1, s.d! / 2 + 0.1]) g.add(cyl(0.03, 0.03, 1.85, postM, 0, 0.92, z, 5))
+        for (const [x, z] of [[-1.6, -1.6], [1.6, -1.6], [-1.6, 1.6], [1.6, 1.6]]) {
+          g.add(cyl(0.02, 0.03, 0.25, postM, x, 0.12, z, 4))
+          const line = new THREE.Mesh(new THREE.CylinderGeometry(0.006, 0.006, 1.9, 3), mat('#e8e2d0'))
+          line.position.set(x * 0.6, 0.7, z * 0.6)
+          line.lookAt(new THREE.Vector3(x, 0, z).add(g.position))
+          line.rotateX(Math.PI / 2)
+          g.add(line)
+        }
+        occlude(g, 1.8, 0.9)
+        return null
+      }
+      case 'barn': {
+        // 헛간: 빨간 판자 벽 + 흰 테두리 X자 큰 문 + 지붕 + 다락 창
+        const w = s.w!, d = s.d!
+        const red = new THREE.MeshStandardMaterial({ map: stripeTex('#b0402f', 'rgba(60,15,10,0.45)', 3, { repeatX: 6, repeatY: 1 }), roughness: 0.85 })
+        red.map!.rotation = Math.PI / 2
+        g.add(box(w, 3.6, d, red, 0, 1.8, 0))
+        g.add(new THREE.Mesh(roofGeo(w + 0.6, d + 0.8, 2.4), mat('#5a5a62', 0.7)).translateY(3.6))
+        // 앞(+z) 큰 문 · 다락 창
+        for (const sx of [-1, 1]) {
+          const door = new THREE.Group()
+          door.position.set(sx * 0.9, 1.25, d / 2 + 0.03)
+          door.add(box(1.75, 2.5, 0.06, mat('#8c2f22'), 0, 0, 0), box(1.75, 0.12, 0.08, whiteM, 0, 1.2, 0), box(1.75, 0.12, 0.08, whiteM, 0, -1.2, 0), box(0.12, 2.5, 0.08, whiteM, sx * 0.82, 0, 0))
+          const x1 = box(2.9, 0.1, 0.08, whiteM, 0, 0, 0.01)
+          x1.rotation.z = Math.atan2(2.4, 1.6) * sx
+          door.add(x1)
+          g.add(door)
+        }
+        g.add(box(1, 0.9, 0.06, windowM, 0, 3.9, d / 2 + 0.25), box(1.2, 1.1, 0.05, whiteM, 0, 3.9, d / 2 + 0.22))
+        occlude(g, Math.max(w, d) / 2 + 0.6, 2.4)
+        return null
+      }
+      case 'windmill': {
+        // 풍차: 돌 탑 + 지붕 + 천천히 도는 날개 넷
+        const stone = new THREE.MeshStandardMaterial({ map: noiseTex('#cfc6b4', [['#b3a994', 400, 4], ['#e2dbcc', 300, 4]], 1, 128), roughness: 0.9 })
+        g.add(cyl(1.5, 2.3, 6.5, stone, 0, 3.25, 0, 14), new THREE.Mesh(new THREE.ConeGeometry(1.9, 2, 14), mat('#7a4a2a')).translateY(7.5))
+        g.add(box(0.9, 1.6, 0.06, mat('#5a3b22'), 0, 0.8, 2.25), box(0.6, 0.7, 0.06, windowM, 0, 4.2, 1.85))
+        const hub = new THREE.Group()
+        hub.position.set(0, 6.2, 2.05)
+        hub.add(cyl(0.22, 0.22, 0.4, darkM, 0, 0, 0, 10).rotateX(Math.PI / 2))
+        const sail = new THREE.MeshStandardMaterial({ color: '#f1e9da', roughness: 0.9, side: THREE.DoubleSide })
+        for (let k = 0; k < 4; k++) {
+          const arm = new THREE.Group()
+          arm.rotation.z = (k / 4) * Math.PI * 2
+          arm.add(box(0.12, 4.2, 0.08, postM, 0, 2.2, 0.15))
+          arm.add(box(0.85, 3.4, 0.02, sail, 0.5, 2.6, 0.18))
+          for (let j = 0; j < 5; j++) arm.add(box(0.95, 0.04, 0.05, postM, 0.5, 1.1 + j * 0.75, 0.2))
+          hub.add(arm)
+        }
+        g.add(hub)
+        scene.add(g)
+        dyn.push((t) => (hub.rotation.z = t * 0.35))
+        return null
+      }
+      case 'field': {
+        // 밭: 갈아 놓은 흙 이랑 + 줄지어 자란 채소 (안 막힘)
+        const soil = new THREE.Mesh(new THREE.PlaneGeometry(s.w!, s.d!), new THREE.MeshStandardMaterial({ map: stripeTex('#7a5a3a', 'rgba(40,25,10,0.5)', 16, { repeatX: 1, repeatY: 1 }), roughness: 1 }))
+        soil.rotation.x = -Math.PI / 2
+        soil.position.set(s.x, 0.03, s.z)
+        soil.receiveShadow = true
+        scene.add(soil)
+        const crops: { x: number; z: number; s: number }[] = []
+        for (let row = 0; row < 16; row++)
+          for (let k = 0; k < 30; k++) crops.push({ x: s.x - s.w! / 2 + 0.5 + k * ((s.w! - 1) / 29), z: s.z - s.d! / 2 + 0.5 + row * ((s.d! - 1) / 15), s: 0.8 + rnd() * 0.4 })
+        instanced(new THREE.IcosahedronGeometry(0.22, 1).scale(1, 0.75, 1).translate(0, 0.15, 0), mat('#5aa040', 0.8), crops)
+        return null
+      }
+      case 'flowers': {
+        // 꽃밭: 알록달록 촘촘히 (안 막힘)
+        const fl: { x: number; z: number; s: number; color: string }[] = []
+        const C = ['#ff6b8a', '#ffd23f', '#ffffff', '#c79bff', '#ff9a3c', '#e8473f']
+        for (let k = 0; k < 900; k++) fl.push({ x: s.x + (rnd() - 0.5) * s.w!, z: s.z + (rnd() - 0.5) * s.d!, s: 0.9 + rnd() * 0.7, color: C[Math.floor(rnd() * C.length)] })
+        instanced(mergeGeometries([new THREE.CylinderGeometry(0.015, 0.015, 0.4, 4).translate(0, 0.2, 0).toNonIndexed(), new THREE.IcosahedronGeometry(0.09, 0).translate(0, 0.42, 0).toNonIndexed()])!, new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 0.8 }), fl)
+        return null
+      }
+      case 'haybale': {
+        const hay = new THREE.MeshStandardMaterial({ map: noiseTex('#d9b45a', [['#b8913e', 500, 2], ['#ecd27e', 400, 2]], 1, 128), roughness: 1 })
+        const bale = cyl(0.75, 0.75, 1.2, hay, 0, 0.75, 0, 16)
+        bale.rotation.z = Math.PI / 2
+        g.add(bale)
+        statics.add(g)
+        return null
+      }
+      case 'bar': {
+        // 바닷가 가게: 초가 지붕 + 기둥 + 카운터 + 간판 + 높은 의자 + 병들
+        const w = s.w!, d = s.d!
+        for (const [x, z] of [[-w / 2, -d / 2], [w / 2, -d / 2], [-w / 2, d / 2], [w / 2, d / 2]]) g.add(cyl(0.1, 0.12, 2.8, postM, x, 1.4, z, 7))
+        const thatch = new THREE.MeshStandardMaterial({ map: stripeTex('#c9a45c', 'rgba(90,60,20,0.5)', 14, { repeatX: 3, repeatY: 1 }), roughness: 1 })
+        g.add(new THREE.Mesh(new THREE.ConeGeometry(Math.max(w, d) * 0.78, 1.6, 4, 1, true), thatch).translateY(3.5).rotateY(Math.PI / 4))
+        g.add(box(w - 0.4, 1.05, 0.6, plankM, 0, 0.52, d / 2 - 0.3), box(w - 0.2, 0.06, 0.8, mat('#6b4320'), 0, 1.08, d / 2 - 0.3))
+        g.add(box(w - 0.4, 0.06, 0.4, plankM, 0, 1.8, -d / 2 + 0.4))
+        for (let k = 0; k < 8; k++) g.add(cyl(0.05, 0.06, 0.28, mat(['#2f9e6a', '#7a3a2a', '#3f8fd0', '#e0b030'][k % 4], 0.2), -w / 2 + 0.6 + k * 0.5, 1.97, -d / 2 + 0.4, 8))
+        for (const x of [-1.4, 0, 1.4]) {
+          g.add(cyl(0.2, 0.2, 0.06, mat('#c8553d'), x, 0.78, d / 2 + 0.45, 12), cyl(0.03, 0.04, 0.75, darkM, x, 0.38, d / 2 + 0.45, 6))
+        }
+        const sign = new THREE.Mesh(new THREE.PlaneGeometry(2.4, 0.55), new THREE.MeshStandardMaterial({ map: labelTex('바닷가 가게', '#2f9e6a', '#fff7e0'), roughness: 0.6 }))
+        sign.position.set(0, 2.95, d / 2 + 0.12)
+        g.add(sign)
+        occlude(g, Math.max(w, d) / 2 + 0.8, 1.8)
+        return null
+      }
       case 'lighthouse': {
         g.position.y = 0.45
         g.add(cyl(2.4, 2.6, 0.8, mat('#9a9790', 0.95), 0, 0.4, 0, 16))
@@ -920,7 +1031,7 @@ export function buildWorld(scene: THREE.Scene, renderer: THREE.WebGLRenderer): W
         return null
       }
       case 'tree': {
-        const t = makeTree(sc, s.x * 17 + s.z * 3)
+        const t = makeTree(sc, s.x * 17 + s.z * 3, s.color === 'orchard')
         g.add(t.group)
         occlude(g, 2 * sc, t.height * 0.6)
         return null
@@ -1293,7 +1404,7 @@ export function buildWorld(scene: THREE.Scene, renderer: THREE.WebGLRenderer): W
     minimap.height = H * K
     const g = minimap.getContext('2d')!
     const img = g.createImageData(minimap.width, minimap.height)
-    const boards = [PIER, PIER_END, JETTY, DOCK, BRIDGE, LAKE_DOCK]
+    const boards = [PIER, PIER_END, PIER2, PIER2_END, JETTY, DOCK, BRIDGE, LAKE_DOCK]
     for (let py = 0; py < minimap.height; py++)
       for (let px = 0; px < minimap.width; px++) {
         const x = BOUNDS.minX + (px + 0.5) / K, z = BOUNDS.minZ + (py + 0.5) / K

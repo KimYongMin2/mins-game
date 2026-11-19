@@ -7,7 +7,8 @@ import type { Zone } from './fish'
 //  - 남쪽: 작은 마을(낚시 가게·집·분수 광장·자판기·벤치·가로등)
 //  - 동쪽(x ≥ 22): 풀밭·소나무 숲, 북쪽에서 내려오는 강(나무 다리) → 큰 호수(작은 나무 선착장·통나무집·피크닉 탁자)
 
-export const BOUNDS = { minX: -64, maxX: 64, minZ: -40, maxZ: 46 }
+// 2026-11-19 더 넓힘 (사용자 요청): 200 × 120m — 서쪽 작은 만(둘째 부두·바닷가 가게), 동쪽 숲·캠핑장, 남쪽 밭·풍차·헛간·과수원
+export const BOUNDS = { minX: -100, maxX: 100, minZ: -40, maxZ: 80 }
 /** 바다가 끝나는 곳 (여기부터 오른쪽은 풀밭) */
 export const SEA_EAST = 22
 export const shoreZ = (x: number) => -8 + Math.sin(x * 0.13) * 2.2 + Math.sin(x * 0.31 + 1) * 0.6
@@ -17,6 +18,9 @@ export type Rect = { minX: number; maxX: number; minZ: number; maxZ: number }
 /** 긴 나무 부두 (몸통 + 끝의 넓은 자리) */
 export const PIER: Rect = { minX: -34, maxX: -31, minZ: -34, maxZ: 0 }
 export const PIER_END: Rect = { minX: -39, maxX: -26, minZ: -39, maxZ: -34 }
+/** 서쪽 만의 둘째 나무 부두 (끝은 T자 낚시 자리) */
+export const PIER2: Rect = { minX: -83, maxX: -80.5, minZ: -26, maxZ: 0 }
+export const PIER2_END: Rect = { minX: -88, maxX: -75.5, minZ: -30, maxZ: -26 }
 /** 바위 방파제 (끝에 등대) */
 export const JETTY: Rect = { minX: -56, maxX: -51, minZ: -36, maxZ: 0 }
 /** 가운데 작은 배 선착장 */
@@ -29,7 +33,7 @@ export const RIVER = { pts: [[47, -54], [42, -24], [35, -6], [37, 8], [41, 15]] 
 export const BRIDGE: Rect = { minX: 30, maxX: 41, minZ: -9.2, maxZ: -6.2 }
 /** 호수 나무 선착장 (서쪽 가에서 호수 안으로) */
 export const LAKE_DOCK: Rect = { minX: 30, maxX: 37.5, minZ: 23, maxZ: 25.2 }
-const WALK_ON_WATER: Rect[] = [PIER, PIER_END, JETTY, DOCK, BRIDGE, LAKE_DOCK]
+const WALK_ON_WATER: Rect[] = [PIER, PIER_END, PIER2, PIER2_END, JETTY, DOCK, BRIDGE, LAKE_DOCK]
 
 /** 걷는 빠르기 (m/s) — 맵이 넓어져 5에서 6으로 */
 export const WALK_SPEED = 6
@@ -47,6 +51,7 @@ export const BED_REACH = 2
 export type StructKind =
   | 'lighthouse' | 'house' | 'cabin' | 'hut' | 'tower' | 'fire' | 'palm' | 'pine' | 'tree' | 'rock'
   | 'boat' | 'table' | 'bench' | 'lamp' | 'fountain' | 'vending' | 'sign' | 'umbrella' | 'crate' | 'flag' | 'well'
+  | 'tent' | 'barn' | 'windmill' | 'field' | 'bar' | 'haybale' | 'flowers'
 export type Struct = { kind: StructKind; x: number; z: number; r?: number; s?: number; w?: number; d?: number; c?: number; color?: string; label?: string }
 
 const S: Struct[] = [
@@ -77,6 +82,28 @@ const S: Struct[] = [
   { kind: 'sign', x: -50, z: 4, c: 0.25, label: '등대 방파제' },
   // 호수 옆
   { kind: 'cabin', x: 57, z: 8, r: Math.PI, w: 6, d: 5 },
+  // ── 서쪽 만: 바닷가 가게(그늘 바·의자), 야자수 ──
+  { kind: 'bar', x: -72, z: 9, w: 5, d: 3.5 },
+  ...[[-92, 10], [-86, 13], [-78, 14], [-66, 12], [-96, 4], [-62, 6]].map(([x, z], i) => ({ kind: 'palm' as const, x, z, c: 0.45, s: 0.95 + (i % 3) * 0.12 })),
+  ...[[-90, 0], [-68, 2]].map(([x, z]) => ({ kind: 'rock' as const, x, z, c: 1.1, s: 1.2 })),
+  // ── 동쪽 숲·캠핑장: 텐트 3, 모닥불, 소나무 숲 ──
+  { kind: 'tent', x: 80, z: 12, w: 2.6, d: 2.6, color: '#e8743a' },
+  { kind: 'tent', x: 88, z: 6, r: -0.5, w: 2.6, d: 2.6, color: '#3d8f5a' },
+  { kind: 'tent', x: 78, z: 2, r: 0.6, w: 2.6, d: 2.6, color: '#3d6f9e' },
+  { kind: 'fire', x: 84, z: 15, c: 1.4 },
+  ...[[70, -34], [76, -28], [82, -36], [90, -30], [96, -20], [72, -18], [86, -14], [94, -6], [70, -6], [98, 8], [92, 22], [72, 26], [80, 32], [96, 36], [68, 40], [88, 44], [76, 50], [94, 56], [70, 62], [86, 70], [98, 76], [66, -26], [80, -22], [92, 30]].map(([x, z], i) => ({ kind: 'pine' as const, x, z, c: 0.8, s: 0.95 + (i % 5) * 0.15 })),
+  // ── 남쪽 밭·풍차·헛간·과수원·꽃밭 ──
+  { kind: 'field', x: -28, z: 62, w: 26, d: 16, c: 0 },
+  { kind: 'windmill', x: 6, z: 64, c: 2.6 },
+  { kind: 'barn', x: 28, z: 60, r: Math.PI, w: 9, d: 6.5, color: '#b0402f' },
+  ...[[34, 66], [36, 67.5], [22, 66]].map(([x, z]) => ({ kind: 'haybale' as const, x, z, c: 0.75 })),
+  ...[[-66, 54], [-60, 54], [-54, 54], [-66, 62], [-60, 62], [-54, 62], [-66, 70], [-60, 70], [-54, 70]].map(([x, z], i) => ({ kind: 'tree' as const, x, z, c: 0.55, s: 0.85 + (i % 3) * 0.12, color: 'orchard' })),
+  { kind: 'flowers', x: 52, z: 70, w: 18, d: 12, c: 0 },
+  { kind: 'house', x: -84, z: 38, r: Math.PI, w: 7, d: 6, color: '#3d6f9e' },
+  { kind: 'house', x: 48, z: 52, r: Math.PI, w: 6.5, d: 6, color: '#c8553d' },
+  ...[[-10, 48], [14, 50], [-44, 46]].map(([x, z]) => ({ kind: 'lamp' as const, x, z, c: 0.25 })),
+  ...[[-6, 50], [40, 46]].map(([x, z]) => ({ kind: 'bench' as const, x, z, w: 2, d: 0.8 })),
+  { kind: 'sign', x: -4, z: 46, c: 0.25, label: '← 과수원 · 풍차 →' },
   ...[[50, 40], [56, 32], [28, 30]].map(([x, z]) => ({ kind: 'table' as const, x, z, w: 2, d: 1.6 })),
   // 야자수 (모래사장 뒤쪽)
   ...[[-58, 12], [-34, 12], [-27, 13], [-10, 12.5], [-2, 13], [10, 12], [17, 12.5], [-52, 8]].map(([x, z], i) => ({ kind: 'palm' as const, x, z, c: 0.45, s: 0.9 + (i % 3) * 0.15 })),
@@ -97,6 +124,8 @@ export const BEDS: Bed[] = [
   ...[-21, -17, -13, -9, -5, -1, 3, 16].map((x) => ({ x, z: shoreZ(x) + 2.4, r: Math.PI })),
   ...[[LAKE.x - 2, LAKE.z + LAKE.r + 2.2], [LAKE.x + 9, LAKE.z + 9]].map(([x, z]) => ({ x, z, r: Math.atan2(LAKE.x - x, LAKE.z - z) })),
   { x: -28, z: -36.2, r: Math.PI },
+  // 서쪽 만 바닷가
+  ...[-92, -88, -70, -66].map((x) => ({ x, z: shoreZ(x) + 2.4, r: Math.PI })),
 ]
 export const SPAWN = { x: 0, z: 9 }
 
@@ -170,6 +199,60 @@ export function houseLayout(s: Struct): HouseLayout {
   }
 }
 export const HOUSES = S.filter((s) => s.kind === 'house' || s.kind === 'cabin').map((s) => ({ s, ...houseLayout(s) }))
+
+// ── 앉을 자리·누울 자리 (상호작용 R — 사용자 요청 2026-11-19): 집 침대·소파·식탁 의자, 벤치, 피크닉 탁자, 모닥불 통나무 ──
+// x·z = 앉는(눕는) 자리, r = 앉은 사람이 보는 쪽(누우면 머리 → 발 쪽), y = 앉는 면 높이, stand = 일어나면 서는 곳(걸을 수 있는 곳)
+export type Seat = { x: number; z: number; r: number; y: number; kind: 'sit' | 'lie'; stand: { x: number; z: number } }
+function buildSeats(): Seat[] {
+  const out: Seat[] = []
+  const T = 0.25
+  // 구조물 기준(앞 = +z) 좌표 → 세상 좌표
+  const W = (s: { x: number; z: number; r?: number }, lx: number, lz: number) => {
+    const r = s.r ?? 0
+    return { x: s.x + lx * Math.cos(r) + lz * Math.sin(r), z: s.z - lx * Math.sin(r) + lz * Math.cos(r) }
+  }
+  for (const h of HOUSES) {
+    const s = h.s, hw = s.w! / 2, hd = s.d! / 2, r = s.r ?? 0
+    const ix0 = -hw + T, ix1 = hw - T, iz0 = -hd + T
+    // 침대: 머리판은 뒷벽, 발은 앞으로
+    out.push({ ...W(s, ix0 + 0.7, iz0 + 1.95), r, y: 0.58, kind: 'lie', stand: W(s, ix0 + 1.95, iz0 + 1.1) })
+    // 소파: 등이 옆벽, 방 가운데를 봄 (두 자리)
+    const sz0 = 0.2, sz1 = Math.min(2, hd - T - 0.3)
+    for (const k of [0.3, 0.72]) out.push({ ...W(s, ix0 + 0.45, sz0 + (sz1 - sz0) * k), r: r + Math.PI / 2, y: 0.42, kind: 'sit', stand: W(s, ix0 + 1.3, sz0 + (sz1 - sz0) * k) })
+    // 식탁 의자 둘 (식탁을 봄)
+    const cx = ix1 - 1.2
+    out.push({ ...W(s, cx, -0.75), r, y: 0.47, kind: 'sit', stand: W(s, cx - 1.05, -0.75) })
+    out.push({ ...W(s, cx, 0.75), r: r + Math.PI, y: 0.47, kind: 'sit', stand: W(s, cx - 1.05, 0.75) })
+  }
+  for (const s of S) {
+    if (s.kind === 'bench')
+      for (const lx of [-0.5, 0.5]) out.push({ ...W(s, lx, 0.05), r: s.r ?? 0, y: 0.5, kind: 'sit', stand: W(s, lx, 0.95) })
+    if (s.kind === 'table')
+      for (const lx of [-0.5, 0.5])
+        for (const sg of [-1, 1]) out.push({ ...W(s, lx, sg * 0.62), r: (s.r ?? 0) + (sg < 0 ? 0 : Math.PI), y: 0.48, kind: 'sit', stand: W(s, lx, sg * 1.4) })
+    if (s.kind === 'fire')
+      for (const a of [0.4, 2.1, 3.9]) {
+        const x = s.x + Math.cos(a) * 2.3, z = s.z + Math.sin(a) * 2.3
+        out.push({ x, z, r: Math.atan2(s.x - x, s.z - z), y: 0.42, kind: 'sit', stand: { x: s.x + Math.cos(a) * 3.1, z: s.z + Math.sin(a) * 3.1 } })
+      }
+  }
+  return out
+}
+export const SEATS: Seat[] = buildSeats()
+export const SEAT_REACH = 1.5
+/** 가장 가까운 앉을 자리 (자리나 서는 곳에서 이만큼 안) */
+export function nearSeat(x: number, z: number): number | null {
+  let best: number | null = null
+  let bestD = SEAT_REACH
+  SEATS.forEach((s, i) => {
+    const d = Math.min(Math.hypot(s.x - x, s.z - z), Math.hypot(s.stand.x - x, s.stand.z - z))
+    if (d < bestD) {
+      bestD = d
+      best = i
+    }
+  })
+  return best
+}
 /** 지금 서 있는 집 (번호), 밖이면 null */
 export function houseAt(x: number, z: number): number | null {
   const i = HOUSES.findIndex((h) => inRect(x, z, h.inside))
@@ -275,7 +358,7 @@ export function blocked(x: number, z: number): boolean {
     for (const f of h.furniture) if (x > f.rect.minX - R && x < f.rect.maxX + R && z > f.rect.minZ - R && z < f.rect.maxZ + R) return true
   }
   for (const s of S) {
-    if (s.kind === 'house' || s.kind === 'cabin') continue
+    if (s.kind === 'house' || s.kind === 'cabin' || s.kind === 'field' || s.kind === 'flowers') continue
     if (s.w && s.d) {
       if (Math.abs(x - s.x) < s.w / 2 + R && Math.abs(z - s.z) < s.d / 2 + R) return true
     } else if (s.c && Math.hypot(x - s.x, z - s.z) < s.c + R) return true

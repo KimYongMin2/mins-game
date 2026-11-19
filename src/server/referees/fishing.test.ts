@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import type { BagItem, ServerMsg } from '../../games/fishing/play/protocol'
-import { BOATS, BUILD_MS, CASTLES, CRATES, CRATE_RESPAWN_MS, LADDERS, shoreZ } from '../../games/fishing/play/map'
+import { BOATS, BUILD_MS, CASTLES, CRATES, CRATE_RESPAWN_MS, LADDERS, SEATS, shoreZ } from '../../games/fishing/play/map'
 import { resetStore } from '../fishingStore'
 import { addToBag, fishingReferee } from './fishing'
 
@@ -179,6 +179,27 @@ describe('낚시터 심판', () => {
     expect(s.last('boats')!.l.slice(0, 3).every((b) => b[3] && b[4])).toBe(true)
     s.tick(11_000)
     expect(activeN()).toBe(BOATS.length + 1)
+  })
+
+  it('앉을 자리: 가까이에서 앉고, 다른 사람은 못 앉고, 일어나면 서는 곳으로', () => {
+    const s = setup()
+    s.ref.input('a', { t: 'hi' })
+    s.ref.input('b', { t: 'hi' })
+    const i = SEATS.findIndex((st) => st.kind === 'lie')
+    const st = SEATS[i]
+    // 멀면 못 앉음
+    s.ref.input('a', { t: 'seat', i })
+    expect(s.last('st')?.p.seat).toBeNull()
+    for (const id of ['a', 'b']) {
+      walkTo(s, id, st.stand.x, st.stand.z - 4)
+      walkTo(s, id, st.stand.x, st.stand.z)
+    }
+    s.ref.input('a', { t: 'seat', i })
+    expect(s.last('st')?.p).toMatchObject({ id: 'a', seat: i, x: st.x, z: st.z })
+    s.ref.input('b', { t: 'seat', i })
+    expect(s.last('st')?.p).toMatchObject({ id: 'b', seat: null })
+    s.ref.input('a', { t: 'seat', i: null })
+    expect(s.last('st')?.p).toMatchObject({ id: 'a', seat: null, x: st.stand.x, z: st.stand.z })
   })
 
   it('앉기·눕기: 아무 데서나, 움직이면 풀림, 배에선 안 됨', () => {

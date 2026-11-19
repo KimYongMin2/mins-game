@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { BEDS, BOATS, HOUSES, LADDERS, boatable, houseAt, landingSpot, moveBoat, nearLadder, onLadderTop, BRIDGE, JETTY, LAKE, LAKE_DOCK, PIER, PIER_END, SPAWN, blocked, castTarget, moveBy, shoreZ, walkable, waterAt } from './map'
+import { SEATS, nearSeat, PIER2_END, BEDS, BOATS, HOUSES, LADDERS, boatable, houseAt, landingSpot, moveBoat, nearLadder, onLadderTop, BRIDGE, JETTY, LAKE, LAKE_DOCK, PIER, PIER_END, SPAWN, blocked, castTarget, moveBy, shoreZ, walkable, waterAt } from './map'
 import { FISH, rollCatch } from './fish'
 
 describe('낚시터 맵', () => {
@@ -104,5 +104,15 @@ describe('낚시터 맵', () => {
     expect(landingSpot(0, -30)).toBeNull()
     // 호수 배는 바다로 못 감
     expect(boatable(BOATS[3].x, BOATS[3].z, 'sea')).toBe(false)
+  })
+
+  it('앉을 자리: 일어나는 곳은 걸을 수 있고, 거기서 찾으면 그 자리', () => {
+    expect(SEATS.length).toBeGreaterThan(30)
+    SEATS.forEach((st, i) => {
+      expect(walkable(st.stand.x, st.stand.z), `자리 ${i} (${st.kind}) 일어나는 곳`).toBe(true)
+      expect(nearSeat(st.stand.x, st.stand.z) === null).toBe(false)
+    })
+    // 서쪽 만 둘째 부두 끝에서도 바다로
+    expect(castTarget(-82, PIER2_END.minZ + 0.5, Math.PI)?.zone).toBe('sea')
   })
 })

@@ -381,7 +381,7 @@ export function makePine(scale: number, seed: number) {
 }
 
 // ── 둥근 나무: 가지 뻗은 줄기 + 울퉁불퉁한 잎 덩어리 여러 개 (덩어리마다 색이 조금씩) ──
-export function makeTree(scale: number, seed: number) {
+export function makeTree(scale: number, seed: number, fruit = false) {
   const K = kit()
   const r = seeded(seed)
   const g = new THREE.Group()
@@ -428,6 +428,16 @@ export function makeTree(scale: number, seed: number) {
       blobs.push(b)
     }
   g.add(new THREE.Mesh(mergeGeometries(blobs)!, K.leafM))
+  // 과수원 나무: 빨간 사과가 주렁주렁
+  if (fruit) {
+    const apples: THREE.BufferGeometry[] = []
+    for (const tip of tips)
+      for (let k = 0; k < 5; k++) {
+        const a = r() * Math.PI * 2, e = r() * 1.2 - 0.3
+        apples.push(new THREE.SphereGeometry(0.09, 8, 6).translate(tip.x + Math.cos(a) * 1.05, tip.y + e * 0.8, tip.z + Math.sin(a) * 1.05))
+      }
+    g.add(new THREE.Mesh(mergeGeometries(apples)!, new THREE.MeshStandardMaterial({ color: '#d8322a', roughness: 0.4 })))
+  }
   g.scale.setScalar(scale)
   return { group: g, height: (H + 2) * scale }
 }

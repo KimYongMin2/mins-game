@@ -40,6 +40,8 @@ export type PlayerPub = {
   up: number | null
   /** 앉기·눕기 (아무 데서나, 움직이면 풀림 — 사용자 요청 2026-11-18) */
   act: Act
+  /** 앉은(누운) 자리 번호 (SEATS — 집 침대·의자·벤치 등) */
+  seat: number | null
 }
 export type Act = 'sit' | 'lie' | null
 /** 배 하나: 자리·방향·젓는 사람(가운데 판)·같이 탄 사람(앞 판) — 두 명까지 (사용자 요청 2026-11-18) */
@@ -59,7 +61,10 @@ export type ClientMsg =
   | { t: 'mv'; x: number; z: number; r: number }
   | { t: 'cast' }
   | { t: 'reel' }
+  /** 썬베드 눕기 (i = -1 이면 일어나기) */
   | { t: 'bed'; i: number }
+  /** 앉을 자리 (i = null 이면 일어나기) */
+  | { t: 'seat'; i: number | null }
   | { t: 'chat'; text: string }
   | { t: 'tank'; keys: string[] }
   | { t: 'look'; who: string }

@@ -1,6 +1,6 @@
 import type { Referee, RefereeContext, RefereeFactory } from '../hub'
 import { type Catch, fishById, isBig, rollCatch } from '../../games/fishing/play/fish'
-import { BEDS, BOAT_SLOTS, BOAT_REACH, CRATES, CRATE_HP, CRATE_RESPAWN_MS, BOAT_SPEED, BOUNDS, BUILD_MS, CASTLES, LADDERS, nearCastle, RUN_SPEED, SPAWN, boatable, castTarget, landingSpot, nearBed, nearLadder, onLadderTop, walkable } from '../../games/fishing/play/map'
+import { BEDS, BOAT_SLOTS, BOAT_REACH, CRATES, CRATE_HP, CRATE_RESPAWN_MS, BOAT_SPEED, BOUNDS, BUILD_MS, CASTLES, LADDERS, SEATS, nearCastle, nearSeat, RUN_SPEED, SPAWN, boatable, castTarget, landingSpot, nearBed, nearLadder, onLadderTop, walkable } from '../../games/fishing/play/map'
 import {
   BITE_MAX_MS,
   BITE_MIN_MS,
@@ -39,7 +39,7 @@ const num = (v: unknown, lo: number, hi: number) => typeof v === 'number' && Num
 const cleanText = (v: unknown) => (typeof v === 'string' ? [...v.replace(/[\u0000-\u001f\u007f]/g, ' ').trim()].slice(0, CHAT_MAX).join('') : '')
 const r2 = (v: number) => Math.round(v * 100) / 100
 
-const pub = (p: P): PlayerPub => ({ id: p.id, name: p.name, ...(p.avatar ? { avatar: p.avatar } : {}), x: p.x, z: p.z, r: p.r, bed: p.bed, fishing: p.fishing, bob: p.bob, ride: p.ride, up: p.up, act: p.act })
+const pub = (p: P): PlayerPub => ({ id: p.id, name: p.name, ...(p.avatar ? { avatar: p.avatar } : {}), x: p.x, z: p.z, r: p.r, bed: p.bed, fishing: p.fishing, bob: p.bob, ride: p.ride, up: p.up, act: p.act, seat: p.seat })
 /** 아무도 안 탄 배가 이만큼 그대로면 제자리로 */
 const BOAT_HOME_MS = 10 * 60_000
 
@@ -100,7 +100,7 @@ export function fishingReferee(_setup: unknown, ctx: RefereeContext): Referee {
     if (!p) {
       // 빈자리 근처에서 시작 (겹치지 않게 조금씩 흩뿌림)
       const a = rand() * Math.PI * 2
-      p = { id: key, name: mem.nickname, ...(mem.avatar ? { avatar: mem.avatar } : {}), x: r2(SPAWN.x + Math.cos(a) * 2.5), z: r2(SPAWN.z + Math.sin(a) * 1.5), r: Math.PI, bed: null, fishing: 'none', bob: null, ride: null, up: null, act: null, uid: mem.uid ?? null, castAt: 0, biteAt: 0, biteUntil: 0, zone: null, lastMv: ctx.now(), lastChat: 0, lastBonk: 0, lastJump: 0, castX: 0, castZ: 0 }
+      p = { id: key, name: mem.nickname, ...(mem.avatar ? { avatar: mem.avatar } : {}), x: r2(SPAWN.x + Math.cos(a) * 2.5), z: r2(SPAWN.z + Math.sin(a) * 1.5), r: Math.PI, bed: null, fishing: 'none', bob: null, ride: null, up: null, act: null, seat: null, uid: mem.uid ?? null, castAt: 0, biteAt: 0, biteUntil: 0, zone: null, lastMv: ctx.now(), lastChat: 0, lastBonk: 0, lastJump: 0, castX: 0, castZ: 0 }
       players.set(key, p)
       all({ t: 'st', p: pub(p) })
     }
@@ -135,6 +135,19 @@ export function fishingReferee(_setup: unknown, ctx: RefereeContext): Referee {
       z = p.z + ((z - p.z) / far) * allow
     }
     // 배는 그 물 위만, 사다리 위는 위 자리 안만, 아니면 걸을 수 있는 곳
+    // 앉아 있다가 움직이면: 일어나는 곳에서부터 (자리가 막힌 곳 안일 수 있어서). 제자리 신호(방향만 바뀜)는 무시
+    if (p.seat !== null) {
+      const here = SEATS[p.seat]
+      if (Math.hypot(m.x - here.x, m.z - here.z) < 0.3) {
+        p.lastMv = now
+        return
+      }
+      const st = here.stand
+      p.seat = null
+      p.x = st.x
+      p.z = st.z
+      all({ t: 'st', p: pub(p) })
+    }
     const ok = p.ride !== null ? boatable(x, z, BOAT_SLOTS[p.ride].zone) : p.up !== null ? onLadderTop(p.up, x, z) : walkable(x, z)
     if (!ok) return send(p.id, { t: 'st', p: pub(p) })
     const moved = Math.hypot(x - p.x, z - p.z) > 0.05
@@ -237,7 +250,7 @@ export function fishingReferee(_setup: unknown, ctx: RefereeContext): Referee {
     if (typeof i !== 'number' || !Number.isInteger(i) || !boats[i]) return
     const b = boats[i]
     // 비었으면 젓는 사람, 한 명 타 있으면 같이 탐
-    if (!b.active || p.ride !== null || p.up !== null || (b.rider && b.passenger) || Math.hypot(b.x - p.x, b.z - p.z) > BOAT_REACH + 0.5) return bad(p)
+    if (!b.active || p.ride !== null || p.up !== null || p.seat !== null || (b.rider && b.passenger) || Math.hypot(b.x - p.x, b.z - p.z) > BOAT_REACH + 0.5) return bad(p)
     stopFishing(p)
     p.bed = null
     p.act = null
@@ -268,7 +281,7 @@ export function fishingReferee(_setup: unknown, ctx: RefereeContext): Referee {
 
   function climb(p: P, i: unknown) {
     if (typeof i !== 'number' || !Number.isInteger(i) || !LADDERS[i]) return
-    if (p.ride !== null || p.up !== null || nearLadder(p.x, p.z) !== i) return bad(p)
+    if (p.ride !== null || p.up !== null || p.seat !== null || nearLadder(p.x, p.z) !== i) return bad(p)
     stopFishing(p)
     p.bed = null
     p.act = null
@@ -309,8 +322,38 @@ export function fishingReferee(_setup: unknown, ctx: RefereeContext): Referee {
     all({ t: 'st', p: pub(p) })
   }
 
+  /** 앉을 자리에 앉기·눕기 / 일어나기 (i = null) */
+  function seat(p: P, i: unknown) {
+    if (i === null) {
+      if (p.seat === null) return
+      const st = SEATS[p.seat].stand
+      p.seat = null
+      p.x = st.x
+      p.z = st.z
+      return all({ t: 'st', p: pub(p) })
+    }
+    if (typeof i !== 'number' || !Number.isInteger(i) || !SEATS[i]) return
+    if (p.ride !== null || p.up !== null || p.bed !== null || nearSeat(p.x, p.z) !== i || [...players.values()].some((o) => o !== p && o.seat === i)) return bad(p)
+    const st = SEATS[i]
+    stopFishing(p)
+    p.act = null
+    p.seat = i
+    p.x = st.x
+    p.z = st.z
+    p.r = r2(st.r)
+    stopBuilding(p.id)
+    all({ t: 'st', p: pub(p) })
+  }
+
   function lie(p: P, i: unknown) {
-    if (typeof i !== 'number' || !Number.isInteger(i) || !BEDS[i] || p.ride !== null || p.up !== null) return
+    // 썬베드에서 일어나기
+    if (i === -1) {
+      if (p.bed === null) return
+      p.bed = null
+      stopFishing(p)
+      return all({ t: 'st', p: pub(p) })
+    }
+    if (typeof i !== 'number' || !Number.isInteger(i) || !BEDS[i] || p.ride !== null || p.up !== null || p.seat !== null) return
     if (nearBed(p.x, p.z) !== i || [...players.values()].some((o) => o !== p && o.bed === i)) return send(p.id, { t: 'st', p: pub(p) })
     stopFishing(p)
     p.act = null
@@ -477,6 +520,9 @@ export function fishingReferee(_setup: unknown, ctx: RefereeContext): Referee {
           break
         case 'pose':
           pose(p, m.p)
+          break
+        case 'seat':
+          seat(p, m.i)
           break
         case 'jump':
           jump(p)

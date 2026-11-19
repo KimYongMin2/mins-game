@@ -165,6 +165,27 @@
 @media (max-height: 420px) { .fs-poses { bottom: calc(140px + env(safe-area-inset-bottom, 0px)); } .fs-pose { min-width: 48px; font-size: 12px; padding: 4px 6px; } }
 
 /* 낚시터 시각·날씨 (지도 바로 아래) */
-.fs-clock { position: absolute; z-index: 3; left: calc(10px + env(safe-area-inset-left, 0px)); top: calc(58px + 150px * 0.672 + 8px + env(safe-area-inset-top, 0px)); padding: 3px 8px; border-radius: 2px; background: rgba(28, 23, 72, 0.8); color: #f4f2ff; font-size: 12px; font-weight: 800; pointer-events: none; white-space: nowrap; }
+.fs-clock { position: absolute; z-index: 3; left: calc(10px + env(safe-area-inset-left, 0px)); top: calc(58px + 150px * 0.6 + 8px + env(safe-area-inset-top, 0px)); padding: 3px 8px; border-radius: 2px; background: rgba(28, 23, 72, 0.8); color: #f4f2ff; font-size: 12px; font-weight: 800; pointer-events: none; white-space: nowrap; }
 .fs-clock--big { display: none; }
-@media (max-height: 460px) { .fs-clock { top: calc(52px + 118px * 0.672 + 8px + env(safe-area-inset-top, 0px)); font-size: 11px; } }
+@media (max-height: 460px) { .fs-clock { top: calc(52px + 118px * 0.6 + 8px + env(safe-area-inset-top, 0px)); font-size: 11px; } }
+
+/* 오른쪽 조작 (2026-11-19): 점프·뿅은 늘, 낚시·상호작용은 할 수 있을 때만 위에 뜸 */
+.fs-act, .fs-bonk, .fs-alt, .fs-poses { display: none !important; }
+.fs-pad { position: absolute; z-index: 3; right: calc(14px + env(safe-area-inset-right, 0px)); bottom: calc(18px + env(safe-area-inset-bottom, 0px)); width: 170px; height: 230px; pointer-events: none; }
+.fs-pad > * { pointer-events: auto; }
+.fs-round { position: absolute; display: flex; flex-direction: column; align-items: center; justify-content: center; border-radius: 50%; border: 3px solid #1f1a4d; font: inherit; font-family: 'Black Han Sans', sans-serif; line-height: 1; cursor: pointer; touch-action: none; }
+.fs-round small { font-family: 'IBM Plex Sans KR', sans-serif; font-size: 10px; font-weight: 700; opacity: 0.8; margin-top: 2px; }
+.fs-round--jump { right: 0; bottom: 0; width: 84px; height: 84px; background: #f4f2ff; color: #1c1748; font-size: 20px; box-shadow: 0 4px 0 #8a86b8; }
+.fs-round--jump:active { transform: translateY(3px); box-shadow: 0 1px 0 #8a86b8; }
+.fs-round--bonk { right: 92px; bottom: 6px; width: 64px; height: 64px; background: #ff6b5e; color: #fff; font-size: 19px; box-shadow: 0 4px 0 #a3241b; }
+.fs-round--bonk:active { transform: translateY(3px); box-shadow: 0 1px 0 #a3241b; }
+.fs-ctx { position: absolute; right: 0; bottom: 98px; display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
+.fs-ctx__btn { min-width: 108px; padding: 9px 14px; border: 3px solid #1f1a4d; border-radius: 4px; background: #5be0f0; color: #1c1748; font: inherit; font-family: 'Black Han Sans', sans-serif; font-size: 18px; display: flex; align-items: center; justify-content: center; gap: 8px; box-shadow: 0 4px 0 #1f7f8c; cursor: pointer; touch-action: none; animation: fs-ctx-in 0.15s ease-out; }
+.fs-ctx__btn small { font-family: 'IBM Plex Sans KR', sans-serif; font-size: 11px; font-weight: 800; padding: 1px 5px; border-radius: 2px; background: rgba(28, 23, 72, 0.18); }
+.fs-ctx__btn:active { transform: translateY(3px); box-shadow: 0 1px 0 #1f7f8c; }
+.fs-ctx__btn--fish { background: #ffd23f; box-shadow: 0 4px 0 #b8890b; }
+.fs-ctx__btn--now { background: #ff6b5e; color: #fff; animation: fs-ctx-pulse 0.5s ease-in-out infinite alternate; }
+.fs-ctx__btn--off { background: #9aa0b8; box-shadow: 0 4px 0 #5d6178; }
+@keyframes fs-ctx-in { from { transform: translateY(6px); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes fs-ctx-pulse { from { transform: scale(1); } to { transform: scale(1.07); } }
+@media (max-height: 420px) { .fs-pad { bottom: calc(10px + env(safe-area-inset-bottom, 0px)); } .fs-round--jump { width: 72px; height: 72px; font-size: 17px; } .fs-round--bonk { right: 80px; width: 56px; height: 56px; } .fs-ctx { bottom: 84px; } .fs-ctx__btn { min-width: 96px; padding: 7px 10px; font-size: 16px; } }

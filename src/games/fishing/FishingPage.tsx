@@ -5,7 +5,7 @@ import { loadNickname } from '../../shared/storage/nickname'
 import { DEX_FISH, RARITY, fishById } from './play/fish'
 import { CHAT_MAX, FISHING_CAPACITY } from './play/protocol'
 import { IRO_FILTERS, SHADOW_FILTER, fishSvg } from './field/fishArt'
-import { type Action, type Alt, CAM_LIMITS, iroName, useFishingRoom } from './game/useFishingRoom'
+import { type Alt, CAM_LIMITS, type FishAct, iroName, useFishingRoom } from './game/useFishingRoom'
 import { Joystick } from './game/Joystick'
 import { BragSheet, DexSheet, MyTankSheet, OtherTankSheet } from './screens/Sheets'
 import './fishing.css'
@@ -16,8 +16,10 @@ import './fishing.css'
 
 const Scene3D = lazy(() => import('./game/Scene3D').then((m) => ({ default: m.Scene3D })))
 
-const ALT_LABEL: Record<NonNullable<Alt>, string> = { board: '배 타기', unboard: '내리기', noLand: '내리기', climb: '올라가기', down: '내려가기', build: '모래성 쌓기' }
-const ACTION_LABEL: Record<Action, string> = { reel: '잡기!', reelIn: '거두기', cast: '던지기', bed: '눕기', none: '물가로 가요' }
+// 조작 (사용자 요청 2026-11-19): PC — 걷기 WASD·방향키 · 달리기 Shift · 앉기 Ctrl · 점프 Space · 뿅망치 F · 상호작용 R · 낚시 T
+// 폰 — 왼쪽 아래 조이스틱(끝까지 밀면 달리기), 오른쪽 점프·뿅, 상호작용·낚시 버튼은 할 수 있을 때만 뜸
+const ALT_LABEL: Record<NonNullable<Alt>, string> = { board: '배 타기', unboard: '내리기', noLand: '내리기', climb: '올라가기', down: '내려가기', build: '모래성 쌓기', bed: '눕기', lieBed: '눕기', sit: '앉기', stand: '일어나기' }
+const FISH_LABEL: Record<NonNullable<FishAct>, string> = { cast: '낚시', reelIn: '거두기', reel: '잡기!' }
 
 const isTouch = () => typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches
 const isPortrait = () => window.innerHeight > window.innerWidth
@@ -42,8 +44,7 @@ export function FishingPage() {
   const [text, setText] = useState('')
   const [firstPerson, setFirstPerson] = useState(false)
   const chatRef = useRef<HTMLInputElement>(null)
-  const { world, act, send, bonk, doAlt, setPose, jump } = room
-  const [running, setRunning] = useState(false)
+  const { world, fish, send, bonk, doAlt, setPose, jump } = room
 
   useEffect(() => {
     const on = () => setPortrait(isTouch() && isPortrait())
@@ -75,6 +76,7 @@ export function FishingPage() {
     const apply = () => {
       world.input.x = (keys.has('right') ? 1 : 0) - (keys.has('left') ? 1 : 0)
       world.input.y = (keys.has('down') ? 1 : 0) - (keys.has('up') ? 1 : 0)
+      world.input.kb = ['left', 'right', 'up', 'down'].some((k) => keys.has(k))
     }
     // 키 위치(e.code)로 받음 — 한글 입력 상태면 e.key가 'ㅈ·ㅁ·ㄴ·ㅇ'이라 WASD가 안 먹었음
     const dir = (code: string) => ({ ArrowLeft: 'left', KeyA: 'left', ArrowRight: 'right', KeyD: 'right', ArrowUp: 'up', KeyW: 'up', ArrowDown: 'down', KeyS: 'down' })[code]
@@ -89,25 +91,28 @@ export function FishingPage() {
       } else if (e.code === 'KeyQ' || e.code === 'KeyE') {
         keys.add(e.code === 'KeyQ' ? 'spinL' : 'spinR')
         spin()
-      } else if (e.code === 'KeyF' && !e.repeat) {
-        bonk()
-      } else if (e.code === 'KeyR' && !e.repeat) {
-        doAlt()
+      } else if (e.code === 'KeyF') {
+        // Ctrl을 누른 채면 브라우저 단축키(찾기·새로 고침 등)가 안 뜨게
+        e.preventDefault()
+        if (!e.repeat) bonk()
+      } else if (e.code === 'KeyR') {
+        e.preventDefault()
+        if (!e.repeat) doAlt()
+      } else if (e.code === 'KeyT') {
+        e.preventDefault()
+        if (!e.repeat) fish()
+      } else if (e.code === 'Space') {
+        e.preventDefault()
+        if (!e.repeat) jump()
       } else if ((e.code === 'ShiftLeft' || e.code === 'ShiftRight') && !e.repeat) {
         // 누르는 동안 달리기
         world.input.run = true
-        setRunning(true)
-      } else if (e.code === 'KeyJ' && !e.repeat) {
-        jump()
-      } else if (e.code === 'KeyC' && !e.repeat) {
+      } else if ((e.code === 'ControlLeft' || e.code === 'ControlRight') && !e.repeat) {
         setPose('sit')
       } else if (e.code === 'KeyZ' && !e.repeat) {
         setPose('lie')
       } else if (e.code === 'KeyV' && !e.repeat) {
         toggleView()
-      } else if (e.code === 'Space') {
-        e.preventDefault()
-        if (!e.repeat) act()
       } else if (e.code === 'Enter' || e.code === 'NumpadEnter') {
         e.preventDefault()
         chatRef.current?.focus()
@@ -116,7 +121,6 @@ export function FishingPage() {
     const up = (e: KeyboardEvent) => {
       if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') {
         world.input.run = false
-        setRunning(false)
         return
       }
       if (e.code === 'KeyQ' || e.code === 'KeyE') {
@@ -131,7 +135,6 @@ export function FishingPage() {
     const blur = () => {
       keys.clear()
       world.input.run = false
-      setRunning(false)
       apply()
       spin()
     }
@@ -150,7 +153,7 @@ export function FishingPage() {
       window.removeEventListener('blur', blur)
       window.removeEventListener('contextmenu', menu)
     }
-  }, [entered, world, act, toggleView, bonk, doAlt, setPose, jump])
+  }, [entered, world, fish, toggleView, bonk, doAlt, setPose, jump])
 
   // 잡은 물고기 카드는 잠깐만
   const { myCatch, setMyCatch } = room
@@ -179,8 +182,8 @@ export function FishingPage() {
           <li>바다(부두·바닷가)와 민물(개울·연못)에서 잡히는 물고기가 달라요 — 모두 {DEX_FISH.length}종 + 꽝</li>
           <li>어떤 물고기든 아주 드물게 다른 색(이로치)으로 나와요</li>
           <li>잡은 것 중 10마리를 어항에 넣으면 다른 사람이 나를 눌러 구경해요</li>
-          <li>한 낚시터에 {FISHING_CAPACITY}명까지 · PC는 WASD·방향키로 걷고 스페이스, 화면을 끌거나 Q·E로 시점 돌리기, V 1인칭, F 뿅망치</li>
-          <li>[뿅]을 누르면 앞에 있는 친구를 장난감 망치로 뿅 (맞아도 낚시는 그대로)</li>
+          <li>한 낚시터에 {FISHING_CAPACITY}명까지 · PC: WASD·방향키 걷기 · Shift 달리기 · Ctrl 앉기 · Space 점프 · F 뿅망치 · R 상호작용(배·사다리·눕기·앉기·모래성) · T 낚시 · Q·E·화면 끌기 시점 · V 1인칭</li>
+          <li>폰: 왼쪽 아래 조이스틱(끝까지 밀면 달리기) · 오른쪽 점프·뿅 · 낚시·상호작용 버튼은 할 수 있을 때만 떠요</li>
         </ul>
         {!canWebGL() && <p className="error">이 기기는 3D 화면을 그릴 수 없어서 낚시터에 들어갈 수 없어요</p>}
         <button
@@ -256,71 +259,61 @@ export function FishingPage() {
       )}
 
       <Joystick out={world.input} />
-      {/* 달리기(켜고 끄기)·앉기·눕기 — PC는 Shift·C·Z */}
-      <div className="fs-poses">
+      {/* 오른쪽: 점프·뿅은 늘, 낚시·상호작용은 할 수 있을 때만 */}
+      <div className="fs-pad">
+        <div className="fs-ctx">
+          {room.fishAct && (
+            <button
+              type="button"
+              className={`fs-ctx__btn fs-ctx__btn--fish${room.fishAct === 'reel' ? ' fs-ctx__btn--now' : ''}`}
+              onPointerDown={(e) => {
+                e.preventDefault()
+                if (e.button === 0) fish()
+              }}
+            >
+              {FISH_LABEL[room.fishAct]}
+              <small>T</small>
+            </button>
+          )}
+          {room.alt && (
+            <button
+              type="button"
+              className={`fs-ctx__btn${room.alt === 'noLand' ? ' fs-ctx__btn--off' : ''}`}
+              onPointerDown={(e) => {
+                e.preventDefault()
+                if (e.button === 0) doAlt()
+              }}
+              title={room.alt === 'noLand' ? '물가나 부두 가까이 가면 내릴 수 있어요' : undefined}
+            >
+              {ALT_LABEL[room.alt]}
+              <small>R</small>
+            </button>
+          )}
+        </div>
         <button
           type="button"
-          className="fs-pose"
-          aria-pressed={running}
+          className="fs-round fs-round--bonk"
           onPointerDown={(e) => {
             e.preventDefault()
-            if (e.button !== 0) return
-            world.input.run = !world.input.run
-            setRunning(world.input.run)
+            if (e.button === 0) bonk()
           }}
-          title="달리기 (Shift를 누르는 동안)"
+          aria-label="뿅망치 (F)"
+          title="뿅망치 (F) — 사람·모래성·나무 상자"
         >
-          달리기<small>Shift</small>
+          뿅<small>F</small>
         </button>
-        <button type="button" className="fs-pose" onPointerDown={(e) => { e.preventDefault(); if (e.button === 0) jump() }} title="점프 (J)">
-          점프<small>J</small>
-        </button>
-        <button type="button" className="fs-pose" onPointerDown={(e) => { e.preventDefault(); if (e.button === 0) setPose('sit') }} title="앉기 (C) — 한 번 더 누르면 일어나요">
-          앉기<small>C</small>
-        </button>
-        <button type="button" className="fs-pose" onPointerDown={(e) => { e.preventDefault(); if (e.button === 0) setPose('lie') }} title="눕기 (Z) — 한 번 더 누르면 일어나요">
-          눕기<small>Z</small>
+        <button
+          type="button"
+          className="fs-round fs-round--jump"
+          onPointerDown={(e) => {
+            e.preventDefault()
+            if (e.button === 0) jump()
+          }}
+          aria-label="점프 (Space)"
+        >
+          점프<small>Space</small>
         </button>
       </div>
-      <button
-        type="button"
-        className={`fs-act fs-act--${room.action}`}
-        disabled={room.action === 'none'}
-        onPointerDown={(e) => {
-          e.preventDefault()
-          if (e.button === 0) act()
-        }}
-      >
-        {ACTION_LABEL[room.action]}
-        <small>스페이스</small>
-      </button>
-
-      <button
-        type="button"
-        className="fs-bonk"
-        onPointerDown={(e) => {
-          e.preventDefault()
-          if (e.button === 0) bonk()
-        }}
-        aria-label="뿅망치 (F)"
-        title="뿅망치 (F) — 앞에 있는 사람을 장난으로 뿅"
-      >
-        뿅<small>F</small>
-      </button>
-      {room.alt && (
-        <button
-          type="button"
-          className={`fs-alt${room.alt === 'noLand' ? ' fs-alt--off' : ''}`}
-          onPointerDown={(e) => {
-            e.preventDefault()
-            if (e.button === 0) doAlt()
-          }}
-          title={room.alt === 'noLand' ? '물가나 부두 가까이 가면 내릴 수 있어요' : undefined}
-        >
-          {ALT_LABEL[room.alt]}
-          <small>R</small>
-        </button>
-      )}
 
       <div className="fs-chat">
         <ol className="fs-chat__log">
