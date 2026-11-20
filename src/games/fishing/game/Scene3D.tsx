@@ -203,6 +203,13 @@ export function Scene3D({ world, step, onTapPlayer }: { world: World; step: (dt:
       scene.add(g)
       return g
     })
+    /** 배에서 앉은 판이 배 가운데(서버 자리)에서 앞(+)·뒤(−)로 얼마나 — 젓는 사람 앞 판, 같이 탄 사람 뒤 판, 카약은 0 */
+    const boatSeatShift = (p: { id: string; ride: number | null }) => {
+      if (p.ride === null) return 0
+      const ud = (boatObjs[p.ride]?.userData ?? {}) as { seatFwd?: number; seatBack?: number }
+      if (!ud.seatFwd) return 0
+      return world.boats[p.ride]?.passenger === p.id ? -(ud.seatBack ?? 0) : ud.seatFwd
+    }
     const occluders = art.occluders
     // 가리는 것들은 각자 재질을 따로 (반투명을 하나씩 바꾸려고)
     for (const { g } of occluders)
@@ -571,18 +578,20 @@ export function Scene3D({ world, step, onTapPlayer }: { world: World; step: (dt:
           root.position.set(l.foot.x + (l.top.x - l.foot.x) * k, groundY(l.foot.x, l.foot.z) + l.y * k, l.foot.z + (l.top.z - l.foot.z) * k)
           root.rotation.set(0, Math.atan2(l.top.x - l.foot.x, l.top.z - l.foot.z), 0)
         } else if (p.ride !== null) {
-          // 배 가운데 판(젓는 사람) 또는 앞 판(같이 탄 사람)에 앉음 — 배와 같이 출렁, 다리는 앞으로
+          // 젓는 사람(먼저 탄 사람)은 앞 판, 같이 탄 사람은 뒤 판에 앉음 — 배와 같이 출렁, 다리는 앞으로
+          // (배 가운데 = 서버 자리, 카약은 가운데 하나)
           const bo = boatObjs[p.ride]
           const b = world.boats[p.ride]
-          const ud = (bo?.userData ?? {}) as { seatY?: number; seatY2?: number; seatFwd?: number }
+          const ud = (bo?.userData ?? {}) as { seatY?: number; seatY2?: number; seatY3?: number; seatFwd?: number; seatBack?: number }
           if (b && b.passenger === p.id) {
             const rider = b.rider ? world.players.get(b.rider) : null
             const bx = rider ? rider.sx : b.x, bz = rider ? rider.sz : b.z, br = rider ? rider.sr : b.r
-            const f = ud.seatFwd ?? 0.88
-            root.position.set(bx + Math.sin(br) * f, BOAT_Y + (ud.seatY2 ?? 0.5) - 0.5 * SCALE + Math.sin(t * 1.3 + bx) * 0.05, bz + Math.cos(br) * f)
+            const f = -(ud.seatBack ?? 1.05)
+            root.position.set(bx + Math.sin(br) * f, BOAT_Y + (ud.seatY3 ?? 0.5) - 0.5 * SCALE + Math.sin(t * 1.3 + bx) * 0.05, bz + Math.cos(br) * f)
             root.rotation.set(0, br, 0)
           } else {
-            root.position.set(p.sx, BOAT_Y + (ud.seatY ?? 0.49) - 0.5 * SCALE + Math.sin(t * 1.3 + p.sx) * 0.05, p.sz)
+            const f = ud.seatFwd ?? 0
+            root.position.set(p.sx + Math.sin(p.sr) * f, BOAT_Y + ((f ? ud.seatY2 : ud.seatY) ?? 0.49) - 0.5 * SCALE + Math.sin(t * 1.3 + p.sx) * 0.05, p.sz + Math.cos(p.sr) * f)
             root.rotation.set(0, p.sr, 0)
             // 카약: 두 손을 앞으로 뻗어 노를 쥠
             if ((bo?.userData as { kayak?: boolean } | undefined)?.kayak && pose !== 'fish' && pose !== 'hold') {
@@ -921,7 +930,9 @@ export function Scene3D({ world, step, onTapPlayer }: { world: World; step: (dt:
           if (!eyeReady) eyeY = hy
           eyeY += (hy - eyeY) * (1 - Math.exp(-dt * 3))
           eyeReady = true
-          head.set(me.sx, eyeY, me.sz)
+          // 배에선 앉은 판 자리에서 (배 가운데 = 내 자리라 앞 판·뒤 판만큼 옮김)
+          const seatShift = boatSeatShift(me)
+          head.set(me.sx + Math.sin(me.sr) * seatShift, eyeY, me.sz + Math.cos(me.sr) * seatShift)
           const cp = Math.cos(cam.pitch)
           setFov(viewFov() + 14)
           camera.position.set(head.x - fx * 0.15, head.y + 0.12, head.z - fz * 0.15)

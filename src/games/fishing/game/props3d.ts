@@ -563,9 +563,12 @@ export function makeBoat(color: string) {
   g.add(mask)
   /** 가운데 앉는 판 윗면 높이 (배 기준) */
   g.userData.seatY = sheer(0.5) - 0.16 + 0.025
-  /** 같이 탄 사람: 앞 판 (배 가운데에서 앞으로 seatFwd만큼) */
+  /** 젓는 사람(먼저 탄 사람): 앞 판 (배 가운데에서 앞으로 seatFwd만큼) */
   g.userData.seatY2 = sheer(0.75) - 0.16 + 0.025
   g.userData.seatFwd = L * 0.25
+  /** 같이 탄 사람(나중에 탄 사람): 뒤 판 (배 가운데에서 뒤로 seatBack만큼) */
+  g.userData.seatY3 = sheer(0.2) - 0.16 + 0.025
+  g.userData.seatBack = L * 0.3
   // 예전 배와 같은 크기·방향 (뱃머리 -z)
   return g
 }
