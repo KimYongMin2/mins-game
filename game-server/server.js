@@ -12633,6 +12633,19 @@ const BOUNDS = {
 	minZ: -40,
 	maxZ: 100
 };
+/** 배로 갈 수 있는 바다 끝 (사용자 요청 2026-11-20 '바다를 넓게': 북쪽 −40 → −100, 동쪽 풀밭 북쪽(z < EAST_SEA_Z)도 바다) */
+const SEA_BOUNDS = {
+	minX: -130,
+	maxX: 130,
+	minZ: -100
+};
+/** 지도(미니맵)에 보이는 범위 = 걷는 맵 + 넓힌 바다 */
+const MAP_VIEW = {
+	minX: BOUNDS.minX,
+	maxX: BOUNDS.maxX,
+	minZ: SEA_BOUNDS.minZ,
+	maxZ: BOUNDS.maxZ
+};
 const shoreZ = (x) => -8 + Math.sin(x * .13) * 2.2 + Math.sin(x * .31 + 1) * .6;
 /** 긴 나무 부두 (몸통 + 끝의 넓은 자리) */
 const PIER = {
@@ -13881,7 +13894,7 @@ const KAYAK_SPEED = 8.5;
 const boatSpeed = (i) => BOAT_SLOTS[i]?.kayak ? KAYAK_SPEED : 7;
 /** 배가 갈 수 있는 곳: 그 물(바다·민물) 위, 배 둘레(0.9m)도 물, 판자·방파제 밑이 아님 */
 function boatable(x, z, zone) {
-	if (x < BOUNDS.minX || x > BOUNDS.maxX || z < BOUNDS.minZ || z > BOUNDS.maxZ) return false;
+	if (zone === "sea" ? x < SEA_BOUNDS.minX || x > SEA_BOUNDS.maxX || z < SEA_BOUNDS.minZ || z > BOUNDS.maxZ : x < BOUNDS.minX || x > BOUNDS.maxX || z < BOUNDS.minZ || z > BOUNDS.maxZ) return false;
 	for (const [ox, oz] of [
 		[0, 0],
 		[.9, 0],
@@ -13929,7 +13942,7 @@ function riverDist(x, z) {
 function waterAt(x, z) {
 	if (Math.hypot(x - LAKE.x, z - LAKE.z) < LAKE.r || riverDist(x, z) < RIVER.half) return "fresh";
 	if (x < 22 && z < shoreZ(x)) return "sea";
-	if (x < 22 && z < BOUNDS.minZ) return "sea";
+	if (z < -56) return "sea";
 	return null;
 }
 /** 구조물에 막히는지 (사람 반지름 0.35 포함) */
@@ -14366,7 +14379,7 @@ function fishingReferee(_setup, ctx) {
 		return true;
 	}
 	function move(p, m) {
-		if (!num(m.x, BOUNDS.minX - 1, BOUNDS.maxX + 1) || !num(m.z, BOUNDS.minZ - 1, BOUNDS.maxZ + 1) || !num(m.r, -100, 100)) return;
+		if (!num(m.x, MAP_VIEW.minX - 1, MAP_VIEW.maxX + 1) || !num(m.z, MAP_VIEW.minZ - 1, MAP_VIEW.maxZ + 1) || !num(m.r, -100, 100)) return;
 		const now = ctx.now();
 		if (p.ride !== null && boats[p.ride].passenger === p.id) {
 			p.lastMv = now;

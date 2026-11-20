@@ -3,7 +3,7 @@ import * as THREE from 'three'
 import { createStage, nearestOnScreen } from '../../../shared/art3d/stage'
 import { type AnimalRig, ANIMALS, RECLINE, makeAnimal, plainLook } from '../../../shared/art3d/animals'
 import { decodeLook } from '../../../shared/art3d/animalKinds'
-import { BEDS, BOAT_SLOTS, BOUNDS, BUILD_MS, CASTLES, CRATES, SEATS, LADDERS, WIND, bugHeightAt, groundY, houseAt } from '../play/map'
+import { BEDS, BOAT_SLOTS, MAP_VIEW, BUILD_MS, CASTLES, CRATES, SEATS, LADDERS, WIND, bugHeightAt, groundY, houseAt } from '../play/map'
 import { buildWorld, makeBoat } from './worldArt'
 import { kit, makeKayak, makeSandRuin, makeSandcastle } from './props3d'
 import { WEATHER_NAME, gameHour, hourLabel, weatherNow } from './clock'
@@ -451,9 +451,9 @@ export function Scene3D({ world, step, onTapPlayer }: { world: World; step: (dt:
     }
     function drawMinimap() {
       if (!mctx || !mini) return
-      const K = mini.width / (BOUNDS.maxX - BOUNDS.minX)
+      const K = mini.width / (MAP_VIEW.maxX - MAP_VIEW.minX)
       mctx.drawImage(art.minimap, 0, 0)
-      const at = (x: number, z: number) => [(x - BOUNDS.minX) * K, (z - BOUNDS.minZ) * K] as const
+      const at = (x: number, z: number) => [(x - MAP_VIEW.minX) * K, (z - MAP_VIEW.minZ) * K] as const
       for (const p of world.players.values()) {
         if (p.id === world.me) continue
         const [x, y] = at(p.sx, p.sz)

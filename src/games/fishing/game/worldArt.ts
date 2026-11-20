@@ -2,7 +2,7 @@ import * as THREE from 'three'
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 import { gameHour, weatherNow } from './clock'
 import { kit, makeBoat, makeFlipFlops, makePalm, makePine, makeSideTable, makeSunbed, makeTree, makeUmbrella, rockGeo, waterNormals } from './props3d'
-import { BEDS, BOUNDS, BRIDGE, DOCK, PIER2, PIER2_END, type FurnKind, HOUSES, JETTY, LADDERS, LAKE, LAKE_DOCK, PIER, PIER_END, RIVER, type Rect, SEA_EAST, STRUCTS, type Struct, shoreZ, waterAt } from '../play/map'
+import { BEDS, BOUNDS, BRIDGE, MAP_VIEW, DOCK, PIER2, PIER2_END, type FurnKind, HOUSES, JETTY, LADDERS, LAKE, LAKE_DOCK, PIER, PIER_END, RIVER, type Rect, SEA_EAST, STRUCTS, type Struct, shoreZ, waterAt } from '../play/map'
 
 // 낚시터 3D 맵 그림 (2026-11-18 사용자 요청 — 더 사실적이고 넓게, 구조물 많이, 추가할 만한 것 다).
 // 좌표·막힘은 play/map.ts(서버와 같이 씀), 여기는 그림만.
@@ -346,6 +346,14 @@ export function buildWorld(scene: THREE.Scene, renderer: THREE.WebGLRenderer): W
     const r = new THREE.Mesh(rockGeo(s, z, { moss: false }), rockM)
     r.position.set(SEA_EAST - 0.4 + Math.sin(z) * 0.4, 0.1, z)
     r.rotation.set(z, z * 2, 0)
+    statics.add(r)
+  }
+  // 동쪽 풀밭 북쪽 끝도 바다와 만남 (바다를 넓히며 — 그 너머는 배로 갈 수 있는 바다)
+  for (let x = SEA_EAST + 0.8; x < BOUNDS.maxX + 6; x += 1.2) {
+    const s = 0.7 + Math.abs(Math.sin(x * 2.1)) * 0.6
+    const r = new THREE.Mesh(rockGeo(s, x, { moss: false }), rockM)
+    r.position.set(x, 0.1, -52.4 + Math.sin(x) * 0.4)
+    r.rotation.set(x, x * 2, 0)
     statics.add(r)
   }
 
@@ -1199,7 +1207,7 @@ export function buildWorld(scene: THREE.Scene, renderer: THREE.WebGLRenderer): W
 
   // ── 물 위 움직이는 것: 묶인 배·부표·멀리 돛단배 ──
   const floaters: { o: THREE.Object3D; ph: number }[] = []
-  for (const [x, z] of [[-20, -30], [-6, -34], [12, -30], [-44, -28], [2, -24], [16, -22]]) {
+  for (const [x, z] of [[-20, -30], [-6, -34], [12, -30], [-44, -28], [2, -24], [16, -22], [-30, -62], [8, -75], [-80, -55], [45, -70], [90, -64], [-110, -85], [-15, -92]]) {
     const b = new THREE.Group()
     b.position.set(x, 0, z)
     b.add(cyl(0.35, 0.45, 0.6, mat('#e8473f', 0.5), 0, 0.15, 0, 12), cyl(0.36, 0.36, 0.16, whiteM, 0, 0.3, 0, 12), cyl(0.04, 0.04, 0.6, darkM, 0, 0.75, 0, 5))
@@ -1232,7 +1240,7 @@ export function buildWorld(scene: THREE.Scene, renderer: THREE.WebGLRenderer): W
     scene.add(sailboat)
   }
   dyn.push((t) => {
-    sailboat.position.set(-140 + ((t * 2.2) % 280), Math.sin(t) * 0.08, -95)
+    sailboat.position.set(-140 + ((t * 2.2) % 280), Math.sin(t) * 0.08, -135)
   })
 
   // ── 먼 곳: 섬·산 (안개 없이 흐린 색) ──
@@ -1409,7 +1417,7 @@ export function buildWorld(scene: THREE.Scene, renderer: THREE.WebGLRenderer): W
   // ── 미니맵 바탕 (2px = 1m) ──
   const minimap = document.createElement('canvas')
   {
-    const W = BOUNDS.maxX - BOUNDS.minX, H = BOUNDS.maxZ - BOUNDS.minZ, K = 2
+    const W = MAP_VIEW.maxX - MAP_VIEW.minX, H = MAP_VIEW.maxZ - MAP_VIEW.minZ, K = 2
     minimap.width = W * K
     minimap.height = H * K
     const g = minimap.getContext('2d')!
@@ -1417,7 +1425,7 @@ export function buildWorld(scene: THREE.Scene, renderer: THREE.WebGLRenderer): W
     const boards = [PIER, PIER_END, PIER2, PIER2_END, JETTY, DOCK, BRIDGE, LAKE_DOCK]
     for (let py = 0; py < minimap.height; py++)
       for (let px = 0; px < minimap.width; px++) {
-        const x = BOUNDS.minX + (px + 0.5) / K, z = BOUNDS.minZ + (py + 0.5) / K
+        const x = MAP_VIEW.minX + (px + 0.5) / K, z = MAP_VIEW.minZ + (py + 0.5) / K
         const w = waterAt(x, z)
         const onB = boards.some((b) => x >= b.minX && x <= b.maxX && z >= b.minZ && z <= b.maxZ)
         const c = onB ? [169, 115, 63] : w === 'sea' ? [47, 134, 198] : w === 'fresh' ? [63, 182, 201] : z < 15 && x < SEA_EAST ? [236, 212, 154] : [111, 184, 92]
@@ -1428,15 +1436,15 @@ export function buildWorld(scene: THREE.Scene, renderer: THREE.WebGLRenderer): W
     g.fillStyle = 'rgba(31,26,77,0.85)'
     for (const s of STRUCTS) {
       if (s.kind === 'umbrella' || s.kind === 'lamp' || s.kind === 'sign' || s.kind === 'flag') continue
-      if (s.w && s.d) g.fillRect((s.x - s.w / 2 - BOUNDS.minX) * K, (s.z - s.d / 2 - BOUNDS.minZ) * K, s.w * K, s.d * K)
+      if (s.w && s.d) g.fillRect((s.x - s.w / 2 - MAP_VIEW.minX) * K, (s.z - s.d / 2 - MAP_VIEW.minZ) * K, s.w * K, s.d * K)
       else if (s.c) {
         g.beginPath()
-        g.arc((s.x - BOUNDS.minX) * K, (s.z - BOUNDS.minZ) * K, Math.max(1.5, s.c * K), 0, Math.PI * 2)
+        g.arc((s.x - MAP_VIEW.minX) * K, (s.z - MAP_VIEW.minZ) * K, Math.max(1.5, s.c * K), 0, Math.PI * 2)
         g.fill()
       }
     }
     g.fillStyle = '#ffffff'
-    for (const b of BEDS) g.fillRect((b.x - BOUNDS.minX) * K - 1.5, (b.z - BOUNDS.minZ) * K - 1.5, 3, 3)
+    for (const b of BEDS) g.fillRect((b.x - MAP_VIEW.minX) * K - 1.5, (b.z - MAP_VIEW.minZ) * K - 1.5, 3, 3)
   }
 
   return {

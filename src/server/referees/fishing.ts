@@ -2,7 +2,7 @@ import type { Referee, RefereeContext, RefereeFactory } from '../hub'
 import { type Catch, fishById, isBig, rollBugCatch, rollCatch } from '../../games/fishing/play/fish'
 import { isBugId, isNightHour } from '../../games/fishing/play/bugs'
 import { gameHour } from '../../games/fishing/game/clock'
-import { BEDS, BOAT_SLOTS, BOARD_REACH, CRATES, CRATE_HP, CRATE_RESPAWN_MS, boatSpeed, BOUNDS, BUILD_MS, CASTLES, LADDERS, SEATS, nearCastle, nearSeat, RUN_SPEED, SPAWN, boatable, bugSpot, castTarget, CLOVER_COUNT, CLOVER_REACH, KITE_MAX, LUCK_MS, fireOfSeat, kiteOk, onGrass, landingSpot, nearBed, nearLadder, onLadderTop, walkable } from '../../games/fishing/play/map'
+import { BEDS, BOAT_SLOTS, BOARD_REACH, CRATES, CRATE_HP, CRATE_RESPAWN_MS, boatSpeed, MAP_VIEW, BUILD_MS, CASTLES, LADDERS, SEATS, nearCastle, nearSeat, RUN_SPEED, SPAWN, boatable, bugSpot, castTarget, CLOVER_COUNT, CLOVER_REACH, KITE_MAX, LUCK_MS, fireOfSeat, kiteOk, onGrass, landingSpot, nearBed, nearLadder, onLadderTop, walkable } from '../../games/fishing/play/map'
 import {
   BITE_MAX_MS,
   BITE_MIN_MS,
@@ -143,7 +143,7 @@ export function fishingReferee(_setup: unknown, ctx: RefereeContext): Referee {
   }
 
   function move(p: P, m: Extract<ClientMsg, { t: 'mv' }>) {
-    if (!num(m.x, BOUNDS.minX - 1, BOUNDS.maxX + 1) || !num(m.z, BOUNDS.minZ - 1, BOUNDS.maxZ + 1) || !num(m.r, -100, 100)) return
+    if (!num(m.x, MAP_VIEW.minX - 1, MAP_VIEW.maxX + 1) || !num(m.z, MAP_VIEW.minZ - 1, MAP_VIEW.maxZ + 1) || !num(m.r, -100, 100)) return
     const now = ctx.now()
     // 같이 탄 사람은 배를 못 움직임 (자리는 배를 따라감)
     if (p.ride !== null && boats[p.ride].passenger === p.id) {
