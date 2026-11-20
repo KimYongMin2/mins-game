@@ -420,14 +420,14 @@ export function useFishingRoom(nickname: string, active: boolean) {
         if (!alive) return r.leave()
         room = r
         roomRef.current = r
-        setRoomLabel(`낚시터 ${r.code.replace('FISH', '')}`)
+        setRoomLabel(`힐링 ${r.code.replace('FISH', '')}`)
         r.onMessage(onMsg)
         r.send({ t: 'hi' })
       })
       .catch((e) => {
         if (!alive) return
         setStatus('error')
-        setError(e instanceof RoomError && e.reason === 'full' ? '낚시터가 모두 가득 찼어요. 조금 뒤에 다시 와 주세요' : '서버에 연결하지 못했어요. 인터넷 연결을 확인해 주세요')
+        setError(e instanceof RoomError && e.reason === 'full' ? '힐링이 모두 가득 찼어요. 조금 뒤에 다시 와 주세요' : '서버에 연결하지 못했어요. 인터넷 연결을 확인해 주세요')
       })
     return () => {
       alive = false

@@ -1180,6 +1180,7 @@ src/
 
 # 낚시터 (fishing) — 같이 노는 곳
 
+- **화면 이름은 '힐링'** (사용자 요청 2026-11-20 — 메뉴 줄·메인 띠·시작 화면·방 이름 '힐링 1'). 폴더·주소(`/games/fishing`)·방 번호(`FISH1`)·저장 키는 그대로, 아래 설명은 예전 이름 '낚시터'로 씀
 위치: `src/games/fishing/` · 주소: `/games/fishing` · CSS 접두사 `fs-` · 사용자 요청 2026-11-17 (그림 시안 https://claude.ai/artifact/7sSYAiXXQZnqB2P9NtqtCE , 맵 시안 https://claude.ai/artifact/LEEqNxxZgSRYjWdzdrxEjz)
 
 - **바닷가 하나에 최대 16명**(`FISH1`~`FISH5`, 차면 다음 낚시터 — 방 고르기 없이 바로 들어감, 메인에선 게임 목록이 아니라 수다방 띠 위에 따로 '낚시터' 띠(사용자 요청 2026-11-18)). 처음 온 사람이 방을 열고 서버 심판(`fishing`)을 세움, 방장이 나가도 먼저 온 사람이 이어받음(`hub.ts` `HOST_TRANSFER`)

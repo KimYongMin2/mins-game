@@ -157,7 +157,7 @@ export function OtherTankSheet({ name, items, onClose }: { name: string; items: 
 export function BragSheet({ profile, onBrag, onClose }: { profile: Profile | null; onBrag: (key: string) => void; onClose: () => void }) {
   const bag = useMemo(() => sortBag(profile?.bag ?? []).filter((x) => fishById(x.f)?.rarity !== 'junk'), [profile])
   return (
-    <Sheet title="자랑하기" sub="고르면 낚시터 모두에게 보여요" onClose={onClose}>
+    <Sheet title="자랑하기" sub="고르면 힐링에 있는 모두에게 보여요" onClose={onClose}>
       {bag.length === 0 ? (
         <p className="fs-sheet__hint">아직 자랑할 물고기·곤충이 없어요</p>
       ) : (

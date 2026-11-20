@@ -184,7 +184,7 @@ export function FishingPage() {
         {filters}
         <header className="fs-start__head">
           <HomeLink className="button button--small">← 목록</HomeLink>
-          <h1 className="title">낚시터</h1>
+          <h1 className="title">힐링</h1>
         </header>
         <div className="fs-start__art" dangerouslySetInnerHTML={{ __html: fishSvg('redbream', 'gold', { bg: 'sea' }) }} />
         <p className="fs-start__lead">바닷가에서 친구들과 같이 낚시해요. 조이스틱으로 걸어 다니다가 물가나 썬베드에서 낚싯대를 던지고, 입질이 오면 5초 안에 한 번 눌러요.</p>
@@ -193,10 +193,10 @@ export function FishingPage() {
           <li>숲 나무 가까이·꽃밭에선 잠자리채로 곤충 채집 — {DEX_BUGS.length}종 + 꽝, 밤에만 나오는 곤충도 있어요</li>
           <li>어떤 물고기·곤충이든 아주 드물게 다른 색(이로치)으로 나와요</li>
           <li>잡은 것 중 10마리를 어항에 넣으면 다른 사람이 나를 눌러 구경해요</li>
-          <li>한 낚시터에 {FISHING_CAPACITY}명까지 · PC: WASD·방향키 걷기 · Shift 달리기 · Ctrl 앉기 · Space 점프 · F 뿅망치 · R 상호작용(배·카약·사다리·눕기·앉기·모래성·네잎클로버) · T 낚시·채집·굽기·연 당기기 · G 노래·연날리기 · Q·E·화면 끌기 시점 · V 1인칭</li>
+          <li>한 곳에 {FISHING_CAPACITY}명까지 · PC: WASD·방향키 걷기 · Shift 달리기 · Ctrl 앉기 · Space 점프 · F 뿅망치 · R 상호작용(배·카약·사다리·눕기·앉기·모래성·네잎클로버) · T 낚시·채집·굽기·연 당기기 · G 노래·연날리기 · Q·E·화면 끌기 시점 · V 1인칭</li>
           <li>폰: 왼쪽 아래 조이스틱(끝까지 밀면 달리기) · 오른쪽 점프·뿅 · 낚시·상호작용 버튼은 할 수 있을 때만 떠요</li>
         </ul>
-        {!canWebGL() && <p className="error">이 기기는 3D 화면을 그릴 수 없어서 낚시터에 들어갈 수 없어요</p>}
+        {!canWebGL() && <p className="error">이 기기는 3D 화면을 그릴 수 없어서 힐링에 들어갈 수 없어요</p>}
         <button
           type="button"
           className="button button--primary fs-start__go"
@@ -206,7 +206,7 @@ export function FishingPage() {
             setEntered(true)
           }}
         >
-          {isTouch() ? '가로 화면으로 들어가기' : '낚시터 들어가기'}
+          {isTouch() ? '가로 화면으로 들어가기' : '힐링 들어가기'}
         </button>
       </main>
     )
@@ -217,16 +217,16 @@ export function FishingPage() {
     <main className="fs-game">
       {filters}
       {room.status === 'ready' && (
-        <Suspense fallback={<div className="fs-loading">낚시터를 그리는 중…</div>}>
+        <Suspense fallback={<div className="fs-loading">힐링을 그리는 중…</div>}>
           <Scene3D world={world} step={room.step} onTapPlayer={onTapPlayer} />
         </Suspense>
       )}
-      {room.status !== 'ready' && <div className="fs-loading">{room.status === 'error' ? room.error : '낚시터에 들어가는 중…'}</div>}
+      {room.status !== 'ready' && <div className="fs-loading">{room.status === 'error' ? room.error : '힐링에 들어가는 중…'}</div>}
 
       <div className="fs-hud fs-hud--tl">
         <HomeLink className="fs-key">나가기</HomeLink>
         <span className="fs-room">
-          {room.roomLabel || '낚시터'} · {room.count}/{FISHING_CAPACITY}명
+          {room.roomLabel || '힐링'} · {room.count}/{FISHING_CAPACITY}명
         </span>
         {!room.saving && <span className="fs-warn">기록 저장 준비 중 (서버를 다시 켜면 사라져요)</span>}
       </div>
@@ -410,7 +410,7 @@ export function FishingPage() {
       {portrait && (
         <div className="fs-rotate" role="alert">
           <b>폰을 가로로 돌려 주세요</b>
-          <span>낚시터는 가로 화면에서 조이스틱과 버튼을 양손으로 해요</span>
+          <span>힐링은 가로 화면에서 조이스틱과 버튼을 양손으로 해요</span>
           <button type="button" className="fs-key fs-key--primary" onClick={() => void goLandscape()}>
             가로 화면으로
           </button>
