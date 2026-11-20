@@ -67,8 +67,8 @@ const ECHO = { feedback: 0.25, wet: 0.35, tone: 3200 }
 
 /** 내 마이크 크기 배율 (사용자가 고름) */
 export const MIC_VOLUME = { min: 0, max: 2, default: 1 }
-/** 보내기 전에 압축한 뒤 키우는 배율 (전체 소리를 크게) */
-const SEND_BOOST = 1.5
+/** 보내기 전에 압축한 뒤 곱하는 배율 — 1.5였는데 잡음까지 커져 1로 (사용자 요청 2026-11-20, 작으면 사용자가 '내 마이크'로 키움) */
+const SEND_BOOST = 1
 
 /** 높게·낮게: 소리 높이 배율 */
 const PITCH = { high: 1.6, low: 0.65, helium: 2.1, monster: 0.55 }

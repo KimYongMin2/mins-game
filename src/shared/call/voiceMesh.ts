@@ -16,8 +16,8 @@ export type CallPeer = { id: string; connection: Connection; micOn: boolean; str
 
 const ICE_SERVERS: RTCIceServer[] = [{ urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302'] }]
 
-/** 음성 최대 비트레이트: 말소리엔 충분하고 데이터를 아낀다 (한 사람과 1시간에 약 10MB) */
-export const VOICE_BITRATE = 24_000
+/** 음성 최대 비트레이트 (SfuCall과 같게 40kbps, 한 사람과 1시간에 약 18MB) */
+export const VOICE_BITRATE = 40_000
 /** 연결이 끊기면 이만큼 뒤 한 번 더 청한다 */
 const RETRY_MS = 1500
 const MAX_RETRIES = 2

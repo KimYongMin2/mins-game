@@ -6,8 +6,8 @@
 export const LISTEN_VOLUME = { min: 0, max: 3, default: 1 }
 /** 사람마다 소리 크기 배율 (디스코드처럼 그 사람만 키우거나 줄이기) */
 export const PERSON_VOLUME = { min: 0, max: 2, default: 1 }
-/** 기본으로 조금 키워 듣는다 (끝에 리미터가 있어 찢어지지 않음) */
-const LISTEN_BOOST = 1.5
+/** 듣는 소리 기본 배율 — 1.5였는데 리미터에 눌려 찌그러져 1로 (사용자 요청 2026-11-20, 작으면 사용자가 '듣는 소리'로 키움) */
+const LISTEN_BOOST = 1
 
 export class Speaker {
   /** 틀 소리 (audio 요소의 srcObject로) */

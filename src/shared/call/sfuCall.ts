@@ -7,8 +7,8 @@ import type { CallPeer } from './voiceMesh'
 // LiveKit 참가자 이름(identity) = '방 접속 번호.사용자 ID 앞 8자'(입장권 서버가 붙임) → 점 앞이 접속 번호.
 // 화면 쪽은 VoiceMesh와 같은 모양(peers·mic·setTrack·setMicOn·setMembers·refresh·close)으로 쓴다.
 
-/** 음성 최대 비트레이트 (한 사람 말소리 1시간 약 10MB) */
-const VOICE_BITRATE = 24_000
+/** 음성 최대 비트레이트 — 24kbps는 지저분해서 40kbps로 (사용자 요청 2026-11-20, 말하는 사람 1시간 약 18MB) */
+const VOICE_BITRATE = 40_000
 
 /**
  * 화상 (사용자 요청 2026-11-17 — 회의방에 카메라). 큰 칸용 360p + 작은 칸용 180p 두 겹(simulcast)으로 올리고,
