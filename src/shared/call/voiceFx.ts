@@ -67,8 +67,6 @@ const ECHO = { feedback: 0.25, wet: 0.35, tone: 3200 }
 
 /** 내 마이크 크기 배율 (사용자가 고름) */
 export const MIC_VOLUME = { min: 0, max: 2, default: 1 }
-/** 보내기 전에 압축한 뒤 곱하는 배율 — 1.5였는데 잡음까지 커져 1로 (사용자 요청 2026-11-20, 작으면 사용자가 '내 마이크'로 키움) */
-const SEND_BOOST = 1
 
 /** 높게·낮게: 소리 높이 배율 */
 const PITCH = { high: 1.6, low: 0.65, helium: 2.1, monster: 0.55 }
@@ -322,19 +320,10 @@ export class VoiceChanger {
     this.track = this.output.stream.getAudioTracks()[0]
     this.bus = ctx.createGain()
     this.bus.gain.value = MIC_VOLUME.default
-    const comp = ctx.createDynamicsCompressor()
-    comp.threshold.value = -28
-    comp.knee.value = 12
-    comp.ratio.value = 4
-    comp.attack.value = 0.005
-    comp.release.value = 0.2
-    const boost = ctx.createGain()
-    boost.gain.value = SEND_BOOST
-    this.final = boost
+    // 압축기·키우기 없이 그대로 보냄 (사용자 요청 2026-11-20 — 잡음까지 커지고 크기가 출렁여서 뺌, 크기는 브라우저 자동 조절 + '내 마이크' 막대)
+    this.final = this.bus
     this.gate = ctx.createGain()
-    this.bus.connect(comp)
-    comp.connect(boost)
-    boost.connect(this.gate)
+    this.bus.connect(this.gate)
     this.gate.connect(this.output)
     this.input.connect(this.bus)
     void loadWorklet(ctx)
