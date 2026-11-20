@@ -14546,7 +14546,7 @@ function fishingReferee(_setup, ctx) {
 	function board(p, i) {
 		if (typeof i !== "number" || !Number.isInteger(i) || !boats[i]) return;
 		const b = boats[i];
-		if (!b.active || BOAT_SLOTS[i].kayak && b.rider || p.ride !== null || p.up !== null || p.seat !== null || b.rider && b.passenger || Math.hypot(b.x - p.x, b.z - p.z) > 3.3) return bad(p);
+		if (!b.active || BOAT_SLOTS[i].kayak && b.rider || p.ride !== null || p.up !== null || p.seat !== null || b.rider && b.passenger || Math.hypot(b.x - p.x, b.z - p.z) > 5.5) return bad(p);
 		stopFishing(p);
 		p.bed = null;
 		p.act = null;

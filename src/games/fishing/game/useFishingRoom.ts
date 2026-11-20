@@ -4,7 +4,7 @@ import { REFEREE_FROM } from '../../../shared/online/hubProtocol'
 import { encodeLook } from '../../../shared/art3d/animalKinds'
 import { loadLook } from '../../../shared/storage/avatar'
 import { type Catch, fishById, isBig } from '../play/fish'
-import { bugSpot, castTarget, nearBed, moveBy, RUN_SPEED, SEATS, nearSeat, WALK_SPEED, BEDS, BOAT_SLOTS, BOAT_REACH, boatSpeed, CASTLES, CRATES, LADDERS, nearCastle, landingSpot, moveBoat, nearLadder, onLadderTop, CLOVER_REACH, FIRES, KITE_MAX, LUCK_MS, fireOfSeat, kiteOk, onGrass } from '../play/map'
+import { bugSpot, castTarget, nearBed, moveBy, RUN_SPEED, SEATS, nearSeat, WALK_SPEED, BEDS, BOAT_SLOTS, BOARD_REACH, boatSpeed, CASTLES, CRATES, LADDERS, nearCastle, landingSpot, moveBoat, nearLadder, onLadderTop, CLOVER_REACH, FIRES, KITE_MAX, LUCK_MS, fireOfSeat, kiteOk, onGrass } from '../play/map'
 import {
   type Act,
   type BagItem,
@@ -797,7 +797,7 @@ function freeBed(world: World, me: Shown): number | null {
 /** 가까운 빈 배 */
 function freeBoat(world: World, me: Shown): number | null {
   let best: number | null = null
-  let bestD = BOAT_REACH
+  let bestD = BOARD_REACH
   world.boats.forEach((b, i) => {
     const d = Math.hypot(b.x - me.x, b.z - me.z)
     if (b.active && (!b.rider || (!b.passenger && !BOAT_SLOTS[i].kayak)) && d < bestD) {

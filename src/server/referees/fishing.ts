@@ -2,7 +2,7 @@ import type { Referee, RefereeContext, RefereeFactory } from '../hub'
 import { type Catch, fishById, isBig, rollBugCatch, rollCatch } from '../../games/fishing/play/fish'
 import { isBugId, isNightHour } from '../../games/fishing/play/bugs'
 import { gameHour } from '../../games/fishing/game/clock'
-import { BEDS, BOAT_SLOTS, BOAT_REACH, CRATES, CRATE_HP, CRATE_RESPAWN_MS, boatSpeed, BOUNDS, BUILD_MS, CASTLES, LADDERS, SEATS, nearCastle, nearSeat, RUN_SPEED, SPAWN, boatable, bugSpot, castTarget, CLOVER_COUNT, CLOVER_REACH, KITE_MAX, LUCK_MS, fireOfSeat, kiteOk, onGrass, landingSpot, nearBed, nearLadder, onLadderTop, walkable } from '../../games/fishing/play/map'
+import { BEDS, BOAT_SLOTS, BOARD_REACH, CRATES, CRATE_HP, CRATE_RESPAWN_MS, boatSpeed, BOUNDS, BUILD_MS, CASTLES, LADDERS, SEATS, nearCastle, nearSeat, RUN_SPEED, SPAWN, boatable, bugSpot, castTarget, CLOVER_COUNT, CLOVER_REACH, KITE_MAX, LUCK_MS, fireOfSeat, kiteOk, onGrass, landingSpot, nearBed, nearLadder, onLadderTop, walkable } from '../../games/fishing/play/map'
 import {
   BITE_MAX_MS,
   BITE_MIN_MS,
@@ -282,7 +282,7 @@ export function fishingReferee(_setup: unknown, ctx: RefereeContext): Referee {
     if (typeof i !== 'number' || !Number.isInteger(i) || !boats[i]) return
     const b = boats[i]
     // 비었으면 젓는 사람, 한 명 타 있으면 같이 탐 (카약은 한 명만)
-    if (!b.active || (BOAT_SLOTS[i].kayak && b.rider) || p.ride !== null || p.up !== null || p.seat !== null || (b.rider && b.passenger) || Math.hypot(b.x - p.x, b.z - p.z) > BOAT_REACH + 0.5) return bad(p)
+    if (!b.active || (BOAT_SLOTS[i].kayak && b.rider) || p.ride !== null || p.up !== null || p.seat !== null || (b.rider && b.passenger) || Math.hypot(b.x - p.x, b.z - p.z) > BOARD_REACH + 0.5) return bad(p)
     stopFishing(p)
     p.bed = null
     p.act = null

@@ -328,6 +328,8 @@ export const KAYAK_SPEED = 8.5
 export const boatSpeed = (i: number) => (BOAT_SLOTS[i]?.kayak ? KAYAK_SPEED : BOAT_SPEED)
 /** 배에 탈 수 있는 거리 · 내릴 땅을 찾는 거리 */
 export const BOAT_REACH = 2.8
+/** 배·카약에 탈 수 있는 거리 — 내린 자리(배에서 최대 3.4m) + 손 뗀 뒤 배가 밀려난 만큼 (사용자 제보 2026-11-20: 내린 뒤 배가 조금 밀리면 못 탔음) */
+export const BOARD_REACH = 5
 /** 배가 갈 수 있는 곳: 그 물(바다·민물) 위, 배 둘레(0.9m)도 물, 판자·방파제 밑이 아님 */
 export function boatable(x: number, z: number, zone: Zone): boolean {
   if (x < BOUNDS.minX || x > BOUNDS.maxX || z < BOUNDS.minZ || z > BOUNDS.maxZ) return false

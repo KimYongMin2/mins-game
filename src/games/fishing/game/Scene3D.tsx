@@ -638,22 +638,37 @@ export function Scene3D({ world, step, onTapPlayer }: { world: World; step: (dt:
         for (const o of a.rodParts) o.visible = !netOn
         for (const o of a.netParts) o.visible = netOn
         let rodX = 0.95
-        // 잠자리채는 낚싯대와 다르게 '아래에서 위로' 휘두름 (사용자 요청 2026-11-19): 0 = 머리 위로 똑바로, 1.6 = 앞으로 수평, 2 = 앞쪽 아래
+        let rodZ = 0
+        // 잠자리채 (사용자 요청 2026-11-20): 시작은 좌우로 휘휘 흔들기, 잡을 땐 위에서 빠르게 내리 덮기. 0 = 머리 위로 똑바로, 1.6 = 앞으로 수평, 2 = 앞쪽 아래
         const bugTarget = p.bob ?? a.lastBob
         const aimX = bugTarget && bugHeightAt(bugTarget[0], bugTarget[1]) > 1 ? 1.15 : 1.75
         const ease = (k: number) => (1 - Math.cos(Math.min(1, Math.max(0, k)) * Math.PI)) / 2
-        if (netOn && p.fishing === 'bite') rodX = aimX - 0.25 - Math.abs(Math.sin(t * 9)) * 0.55
-        else if (netOn && p.fishing === 'cast') {
-          // 앞쪽 아래로 내렸다가(0~0.18초) → 위로 휙 쓸어 올리고(~0.45초) → 곤충 쪽으로 천천히 내려 겨눔
-          rodX = castK < 0.18 ? 0.95 + ease(castK / 0.18) * 1.15 : castK < 0.45 ? 2.1 - ease((castK - 0.18) / 0.27) * 2.0 : 0.1 + ease((castK - 0.45) / 0.5) * (aimX - 0.1) + Math.sin(t * 2.2) * 0.05
-        } else if (netOn && caught) rodX = aimX - ease((now - p.popup!.start) / 220) * (aimX + 0.2)
-        else if (netOn && reelK < 0.5) rodX = 0.95 - Math.sin((reelK / 0.5) * Math.PI) * 0.9
+        const catchK = caught ? (now - p.popup!.start) / 1000 : 0
+        if (netOn && p.fishing === 'bite') {
+          // 걸림: 채를 곤충 위로 살짝 들고 바르르 (곧 내리칠 자세)
+          rodX = aimX - 0.55 + Math.sin(t * 30) * 0.06
+          rodZ = Math.sin(t * 17) * 0.08
+        } else if (netOn && p.fishing === 'cast') {
+          // 들어 올려(0~0.2초) → 좌우로 크게 휘휘 세 번(~1.4초) → 곤충 쪽으로 겨누고 살랑살랑
+          const lift = ease(castK / 0.2)
+          if (castK < 1.4) {
+            rodX = 0.95 + (aimX - 0.35 - 0.95) * lift
+            rodZ = Math.sin(Math.max(0, castK - 0.1) * Math.PI * 2.3) * 0.75 * lift * (1 - ease((castK - 1.1) / 0.3))
+          } else {
+            rodX = aimX - 0.35 + ease((castK - 1.4) / 0.4) * 0.35
+            rodZ = Math.sin(t * 2.4 + hash(p.id)) * 0.18
+          }
+        } else if (netOn && caught) {
+          // 위에서 앞쪽 아래로 빠르게 덮기 (0.12초) → 잠깐 눌렀다가
+          rodX = catchK < 0.12 ? aimX - 0.6 + (2.05 - aimX + 0.6) * (catchK / 0.12) ** 2 : 2.05
+        } else if (netOn && reelK < 0.5) rodX = 0.95 + Math.sin((reelK / 0.5) * Math.PI) * 0.3
         else if (p.fishing === 'bite') rodX = 1.22 + Math.sin(t * 26) * 0.12
         else if (p.fishing === 'cast') rodX = castAngle(castK)
         else if (caught) rodX = 0.95 - Math.min(1, (now - p.popup!.start) / 160) * 1.1
         else if (reelK < 0.5) rodX = 0.95 - Math.sin((reelK / 0.5) * Math.PI) * 0.55
         // 누워 있으면 몸을 젖힌 만큼 낚싯대를 앞으로 (안 그러면 머리 쪽을 향함)
         a.rod.rotation.x = rodX + (lying ? RECLINE : 0)
+        a.rod.rotation.z = rodZ
         a.rig.root.updateMatrixWorld(true)
         a.tip.getWorldPosition(tipW)
         // 찌 자리
