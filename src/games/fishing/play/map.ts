@@ -523,4 +523,4 @@ export const CLOVER_COUNT = 6
 export const LUCK_MS = 3 * 60_000
 /** 바람 방향 (연이 날아가는 쪽, 바다에서 육지로 = 남쪽 조금 동쪽) */
 export const WIND = { x: 0.35, z: 0.94 }
-export const KITE_MAX = 60
+export const KITE_MAX = 80

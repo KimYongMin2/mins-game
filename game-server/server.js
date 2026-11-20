@@ -14845,7 +14845,7 @@ function fishingReferee(_setup, ctx) {
 				h: null
 			});
 		}
-		if (!num(h, 0, 60) || now - p.lastKite < 220) return;
+		if (!num(h, 0, 80) || now - p.lastKite < 220) return;
 		if (p.kiteH === null && (p.ride !== null || p.seat !== null || p.bed !== null || !kiteOk(p.x, p.z))) return bad(p);
 		p.lastKite = now;
 		p.kiteH = Math.round(h * 10) / 10;
