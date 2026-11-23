@@ -11,6 +11,7 @@ import { nunchiReferee } from './nunchi'
 import { omokReferee } from './omok'
 import { numbaseballReferee } from './numbaseball'
 import { rouletteReferee } from './roulette'
+import { spotdiffReferee } from './spotdiff'
 import { survivalReferee } from './survival'
 import { tilesReferee } from './tiles'
 import { volleyReferee } from './volley'
@@ -32,6 +33,7 @@ export const REFEREES: Record<string, RefereeFactory> = {
   omok: omokReferee,
   doodle: doodleReferee,
   chosung: chosungReferee,
+  spotdiff: spotdiffReferee,
   wordchain: wordchainReferee,
   armwrestle: armwrestleReferee,
   volley: volleyReferee,

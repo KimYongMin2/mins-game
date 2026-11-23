@@ -12,6 +12,7 @@ import { loadRecord as numbaseball } from '../games/numbaseball/records'
 import { loadRecord as nunchi } from '../games/nunchi/records'
 import { loadRecord as omok } from '../games/omok/records'
 import { loadRecord as roulette } from '../games/roulette/records'
+import { loadRecord as spotdiff } from '../games/spotdiff/records'
 import { loadRecord as survival } from '../games/survival/records'
 import { loadRecord as tiles } from '../games/tiles/records'
 import { loadRecord as volley } from '../games/volley/records'
@@ -73,6 +74,11 @@ export function loadStats(): GameStat[] {
     safe('doodle', () => {
       const r = doodle()
       return { id: 'doodle', played: r.games, bot: null, pvp: r.games ? `${tally(r)} · 최고 ${r.best}점` : null }
+    }),
+    // 다른 그림 찾기: 혼자(최고 점수) · 친구 대전(우승)
+    safe('spotdiff', () => {
+      const r = spotdiff()
+      return { id: 'spotdiff', played: r.solo.games + r.pvp.games, bot: r.solo.games ? `혼자 ${r.solo.games}판 · 최고 ${r.solo.best}점` : null, pvp: r.pvp.games ? `${r.pvp.games}판 · 우승 ${r.pvp.wins}번` : null }
     }),
     safe('nunchi', () => {
       const r = nunchi()

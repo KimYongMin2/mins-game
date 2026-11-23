@@ -8304,7 +8304,7 @@ const COUNTDOWN_MS$4 = 2400;
 /** 판 결과 보여주기 */
 const ROUND_END_MS = 1800;
 /** 경기가 끝난 뒤 결과 화면으로 넘어가기까지 */
-const DONE_MS$12 = 1800;
+const DONE_MS$13 = 1800;
 /** 연타전: 한 번 누를 때 넘어가는 양 */
 const TAP_PUSH = .05;
 /** 봇 연타 속도(초당) */
@@ -8472,7 +8472,7 @@ function afterRound(state) {
 			phase: {
 				kind: "done",
 				winner,
-				until: state.now + DONE_MS$12
+				until: state.now + DONE_MS$13
 			}
 		}, winner === userSide ? "win" : "lose");
 	}
@@ -8549,7 +8549,7 @@ function applyGrade(state, side, pass, grade) {
 	};
 	return push(side === state.controllers.indexOf("user") ? withSounds$2(next, grade) : next, side, pushOf(grade));
 }
-function tick$13(state) {
+function tick$14(state) {
 	if (state.follow) {
 		const shownPos = state.shownPos + (state.pos - state.shownPos) * .3;
 		return {
@@ -8557,13 +8557,13 @@ function tick$13(state) {
 			shownPos: Math.abs(state.pos - shownPos) < .002 ? state.pos : shownPos
 		};
 	}
-	const next = advance$1(state);
+	const next = advance$2(state);
 	return next.shownPos === next.pos ? next : {
 		...next,
 		shownPos: next.pos
 	};
 }
-function advance$1(state) {
+function advance$2(state) {
 	const { phase, now } = state;
 	switch (phase.kind) {
 		case "countdown": {
@@ -8586,7 +8586,7 @@ function advance$1(state) {
 		case "done": return state;
 	}
 }
-function tap(state) {
+function tap$1(state) {
 	if (state.event !== "mash" || state.phase.kind !== "pull") return state;
 	return push(withSounds$2({
 		...state,
@@ -8691,11 +8691,11 @@ function sync(state, s) {
 }
 function matchReducer$2(state, action) {
 	switch (action.type) {
-		case "tick": return tick$13({
+		case "tick": return tick$14({
 			...state,
 			now: action.now
 		});
-		case "tap": return tap(state);
+		case "tap": return tap$1(state);
 		case "press": return press$1(state, action.at);
 		case "remoteTaps": return remoteTaps(state, action.total, action.side);
 		case "remotePress": return remotePress(state, action.pass, action.grade, action.side);
@@ -8813,7 +8813,7 @@ const clampNumber = (n) => {
 	const x = Math.floor(Number(n));
 	return Number.isFinite(x) ? Math.min(99, Math.max(0, x)) : 7;
 };
-const pick$2 = (list, x, fallback) => typeof x === "string" && list.includes(x) ? x : fallback;
+const pick$3 = (list, x, fallback) => typeof x === "string" && list.includes(x) ? x : fallback;
 /** 방으로 보낼 짧은 글자: '동물.모자.안경.목.털.옷.색.번호' */
 const encodeLook = (l) => [
 	l.animal,
@@ -8833,12 +8833,12 @@ function decodeLook(x) {
 	if (!animal) return void 0;
 	return {
 		animal,
-		hat: pick$2(HATS, hat, "none"),
-		glasses: pick$2(GLASSES, glasses, "none"),
-		neck: pick$2(NECKS, neck, "none"),
-		fur: pick$2(FURS, fur, "base"),
-		outfit: pick$2(OUTFITS, outfit, "shirt"),
-		tint: pick$2(TINTS, tint, "red"),
+		hat: pick$3(HATS, hat, "none"),
+		glasses: pick$3(GLASSES, glasses, "none"),
+		neck: pick$3(NECKS, neck, "none"),
+		fur: pick$3(FURS, fur, "base"),
+		outfit: pick$3(OUTFITS, outfit, "shirt"),
+		tint: pick$3(TINTS, tint, "red"),
 		number: number === void 0 ? 7 : clampNumber(number)
 	};
 }
@@ -8983,7 +8983,7 @@ const BARREL = 7.5;
 const COUNTDOWN_MS$3 = 1500;
 const TURN_MS$3 = 2e4;
 const BOOM_MS$1 = 1600;
-const DONE_MS$11 = 2500;
+const DONE_MS$12 = 2500;
 /** 봇이 생각하는 시간 */
 const BOT_THINK_MS$1 = [1200, 2400];
 //#endregion
@@ -9304,7 +9304,7 @@ function startSpots(rng, n) {
 	}
 	return spots;
 }
-function createEngine$9(opts) {
+function createEngine$10(opts) {
 	const rng = createRng(opts.seed);
 	const { land, terrain } = makeLand(rng);
 	const tanks = startSpots(rng, opts.players.length).map((x) => ({
@@ -9452,12 +9452,12 @@ function afterBoom$1(s) {
 		...s,
 		phase: {
 			kind: "done",
-			until: s.now + DONE_MS$11
+			until: s.now + DONE_MS$12
 		}
 	};
 	return startTurn$2(s, nextAlive$2(s, s.turn));
 }
-function drop$9(s, player) {
+function drop$10(s, player) {
 	if (!s.tanks[player].alive || s.phase.kind === "done") return s;
 	const next = {
 		...s,
@@ -9472,13 +9472,13 @@ function drop$9(s, player) {
 		...next,
 		phase: {
 			kind: "done",
-			until: s.now + DONE_MS$11
+			until: s.now + DONE_MS$12
 		}
 	};
 	if (s.phase.kind === "aim" && s.turn === player) return startTurn$2(next, nextAlive$2(next, player));
 	return next;
 }
-function tick$12(s) {
+function tick$13(s) {
 	const { phase, now } = s;
 	switch (phase.kind) {
 		case "countdown": return now >= phase.until ? startTurn$2(s, s.turn) : s;
@@ -9498,9 +9498,9 @@ function tick$12(s) {
 		case "done": return s;
 	}
 }
-function engineReducer$9(state, action) {
+function engineReducer$10(state, action) {
 	switch (action.type) {
-		case "tick": return tick$12({
+		case "tick": return tick$13({
 			...state,
 			now: action.now
 		});
@@ -9508,11 +9508,11 @@ function engineReducer$9(state, action) {
 		case "fire":
 			if (state.phase.kind !== "aim" || action.player !== state.turn || !state.tanks[action.player].alive) return state;
 			return launch(setAim(state, action.player, action.x, action.angle, action.power));
-		case "drop": return drop$9(state, action.player);
+		case "drop": return drop$10(state, action.player);
 	}
 }
 /** 사람별 등수 (1 = 우승). 끝나기 전이면 남은 사람은 모두 1 */
-function ranksOf$6(s) {
+function ranksOf$7(s) {
 	const ranks = s.players.map(() => 1);
 	let next = aliveIndexes$4(s).length + 1;
 	for (const group of [...s.out].reverse()) {
@@ -9551,7 +9551,7 @@ function toView$7(s) {
 		shot: phase.kind === "flight" ? phase.shot : null,
 		boom: phase.kind === "boom" ? phase.boom : null,
 		kills: s.kills,
-		ranks: ranksOf$6(s)
+		ranks: ranksOf$7(s)
 	};
 }
 /** 친구에게 바로 알려야 할 만큼 바뀌었는지 (차례인 사람이 움직이거나 겨누는 것도) */
@@ -9641,9 +9641,9 @@ const humanIndex = (players, key) => players.findIndex((p) => p.id === key && p.
 const isInt$1 = (x) => typeof x === "number" && Number.isInteger(x);
 //#endregion
 //#region src/server/referees/validate.ts
-const isNum = (x) => typeof x === "number" && Number.isFinite(x);
+const isNum$1 = (x) => typeof x === "number" && Number.isFinite(x);
 const isInt = (x, min = -1e9, max = 1e9) => typeof x === "number" && Number.isInteger(x) && x >= min && x <= max;
-const isVec = (x) => !!x && typeof x === "object" && isNum(x.x) && isNum(x.y);
+const isVec = (x) => !!x && typeof x === "object" && isNum$1(x.x) && isNum$1(x.y);
 /** 숫자 잇기 바닥: 줄 최대 60개, 줄마다 최대 13장, 타일 번호 0~105 */
 const isTable = (x) => Array.isArray(x) && x.length <= 60 && x.every((row) => Array.isArray(row) && row.length <= 13 && row.every((t) => isInt(t, 0, 105)));
 //#endregion
@@ -9655,7 +9655,7 @@ function artilleryReferee(setup, ctx) {
 	const teams = readTeams(o.teams, players.length);
 	if (teams === void 0) return null;
 	return hostEngineReferee(ctx, {
-		state: createEngine$9({
+		state: createEngine$10({
 			now: ctx.now(),
 			seed: serverSeed(),
 			players,
@@ -9663,7 +9663,7 @@ function artilleryReferee(setup, ctx) {
 			friendlyFire: o.friendlyFire === true,
 			level: "normal"
 		}),
-		reduce: engineReducer$9,
+		reduce: engineReducer$10,
 		tick: (now) => ({
 			type: "tick",
 			now
@@ -9673,7 +9673,7 @@ function artilleryReferee(setup, ctx) {
 		input: (s, from, m) => {
 			if (m.t !== "aim" && m.t !== "fire") return void 0;
 			const player = humanIndex(s.players, from);
-			if (player < 0 || m.turnNo !== s.turnNo || !isNum(m.x) || !isNum(m.angle) || !isNum(m.power)) return null;
+			if (player < 0 || m.turnNo !== s.turnNo || !isNum$1(m.x) || !isNum$1(m.angle) || !isNum$1(m.power)) return null;
 			return {
 				type: m.t,
 				player,
@@ -9702,13 +9702,13 @@ const COUNTDOWN_MS$2 = 2400;
 /** 펑! 보여주기 */
 const BOOM_MS = 2200;
 /** 경기가 끝난 뒤 결과 화면으로 넘어가기까지 */
-const DONE_MS$10 = 2500;
+const DONE_MS$11 = 2500;
 /** 봇이 폭탄을 받고 넘기기까지 */
 const BOT_HOLD_MS = [350, 1500];
 //#endregion
 //#region src/games/bomb/play/engine.ts
 const within$4 = (rng, [min, max]) => min + rng.next() * (max - min);
-function createEngine$8(opts) {
+function createEngine$9(opts) {
 	return countdown$1({
 		now: opts.now,
 		seed: opts.seed,
@@ -9791,7 +9791,7 @@ function afterBoom(state) {
 		...state,
 		phase: {
 			kind: "done",
-			until: state.now + DONE_MS$10
+			until: state.now + DONE_MS$11
 		}
 	};
 	return countdown$1({
@@ -9866,7 +9866,7 @@ function pass(state, from, to) {
 		passes: state.passes.map((n, i) => i === from ? n + 1 : n)
 	};
 }
-function drop$8(state, player) {
+function drop$9(state, player) {
 	if (!state.alive[player] || state.phase.kind === "done") return state;
 	let next = eliminate$1(state, player);
 	const left = aliveIndexes$3(next);
@@ -9875,7 +9875,7 @@ function drop$8(state, player) {
 		flight: null,
 		phase: {
 			kind: "done",
-			until: state.now + DONE_MS$10
+			until: state.now + DONE_MS$11
 		}
 	};
 	if (next.holder === player || next.flight?.to === player || next.flight?.from === player) {
@@ -9891,7 +9891,7 @@ function drop$8(state, player) {
 	}
 	return next;
 }
-function tick$11(state) {
+function tick$12(state) {
 	const { phase, now } = state;
 	switch (phase.kind) {
 		case "countdown": return now >= phase.until ? startPlay(state) : state;
@@ -9902,14 +9902,14 @@ function tick$11(state) {
 		case "done": return state;
 	}
 }
-function engineReducer$8(state, action) {
+function engineReducer$9(state, action) {
 	switch (action.type) {
-		case "tick": return tick$11({
+		case "tick": return tick$12({
 			...state,
 			now: action.now
 		});
 		case "pass": return pass(state, action.from, action.to);
-		case "drop": return drop$8(state, action.player);
+		case "drop": return drop$9(state, action.player);
 	}
 }
 /** 순위: 1등(끝까지 남은 사람)부터. 끝나기 전이면 남은 사람들은 순서 없이 앞에 */
@@ -9959,13 +9959,13 @@ function bombReferee(setup, ctx) {
 	const teams = readTeams(o.teams, players.length);
 	if (teams === void 0) return null;
 	return hostEngineReferee(ctx, {
-		state: createEngine$8({
+		state: createEngine$9({
 			now: ctx.now(),
 			seed: serverSeed(),
 			players,
 			teams
 		}),
-		reduce: engineReducer$8,
+		reduce: engineReducer$9,
 		tick: (now) => ({
 			type: "tick",
 			now
@@ -10856,11 +10856,11 @@ function initialVariants(ch) {
 }
 //#endregion
 //#region src/games/chosung/constants.ts
-const INTRO_MS$7 = 2e3;
+const INTRO_MS$8 = 2e3;
 /** 한 문제 */
-const ASK_MS = 2e4;
-const REVEAL_MS$2 = 2500;
-const DONE_MS$9 = 2e3;
+const ASK_MS$1 = 2e4;
+const REVEAL_MS$3 = 2500;
+const DONE_MS$10 = 2e3;
 /** 맞힌 순서대로 (그 뒤 1점). 힌트가 나온 뒤에 맞히면 절반(올림) */
 const POINTS = [
 	10,
@@ -10871,7 +10871,7 @@ const POINTS = [
 ];
 //#endregion
 //#region src/games/chosung/play/engine.ts
-function shuffle$2(rng, xs) {
+function shuffle$3(rng, xs) {
 	const a = [...xs];
 	for (let i = a.length - 1; i > 0; i--) {
 		const j = Math.floor(rng.next() * (i + 1));
@@ -10881,7 +10881,7 @@ function shuffle$2(rng, xs) {
 }
 /** 문제: 갈래를 골고루 섞어서, 두 글자 이상 */
 function pickQuestions(rng, n = 10) {
-	return shuffle$2(rng, Object.entries(WORD_GROUPS).flatMap(([group, ws]) => ws.filter((w) => [...w].length >= 2).map((word) => ({
+	return shuffle$3(rng, Object.entries(WORD_GROUPS).flatMap(([group, ws]) => ws.filter((w) => [...w].length >= 2).map((word) => ({
 		word,
 		group
 	})))).slice(0, n).map((x) => ({
@@ -10903,7 +10903,7 @@ function addLog$2(s, kind, player, text) {
 	};
 }
 const activePlayers$1 = (s) => s.players.flatMap((_, i) => s.left[i] ? [] : [i]);
-function createEngine$7(opts) {
+function createEngine$8(opts) {
 	const rng = createRng(opts.seed);
 	return {
 		now: opts.now,
@@ -10915,7 +10915,7 @@ function createEngine$7(opts) {
 		q: -1,
 		phase: {
 			kind: "intro",
-			until: opts.now + INTRO_MS$7
+			until: opts.now + INTRO_MS$8
 		},
 		log: [],
 		logSeq: 0
@@ -10928,7 +10928,7 @@ function ask(s) {
 		...s,
 		phase: {
 			kind: "done",
-			until: s.now + DONE_MS$9
+			until: s.now + DONE_MS$10
 		}
 	};
 	return {
@@ -10937,7 +10937,7 @@ function ask(s) {
 		phase: {
 			kind: "ask",
 			start: s.now,
-			until: s.now + ASK_MS,
+			until: s.now + ASK_MS$1,
 			guessed: []
 		}
 	};
@@ -10948,7 +10948,7 @@ function reveal$3(s) {
 		...s,
 		phase: {
 			kind: "reveal",
-			until: s.now + REVEAL_MS$2,
+			until: s.now + REVEAL_MS$3,
 			guessed: s.phase.guessed
 		}
 	}, "system", null, `정답: ${s.questions[s.q].word}`);
@@ -10981,7 +10981,7 @@ function guess$1(s, player, text) {
 	if (activePlayers$1(next).every((i) => guessed.some((g) => g.player === i))) next = reveal$3(next);
 	return next;
 }
-function drop$7(s, player) {
+function drop$8(s, player) {
 	if (s.left[player] || s.phase.kind === "done") return s;
 	const next = addLog$2({
 		...s,
@@ -10991,33 +10991,33 @@ function drop$7(s, player) {
 		...next,
 		phase: {
 			kind: "done",
-			until: s.now + DONE_MS$9
+			until: s.now + DONE_MS$10
 		}
 	};
 	const p = next.phase;
 	if (p.kind === "ask" && activePlayers$1(next).every((i) => p.guessed.some((g) => g.player === i))) return reveal$3(next);
 	return next;
 }
-function tick$10(s) {
+function tick$11(s) {
 	const { phase, now } = s;
 	if (phase.kind === "done" || now < phase.until) return s;
 	if (phase.kind === "ask") return reveal$3(s);
 	return ask(s);
 }
-function engineReducer$7(s, a) {
+function engineReducer$8(s, a) {
 	switch (a.type) {
-		case "tick": return tick$10({
+		case "tick": return tick$11({
 			...s,
 			now: a.now
 		});
 		case "guess": return guess$1(s, a.player, a.text);
-		case "drop": return drop$7(s, a.player);
+		case "drop": return drop$8(s, a.player);
 	}
 }
-const ranksOf$5 = (s) => s.scores.map((v) => 1 + s.scores.filter((o) => o > v).length);
+const ranksOf$6 = (s) => s.scores.map((v) => 1 + s.scores.filter((o) => o > v).length);
 //#endregion
 //#region src/games/chosung/play/view.ts
-function viewFor$1(s, viewerId) {
+function viewFor$2(s, viewerId) {
 	const me = s.players.findIndex((p) => p.id === viewerId);
 	const p = s.phase;
 	const cur = s.q >= 0 ? s.questions[s.q] : null;
@@ -11047,10 +11047,10 @@ function viewFor$1(s, viewerId) {
 		canGuess: canGuess$1(s, me),
 		guessed: p.kind === "ask" || p.kind === "reveal" ? p.guessed : [],
 		log: s.log.slice(-15),
-		ranks: ranksOf$5(s)
+		ranks: ranksOf$6(s)
 	};
 }
-function changeKey$2(s) {
+function changeKey$3(s) {
 	return [
 		s.phase.kind,
 		s.q,
@@ -11065,19 +11065,19 @@ function chosungReferee(setup, ctx) {
 	const players = readPlayers((setup ?? {}).players, ctx, 2, 8);
 	if (!players || players.some((p) => p.kind === "bot")) return null;
 	return hostEngineReferee(ctx, {
-		state: createEngine$7({
+		state: createEngine$8({
 			now: ctx.now(),
 			seed: serverSeed(),
 			players
 		}),
-		reduce: engineReducer$7,
+		reduce: engineReducer$8,
 		tick: (now) => ({
 			type: "tick",
 			now
 		}),
 		toView: (s) => s,
-		changed: (a, b) => !a || changeKey$2(a) !== changeKey$2(b),
-		viewFor: (_v, key, s) => viewFor$1(s, key),
+		changed: (a, b) => !a || changeKey$3(a) !== changeKey$3(b),
+		viewFor: (_v, key, s) => viewFor$2(s, key),
 		input: (s, from, m) => {
 			if (m.t !== "guess") return void 0;
 			const player = s.players.findIndex((p) => p.id === from);
@@ -11101,14 +11101,14 @@ function chosungReferee(setup, ctx) {
 //#endregion
 //#region src/games/doodle/constants.ts
 /** 시작 안내 */
-const INTRO_MS$6 = 2e3;
+const INTRO_MS$7 = 2e3;
 /** 그릴 사람이 제시어 2개 중 고르는 시간 (넘으면 무작위) */
 const CHOOSE_MS$1 = 6e3;
 /** 그리는 시간 */
 const DRAW_MS = 12e4;
 /** 정답 보여주기 */
-const REVEAL_MS$1 = 4e3;
-const DONE_MS$8 = 2500;
+const REVEAL_MS$2 = 4e3;
+const DONE_MS$9 = 2500;
 /** 맞힌 순서대로 점수 (그 뒤는 1점) */
 const GUESS_POINTS = [
 	10,
@@ -11127,7 +11127,7 @@ const VOTE_PICK_MS = 15e3;
 const VOTE_RESULT_MS = 6e3;
 //#endregion
 //#region src/games/doodle/play/engine.ts
-function shuffle$1(rng, xs) {
+function shuffle$2(rng, xs) {
 	const a = [...xs];
 	for (let i = a.length - 1; i > 0; i--) {
 		const j = Math.floor(rng.next() * (i + 1));
@@ -11150,9 +11150,9 @@ function addLog$1(s, kind, player, text, secret) {
 	};
 }
 const activePlayers = (s) => s.players.flatMap((_, i) => s.left[i] ? [] : [i]);
-function createEngine$6(opts) {
+function createEngine$7(opts) {
 	const rng = createRng(opts.seed);
-	const base = shuffle$1(rng, opts.players.map((_, i) => i));
+	const base = shuffle$2(rng, opts.players.map((_, i) => i));
 	const order = Array.from({ length: 2 }, () => base).flat();
 	return {
 		now: opts.now,
@@ -11164,7 +11164,7 @@ function createEngine$6(opts) {
 		turnNo: -1,
 		phase: {
 			kind: "intro",
-			until: opts.now + INTRO_MS$6
+			until: opts.now + INTRO_MS$7
 		},
 		log: [],
 		logSeq: 0,
@@ -11179,7 +11179,7 @@ function nextTurn$2(s) {
 	if (turnNo >= s.order.length) return finish$2(s);
 	const rng = createRng(s.seed);
 	const fresh = WORDS.filter((w) => !s.used.includes(w));
-	const pool = shuffle$1(rng, fresh.length >= 2 ? fresh : WORDS);
+	const pool = shuffle$2(rng, fresh.length >= 2 ? fresh : WORDS);
 	const a = pool[0];
 	const b = pool.find((w) => groupOf(w) !== groupOf(a)) ?? pool[1];
 	const drawer = s.order[turnNo];
@@ -11221,7 +11221,7 @@ function reveal$2(s) {
 			kind: "reveal",
 			drawer,
 			word,
-			until: s.now + REVEAL_MS$1,
+			until: s.now + REVEAL_MS$2,
 			guessed
 		}
 	}, "system", null, `정답은 '${word}'`);
@@ -11231,7 +11231,7 @@ function finish$2(s) {
 		...s,
 		phase: {
 			kind: "done",
-			until: s.now + DONE_MS$8
+			until: s.now + DONE_MS$9
 		}
 	};
 }
@@ -11279,7 +11279,7 @@ function guess(s, player, text) {
 	}
 	return addLog$1(s, "chat", player, clean, s.phase.kind === "draw" && normalizeGuess(clean).includes(normalizeGuess(s.phase.word)) ? s.turnNo : void 0);
 }
-function drop$6(s, player) {
+function drop$7(s, player) {
 	if (s.left[player] || s.phase.kind === "done") return s;
 	let next = addLog$1({
 		...s,
@@ -11293,7 +11293,7 @@ function drop$6(s, player) {
 	}
 	return next;
 }
-function tick$9(s) {
+function tick$10(s) {
 	const { phase, now } = s;
 	switch (phase.kind) {
 		case "intro": return now >= phase.until ? nextTurn$2(s) : s;
@@ -11310,19 +11310,19 @@ function tick$9(s) {
 		case "done": return s;
 	}
 }
-function engineReducer$6(s, a) {
+function engineReducer$7(s, a) {
 	switch (a.type) {
-		case "tick": return tick$9({
+		case "tick": return tick$10({
 			...s,
 			now: a.now
 		});
 		case "choose": return s.phase.kind === "choose" && s.phase.drawer === a.player ? startDraw(s, a.index) : s;
 		case "guess": return guess(s, a.player, a.text);
-		case "drop": return drop$6(s, a.player);
+		case "drop": return drop$7(s, a.player);
 	}
 }
 /** 순위 (점수 높은 순, 같으면 같은 등수) */
-function ranksOf$4(s) {
+function ranksOf$5(s) {
 	return s.scores.map((v) => 1 + s.scores.filter((o) => o > v).length);
 }
 //#endregion
@@ -11398,7 +11398,7 @@ function canSee(s, me, l) {
 	if (l.secret === void 0 || p.kind !== "draw" || l.secret !== s.turnNo) return true;
 	return me === p.drawer || me === l.player || p.guessed.some((g) => g.player === me);
 }
-function viewFor(s, viewerId) {
+function viewFor$1(s, viewerId) {
 	const me = s.players.findIndex((p) => p.id === viewerId);
 	const p = s.phase;
 	const drawer = p.kind === "choose" || p.kind === "draw" || p.kind === "reveal" ? p.drawer : null;
@@ -11423,11 +11423,11 @@ function viewFor(s, viewerId) {
 		canChat: canChat(s, me),
 		guessed: p.kind === "draw" || p.kind === "reveal" ? p.guessed : [],
 		log: s.log.filter((l) => canSee(s, me, l)).slice(-20),
-		ranks: ranksOf$4(s)
+		ranks: ranksOf$5(s)
 	};
 }
 /** 바로 보내야 할 만큼 바뀌었는지 (그 밖엔 1초마다) */
-function changeKey$1(s) {
+function changeKey$2(s) {
 	const p = s.phase;
 	return [
 		p.kind,
@@ -11439,7 +11439,7 @@ function changeKey$1(s) {
 }
 //#endregion
 //#region src/games/doodle/play/voteEngine.ts
-function shuffle(rng, xs) {
+function shuffle$1(rng, xs) {
 	const a = [...xs];
 	for (let i = a.length - 1; i > 0; i--) {
 		const j = Math.floor(rng.next() * (i + 1));
@@ -11458,7 +11458,7 @@ function createVote(opts) {
 		round: 0,
 		phase: {
 			kind: "intro",
-			until: opts.now + INTRO_MS$6
+			until: opts.now + INTRO_MS$7
 		},
 		used: [],
 		history: [],
@@ -11470,7 +11470,7 @@ function nextRound(s) {
 		...s,
 		phase: {
 			kind: "done",
-			until: s.now + DONE_MS$8
+			until: s.now + DONE_MS$9
 		}
 	};
 	const rng = createRng(s.seed);
@@ -11491,7 +11491,7 @@ function nextRound(s) {
 function startVote(s) {
 	if (s.phase.kind !== "draw") return s;
 	const rng = createRng(s.seed);
-	const order = shuffle(rng, activeOf(s));
+	const order = shuffle$1(rng, activeOf(s));
 	return {
 		...s,
 		seed: rng.seed(),
@@ -11543,7 +11543,7 @@ function vote(s, player, target) {
 	};
 	return allVoted(next) ? finishVote(next) : next;
 }
-function drop$5(s, player) {
+function drop$6(s, player) {
 	if (s.left[player] || s.phase.kind === "done") return s;
 	const next = {
 		...s,
@@ -11553,12 +11553,12 @@ function drop$5(s, player) {
 		...next,
 		phase: {
 			kind: "done",
-			until: s.now + DONE_MS$8
+			until: s.now + DONE_MS$9
 		}
 	};
 	return allVoted(next) ? finishVote(next) : next;
 }
-function tick$8(s) {
+function tick$9(s) {
 	const { phase, now } = s;
 	if (phase.kind === "done" || now < phase.until) return s;
 	switch (phase.kind) {
@@ -11578,12 +11578,12 @@ function tick$8(s) {
 }
 function voteReducer(s, a) {
 	switch (a.type) {
-		case "tick": return tick$8({
+		case "tick": return tick$9({
 			...s,
 			now: a.now
 		});
 		case "vote": return vote(s, a.player, a.target);
-		case "drop": return drop$5(s, a.player);
+		case "drop": return drop$6(s, a.player);
 	}
 }
 const voteRanks = (s) => s.scores.map((v) => 1 + s.scores.filter((o) => o > v).length);
@@ -11642,19 +11642,19 @@ function doodleReferee(setup, ctx) {
 	let history = [];
 	const drawerKey = (s) => s.phase.kind === "draw" ? s.players[s.phase.drawer].id : null;
 	return hostEngineReferee(ctx, {
-		state: createEngine$6({
+		state: createEngine$7({
 			now: ctx.now(),
 			seed: serverSeed(),
 			players
 		}),
-		reduce: engineReducer$6,
+		reduce: engineReducer$7,
 		tick: (now) => ({
 			type: "tick",
 			now
 		}),
 		toView: (s) => s,
-		changed: (a, b) => !a || changeKey$1(a) !== changeKey$1(b),
-		viewFor: (_v, key, s) => viewFor(s, key),
+		changed: (a, b) => !a || changeKey$2(a) !== changeKey$2(b),
+		viewFor: (_v, key, s) => viewFor$1(s, key),
 		input: (s, from, m) => {
 			if (inkTurn !== s.turnNo) {
 				inkTurn = s.turnNo;
@@ -11802,11 +11802,11 @@ function voteReferee(players, ctx) {
 /** 자세를 고르는 시간 */
 const CHOOSE_MS = 2e3;
 /** 공개한 결과를 보여주는 시간 */
-const REVEAL_MS = 1200;
+const REVEAL_MS$1 = 1200;
 /** 첫 턴 전 '시작!' 표시 */
-const INTRO_MS$5 = 1200;
+const INTRO_MS$6 = 1200;
 /** 경기가 끝난 뒤 결과 화면으로 넘어가기까지 */
-const DONE_MS$7 = 1800;
+const DONE_MS$8 = 1800;
 //#endregion
 //#region src/games/fight/rules/turn.ts
 const STANCES = [
@@ -11958,7 +11958,7 @@ function createMatch$1(opts) {
 		turns: [],
 		phase: {
 			kind: "intro",
-			until: opts.now + INTRO_MS$5
+			until: opts.now + INTRO_MS$6
 		},
 		sounds: [],
 		soundSeq: 0
@@ -12013,11 +12013,11 @@ function reveal$1(state, picks) {
 		phase: {
 			kind: "reveal",
 			result,
-			until: state.now + REVEAL_MS
+			until: state.now + REVEAL_MS$1
 		}
 	}, ...turnSounds(result));
 }
-function tick$7(state) {
+function tick$8(state) {
 	const { phase, now } = state;
 	switch (phase.kind) {
 		case "intro": return now >= phase.until && !state.follow ? startChoosing(state) : state;
@@ -12032,14 +12032,14 @@ function tick$7(state) {
 				phase: {
 					kind: "done",
 					winner,
-					until: now + DONE_MS$7
+					until: now + DONE_MS$8
 				}
 			}, winner === userSide ? "win" : "lose");
 		}
 		case "done": return state;
 	}
 }
-function pick$1(state, side, stance) {
+function pick$2(state, side, stance) {
 	const { phase } = state;
 	if (phase.kind !== "choosing" || state.controllers[side] !== "user" || state.now >= phase.inputUntil) return state;
 	if (!canChoose(state.fighters[side], stance) || phase.picks[side] === stance) return state;
@@ -12083,11 +12083,11 @@ function remoteReveal(state, turn, stances) {
 }
 function matchReducer$1(state, action) {
 	switch (action.type) {
-		case "tick": return tick$7({
+		case "tick": return tick$8({
 			...state,
 			now: action.now
 		});
-		case "pick": return pick$1(state, action.side, action.stance);
+		case "pick": return pick$2(state, action.side, action.stance);
 		case "remotePick": return remotePick(state, action.side, action.turn, action.stance);
 		case "remoteTurn": return remoteTurn(state, action.turn);
 		case "remoteReveal": return remoteReveal(state, action.turn, action.stances);
@@ -14082,7 +14082,7 @@ const SUPABASE_URL$1 = "https://fxekefrjsmnmcuoaynfa.supabase.co";
 const supabaseSecret = () => env$1.SUPABASE_SECRET_KEY;
 //#endregion
 //#region src/server/fishingStore.ts
-const cache$1 = /* @__PURE__ */ new Map();
+const cache$2 = /* @__PURE__ */ new Map();
 const dirty = /* @__PURE__ */ new Set();
 const loading = /* @__PURE__ */ new Map();
 const empty = () => ({
@@ -14108,7 +14108,7 @@ function clean(x) {
 	};
 }
 function loadProfile(uid) {
-	const hit = cache$1.get(uid);
+	const hit = cache$2.get(uid);
 	if (hit) return Promise.resolve(hit.profile);
 	const going = loading.get(uid);
 	if (going) return going;
@@ -14122,9 +14122,9 @@ function loadProfile(uid) {
 		} catch (e) {
 			console.warn("[fishing] 읽기 실패", e);
 		}
-		const hitNow = cache$1.get(uid);
+		const hitNow = cache$2.get(uid);
 		if (hitNow) return hitNow.profile;
-		cache$1.set(uid, {
+		cache$2.set(uid, {
 			profile,
 			nickname: ""
 		});
@@ -14135,7 +14135,7 @@ function loadProfile(uid) {
 }
 /** 바꾼 뒤 부름 (몇 초 모아서 씀) */
 function markDirty(uid, nickname) {
-	const hit = cache$1.get(uid);
+	const hit = cache$2.get(uid);
 	if (!hit) return;
 	hit.nickname = nickname;
 	dirty.add(uid);
@@ -14145,8 +14145,8 @@ async function flush() {
 	if (!secret || dirty.size === 0) return dirty.clear();
 	const rows = [...dirty].map((uid) => ({
 		user_id: uid,
-		nickname: cache$1.get(uid).nickname.slice(0, 20),
-		data: cache$1.get(uid).profile,
+		nickname: cache$2.get(uid).nickname.slice(0, 20),
+		data: cache$2.get(uid).profile,
 		updated_at: (/* @__PURE__ */ new Date()).toISOString()
 	}));
 	dirty.clear();
@@ -15147,11 +15147,11 @@ function chooseBotCard(rng, view) {
 /** 한 장 고르는 시간. 넘기면 무작위로 열린다 */
 const PICK_MS$1 = 1e4;
 /** 첫 차례 전 '시작!' 표시 */
-const INTRO_MS$4 = 1500;
+const INTRO_MS$5 = 1500;
 /** 틀린 두 장을 보여주는 시간 (그다음 덮고 차례가 넘어간다) */
 const MISS_SHOW_MS = 1e3;
 /** 경기가 끝난 뒤 결과 화면으로 넘어가기까지 */
-const DONE_MS$6 = 1800;
+const DONE_MS$7 = 1800;
 /** 봇 기억력: 열린 카드를 기억할 확률, 차례가 바뀔 때 기억한 카드 하나를 잊을 확률 */
 const BOT_MEMORY = {
 	normal: {
@@ -15206,7 +15206,7 @@ function createMatch(opts) {
 		memory: Array.from({ length: 22 }, () => null),
 		phase: {
 			kind: "intro",
-			until: opts.now + INTRO_MS$4
+			until: opts.now + INTRO_MS$5
 		},
 		sounds: [],
 		soundSeq: 0,
@@ -15305,17 +15305,17 @@ function finish$1(state) {
 		phase: {
 			kind: "done",
 			winner,
-			until: state.now + DONE_MS$6
+			until: state.now + DONE_MS$7
 		}
 	}, winner === userSide ? "win" : "lose");
 }
 /** 보여주기·시작 안내가 남아 있으면 바로 끝낸다 (친구 카드가 조금 일찍 도착했을 때) */
-function settle$1(state) {
+function settle$2(state) {
 	if (state.phase.kind === "intro") return picking(state);
 	if (state.phase.kind === "showing") return endShowing(state);
 	return state;
 }
-function tick$6(state) {
+function tick$7(state) {
 	const { phase, now } = state;
 	switch (phase.kind) {
 		case "intro": return now >= phase.until ? picking(state) : state;
@@ -15358,19 +15358,19 @@ function botFlip(state) {
 }
 function matchReducer(state, action) {
 	switch (action.type) {
-		case "tick": return tick$6({
+		case "tick": return tick$7({
 			...state,
 			now: action.now
 		});
 		case "pick": return state.controllers[state.turn] === "user" && !state.hidden ? flip(state, action.index) : state;
 		case "remoteFlip": {
 			if (action.n !== state.flips.length) return state;
-			const settled = settle$1(state);
+			const settled = settle$2(state);
 			return settled.controllers[settled.turn] === "remote" && !state.hidden ? flip(settled, action.index) : state;
 		}
 		case "serverFlip": {
 			if (!state.hidden || action.n !== state.flips.length) return state;
-			const settled = settle$1(state);
+			const settled = settle$2(state);
 			const cards = settled.cards.map((c, i) => i === action.index ? {
 				...c,
 				face: action.face
@@ -15456,7 +15456,7 @@ const RESULT_MS = 2400;
 const RPS_PICK_MS = 3e3;
 const RPS_REVEAL_MS = 1800;
 /** 경기가 끝난 뒤 결과 화면으로 넘어가기까지 */
-const DONE_MS$5 = 2500;
+const DONE_MS$6 = 2500;
 /** 봇이 누를 시각 (판 시작부터): 성격마다 다름 */
 const BOT_STYLES = [
 	[300, 2500],
@@ -15472,7 +15472,7 @@ const HANDS$1 = [
 ];
 const within$3 = (rng, [min, max]) => min + rng.next() * (max - min);
 const aliveIndexes$2 = (s) => s.alive.flatMap((a, i) => a ? [i] : []);
-function createEngine$5(opts) {
+function createEngine$6(opts) {
 	return countdown({
 		now: opts.now,
 		seed: opts.seed,
@@ -15587,7 +15587,7 @@ function afterResult(s) {
 		...next,
 		phase: {
 			kind: "done",
-			until: s.now + DONE_MS$5
+			until: s.now + DONE_MS$6
 		}
 	};
 	if (left === 2) return startRps({
@@ -15653,7 +15653,7 @@ function afterReveal$1(s) {
 		out: [...s.out, [loser]],
 		phase: {
 			kind: "done",
-			until: s.now + DONE_MS$5
+			until: s.now + DONE_MS$6
 		}
 	};
 }
@@ -15672,7 +15672,7 @@ function bots$2(s) {
 		if (s.phase.kind === "rps") {
 			const rng = createRng(next.seed);
 			const hand = pickOne(rng, HANDS$1);
-			next = pick({
+			next = pick$1({
 				...next,
 				seed: rng.seed()
 			}, i, hand);
@@ -15690,7 +15690,7 @@ function press(s, player) {
 		}]
 	};
 }
-function pick(s, player, hand) {
+function pick$1(s, player, hand) {
 	if (s.phase.kind !== "rps" || !s.alive[player]) return s;
 	return {
 		...s,
@@ -15700,7 +15700,7 @@ function pick(s, player, hand) {
 		}
 	};
 }
-function drop$4(s, player) {
+function drop$5(s, player) {
 	if (!s.alive[player] || s.phase.kind === "done") return s;
 	const next = {
 		...s,
@@ -15712,13 +15712,13 @@ function drop$4(s, player) {
 		...next,
 		phase: {
 			kind: "done",
-			until: s.now + DONE_MS$5
+			until: s.now + DONE_MS$6
 		}
 	};
 	if (left === 2) return startRps(next);
 	return s.phase.kind === "call" ? countdown(next) : next;
 }
-function tick$5(s) {
+function tick$6(s) {
 	const { phase, now } = s;
 	switch (phase.kind) {
 		case "countdown": return now >= phase.until ? startCall(s) : s;
@@ -15735,19 +15735,19 @@ function tick$5(s) {
 		case "done": return s;
 	}
 }
-function engineReducer$5(state, action) {
+function engineReducer$6(state, action) {
 	switch (action.type) {
-		case "tick": return tick$5({
+		case "tick": return tick$6({
 			...state,
 			now: action.now
 		});
 		case "press": return press(state, action.player);
-		case "pick": return pick(state, action.player, action.hand);
-		case "drop": return drop$4(state, action.player);
+		case "pick": return pick$1(state, action.player, action.hand);
+		case "drop": return drop$5(state, action.player);
 	}
 }
 /** 사람별 등수 (1 = 우승). 끝나기 전이면 남은 사람은 모두 1 */
-function ranksOf$3(s) {
+function ranksOf$4(s) {
 	const ranks = s.players.map(() => 1);
 	let next = aliveIndexes$2(s).length + 1;
 	for (const group of [...s.out].reverse()) {
@@ -15784,7 +15784,7 @@ function toView$5(s) {
 		picked: phase.kind === "rps" ? aliveIndexes$2(s).filter((i) => s.picks[i] !== void 0) : [],
 		hands: phase.kind === "reveal" ? phase.hands : {},
 		winner: phase.kind === "reveal" ? phase.winner : null,
-		ranks: ranksOf$3(s)
+		ranks: ranksOf$4(s)
 	};
 }
 /** 친구에게 바로 알려야 할 만큼 바뀌었는지 (그 밖엔 1초마다 보냄) */
@@ -15806,13 +15806,13 @@ function nunchiReferee(setup, ctx) {
 	const teams = readTeams(o.teams, players.length);
 	if (teams === void 0) return null;
 	return hostEngineReferee(ctx, {
-		state: createEngine$5({
+		state: createEngine$6({
 			now: ctx.now(),
 			seed: serverSeed(),
 			players,
 			teams
 		}),
-		reduce: engineReducer$5,
+		reduce: engineReducer$6,
 		tick: (now) => ({
 			type: "tick",
 			now
@@ -15972,14 +15972,14 @@ function numbaseballReferee(setup, ctx) {
 //#endregion
 //#region src/games/roulette/constants.ts
 /** 시작 전 안내 */
-const INTRO_MS$3 = 1500;
+const INTRO_MS$4 = 1500;
 /** 한 차례 시간. 넘기면 골라 둔 사람(없으면 아무나)을 쏜다 */
 const TURN_MS$2 = 15e3;
 /** 방아쇠: 철컥 뒤 SUSPENSE_MS에 '틱' 또는 '탕' */
 const SUSPENSE_MS = 1100;
 const BANG_SHOW_MS = 2400;
 /** 경기가 끝난 뒤 결과 화면으로 넘어가기까지 */
-const DONE_MS$4 = 2500;
+const DONE_MS$5 = 2500;
 /** 봇: 누구를 쏠지 고르기까지, 고른 뒤 당기기까지 */
 const BOT_AIM_MS = [700, 1600];
 const BOT_PULL_MS = [500, 1100];
@@ -16027,7 +16027,7 @@ function reload(s) {
 		pulls: 0
 	};
 }
-function createEngine$4(opts) {
+function createEngine$5(opts) {
 	const rng = createRng(opts.seed);
 	const turn = Math.floor(rng.next() * opts.players.length);
 	return reload({
@@ -16046,7 +16046,7 @@ function createEngine$4(opts) {
 		bot: null,
 		phase: {
 			kind: "intro",
-			until: opts.now + INTRO_MS$3
+			until: opts.now + INTRO_MS$4
 		}
 	});
 }
@@ -16121,7 +16121,7 @@ function afterFire(s) {
 		aimAt: null,
 		phase: {
 			kind: "done",
-			until: s.now + DONE_MS$4
+			until: s.now + DONE_MS$5
 		}
 	};
 	const turn = next.alive[shooter] ? shooter : nextAlive$1(next.alive, shooter);
@@ -16144,7 +16144,7 @@ function bots$1(s) {
 	if (s.now >= b.pullAt) next = pull(next, s.turn, b.target);
 	return next;
 }
-function drop$3(s, player) {
+function drop$4(s, player) {
 	if (!s.alive[player] || s.phase.kind === "done") return s;
 	const next = {
 		...s,
@@ -16156,7 +16156,7 @@ function drop$3(s, player) {
 		aimAt: null,
 		phase: {
 			kind: "done",
-			until: s.now + DONE_MS$4
+			until: s.now + DONE_MS$5
 		}
 	};
 	if (s.phase.kind === "aim") {
@@ -16168,7 +16168,7 @@ function drop$3(s, player) {
 	}
 	return next;
 }
-function tick$4(s) {
+function tick$5(s) {
 	const { phase, now } = s;
 	switch (phase.kind) {
 		case "intro": return now >= phase.until ? startTurn$1(s, s.turn) : s;
@@ -16181,19 +16181,19 @@ function tick$4(s) {
 		case "done": return s;
 	}
 }
-function engineReducer$4(state, action) {
+function engineReducer$5(state, action) {
 	switch (action.type) {
-		case "tick": return tick$4({
+		case "tick": return tick$5({
 			...state,
 			now: action.now
 		});
 		case "aim": return aim(state, action.player, action.target);
 		case "pull": return pull(state, action.player, action.target ?? state.aimAt);
-		case "drop": return drop$3(state, action.player);
+		case "drop": return drop$4(state, action.player);
 	}
 }
 /** 사람별 등수 (1 = 우승). 늦게 탈락할수록 앞. 끝나기 전이면 남은 사람은 모두 1 */
-function ranksOf$2(s) {
+function ranksOf$3(s) {
 	const ranks = s.players.map(() => 1);
 	const left = aliveIndexes$1(s).length;
 	[...s.out].reverse().forEach((i, k) => ranks[i] = left + 1 + k);
@@ -16221,7 +16221,7 @@ function toView$4(s) {
 		phase: phase.kind,
 		leftMs: Math.max(0, phase.until - now),
 		fire: phase.kind === "fire" ? phase.fire : null,
-		ranks: ranksOf$2(s)
+		ranks: ranksOf$3(s)
 	};
 }
 /** 친구에게 바로 알려야 할 만큼 바뀌었는지 (그 밖엔 1초마다 보냄) */
@@ -16238,14 +16238,14 @@ function rouletteReferee(setup, ctx) {
 	const teams = readTeams(o.teams, players.length);
 	if (teams === void 0) return null;
 	return hostEngineReferee(ctx, {
-		state: createEngine$4({
+		state: createEngine$5({
 			now: ctx.now(),
 			seed: serverSeed(),
 			players,
 			teams,
 			friendlyFire: o.friendlyFire === true
 		}),
-		reduce: engineReducer$4,
+		reduce: engineReducer$5,
 		tick: (now) => ({
 			type: "tick",
 			now
@@ -16268,6 +16268,2166 @@ function rouletteReferee(setup, ctx) {
 		},
 		drop: (s, key) => {
 			const player = humanIndex(s.players, key);
+			return player >= 0 ? {
+				type: "drop",
+				player
+			} : null;
+		},
+		done: (s) => s.phase.kind === "done",
+		nowOf: (s) => s.now
+	});
+}
+//#endregion
+//#region src/games/spotdiff/constants.ts
+/** 한 문제 제한 시간 */
+const ASK_MS = 6e4;
+/** 틀린 곳을 누르면 이만큼 못 누름 */
+const LOCK_MS = 3e3;
+/** 친구 대전: 시간 안에 못 찾은 곳 하나마다 걸린 시간에 더함 */
+const MISS_PENALTY_MS = 1e4;
+/** 다 찾은 뒤 다음 문제까지 (시간에 안 셈) */
+const CLEAR_PAUSE_MS = 1500;
+/** 시간이 끝나 못 찾은 곳을 보여 주는 동안 (시간에 안 셈) */
+const REVEAL_MS = 2500;
+const INTRO_MS$3 = 3e3;
+const DONE_MS$4 = 2e3;
+const INK = "#1c1748";
+const P = {
+	red: "#e8483b",
+	orange: "#f28c28",
+	yellow: "#ffd23f",
+	green: "#43b05c",
+	sky: "#5bc8f0",
+	blue: "#3b6fe0",
+	purple: "#8e5bd8",
+	pink: "#f27aa8",
+	brown: "#a0643c",
+	white: "#ffffff",
+	teal: "#22b3a6",
+	gray: "#9aa0a6",
+	tan: "#e2b071"
+};
+const pick = (r, arr) => arr[Math.floor(r.next() * arr.length)];
+const between = (r, a, b) => a + r.next() * (b - a);
+function shuffle(r, arr) {
+	for (let i = arr.length - 1; i > 0; i--) {
+		const j = Math.floor(r.next() * (i + 1));
+		[arr[i], arr[j]] = [arr[j], arr[i]];
+	}
+	return arr;
+}
+function star(cx, cy, ro, ri) {
+	let s = "";
+	for (let i = 0; i < 10; i++) {
+		const a = -Math.PI / 2 + i * Math.PI / 5;
+		const r = i % 2 ? ri : ro;
+		s += (i ? "L" : "M") + (cx + r * Math.cos(a)).toFixed(1) + " " + (cy + r * Math.sin(a)).toFixed(1);
+	}
+	return s + "Z";
+}
+const THINGS = {
+	cloud: {
+		z: "sky",
+		r: 26,
+		sz: [.8, 1.25],
+		diffs: [
+			"size",
+			"remove",
+			"detail"
+		],
+		flip: true,
+		draw: (o) => `<g stroke="none" fill="#fff"><ellipse cx="-12" cy="3" rx="14" ry="10"/><ellipse cx="5" cy="-4" rx="16" ry="13"/><ellipse cx="19" cy="4" rx="11" ry="8"/><rect x="-24" y="2" width="52" height="10" rx="5"/>${o.d ? "<ellipse cx=\"-27\" cy=\"7\" rx=\"10\" ry=\"7\"/><ellipse cx=\"-30\" cy=\"-1\" rx=\"7\" ry=\"6\"/>" : ""}</g>`
+	},
+	sun: {
+		z: "sky",
+		max: 1,
+		r: 28,
+		sz: [1, 1.1],
+		colors: [P.yellow, P.orange],
+		diffs: [
+			"color",
+			"detail",
+			"size"
+		],
+		draw: (o) => {
+			let s = "";
+			for (let i = 0; i < 8; i++) {
+				const a = i * Math.PI / 4;
+				s += `<line x1="${(19 * Math.cos(a)).toFixed(1)}" y1="${(19 * Math.sin(a)).toFixed(1)}" x2="${(27 * Math.cos(a)).toFixed(1)}" y2="${(27 * Math.sin(a)).toFixed(1)}" stroke="${o.c}" stroke-width="3.5"/>`;
+			}
+			return s + `<circle r="16" fill="${o.c}"/>` + (o.d ? `<circle cx="-5" cy="-3" r="1.8" fill="${INK}" stroke="none"/><circle cx="5" cy="-3" r="1.8" fill="${INK}" stroke="none"/><path d="M-6 4 Q0 10 6 4" fill="none"/>` : "");
+		}
+	},
+	seagull: {
+		z: "sky",
+		r: 14,
+		sz: [.8, 1.2],
+		diffs: [
+			"remove",
+			"flip",
+			"size"
+		],
+		flip: true,
+		draw: () => `<path d="M-14 0 Q-7 -9 0 0 Q5 -6 12 -3" fill="none" stroke-width="2.6"/>`
+	},
+	boat: {
+		z: "sea",
+		ground: true,
+		dy: -22,
+		r: 25,
+		sz: [.8, 1.05],
+		colors: [
+			P.red,
+			P.blue,
+			P.teal,
+			P.orange,
+			P.purple
+		],
+		diffs: [
+			"color",
+			"flip",
+			"detail",
+			"remove"
+		],
+		flip: true,
+		draw: (o) => `<line x1="-2" y1="-10" x2="-2" y2="-46"/><path d="M0 -44 L0 -14 L20 -14 Z" fill="#fff"/>${o.d ? `<path d="M-2 -46 L-14 -42 L-2 -38 Z" fill="${P.yellow}"/>` : ""}<path d="M-24 -12 L24 -12 L17 0 L-17 0 Z" fill="${o.c}"/>`
+	},
+	umbrella: {
+		z: "ground",
+		ground: true,
+		dy: -34,
+		r: 30,
+		sz: [.85, 1.05],
+		colors: [
+			P.red,
+			P.blue,
+			P.green,
+			P.purple,
+			P.orange,
+			P.pink
+		],
+		diffs: [
+			"color",
+			"detail",
+			"remove",
+			"size"
+		],
+		draw: (o) => `<rect x="-1.5" y="-50" width="3" height="50" fill="${P.brown}"/><path d="M-30 -42 Q0 -76 30 -42 Q15 -48 0 -42 Q-15 -48 -30 -42 Z" fill="${o.c}"/>${o.d ? "<path d=\"M0 -59 L-9 -44.5 Q-4 -46 0 -42 Q4 -46 9 -44.5 Z\" fill=\"#fff\"/>" : ""}`
+	},
+	palm: {
+		z: "ground",
+		ground: true,
+		dy: -48,
+		r: 34,
+		sz: [.85, 1.1],
+		diffs: [
+			"flip",
+			"detail",
+			"remove",
+			"size"
+		],
+		flip: true,
+		draw: (o) => {
+			let s = `<path d="M-4 0 Q6 -34 -2 -64 L4 -64 Q12 -34 4 0 Z" fill="${P.brown}"/>`;
+			for (const a of [
+				-170,
+				-135,
+				-95,
+				-45,
+				-8
+			]) s += `<path d="M0 0 Q14 -10 32 3 Q14 -2 0 0 Z" fill="${P.green}" transform="translate(1 -64) rotate(${a})"/>`;
+			return s + (o.d ? `<circle cx="-3" cy="-59" r="4" fill="#7a4a26"/><circle cx="5" cy="-58" r="4" fill="#7a4a26"/>` : "");
+		}
+	},
+	ball: {
+		z: "ground",
+		ground: true,
+		dy: -11,
+		r: 13,
+		sz: [.8, 1.05],
+		colors: [
+			P.red,
+			P.blue,
+			P.yellow,
+			P.green,
+			P.purple,
+			P.orange
+		],
+		diffs: [
+			"color",
+			"remove",
+			"size"
+		],
+		draw: (o) => `<circle cx="0" cy="-11" r="11" fill="${o.c}"/><path d="M-11 -11 Q0 -3 11 -11 Q0 -19 -11 -11 Z" fill="#fff"/>`
+	},
+	crab: {
+		z: "ground",
+		ground: true,
+		dy: -14,
+		r: 20,
+		sz: [.85, 1.05],
+		colors: [
+			P.red,
+			P.orange,
+			P.purple
+		],
+		diffs: [
+			"color",
+			"detail",
+			"remove"
+		],
+		draw: (o) => {
+			const cy = o.d ? -27 : -19;
+			return `<path d="M-10 -6 L-18 0 M-8 -3 L-14 3 M10 -6 L18 0 M8 -3 L14 3 M-11 -10 L-16 ${cy + 3} M11 -10 L16 ${cy + 3} M-4 -14 V-18 M4 -14 V-18" fill="none"/><circle cx="-17" cy="${cy}" r="5" fill="${o.c}"/><circle cx="17" cy="${cy}" r="5" fill="${o.c}"/><ellipse cx="0" cy="-9" rx="13" ry="8" fill="${o.c}"/><circle cx="-4" cy="-19" r="2.6" fill="#fff"/><circle cx="4" cy="-19" r="2.6" fill="#fff"/><circle cx="-4" cy="-19" r="1.1" fill="${INK}" stroke="none"/><circle cx="4" cy="-19" r="1.1" fill="${INK}" stroke="none"/>`;
+		}
+	},
+	bucket: {
+		z: "ground",
+		ground: true,
+		dy: -16,
+		r: 18,
+		sz: [.85, 1.05],
+		colors: [
+			P.blue,
+			P.red,
+			P.yellow,
+			P.green,
+			P.pink
+		],
+		diffs: [
+			"color",
+			"detail",
+			"remove"
+		],
+		flip: true,
+		draw: (o) => `${o.d ? `<path d="M5 -22 L15 -40" fill="none" stroke-width="2.6"/><path d="M11 -45 L21 -39 L17 -34 L9 -39 Z" fill="${P.orange}"/>` : ""}<path d="M-12 -22 Q0 -36 12 -22" fill="none"/><path d="M-12 -22 L12 -22 L9 0 L-9 0 Z" fill="${o.c}"/>`
+	},
+	starfish: {
+		z: "ground",
+		ground: true,
+		dy: -8,
+		r: 13,
+		sz: [.85, 1.1],
+		colors: [
+			P.orange,
+			P.pink,
+			P.red,
+			P.yellow,
+			P.purple
+		],
+		diffs: [
+			"color",
+			"size",
+			"remove"
+		],
+		draw: (o) => `<path d="${star(0, -8, 12, 5.5)}" fill="${o.c}"/>`
+	},
+	castle: {
+		z: "ground",
+		ground: true,
+		dy: -22,
+		r: 26,
+		sz: [.9, 1.05],
+		diffs: [
+			"detail",
+			"remove",
+			"size"
+		],
+		flip: true,
+		draw: (o) => {
+			const s = "#e9c37a";
+			return `${o.d ? `<line x1="16" y1="-38" x2="16" y2="-52"/><path d="M16 -52 L27 -48 L16 -44 Z" fill="${P.red}"/>` : ""}<rect x="-22" y="-34" width="12" height="34" fill="${s}"/><rect x="10" y="-34" width="12" height="34" fill="${s}"/><rect x="-22" y="-38" width="4" height="4" fill="${s}"/><rect x="-14" y="-38" width="4" height="4" fill="${s}"/><rect x="10" y="-38" width="4" height="4" fill="${s}"/><rect x="18" y="-38" width="4" height="4" fill="${s}"/><rect x="-12" y="-22" width="24" height="22" fill="${s}"/><path d="M-5 0 V-9 Q0 -15 5 -9 V0 Z" fill="#8a6430"/>`;
+		}
+	},
+	window: {
+		z: "wall",
+		max: 2,
+		r: 31,
+		sz: [.9, 1.05],
+		colors: [
+			P.pink,
+			P.red,
+			P.green,
+			P.purple,
+			P.yellow
+		],
+		diffs: [
+			"detail",
+			"color",
+			"remove"
+		],
+		need: { color: (o) => o.d },
+		draw: (o) => `<rect x="-26" y="-22" width="52" height="44" fill="#fff"/><rect x="-22" y="-18" width="44" height="36" fill="#bfeaff"/><line x1="0" y1="-18" x2="0" y2="18"/><line x1="-22" y1="0" x2="22" y2="0"/><rect x="-30" y="22" width="60" height="5" fill="#fff"/>${o.d ? `<path d="M-30 -25 H-15 Q-19 0 -10 20 H-30 Z" fill="${o.c}"/><path d="M30 -25 H15 Q19 0 10 20 H30 Z" fill="${o.c}"/>` : ""}`
+	},
+	frame: {
+		z: "wall",
+		r: 24,
+		sz: [.9, 1.1],
+		colors: [
+			P.red,
+			P.blue,
+			P.yellow,
+			P.green,
+			P.purple,
+			P.brown
+		],
+		diffs: [
+			"color",
+			"detail",
+			"remove"
+		],
+		draw: (o) => `<rect x="-20" y="-16" width="40" height="32" fill="${o.c}"/><rect x="-15" y="-11" width="30" height="22" fill="#d9f3ff"/><path d="M-15 11 L-5 -3 L2 5 L7 0 L15 11 Z" fill="${P.green}"/>${o.d ? `<circle cx="8" cy="-5" r="3.5" fill="${P.yellow}"/>` : ""}`
+	},
+	clock: {
+		z: "wall",
+		max: 1,
+		r: 20,
+		sz: [.95, 1.1],
+		colors: [
+			P.red,
+			P.blue,
+			P.green,
+			P.orange,
+			P.purple
+		],
+		diffs: [
+			"detail",
+			"color",
+			"remove"
+		],
+		draw: (o) => `<circle r="18" fill="${o.c}"/><circle r="14" fill="#fff"/><line x1="0" y1="0" x2="0" y2="-10" stroke-width="2.4"/><line x1="0" y1="0" x2="${o.d ? 7 : -7}" y2="4" stroke-width="3"/><circle r="2" fill="${INK}"/>`
+	},
+	books: {
+		z: "wall",
+		r: 28,
+		sz: [.9, 1.05],
+		colors: [
+			P.red,
+			P.green,
+			P.purple,
+			P.orange,
+			P.yellow,
+			P.teal
+		],
+		diffs: [
+			"color",
+			"detail",
+			"remove"
+		],
+		draw: (o) => `<rect x="-24" y="-12" width="8" height="22" fill="${P.blue}"/><rect x="-15" y="-16" width="9" height="26" fill="${o.c}"/><rect x="-5" y="-10" width="7" height="20" fill="${P.green === o.c ? P.pink : P.green}"/>${o.d ? `<rect x="3" y="-14" width="8" height="24" fill="${P.red === o.c ? P.yellow : P.red}"/>` : ""}<rect x="-28" y="10" width="56" height="5" fill="${P.brown}"/>`
+	},
+	lamp: {
+		z: "ground",
+		ground: true,
+		dy: -36,
+		r: 28,
+		sz: [.9, 1.05],
+		colors: [
+			P.yellow,
+			P.red,
+			P.blue,
+			P.green,
+			P.pink,
+			P.teal
+		],
+		diffs: [
+			"color",
+			"flip",
+			"detail",
+			"remove"
+		],
+		flip: true,
+		draw: (o) => `<ellipse cx="0" cy="-2" rx="12" ry="3.5" fill="${INK}"/><path d="M0 -2 V-58 L10 -64" fill="none" stroke-width="2.6"/>${o.d ? "<path d=\"M6 -56 L-6 -24 L36 -24 L24 -56 Z\" fill=\"#fff6a8\" stroke=\"none\" opacity=\".8\"/>" : ""}<path d="M4 -72 L24 -72 L30 -56 L-2 -56 Z" fill="${o.c}"/>`
+	},
+	plant: {
+		z: "ground",
+		ground: true,
+		dy: -26,
+		r: 24,
+		sz: [.85, 1.1],
+		colors: [
+			P.orange,
+			P.blue,
+			P.red,
+			P.purple,
+			P.teal,
+			P.yellow
+		],
+		diffs: [
+			"color",
+			"detail",
+			"remove",
+			"size"
+		],
+		draw: (o) => `<path d="M0 -20 Q-18 -30 -16 -44 Q-4 -36 0 -20 Z" fill="${P.green}"/><path d="M0 -20 Q16 -34 12 -48 Q2 -38 0 -20 Z" fill="${P.green}"/><path d="M0 -20 Q-2 -40 4 -52 Q8 -36 0 -20 Z" fill="#2f9447"/>${o.d ? `<circle cx="4" cy="-53" r="5.5" fill="${P.pink}"/><circle cx="4" cy="-53" r="2" fill="${P.yellow}"/>` : ""}<path d="M-12 -20 L12 -20 L9 0 L-9 0 Z" fill="${o.c}"/>`
+	},
+	chair: {
+		z: "ground",
+		ground: true,
+		dy: -24,
+		r: 22,
+		sz: [.85, 1.05],
+		colors: [
+			P.red,
+			P.blue,
+			P.green,
+			P.yellow,
+			P.purple,
+			P.teal
+		],
+		diffs: [
+			"color",
+			"flip",
+			"remove"
+		],
+		flip: true,
+		draw: (o) => `<rect x="-14" y="-20" width="3" height="20" fill="${P.brown}"/><rect x="11" y="-20" width="3" height="20" fill="${P.brown}"/><rect x="-15" y="-48" width="5" height="28" fill="${o.c}"/><rect x="-15" y="-48" width="16" height="5" fill="${o.c}"/><rect x="-16" y="-22" width="32" height="5" fill="${o.c}"/>`
+	},
+	cat: {
+		z: "ground",
+		ground: true,
+		dy: -24,
+		r: 22,
+		sz: [.85, 1.05],
+		colors: [
+			P.orange,
+			P.gray,
+			P.white,
+			P.brown,
+			"#3a3a44"
+		],
+		diffs: [
+			"color",
+			"flip",
+			"detail",
+			"remove"
+		],
+		flip: true,
+		draw: (o) => `<path d="M10 -6 Q27 -10 20 -30" fill="none" stroke="${INK}" stroke-width="6"/><path d="M10 -6 Q27 -10 20 -30" fill="none" stroke="${o.c}" stroke-width="3"/><ellipse cx="0" cy="-13" rx="12" ry="13" fill="${o.c}"/><path d="M-9 -37 L-7 -47 L-2 -41 Z M9 -37 L7 -47 L2 -41 Z" fill="${o.c}"/><circle cx="0" cy="-32" r="10" fill="${o.c}"/>${o.d ? "<path d=\"M-7 -22 Q0 -19 7 -22 M-9 -15 Q0 -12 9 -15 M-9 -8 Q0 -5 9 -8\" fill=\"none\" stroke-width=\"1.6\" opacity=\".7\"/>" : ""}<circle cx="-3.5" cy="-33" r="1.5" fill="${INK}" stroke="none"/><circle cx="3.5" cy="-33" r="1.5" fill="${INK}" stroke="none"/><path d="M-1.5 -29 L1.5 -29 L0 -27.5 Z" fill="${P.pink}" stroke-width="1"/>`
+	},
+	table: {
+		z: "ground",
+		ground: true,
+		dy: -26,
+		r: 28,
+		sz: [.9, 1.05],
+		colors: [
+			P.red,
+			P.blue,
+			P.yellow,
+			P.green,
+			P.white,
+			P.pink
+		],
+		diffs: [
+			"color",
+			"detail",
+			"flip",
+			"remove"
+		],
+		flip: true,
+		draw: (o) => `<rect x="-22" y="-30" width="4" height="30" fill="${P.brown}"/><rect x="18" y="-30" width="4" height="30" fill="${P.brown}"/><rect x="-28" y="-34" width="56" height="5" fill="#c07a44"/>${o.d ? "<path d=\"M9 -50 Q7 -54 10 -57 Q13 -60 11 -63 M14 -50 Q12 -54 15 -57 Q18 -60 16 -63\" fill=\"none\" stroke=\"#c9ccd6\" stroke-width=\"2\"/>" : ""}<path d="M17 -43 Q23 -40 17 -37" fill="none"/><rect x="6" y="-46" width="11" height="12" fill="${o.c}"/>`
+	},
+	house: {
+		z: "ground",
+		ground: true,
+		dy: -30,
+		r: 34,
+		sz: [.9, 1.05],
+		colors: [
+			P.yellow,
+			"#f6efe0",
+			P.pink,
+			P.sky,
+			P.orange
+		],
+		diffs: [
+			"color",
+			"flip",
+			"detail",
+			"remove"
+		],
+		flip: true,
+		init: (o, r) => {
+			o.c2 = pick(r, [
+				P.red,
+				P.blue,
+				P.brown,
+				P.purple
+			]);
+		},
+		draw: (o) => `${o.d ? `<rect x="8" y="-58" width="7" height="16" fill="${P.brown}"/>` : ""}<path d="M-29 -34 L0 -57 L29 -34 Z" fill="${o.c2}"/><rect x="-22" y="-34" width="44" height="34" fill="${o.c}"/><rect x="-14" y="-18" width="10" height="18" fill="${P.brown}"/><rect x="4" y="-26" width="12" height="10" fill="#bfeaff"/><path d="M10 -26 V-16 M4 -21 H16" fill="none" stroke-width="1.4"/>`
+	},
+	tree: {
+		z: "ground",
+		ground: true,
+		dy: -40,
+		r: 30,
+		sz: [.85, 1.2],
+		diffs: [
+			"detail",
+			"size",
+			"remove",
+			"flip"
+		],
+		flip: true,
+		draw: (o) => `<rect x="-4" y="-30" width="8" height="30" fill="${P.brown}"/><g stroke="none" fill="${INK}"><circle cx="0" cy="-48" r="19.5"/><circle cx="-14" cy="-37" r="13.5"/><circle cx="13" cy="-39" r="14.5"/></g><g stroke="none" fill="${P.green}"><circle cx="0" cy="-48" r="18"/><circle cx="-14" cy="-37" r="12"/><circle cx="13" cy="-39" r="13"/></g>${o.d ? `<g fill="${P.red}" stroke-width="1.2"><circle cx="-8" cy="-46" r="3"/><circle cx="6" cy="-54" r="3"/><circle cx="11" cy="-37" r="3"/><circle cx="-15" cy="-34" r="3"/></g>` : ""}`
+	},
+	flower: {
+		z: "ground",
+		ground: true,
+		dy: -16,
+		r: 13,
+		sz: [.85, 1.1],
+		colors: [
+			P.red,
+			P.pink,
+			P.yellow,
+			P.purple,
+			P.orange,
+			P.white,
+			P.blue
+		],
+		diffs: [
+			"color",
+			"detail",
+			"remove",
+			"size"
+		],
+		draw: (o) => {
+			let s = `<path d="M0 0 V-18" fill="none" stroke="${P.green}" stroke-width="2.6"/>` + (o.d ? `<path d="M0 -6 Q8 -13 11 -7 Q6 -3 0 -6 Z" fill="${P.green}" stroke-width="1.2"/>` : "");
+			for (let i = 0; i < 5; i++) {
+				const a = -Math.PI / 2 + i * 2 * Math.PI / 5;
+				s += `<circle cx="${(5.5 * Math.cos(a)).toFixed(1)}" cy="${(-22 + 5.5 * Math.sin(a)).toFixed(1)}" r="4.5" fill="${o.c}" stroke-width="1.3"/>`;
+			}
+			return s + `<circle cx="0" cy="-22" r="3" fill="${o.c === P.yellow ? P.orange : P.yellow}" stroke-width="1.3"/>`;
+		}
+	},
+	bench: {
+		z: "ground",
+		ground: true,
+		dy: -16,
+		r: 26,
+		sz: [.9, 1.05],
+		colors: [
+			P.brown,
+			P.red,
+			P.blue,
+			P.green
+		],
+		diffs: ["color", "remove"],
+		draw: (o) => `<rect x="-20" y="-12" width="3" height="12" fill="${INK}"/><rect x="17" y="-12" width="3" height="12" fill="${INK}"/><rect x="-20" y="-28" width="3" height="16" fill="${INK}"/><rect x="17" y="-28" width="3" height="16" fill="${INK}"/><rect x="-25" y="-15" width="50" height="4" fill="${o.c}"/><rect x="-25" y="-28" width="50" height="4" fill="${o.c}"/><rect x="-25" y="-22" width="50" height="4" fill="${o.c}"/>`
+	},
+	balloon: {
+		z: "sky",
+		r: 18,
+		sz: [.9, 1.1],
+		colors: [
+			P.red,
+			P.blue,
+			P.yellow,
+			P.green,
+			P.purple,
+			P.pink,
+			P.orange
+		],
+		diffs: [
+			"color",
+			"detail",
+			"remove"
+		],
+		flip: true,
+		draw: (o) => `${o.d ? `<path d="M12 6 Q8 18 2 30" fill="none" stroke-width="1.3"/><ellipse cx="12" cy="-6" rx="8" ry="10" fill="${o.c === P.yellow ? P.pink : P.yellow}"/>` : ""}<path d="M0 12 Q-4 22 2 30" fill="none" stroke-width="1.3"/><ellipse cx="0" cy="0" rx="10" ry="12" fill="${o.c}"/><path d="M-2 13 L2 13 L0 10 Z" fill="${o.c}"/>`
+	},
+	bird: {
+		z: "sky",
+		r: 12,
+		sz: [.9, 1.15],
+		colors: [
+			P.blue,
+			P.red,
+			P.yellow,
+			P.teal,
+			P.orange
+		],
+		diffs: [
+			"color",
+			"flip",
+			"remove"
+		],
+		flip: true,
+		draw: (o) => `<circle r="8" fill="${o.c}"/><path d="M-3 -1 Q-10 -9 -13 2 Q-6 2 -3 -1 Z" fill="${o.c}"/><path d="M7 -2 L13 0 L7 2 Z" fill="#ffb02e" stroke-width="1.2"/><circle cx="3" cy="-2.5" r="1.4" fill="${INK}" stroke="none"/>`
+	},
+	dog: {
+		z: "ground",
+		ground: true,
+		dy: -16,
+		r: 22,
+		sz: [.85, 1.05],
+		colors: [
+			P.brown,
+			P.white,
+			P.tan,
+			P.gray
+		],
+		diffs: [
+			"color",
+			"flip",
+			"detail",
+			"remove"
+		],
+		flip: true,
+		draw: (o) => `<path d="M-14 -16 Q-22 -22 -19 -30" fill="none" stroke-width="2.6"/><rect x="-11" y="-10" width="4" height="10" fill="${o.c}"/><rect x="7" y="-10" width="4" height="10" fill="${o.c}"/><ellipse cx="0" cy="-14" rx="15" ry="8" fill="${o.c}"/>${o.d ? "<circle cx=\"-4\" cy=\"-15\" r=\"4\" fill=\"#4a3426\" stroke=\"none\"/>" : ""}<circle cx="14" cy="-24" r="8" fill="${o.c}"/><ellipse cx="11" cy="-25" rx="3" ry="6.5" fill="#6b4a2e"/><circle cx="17" cy="-26" r="1.4" fill="${INK}" stroke="none"/><circle cx="22" cy="-22" r="1.8" fill="${INK}" stroke="none"/>`
+	},
+	mushroom: {
+		z: "ground",
+		ground: true,
+		dy: -12,
+		r: 14,
+		sz: [.85, 1.15],
+		colors: [
+			P.red,
+			P.orange,
+			P.purple,
+			P.blue,
+			P.brown
+		],
+		diffs: [
+			"color",
+			"detail",
+			"remove",
+			"size"
+		],
+		draw: (o) => `<rect x="-4" y="-11" width="8" height="11" fill="#fff6e8"/><path d="M-13 -9 Q0 -30 13 -9 Z" fill="${o.c}"/>${o.d ? "<g fill=\"#fff\" stroke=\"none\"><circle cx=\"-5\" cy=\"-15\" r=\"2.2\"/><circle cx=\"4\" cy=\"-18\" r=\"2.4\"/><circle cx=\"7\" cy=\"-12\" r=\"1.8\"/></g>" : ""}`
+	},
+	fish: {
+		z: "swim",
+		r: 16,
+		sz: [.8, 1.25],
+		colors: [
+			P.orange,
+			P.yellow,
+			P.red,
+			P.blue,
+			P.purple,
+			P.teal,
+			P.pink
+		],
+		diffs: [
+			"color",
+			"flip",
+			"detail",
+			"remove",
+			"size"
+		],
+		flip: true,
+		draw: (o) => `<path d="M-10 0 L-21 -9 L-21 9 Z" fill="${o.c}"/><ellipse cx="2" cy="0" rx="13" ry="9" fill="${o.c}"/>${o.d ? "<path d=\"M-2 -8 Q-5 0 -2 8\" fill=\"none\" stroke=\"#fff\" stroke-width=\"2.6\"/>" : ""}<circle cx="8" cy="-2" r="2.2" fill="#fff" stroke-width="1"/><circle cx="8.6" cy="-2" r="1" fill="${INK}" stroke="none"/>`
+	},
+	jelly: {
+		z: "swim",
+		dy: 4,
+		r: 18,
+		sz: [.85, 1.15],
+		colors: [
+			P.pink,
+			P.purple,
+			P.sky,
+			P.orange
+		],
+		diffs: [
+			"color",
+			"detail",
+			"remove",
+			"size"
+		],
+		draw: (o) => `<path d="M-8 2 q-3 6 0 12 t0 10 M0 2 q3 6 0 12 t0 10 M8 2 q-3 6 0 12 t0 10" fill="none" stroke-width="1.6"/><path d="M-13 2 Q-13 -16 0 -16 Q13 -16 13 2 Z" fill="${o.c}"/>${o.d ? "<g fill=\"#fff\" stroke=\"none\" opacity=\".85\"><circle cx=\"-5\" cy=\"-7\" r=\"2.2\"/><circle cx=\"4\" cy=\"-10\" r=\"1.8\"/><circle cx=\"6\" cy=\"-3\" r=\"1.6\"/></g>" : ""}`
+	},
+	bubble: {
+		z: "swim",
+		dy: -10,
+		r: 13,
+		sz: [.8, 1.3],
+		diffs: [
+			"remove",
+			"detail",
+			"size"
+		],
+		draw: (o) => `<g fill="#dff6ff" fill-opacity=".45" stroke="#fff" stroke-width="1.6"><circle r="6"/><circle cx="5" cy="-11" r="4"/><circle cx="-2" cy="-19" r="3"/>${o.d ? "<circle cx=\"6\" cy=\"-26\" r=\"2.5\"/>" : ""}</g>`
+	},
+	turtle: {
+		z: "swim",
+		r: 22,
+		sz: [.9, 1.1],
+		colors: [
+			P.green,
+			P.teal,
+			P.brown
+		],
+		diffs: [
+			"color",
+			"flip",
+			"detail",
+			"remove"
+		],
+		flip: true,
+		draw: (o) => `<g fill="#9ccc65"><ellipse cx="-11" cy="-10" rx="7" ry="3.5" transform="rotate(-30 -11 -10)"/><ellipse cx="11" cy="-10" rx="7" ry="3.5" transform="rotate(30 11 -10)"/><ellipse cx="-11" cy="10" rx="6" ry="3" transform="rotate(30 -11 10)"/><ellipse cx="11" cy="10" rx="6" ry="3" transform="rotate(-30 11 10)"/><circle cx="19" cy="-1" r="6"/></g><circle cx="21" cy="-3" r="1.2" fill="${INK}" stroke="none"/><ellipse cx="0" cy="0" rx="16" ry="11" fill="${o.c}"/>${o.d ? "<path d=\"M-7 -4 L0 -7 L7 -4 L7 4 L0 7 L-7 4 Z M-7 -4 L-14 -2 M7 -4 L14 -2 M-7 4 L-14 2 M7 4 L14 2\" fill=\"none\" stroke-width=\"1.3\"/>" : ""}`
+	},
+	coral: {
+		z: "ground",
+		ground: true,
+		dy: -18,
+		r: 18,
+		sz: [.85, 1.2],
+		colors: [
+			P.pink,
+			P.orange,
+			P.red,
+			P.purple
+		],
+		diffs: [
+			"color",
+			"flip",
+			"size",
+			"remove"
+		],
+		flip: true,
+		draw: (o) => {
+			const p = "M-2 0 L-2 -14 L-10 -22 M-2 -14 L6 -26 M2 -6 L12 -16 L12 -28 M-2 -14 L-4 -33";
+			return `<path d="${p}" fill="none" stroke="${INK}" stroke-width="8"/><path d="${p}" fill="none" stroke="${o.c}" stroke-width="5"/>`;
+		}
+	},
+	seaweed: {
+		z: "ground",
+		ground: true,
+		dy: -24,
+		r: 16,
+		sz: [.8, 1.25],
+		diffs: [
+			"flip",
+			"size",
+			"remove"
+		],
+		flip: true,
+		draw: () => {
+			const p = "M0 0 Q-8 -12 0 -24 T0 -48 M6 0 Q12 -10 6 -20 T8 -36";
+			return `<path d="${p}" fill="none" stroke="${INK}" stroke-width="7.5"/><path d="${p}" fill="none" stroke="${P.green}" stroke-width="4.5"/>`;
+		}
+	},
+	shell: {
+		z: "ground",
+		ground: true,
+		dy: -9,
+		r: 12,
+		sz: [.85, 1.15],
+		colors: [
+			P.pink,
+			P.white,
+			P.tan,
+			P.orange
+		],
+		diffs: [
+			"color",
+			"size",
+			"remove"
+		],
+		draw: (o) => `<path d="M0 0 L-12 -10 Q0 -23 12 -10 Z" fill="${o.c}"/><path d="M0 0 L-6 -15 M0 0 L0 -16 M0 0 L6 -15" fill="none" stroke-width="1.3"/>`
+	},
+	chest: {
+		z: "ground",
+		ground: true,
+		dy: -16,
+		r: 20,
+		sz: [.9, 1.05],
+		colors: [
+			P.brown,
+			"#7a4a26",
+			P.red
+		],
+		diffs: [
+			"color",
+			"detail",
+			"remove"
+		],
+		draw: (o) => `${o.d ? `<path d="M-16 -17 L-14 -32 Q2 -38 16 -30 L16 -17 Z" fill="${o.c}"/><g fill="${P.yellow}" stroke-width="1.2"><circle cx="-8" cy="-18" r="4"/><circle cx="0" cy="-21" r="4"/><circle cx="8" cy="-18" r="4"/></g>` : `<path d="M-16 -16 Q0 -30 16 -16 Z" fill="${o.c}"/>`}<rect x="-16" y="-16" width="32" height="16" fill="${o.c}"/><rect x="-3" y="-14" width="6" height="6" fill="${P.yellow}"/>`
+	},
+	octopus: {
+		z: "swim",
+		r: 20,
+		sz: [.85, 1.1],
+		colors: [
+			P.red,
+			P.purple,
+			P.orange,
+			P.pink
+		],
+		diffs: [
+			"color",
+			"detail",
+			"remove",
+			"size"
+		],
+		draw: (o) => {
+			const p = "M-10 4 q-7 8 -2 16 M-4 6 q-3 9 0 16 M4 6 q3 9 0 16 M10 4 q7 8 2 16";
+			return `<path d="${p}" fill="none" stroke="${INK}" stroke-width="6.5"/><path d="${p}" fill="none" stroke="${o.c}" stroke-width="3.8"/><ellipse cx="0" cy="-6" rx="13" ry="14" fill="${o.c}"/>${o.d ? "<g fill=\"#fff\" stroke=\"none\" opacity=\".55\"><circle cx=\"-6\" cy=\"-13\" r=\"2.4\"/><circle cx=\"5\" cy=\"-15\" r=\"2\"/><circle cx=\"8\" cy=\"-8\" r=\"1.6\"/></g>" : ""}<circle cx="-4.5" cy="-4" r="2.6" fill="#fff" stroke-width="1"/><circle cx="4.5" cy="-4" r="2.6" fill="#fff" stroke-width="1"/><circle cx="-4.5" cy="-4" r="1.1" fill="${INK}" stroke="none"/><circle cx="4.5" cy="-4" r="1.1" fill="${INK}" stroke="none"/>`;
+		}
+	},
+	snowman: {
+		z: "ground",
+		ground: true,
+		dy: -26,
+		r: 24,
+		sz: [.9, 1.1],
+		colors: [
+			P.red,
+			P.blue,
+			P.green,
+			P.purple,
+			P.orange
+		],
+		diffs: [
+			"color",
+			"detail",
+			"flip",
+			"remove"
+		],
+		flip: true,
+		draw: (o) => `<circle cx="0" cy="-12" r="12" fill="#fff"/><circle cx="0" cy="-33" r="9" fill="#fff"/><rect x="-9" y="-26" width="18" height="4" fill="${o.c}"/><rect x="3" y="-25" width="4" height="10" fill="${o.c}"/><rect x="-7" y="-50" width="14" height="9" fill="${INK}"/><rect x="-10" y="-42" width="20" height="2.5" fill="${INK}"/><path d="M1 -33 L10 -31 L1 -30 Z" fill="${P.orange}" stroke-width="1"/><circle cx="-3" cy="-36" r="1.2" fill="${INK}" stroke="none"/><circle cx="3" cy="-36" r="1.2" fill="${INK}" stroke="none"/>${o.d ? `<g fill="${INK}" stroke="none"><circle cx="0" cy="-17" r="1.5"/><circle cx="0" cy="-11" r="1.5"/><circle cx="0" cy="-5" r="1.5"/></g>` : ""}`
+	},
+	pine: {
+		z: "ground",
+		ground: true,
+		dy: -32,
+		r: 24,
+		sz: [.85, 1.25],
+		diffs: [
+			"detail",
+			"size",
+			"remove"
+		],
+		draw: (o) => `<rect x="-3.5" y="-8" width="7" height="8" fill="${P.brown}"/><path d="M0 -36 L-23 -8 L23 -8 Z" fill="#2f8f4e"/><path d="M0 -50 L-19 -24 L19 -24 Z" fill="#37a058"/><path d="M0 -62 L-14 -40 L14 -40 Z" fill="#43b05c"/><path d="M0 -62 L-5 -55 L5 -55 Z" fill="#fff" stroke-width="1.2"/>${o.d ? `<path d="${star(0, -64, 6, 2.6)}" fill="${P.yellow}" stroke-width="1.3"/>` : ""}`
+	},
+	sled: {
+		z: "ground",
+		ground: true,
+		dy: -8,
+		r: 20,
+		sz: [.9, 1.05],
+		colors: [
+			P.red,
+			P.blue,
+			P.green,
+			P.orange
+		],
+		diffs: [
+			"color",
+			"flip",
+			"remove"
+		],
+		flip: true,
+		draw: (o) => `<path d="M-18 0 H14 Q20 0 20 -6 M-12 0 V-7 M8 0 V-7" fill="none" stroke-width="2.4"/><rect x="-16" y="-12" width="28" height="6" fill="${o.c}"/>`
+	},
+	penguin: {
+		z: "ground",
+		ground: true,
+		dy: -16,
+		r: 16,
+		sz: [.85, 1.1],
+		diffs: [
+			"flip",
+			"detail",
+			"remove",
+			"size"
+		],
+		flip: true,
+		draw: (o) => `<path d="M-6 0 L-1 0 M2 0 L7 0" stroke="${P.orange}" stroke-width="3"/><ellipse cx="0" cy="-15" rx="10" ry="15" fill="#2b2b3a"/><ellipse cx="2" cy="-12" rx="6" ry="10" fill="#fff" stroke="none"/><path d="M8 -22 L14 -20 L8 -18 Z" fill="${P.orange}" stroke-width="1"/><circle cx="4" cy="-23" r="1.6" fill="#fff" stroke="none"/>${o.d ? `<rect x="-9" y="-19" width="18" height="3.5" fill="${P.red}" stroke-width="1.2"/>` : ""}`
+	},
+	present: {
+		z: "ground",
+		ground: true,
+		dy: -11,
+		r: 14,
+		sz: [.85, 1.15],
+		colors: [
+			P.red,
+			P.blue,
+			P.green,
+			P.purple,
+			P.pink,
+			P.yellow
+		],
+		diffs: [
+			"color",
+			"detail",
+			"remove",
+			"size"
+		],
+		draw: (o) => `<rect x="-11" y="-20" width="22" height="20" fill="${o.c}"/><rect x="-2" y="-20" width="4" height="20" fill="#fff" stroke-width="1.2"/>${o.d ? "<path d=\"M0 -20 Q-10 -29 -6 -20 Z M0 -20 Q10 -29 6 -20 Z\" fill=\"#fff\" stroke-width=\"1.4\"/>" : ""}`
+	},
+	snowflake: {
+		z: "sky",
+		r: 10,
+		sz: [.8, 1.3],
+		diffs: ["size", "remove"],
+		draw: () => "<g stroke=\"#fff\" stroke-width=\"2.2\"><line x1=\"-8\" y1=\"0\" x2=\"8\" y2=\"0\"/><line x1=\"-4\" y1=\"-7\" x2=\"4\" y2=\"7\"/><line x1=\"-4\" y1=\"7\" x2=\"4\" y2=\"-7\"/></g>"
+	},
+	jars: {
+		z: "wall",
+		r: 26,
+		sz: [.9, 1.05],
+		colors: [
+			P.red,
+			P.orange,
+			P.green,
+			P.purple,
+			P.yellow
+		],
+		diffs: [
+			"color",
+			"detail",
+			"remove"
+		],
+		draw: (o) => `<rect x="-22" y="-6" width="12" height="18" fill="#e9f6ff"/><rect x="-21" y="2" width="10" height="9" fill="${P.orange}" stroke="none"/><rect x="-23" y="-10" width="14" height="4" fill="${o.c}"/><rect x="-5" y="-2" width="11" height="14" fill="#e9f6ff"/><rect x="-4" y="5" width="9" height="6" fill="${P.green}" stroke="none"/><rect x="-6" y="-6" width="13" height="4" fill="${P.blue}"/>${o.d ? `<rect x="11" y="-4" width="10" height="16" fill="#e9f6ff"/><rect x="10" y="-8" width="12" height="4" fill="${P.red === o.c ? P.purple : P.red}"/>` : ""}<rect x="-26" y="12" width="52" height="4" fill="${P.brown}"/>`
+	},
+	pan: {
+		z: "wall",
+		r: 20,
+		sz: [.9, 1.1],
+		colors: [
+			"#3a3a44",
+			P.red,
+			P.blue,
+			P.teal
+		],
+		diffs: [
+			"color",
+			"flip",
+			"remove"
+		],
+		flip: true,
+		draw: (o) => `<line x1="24" y1="-12" x2="24" y2="-2"/><rect x="10" y="-2" width="18" height="4" fill="${P.brown}"/><circle r="12" fill="${o.c}"/><circle r="8" fill="#fff" fill-opacity=".15" stroke="none"/>`
+	},
+	fridge: {
+		z: "ground",
+		ground: true,
+		dy: -40,
+		r: 30,
+		sz: [.9, 1],
+		colors: [
+			P.white,
+			"#bde8df",
+			"#f6c9d0",
+			"#cfe3ff"
+		],
+		diffs: [
+			"color",
+			"detail",
+			"remove"
+		],
+		draw: (o) => `<rect x="-17" y="-80" width="34" height="80" rx="3" fill="${o.c}"/><line x1="-17" y1="-52" x2="17" y2="-52"/><rect x="10" y="-72" width="3" height="14" fill="#9aa0a6"/><rect x="10" y="-46" width="3" height="18" fill="#9aa0a6"/>${o.d ? `<rect x="-11" y="-74" width="10" height="12" fill="${P.yellow}" stroke-width="1.2"/><circle cx="-6" cy="-74" r="2.2" fill="${P.red}" stroke-width="1"/>` : ""}`
+	},
+	trash: {
+		z: "ground",
+		ground: true,
+		dy: -14,
+		r: 16,
+		sz: [.9, 1.05],
+		colors: [
+			P.gray,
+			P.green,
+			P.blue,
+			P.red
+		],
+		diffs: [
+			"color",
+			"detail",
+			"remove"
+		],
+		draw: (o) => `<path d="M-10 -24 L10 -24 L8 0 L-8 0 Z" fill="${o.c}"/><path d="M-4 -20 V-4 M4 -20 V-4" fill="none" stroke-width="1.3"/>${o.d ? `<rect x="-12" y="-28" width="24" height="4" fill="${o.c}" transform="rotate(-35 -12 -24)"/>` : `<rect x="-12" y="-28" width="24" height="4" fill="${o.c}"/>`}`
+	},
+	basket: {
+		z: "ground",
+		ground: true,
+		dy: -13,
+		r: 18,
+		sz: [.9, 1.1],
+		colors: [
+			P.red,
+			P.orange,
+			P.green,
+			P.purple
+		],
+		diffs: [
+			"color",
+			"detail",
+			"remove"
+		],
+		draw: (o) => `${o.d ? `<path d="M2 -14 Q12 -30 18 -22 Q10 -22 6 -12 Z" fill="${P.yellow}"/>` : ""}<g fill="${o.c}"><circle cx="-7" cy="-14" r="5.5"/><circle cx="3" cy="-15" r="5.5"/></g><path d="M-15 -12 L15 -12 L11 0 L-11 0 Z" fill="#c48a4a"/><path d="M-13 -6 H13" fill="none" stroke-width="1.2"/>`
+	},
+	moon: {
+		z: "sky",
+		max: 1,
+		r: 22,
+		sz: [1, 1.1],
+		colors: ["#fff4b0", P.yellow],
+		diffs: [
+			"color",
+			"detail",
+			"size",
+			"flip"
+		],
+		flip: true,
+		draw: (o) => `<path d="M5 -15 A16 16 0 1 0 5 15 A18 18 0 0 1 5 -15 Z" fill="${o.c}"/>${o.d ? `<path d="${star(16, -12, 5, 2.2)}" fill="#ffe98a" stroke-width="1.2"/>` : ""}`
+	},
+	twinkle: {
+		z: "sky",
+		r: 9,
+		sz: [.7, 1.35],
+		diffs: ["size", "remove"],
+		draw: () => `<path d="${star(0, 0, 7, 3)}" fill="#ffe98a" stroke-width="1.2"/>`
+	},
+	tent: {
+		z: "ground",
+		ground: true,
+		dy: -20,
+		r: 28,
+		sz: [.9, 1.05],
+		colors: [
+			P.orange,
+			P.red,
+			P.green,
+			P.blue,
+			P.yellow
+		],
+		diffs: [
+			"color",
+			"flip",
+			"detail",
+			"remove"
+		],
+		flip: true,
+		draw: (o) => `${o.d ? `<line x1="0" y1="-36" x2="0" y2="-48"/><path d="M0 -48 L10 -44 L0 -40 Z" fill="${P.yellow === o.c ? P.red : P.yellow}"/>` : ""}<path d="M-26 0 L0 -36 L26 0 Z" fill="${o.c}"/><path d="M-6 0 L0 -26 L5 0 Z" fill="#3a2a1a"/>`
+	},
+	fire: {
+		z: "ground",
+		ground: true,
+		dy: -14,
+		r: 16,
+		sz: [.9, 1.2],
+		diffs: [
+			"detail",
+			"size",
+			"remove"
+		],
+		draw: (o) => `<rect x="-14" y="-5" width="28" height="5" fill="${P.brown}" transform="rotate(12)"/><rect x="-14" y="-5" width="28" height="5" fill="${P.brown}" transform="rotate(-12)"/>${o.d ? "<path d=\"M7 -4 Q15 -10 11 -21 Q6 -12 3 -6 Z\" fill=\"#ff8a1e\"/>" : ""}<path d="M0 -4 Q-11 -14 -2 -30 Q0 -20 5 -22 Q12 -12 0 -4 Z" fill="#ff8a1e"/><path d="M0 -5 Q-5 -11 0 -19 Q5 -11 0 -5 Z" fill="${P.yellow}" stroke="none"/>`
+	},
+	lantern: {
+		z: "ground",
+		ground: true,
+		dy: -14,
+		r: 14,
+		sz: [.9, 1.1],
+		colors: [
+			P.yellow,
+			P.red,
+			P.green,
+			P.sky
+		],
+		diffs: [
+			"color",
+			"detail",
+			"remove"
+		],
+		draw: (o) => `${o.d ? `<circle cx="0" cy="-12" r="17" fill="${o.c}" opacity=".3" stroke="none"/>` : ""}<path d="M-5 -23 Q0 -31 5 -23" fill="none"/><rect x="-6" y="-20" width="12" height="16" fill="${o.c}"/><rect x="-7" y="-23" width="14" height="3" fill="${INK}"/><rect x="-7" y="-4" width="14" height="4" fill="${INK}"/>`
+	},
+	backpack: {
+		z: "ground",
+		ground: true,
+		dy: -14,
+		r: 14,
+		sz: [.9, 1.05],
+		colors: [
+			P.red,
+			P.blue,
+			P.green,
+			P.orange,
+			P.purple
+		],
+		diffs: [
+			"color",
+			"detail",
+			"remove"
+		],
+		draw: (o) => `<rect x="-10" y="-26" width="20" height="26" rx="4" fill="${o.c}"/><path d="M-10 -18 Q0 -12 10 -18" fill="none"/>${o.d ? "<rect x=\"-6\" y=\"-11\" width=\"12\" height=\"8\" fill=\"#fff\" fill-opacity=\".45\" stroke-width=\"1.3\"/>" : ""}`
+	},
+	rabbit: {
+		z: "ground",
+		ground: true,
+		dy: -16,
+		r: 16,
+		sz: [.85, 1.05],
+		colors: [
+			P.white,
+			P.gray,
+			P.tan
+		],
+		diffs: [
+			"color",
+			"flip",
+			"detail",
+			"remove"
+		],
+		flip: true,
+		draw: (o) => `<circle cx="-10" cy="-11" r="3.5" fill="#fff"/><ellipse cx="0" cy="-10" rx="10" ry="9" fill="${o.c}"/><ellipse cx="6" cy="-33" rx="2.6" ry="7.5" fill="${o.c}"/><ellipse cx="11" cy="-32" rx="2.6" ry="7.5" fill="${o.c}" transform="rotate(18 11 -32)"/><circle cx="8" cy="-20" r="7" fill="${o.c}"/><circle cx="11" cy="-21" r="1.3" fill="${INK}" stroke="none"/>${o.d ? `<path d="M4 -26 L0 -29 L0 -23 Z M4 -26 L8 -29 L8 -23 Z" fill="${P.red}" stroke-width="1"/>` : ""}`
+	},
+	kite: {
+		z: "sky",
+		r: 20,
+		sz: [.9, 1.1],
+		colors: [
+			P.red,
+			P.blue,
+			P.yellow,
+			P.green,
+			P.purple,
+			P.pink
+		],
+		diffs: [
+			"color",
+			"detail",
+			"flip",
+			"remove"
+		],
+		flip: true,
+		draw: (o) => `<path d="M0 20 q6 8 0 14 q-6 8 3 14" fill="none" stroke-width="1.4"/>${o.d ? `<g fill="${P.red === o.c ? P.yellow : P.red}" stroke-width="1"><path d="M2 26 L-3 24 L-3 29 Z"/><path d="M-1 40 L4 38 L4 43 Z"/></g>` : ""}<path d="M0 -16 L11 0 L0 20 L-11 0 Z" fill="${o.c}"/><path d="M0 -16 V20 M-11 0 H11" fill="none" stroke-width="1.2"/>`
+	},
+	surfboard: {
+		z: "ground",
+		ground: true,
+		dy: -24,
+		r: 16,
+		sz: [.9, 1.1],
+		colors: [
+			P.red,
+			P.blue,
+			P.yellow,
+			P.teal,
+			P.pink,
+			P.orange
+		],
+		diffs: [
+			"color",
+			"detail",
+			"remove",
+			"flip"
+		],
+		flip: true,
+		draw: (o) => `<g transform="rotate(10 0 -24)"><ellipse cx="0" cy="-24" rx="7" ry="24" fill="${o.c}"/>${o.d ? "<path d=\"M-6.6 -30 H6.6 V-24 H-6.6 Z\" fill=\"#fff\" stroke=\"none\"/>" : ""}<line x1="0" y1="-46" x2="0" y2="-2" stroke-width="1"/></g>`
+	},
+	teddy: {
+		z: "ground",
+		ground: true,
+		dy: -16,
+		r: 16,
+		sz: [.85, 1.05],
+		colors: [
+			P.tan,
+			P.brown,
+			"#f2b8c6"
+		],
+		diffs: [
+			"color",
+			"detail",
+			"remove"
+		],
+		draw: (o) => `<circle cx="-6" cy="-31" r="3.6" fill="${o.c}"/><circle cx="6" cy="-31" r="3.6" fill="${o.c}"/><ellipse cx="0" cy="-9" rx="10" ry="10" fill="${o.c}"/><circle cx="0" cy="-24" r="8" fill="${o.c}"/><ellipse cx="0" cy="-21.5" rx="3.6" ry="2.6" fill="#fff3e0" stroke-width="1"/><circle cx="-3" cy="-26" r="1.2" fill="${INK}" stroke="none"/><circle cx="3" cy="-26" r="1.2" fill="${INK}" stroke="none"/>${o.d ? `<path d="M0 -16 L-5 -19 L-5 -13 Z M0 -16 L5 -19 L5 -13 Z" fill="${P.red}" stroke-width="1"/>` : ""}`
+	},
+	tv: {
+		z: "ground",
+		ground: true,
+		dy: -22,
+		r: 22,
+		sz: [.9, 1.05],
+		colors: [
+			"#3a3a44",
+			P.red,
+			P.blue,
+			P.teal,
+			P.orange
+		],
+		diffs: [
+			"color",
+			"detail",
+			"remove"
+		],
+		draw: (o) => `${o.d ? "<path d=\"M-2 -34 L-10 -46 M2 -34 L10 -46\" fill=\"none\"/>" : ""}<path d="M-12 0 L-8 -8 M12 0 L8 -8" fill="none"/><rect x="-18" y="-34" width="36" height="26" fill="${o.c}"/><rect x="-14" y="-30" width="28" height="18" fill="#8fd0ff"/>`
+	}
+};
+const THEMES = {
+	beach: {
+		name: "바닷가",
+		zones: {
+			sky: {
+				x: [30, 370],
+				y: [22, 100]
+			},
+			sea: {
+				x: [40, 360],
+				y: [152, 170]
+			},
+			ground: {
+				x: [24, 376],
+				y: [205, 292]
+			}
+		},
+		items: [
+			[
+				"sun",
+				1,
+				1
+			],
+			[
+				"castle",
+				1,
+				1
+			],
+			[
+				"palm",
+				1,
+				2
+			],
+			[
+				"umbrella",
+				2,
+				2
+			],
+			[
+				"cloud",
+				2,
+				3
+			],
+			[
+				"boat",
+				1,
+				2
+			],
+			[
+				"seagull",
+				2,
+				3
+			],
+			[
+				"crab",
+				1,
+				2
+			],
+			[
+				"bucket",
+				1,
+				2
+			],
+			[
+				"ball",
+				1,
+				2
+			],
+			[
+				"surfboard",
+				1,
+				1
+			],
+			[
+				"starfish",
+				2,
+				3
+			],
+			[
+				"shell",
+				1,
+				2
+			]
+		],
+		adds: [
+			"crab",
+			"starfish",
+			"ball",
+			"bucket",
+			"seagull",
+			"cloud",
+			"shell"
+		],
+		bg: (id) => {
+			let w = "";
+			for (const y of [146, 160]) {
+				let d = `M0 ${y}`;
+				for (let x = 0; x < 400; x += 24) d += ` q6 -3 12 0 t12 0`;
+				w += `<path d="${d}" fill="none" stroke="#9fd8f7" stroke-width="1.5"/>`;
+			}
+			return `<defs><linearGradient id="${id}s" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#5fc3f0"/><stop offset="1" stop-color="#cdeffc"/></linearGradient></defs><rect width="400" height="140" fill="url(#${id}s)"/><rect y="132" width="400" height="52" fill="#2f95d6"/>${w}<path d="M0 182 Q100 172 200 180 T400 177 V300 H0 Z" fill="#f2d08a"/><path d="M0 182 Q100 172 200 180 T400 177" fill="none" stroke="#fff" stroke-width="3"/><g fill="#d9b06a"><circle cx="60" cy="230" r="1.5"/><circle cx="140" cy="270" r="1.5"/><circle cx="250" cy="215" r="1.5"/><circle cx="330" cy="260" r="1.5"/><circle cx="200" cy="290" r="1.5"/></g>`;
+		}
+	},
+	room: {
+		name: "방",
+		zones: {
+			wall: {
+				x: [42, 358],
+				y: [42, 140]
+			},
+			ground: {
+				x: [28, 372],
+				y: [220, 292]
+			}
+		},
+		items: [
+			[
+				"window",
+				1,
+				1
+			],
+			[
+				"table",
+				1,
+				1
+			],
+			[
+				"lamp",
+				1,
+				1
+			],
+			[
+				"books",
+				1,
+				1
+			],
+			[
+				"clock",
+				1,
+				1
+			],
+			[
+				"frame",
+				1,
+				2
+			],
+			[
+				"chair",
+				1,
+				2
+			],
+			[
+				"cat",
+				1,
+				1
+			],
+			[
+				"plant",
+				1,
+				2
+			],
+			[
+				"teddy",
+				1,
+				1
+			],
+			[
+				"tv",
+				0,
+				1
+			],
+			[
+				"ball",
+				1,
+				1
+			]
+		],
+		adds: [
+			"ball",
+			"plant",
+			"frame",
+			"teddy"
+		],
+		bg: (_id) => {
+			let s = "";
+			for (let x = 0; x < 400; x += 40) s += `<rect x="${x}" y="0" width="20" height="196" fill="#efd8ae"/>`;
+			return `<rect width="400" height="200" fill="#f6e5c4"/>${s}<rect y="192" width="400" height="9" fill="#fff" stroke="${INK}" stroke-width="1.5"/><rect y="201" width="400" height="99" fill="#c88c55"/><path d="M0 226 H400 M0 252 H400 M0 279 H400 M90 201 V226 M260 226 V252 M150 252 V279 M330 279 V300" stroke="#a8703f" stroke-width="1.5"/><ellipse cx="200" cy="258" rx="150" ry="26" fill="#6a5acd" opacity=".3"/>`;
+		}
+	},
+	park: {
+		name: "공원",
+		zones: {
+			sky: {
+				x: [30, 370],
+				y: [22, 110]
+			},
+			ground: {
+				x: [24, 376],
+				y: [172, 292]
+			}
+		},
+		items: [
+			[
+				"house",
+				1,
+				2
+			],
+			[
+				"sun",
+				1,
+				1
+			],
+			[
+				"tree",
+				2,
+				3
+			],
+			[
+				"bench",
+				1,
+				1
+			],
+			[
+				"cloud",
+				2,
+				2
+			],
+			[
+				"balloon",
+				1,
+				2
+			],
+			[
+				"kite",
+				1,
+				1
+			],
+			[
+				"bird",
+				2,
+				2
+			],
+			[
+				"rabbit",
+				0,
+				1
+			],
+			[
+				"dog",
+				1,
+				1
+			],
+			[
+				"mushroom",
+				1,
+				2
+			],
+			[
+				"flower",
+				3,
+				4
+			],
+			[
+				"ball",
+				1,
+				1
+			]
+		],
+		adds: [
+			"flower",
+			"mushroom",
+			"bird",
+			"ball",
+			"balloon",
+			"rabbit"
+		],
+		bg: (id) => `<defs><linearGradient id="${id}s" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#6fcbf2"/><stop offset="1" stop-color="#d6f2fc"/></linearGradient></defs><rect width="400" height="160" fill="url(#${id}s)"/><ellipse cx="90" cy="158" rx="140" ry="30" fill="#a6dc8a"/><ellipse cx="320" cy="160" rx="160" ry="34" fill="#9bd47e"/><rect y="152" width="400" height="148" fill="#7cc75b"/><path d="M170 300 Q205 220 262 152 L282 152 Q232 222 246 300 Z" fill="#ead6a4"/>`
+	},
+	sea: {
+		name: "바닷속",
+		zones: {
+			swim: {
+				x: [30, 370],
+				y: [30, 195]
+			},
+			ground: {
+				x: [24, 376],
+				y: [230, 292]
+			}
+		},
+		items: [
+			[
+				"chest",
+				1,
+				1
+			],
+			[
+				"turtle",
+				1,
+				1
+			],
+			[
+				"octopus",
+				1,
+				1
+			],
+			[
+				"coral",
+				2,
+				3
+			],
+			[
+				"seaweed",
+				2,
+				3
+			],
+			[
+				"jelly",
+				1,
+				2
+			],
+			[
+				"fish",
+				3,
+				5
+			],
+			[
+				"bubble",
+				2,
+				3
+			],
+			[
+				"shell",
+				1,
+				2
+			],
+			[
+				"starfish",
+				1,
+				2
+			],
+			[
+				"crab",
+				1,
+				1
+			]
+		],
+		adds: [
+			"fish",
+			"bubble",
+			"shell",
+			"starfish",
+			"jelly"
+		],
+		bg: (id) => `<defs><linearGradient id="${id}s" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2aa3dd"/><stop offset="1" stop-color="#0d4f8c"/></linearGradient></defs><rect width="400" height="300" fill="url(#${id}s)"/><g fill="#fff" opacity=".08"><path d="M60 0 L110 0 L40 220 L10 220 Z"/><path d="M200 0 L240 0 L190 220 L160 220 Z"/><path d="M320 0 L350 0 L330 220 L300 220 Z"/></g><path d="M0 226 Q80 214 160 224 T320 220 T400 222 V300 H0 Z" fill="#e6c98a"/><g fill="#cfae6c"><circle cx="70" cy="262" r="1.6"/><circle cx="180" cy="285" r="1.6"/><circle cx="300" cy="250" r="1.6"/></g>`
+	},
+	winter: {
+		name: "겨울",
+		zones: {
+			sky: {
+				x: [30, 370],
+				y: [22, 105]
+			},
+			ground: {
+				x: [24, 376],
+				y: [176, 292]
+			}
+		},
+		items: [
+			[
+				"house",
+				1,
+				1
+			],
+			[
+				"pine",
+				2,
+				3
+			],
+			[
+				"snowman",
+				1,
+				2
+			],
+			[
+				"sled",
+				1,
+				1
+			],
+			[
+				"penguin",
+				1,
+				2
+			],
+			[
+				"present",
+				1,
+				2
+			],
+			[
+				"cloud",
+				1,
+				2
+			],
+			[
+				"snowflake",
+				4,
+				6
+			],
+			[
+				"bird",
+				1,
+				1
+			],
+			[
+				"dog",
+				0,
+				1
+			]
+		],
+		adds: [
+			"snowflake",
+			"present",
+			"penguin",
+			"bird"
+		],
+		bg: (id) => `<defs><linearGradient id="${id}s" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#9cc8e8"/><stop offset="1" stop-color="#e6f2fb"/></linearGradient></defs><rect width="400" height="170" fill="url(#${id}s)"/><ellipse cx="110" cy="164" rx="150" ry="30" fill="#e3eef8"/><ellipse cx="330" cy="166" rx="150" ry="32" fill="#d8e7f5"/><rect y="158" width="400" height="142" fill="#f6fafd"/><g fill="#dde9f5"><ellipse cx="80" cy="250" rx="60" ry="8"/><ellipse cx="290" cy="280" rx="80" ry="9"/><ellipse cx="230" cy="200" rx="50" ry="6"/></g>`
+	},
+	kitchen: {
+		name: "부엌",
+		zones: {
+			wall: {
+				x: [42, 358],
+				y: [42, 140]
+			},
+			ground: {
+				x: [28, 372],
+				y: [222, 292]
+			}
+		},
+		items: [
+			[
+				"fridge",
+				1,
+				1
+			],
+			[
+				"window",
+				1,
+				1
+			],
+			[
+				"table",
+				1,
+				1
+			],
+			[
+				"jars",
+				1,
+				1
+			],
+			[
+				"pan",
+				1,
+				2
+			],
+			[
+				"clock",
+				1,
+				1
+			],
+			[
+				"chair",
+				1,
+				2
+			],
+			[
+				"basket",
+				1,
+				1
+			],
+			[
+				"trash",
+				1,
+				1
+			],
+			[
+				"cat",
+				0,
+				1
+			],
+			[
+				"plant",
+				1,
+				1
+			]
+		],
+		adds: [
+			"plant",
+			"basket",
+			"frame",
+			"ball"
+		],
+		bg: (_id) => {
+			let t = "";
+			for (let x = 0; x < 400; x += 25) for (let y = 201; y < 300; y += 25) if ((x + y - 201) / 25 % 2 === 0) t += `<rect x="${x}" y="${y}" width="25" height="25" fill="#cdb592"/>`;
+			let g = "";
+			for (let x = 20; x < 400; x += 20) g += `M${x} 0 V196 `;
+			for (let y = 20; y < 196; y += 20) g += `M0 ${y} H400 `;
+			return `<rect width="400" height="200" fill="#e8f3f0"/><path d="${g}" stroke="#d3e5e0" stroke-width="1"/><rect y="192" width="400" height="9" fill="#fff" stroke="${INK}" stroke-width="1.5"/><rect y="201" width="400" height="99" fill="#e2ceb0"/>${t}`;
+		}
+	},
+	camp: {
+		name: "캠핑",
+		zones: {
+			sky: {
+				x: [30, 370],
+				y: [20, 110]
+			},
+			ground: {
+				x: [24, 376],
+				y: [180, 292]
+			}
+		},
+		items: [
+			[
+				"moon",
+				1,
+				1
+			],
+			[
+				"tent",
+				1,
+				2
+			],
+			[
+				"fire",
+				1,
+				1
+			],
+			[
+				"pine",
+				2,
+				3
+			],
+			[
+				"lantern",
+				1,
+				1
+			],
+			[
+				"backpack",
+				1,
+				1
+			],
+			[
+				"rabbit",
+				1,
+				1
+			],
+			[
+				"mushroom",
+				1,
+				2
+			],
+			[
+				"twinkle",
+				5,
+				7
+			]
+		],
+		adds: [
+			"twinkle",
+			"mushroom",
+			"lantern",
+			"rabbit"
+		],
+		bg: (id) => `<defs><linearGradient id="${id}s" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#141a4a"/><stop offset="1" stop-color="#454c8c"/></linearGradient></defs><rect width="400" height="175" fill="url(#${id}s)"/><path d="M0 170 L60 120 L110 150 L180 100 L250 150 L310 115 L400 160 V175 H0 Z" fill="#2a2f5e"/><rect y="165" width="400" height="135" fill="#2f5a3a"/><path d="M150 300 Q190 230 230 165 L248 165 Q215 230 230 300 Z" fill="#5a6b48"/><g fill="#3d7049"><ellipse cx="70" cy="240" rx="40" ry="5"/><ellipse cx="320" cy="270" rx="50" ry="6"/></g>`
+	}
+};
+const THEME_KEYS = Object.keys(THEMES);
+/** 거리의 제곱. Math.hypot은 브라우저·서버(Node)마다 끝자리가 조금 달라서 같은 씨앗값인데 그림이 달라질 수 있어 안 씀 (더하기·곱하기만은 어디서나 같음) */
+const dist2 = (dx, dy) => dx * dx + dy * dy;
+function persp(zone, y) {
+	return .78 + .36 * (y - zone.y[0]) / (zone.y[1] - zone.y[0]);
+}
+function hitOf(o, mul = 1) {
+	const d = THINGS[o.t];
+	return {
+		x: o.x,
+		y: o.y + (d.dy ?? 0) * o.s,
+		r: d.r * o.s * mul
+	};
+}
+function place(theme, type, objs, r, id) {
+	const d = THINGS[type];
+	const zone = theme.zones[d.z];
+	if (!zone) return null;
+	for (let k = 0; k < 80; k++) {
+		const x = between(r, zone.x[0], zone.x[1]);
+		const y = between(r, zone.y[0], zone.y[1]);
+		let s = between(r, d.sz[0], d.sz[1]);
+		if (d.ground) s *= persp(zone, y);
+		const o = {
+			id,
+			t: type,
+			x,
+			y,
+			s,
+			f: d.flip && r.next() < .5 ? -1 : 1,
+			d: d.diffs.includes("detail") ? r.next() < .5 : false,
+			c: d.colors ? pick(r, d.colors) : ""
+		};
+		d.init?.(o, r);
+		const h = hitOf(o);
+		if (h.x - h.r * .7 < 0 || h.x + h.r * .7 > 400) continue;
+		if (objs.every((p) => {
+			const q = hitOf(p);
+			const m = q.r + h.r - 3;
+			return m < 0 || dist2(q.x - h.x, q.y - h.y) > m * m;
+		})) return o;
+	}
+	return null;
+}
+const CAP = {
+	remove: 2,
+	color: 3,
+	detail: 3,
+	flip: 2,
+	size: 2
+};
+/** 씨앗값 → 장면 (장면 종류도 씨앗값이 정함) */
+function makeScene(seed) {
+	const r = createRng(seed);
+	const themeKey = pick(r, THEME_KEYS);
+	const theme = THEMES[themeKey];
+	const objs = [];
+	let id = 0;
+	for (const [type, lo, hi] of theme.items) {
+		const n = lo + Math.floor(r.next() * (hi - lo + 1));
+		for (let i = 0; i < n; i++) {
+			const o = place(theme, type, objs, r, id++);
+			if (o) objs.push(o);
+		}
+	}
+	const right = objs.map((o) => ({ ...o }));
+	const diffs = [];
+	const used = {};
+	for (const o of shuffle(r, objs.slice())) {
+		if (diffs.length >= 6) break;
+		const d = THINGS[o.t];
+		const kinds = d.diffs.filter((k) => (used[k] ?? 0) < CAP[k] && (!d.need?.[k] || d.need[k](o)));
+		if (!kinds.length) continue;
+		const k = pick(r, kinds);
+		const ro = right.find((x) => x.id === o.id);
+		let mul = 1;
+		if (k === "color") ro.c = pick(r, d.colors.filter((c) => c !== o.c));
+		else if (k === "detail") ro.d = !ro.d;
+		else if (k === "flip") ro.f = ro.f === 1 ? -1 : 1;
+		else if (k === "size") {
+			const f = r.next() < .5 ? .68 : 1.4;
+			ro.s *= f;
+			mul = Math.max(1, f);
+		} else ro.hidden = true;
+		used[k] = (used[k] ?? 0) + 1;
+		diffs.push({
+			kind: k,
+			...hitOf(o, mul)
+		});
+	}
+	for (let tries = 0; diffs.length < 7 && tries < 40; tries++) {
+		const o = place(theme, pick(r, theme.adds), right.filter((x) => !x.hidden).concat(objs), r, id++);
+		if (!o) continue;
+		right.push(o);
+		diffs.push({
+			kind: "add",
+			...hitOf(o)
+		});
+	}
+	return {
+		theme: themeKey,
+		left: objs,
+		right,
+		diffs
+	};
+}
+/** 누른 자리(그림 좌표)가 아직 못 찾은 차이에 닿으면 그 번호, 아니면 -1 */
+function hitDiff(diffs, found, x, y) {
+	let best = -1;
+	let bestD = Infinity;
+	diffs.forEach((d, i) => {
+		if (found.includes(i)) return;
+		const dist = dist2(d.x - x, d.y - y);
+		const reach = Math.max(d.r, 16) + 6;
+		if (dist <= reach * reach && dist < bestD) {
+			best = i;
+			bestD = dist;
+		}
+	});
+	return best;
+}
+const cache$1 = /* @__PURE__ */ new Map();
+/** 같은 씨앗값은 한 번만 만든다 (서버 심판이 누를 때마다 부름) */
+function sceneOf(seed) {
+	let s = cache$1.get(seed);
+	if (!s) {
+		s = makeScene(seed);
+		if (cache$1.size > 200) cache$1.clear();
+		cache$1.set(seed, s);
+	}
+	return s;
+}
+//#endregion
+//#region src/games/spotdiff/play/engine.ts
+/** 장면이 겹치지 않게 (바로 앞 문제와 같은 장면이면 다시 뽑음) */
+function pickSeeds(seed, n = 5) {
+	const rng = createRng(seed);
+	const out = [];
+	let prev = "";
+	while (out.length < n) {
+		let s = Math.floor(rng.next() * 2 ** 32);
+		for (let k = 0; k < 10 && makeScene(s).theme === prev; k++) s = Math.floor(rng.next() * 2 ** 32);
+		prev = makeScene(s).theme;
+		out.push(s);
+	}
+	return out;
+}
+const newRun = (now) => ({
+	q: 0,
+	start: now,
+	found: [],
+	lockUntil: 0,
+	pauseUntil: null,
+	results: [],
+	score: 0,
+	misses: 0,
+	done: false
+});
+function createEngine$4(opts) {
+	return {
+		now: opts.now,
+		players: opts.players,
+		left: opts.players.map(() => false),
+		seeds: pickSeeds(opts.seed),
+		runs: opts.players.map(() => newRun(opts.now)),
+		phase: {
+			kind: "intro",
+			until: opts.now + INTRO_MS$3
+		}
+	};
+}
+/** 끝난 문제들 시간 합 */
+const doneMs = (r) => r.results.reduce((a, x) => a + x.ms, 0);
+/** 지금까지 걸린 시간 (푸는 중인 문제 포함) */
+function liveMs(s, i) {
+	const r = s.runs[i];
+	const running = s.phase.kind === "play" && !r.done && r.pauseUntil === null;
+	return doneMs(r) + (running ? Math.min(ASK_MS, s.now - r.start) : 0);
+}
+const diffCount = (s, q) => sceneOf(s.seeds[q]).diffs.length;
+function advance$1(s, r) {
+	const now = s.now;
+	if (r.pauseUntil !== null) {
+		if (now < r.pauseUntil) return r;
+		const q = r.q + 1;
+		if (q >= s.seeds.length) return {
+			...r,
+			pauseUntil: null,
+			done: true
+		};
+		return {
+			...r,
+			q,
+			start: now,
+			found: [],
+			lockUntil: 0,
+			pauseUntil: null
+		};
+	}
+	if (now - r.start < 6e4) return r;
+	const missed = diffCount(s, r.q) - r.found.length;
+	return {
+		...r,
+		results: [...r.results, {
+			found: r.found.length,
+			ms: ASK_MS + missed * MISS_PENALTY_MS,
+			cleared: false
+		}],
+		pauseUntil: now + REVEAL_MS
+	};
+}
+const active = (s) => s.players.flatMap((_, i) => s.left[i] ? [] : [i]);
+function settle$1(s) {
+	if (s.phase.kind !== "play") return s;
+	const act = active(s);
+	if (act.length === 0 || act.every((i) => s.runs[i].done)) return {
+		...s,
+		phase: {
+			kind: "done",
+			until: s.now + DONE_MS$4
+		}
+	};
+	return s;
+}
+function tick$4(s) {
+	if (s.phase.kind === "intro") {
+		if (s.now < s.phase.until) return s;
+		return {
+			...s,
+			phase: { kind: "play" },
+			runs: s.runs.map(() => newRun(s.now))
+		};
+	}
+	if (s.phase.kind !== "play") return s;
+	return settle$1({
+		...s,
+		runs: s.runs.map((r, i) => s.left[i] || r.done ? r : advance$1(s, r))
+	});
+}
+function canTap(s, player) {
+	const r = s.runs[player];
+	return s.phase.kind === "play" && !!r && !s.left[player] && !r.done && r.pauseUntil === null && s.now >= r.lockUntil;
+}
+function tap(s, a) {
+	const r = s.runs[a.player];
+	if (!canTap(s, a.player) || a.q !== r.q || !(a.x >= 0 && a.x <= 400 && a.y >= 0 && a.y <= 300)) return s;
+	const diffs = sceneOf(s.seeds[r.q]).diffs;
+	const i = hitDiff(diffs, r.found, a.x, a.y);
+	let next;
+	if (i < 0) next = {
+		...r,
+		lockUntil: s.now + LOCK_MS,
+		misses: r.misses + 1
+	};
+	else {
+		const found = [...r.found, i];
+		next = {
+			...r,
+			found,
+			score: r.score + 100
+		};
+		if (found.length === diffs.length) {
+			const ms = s.now - r.start;
+			next = {
+				...next,
+				results: [...r.results, {
+					found: found.length,
+					ms,
+					cleared: true
+				}],
+				score: next.score + Math.ceil((ASK_MS - ms) / 1e3) * 10,
+				pauseUntil: s.now + CLEAR_PAUSE_MS
+			};
+		}
+	}
+	return {
+		...s,
+		runs: s.runs.map((x, k) => k === a.player ? next : x)
+	};
+}
+function drop$3(s, player) {
+	if (s.left[player] || s.phase.kind === "done") return s;
+	return settle$1({
+		...s,
+		left: s.left.map((l, i) => l || i === player)
+	});
+}
+function engineReducer$4(s, a) {
+	switch (a.type) {
+		case "tick": return tick$4({
+			...s,
+			now: a.now
+		});
+		case "tap": return tap(s, a);
+		case "drop": return drop$3(s, a.player);
+	}
+}
+/** 친구 대전 순위: 다 푼 사람끼리 총 시간이 짧은 순, 나간 사람은 뒤 (같은 시간은 같은 등수) */
+function ranksOf$2(s) {
+	const key = (i) => s.left[i] ? Infinity : s.runs[i].done ? doneMs(s.runs[i]) : Number.MAX_SAFE_INTEGER;
+	return s.players.map((_, i) => 1 + s.players.filter((__, k) => key(k) < key(i)).length);
+}
+//#endregion
+//#region src/games/spotdiff/play/view.ts
+function viewFor(s, viewerId) {
+	const me = s.players.findIndex((p) => p.id === viewerId);
+	const r = me >= 0 ? s.runs[me] : null;
+	const playing = s.phase.kind === "play";
+	return {
+		phase: s.phase.kind,
+		introLeftMs: s.phase.kind === "intro" ? Math.max(0, s.phase.until - s.now) : 0,
+		players: s.players.map(({ id, name }) => ({
+			id,
+			name
+		})),
+		left: s.left,
+		rows: s.runs.map((x) => ({
+			q: x.q,
+			found: x.found.length,
+			doneMs: doneMs(x),
+			done: x.done,
+			score: x.score
+		})),
+		ranks: ranksOf$2(s),
+		total: s.seeds.length,
+		me,
+		my: r && s.phase.kind !== "intro" ? {
+			q: r.q,
+			seed: s.seeds[r.q],
+			found: r.found,
+			qLeftMs: playing && r.pauseUntil === null && !r.done ? Math.max(0, ASK_MS - (s.now - r.start)) : 0,
+			lockLeftMs: Math.max(0, r.lockUntil - s.now),
+			pauseLeftMs: r.pauseUntil === null ? 0 : Math.max(0, r.pauseUntil - s.now),
+			results: r.results,
+			score: r.score,
+			liveMs: liveMs(s, me),
+			done: r.done
+		} : null
+	};
+}
+function changeKey$1(s) {
+	return [
+		s.phase.kind,
+		s.left.join(),
+		...s.runs.map((r) => [
+			r.q,
+			r.found.length,
+			r.done ? 1 : 0,
+			r.pauseUntil === null ? 0 : 1,
+			r.lockUntil > s.now ? 1 : 0
+		].join("."))
+	].join("|");
+}
+//#endregion
+//#region src/server/referees/spotdiff.ts
+const isNum = (x) => typeof x === "number" && Number.isFinite(x);
+function spotdiffReferee(setup, ctx) {
+	const players = readPlayers((setup ?? {}).players, ctx, 2, 8);
+	if (!players || players.some((p) => p.kind === "bot")) return null;
+	return hostEngineReferee(ctx, {
+		state: createEngine$4({
+			now: ctx.now(),
+			seed: serverSeed(),
+			players
+		}),
+		reduce: engineReducer$4,
+		tick: (now) => ({
+			type: "tick",
+			now
+		}),
+		toView: (s) => s,
+		changed: (a, b) => !a || changeKey$1(a) !== changeKey$1(b),
+		viewFor: (_v, key, s) => viewFor(s, key),
+		input: (s, from, m) => {
+			if (m.t !== "tap") return void 0;
+			const player = s.players.findIndex((p) => p.id === from);
+			return player >= 0 && isInt$1(m.q) && isNum(m.x) && isNum(m.y) ? {
+				type: "tap",
+				player,
+				q: m.q,
+				x: m.x,
+				y: m.y
+			} : null;
+		},
+		drop: (s, key) => {
+			const player = s.players.findIndex((p) => p.id === key);
 			return player >= 0 ? {
 				type: "drop",
 				player
@@ -16787,7 +18947,7 @@ function survivalReferee(setup, ctx) {
 			const player = humanIndex(s.players, from);
 			const p = m.plan;
 			if (player < 0 || m.round !== s.round || !p || typeof p !== "object") return null;
-			if (p.pos !== null && !isVec(p.pos) || p.angle !== null && !isNum(p.angle) || typeof p.locked !== "boolean") return null;
+			if (p.pos !== null && !isVec(p.pos) || p.angle !== null && !isNum$1(p.angle) || typeof p.locked !== "boolean") return null;
 			return {
 				type: "plan",
 				player,
@@ -18751,6 +20911,7 @@ const REFEREES = {
 	omok: omokReferee,
 	doodle: doodleReferee,
 	chosung: chosungReferee,
+	spotdiff: spotdiffReferee,
 	wordchain: wordchainReferee,
 	armwrestle: armwrestleReferee,
 	volley: volleyReferee,

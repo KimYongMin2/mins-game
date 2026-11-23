@@ -1,0 +1,94 @@
+/* 다른 그림 찾기 — 오락실 테마 토큰. 그림 두 장: 세로 화면은 위아래, 가로·넓은 화면은 나란히. 화면 높이에 맞춰 그림을 줄인다 */
+.sd-start,
+.sd-result { display: flex; flex-direction: column; gap: 12px; max-width: 480px; margin: 8px auto 0; }
+.sd-start__lead { margin: 0; font-weight: 700; font-size: 1.05rem; }
+.sd-start__rules { margin: 0; padding-left: 18px; color: var(--ink-soft); line-height: 1.6; font-size: 0.92rem; }
+.sd-start__career { margin: 0; color: var(--ink-soft); font-size: 0.875rem; }
+.sd-start__go { min-height: 52px; font-size: 1.05rem; }
+
+/* 경기 중엔 그림을 크게 (기본 .page는 560px) */
+.sd-page.arcade--play { max-width: 1180px; }
+.sd-game { --chrome: 230px; display: flex; flex-direction: column; gap: 8px; width: 100%; max-width: 1180px; margin: 0 auto; }
+.sd-notice { padding: 16px; border: 2px solid var(--brand); border-radius: 2px; font-weight: 700; }
+.sd-top { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.sd-top__q { color: var(--ink-soft); }
+.sd-top__grow { flex: 1; }
+.sd-top__stat { font-size: 1.05rem; }
+.sd-top__time { min-width: 3em; text-align: right; }
+.sd-top__time--low { color: #e8473f; }
+.sd-dots { display: flex; gap: 4px; }
+.sd-dots i { width: 12px; height: 12px; border: 2px solid var(--ink-soft); border-radius: 2px; }
+.sd-dots i.on { background: var(--brand); border-color: var(--brand); }
+.sd-timer { height: 8px; background: var(--raised); border-radius: 2px; overflow: hidden; }
+.sd-timer__fill { height: 100%; background: #22b3a6; transition: width 0.1s linear; }
+.sd-timer__fill--low { background: #e8473f; }
+
+.sd-stage { padding: 8px; background: #0f0b2e; border-radius: 2px; }
+.sd-boards {
+  position: relative;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+  /* 위아래 두 장이 화면 높이에 들어오게 */
+  width: min(100%, calc((100dvh - var(--chrome)) / 1.5));
+  margin: 0 auto;
+}
+@media (orientation: landscape), (min-width: 760px) {
+  .sd-boards {
+    grid-template-columns: 1fr 1fr;
+    width: min(100%, calc((100dvh - var(--chrome)) / 0.75 * 2 + 8px));
+  }
+}
+@media (orientation: landscape) and (max-height: 560px) {
+  .sd-page.arcade--play { padding-top: 8px; padding-bottom: 8px; }
+  .sd-game { --chrome: 150px; }
+  .sd-help { display: none; }
+}
+.sd-board { position: relative; min-width: 0; aspect-ratio: 4 / 3; cursor: crosshair; touch-action: manipulation; user-select: none; -webkit-user-select: none; -webkit-tap-highlight-color: transparent; }
+.sd-board__pic,
+.sd-board__pic svg,
+.sd-board__marks { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.sd-board__pic svg { border-radius: 2px; }
+.sd-board__marks { pointer-events: none; overflow: visible; }
+.sd-board__tag { position: absolute; left: 6px; top: 6px; padding: 1px 7px; background: #0f0b2e; color: #ffd23f; font-family: 'Black Han Sans', sans-serif; font-size: 13px; border-radius: 2px; pointer-events: none; }
+.sd-board__lock { position: absolute; inset: 0; display: grid; place-items: center; background: rgba(15, 11, 46, 0.55); color: #fff; font-family: 'Black Han Sans', sans-serif; font-size: 1.8rem; text-shadow: var(--outline-md, 2px 2px 0 #000); pointer-events: none; }
+.sd-mark { transform-box: fill-box; transform-origin: center; animation: sd-pop 0.3s ease-out; }
+@keyframes sd-pop { from { transform: scale(1.8); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .sd-mark { animation: none; } }
+.sd-banner {
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+  padding: 12px 20px; max-width: 90%; text-align: center;
+  background: #0f0b2e; border: 3px solid #ffd23f; border-radius: 2px; box-shadow: 5px 5px 0 #000; color: #fff; pointer-events: none;
+}
+.sd-banner strong { font-family: 'Black Han Sans', sans-serif; font-weight: 400; font-size: 1.7rem; color: #ffd23f; }
+.sd-banner span { font-size: 0.9rem; color: #d9d5f5; }
+.sd-wait { display: grid; place-items: center; gap: 4px; min-height: 240px; margin: 0; color: #fff; font-family: 'Black Han Sans', sans-serif; font-size: 1.6rem; text-align: center; }
+.sd-wait p { margin: 0; }
+.sd-wait__sub { font-family: inherit; font-size: 1rem; color: #ffd23f; }
+
+.sd-players { display: flex; flex-wrap: wrap; gap: 4px; margin: 0; padding: 0; list-style: none; }
+.sd-players li { display: flex; gap: 6px; padding: 3px 8px; border: 1px solid var(--hair); border-radius: 2px; background: var(--card); font-size: 0.8rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+.sd-players__done { background: color-mix(in srgb, #22a861 18%, var(--card)) !important; }
+.sd-players__left { opacity: 0.45; text-decoration: line-through; }
+.sd-players__me { outline: 2px solid color-mix(in srgb, var(--brand) 60%, transparent); }
+.sd-help { margin: 0; color: var(--ink-soft); font-size: 0.8rem; text-align: center; }
+
+.sd-result__headline { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 20px 16px; border: 1px solid var(--hair); border-radius: 2px; text-align: center; }
+.sd-result__headline strong { font-size: 3rem; font-weight: 800; line-height: 1.1; }
+.sd-result__headline span { color: var(--ink-soft); font-size: 0.875rem; }
+.sd-result__headline--win { border: 2px solid var(--brand); }
+.sd-result__ranking { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 4px; }
+.sd-result__ranking li { display: flex; gap: 8px; padding: 8px 10px; border: 1px solid var(--hair); border-radius: 2px; background: var(--card); font-variant-numeric: tabular-nums; }
+.sd-result__ranking b { margin-left: auto; }
+.sd-result__me { border-color: var(--brand) !important; font-weight: 800; }
+.sd-result__buttons { display: flex; gap: 8px; }
+.sd-result__buttons .button { flex: 1; min-height: 48px; }
+
+/* 방 채팅·음성 버튼(RoomDock, 화면 왼쪽 가운데)이 폰 세로 화면에선 그림을 가려서 이 게임 경기 중엔 아래로 가로 줄로 */
+@media (orientation: portrait) {
+  body:has(.sd-page.arcade--play) .rdock { top: auto; bottom: calc(10px + env(safe-area-inset-bottom, 0px)); }
+  body:has(.sd-page.arcade--play) .rdock__bar { flex-direction: row; }
+  .sd-page.arcade--play .sd-game { padding-bottom: 52px; }
+  body:has(.rdock) .sd-help { display: none; }
+}

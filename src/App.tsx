@@ -15,6 +15,7 @@ const ArcheryPage = lazy(() => import('./games/archery/ArcheryPage').then((m) =>
 const ArmwrestlePage = lazy(() => import('./games/armwrestle/ArmwrestlePage').then((m) => ({ default: m.ArmwrestlePage })))
 const BattingPage = lazy(() => import('./games/batting/BattingPage').then((m) => ({ default: m.BattingPage })))
 const ChosungPage = lazy(() => import('./games/chosung/ChosungPage').then((m) => ({ default: m.ChosungPage })))
+const SpotdiffPage = lazy(() => import('./games/spotdiff/SpotdiffPage').then((m) => ({ default: m.SpotdiffPage })))
 const WordchainPage = lazy(() => import('./games/wordchain/WordchainPage').then((m) => ({ default: m.WordchainPage })))
 const DoodlePage = lazy(() => import('./games/doodle/DoodlePage').then((m) => ({ default: m.DoodlePage })))
 const BombPage = lazy(() => import('./games/bomb/BombPage').then((m) => ({ default: m.BombPage })))
@@ -118,6 +119,10 @@ function App() {
         <Route
           path="/games/chosung"
           element={nickname ? <ChosungPage /> : <ToNickname />}
+        />
+        <Route
+          path="/games/spotdiff"
+          element={nickname ? <SpotdiffPage /> : <ToNickname />}
         />
         <Route
           path="/games/wordchain"

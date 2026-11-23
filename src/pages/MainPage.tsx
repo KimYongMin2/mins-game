@@ -103,7 +103,7 @@ function MyStats() {
               <span className="my-stats__name">{g.title}</span>
               <span className="my-stats__lines">
                 {s.pvp && <span>친구 {s.pvp}</span>}
-                {s.bot && <span>{g.play === 'solo' ? s.bot : `봇 ${s.bot}`}</span>}
+                {s.bot && <span>{g.play === 'solo' || g.practiceLabel ? s.bot : `봇 ${s.bot}`}</span>}
               </span>
             </li>
           )
