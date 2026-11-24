@@ -18,7 +18,7 @@ export type GameEntry = {
   howto: readonly string[]
   /** 봇이 없는 친구 대전 게임 (그림 맞히기) — 메인의 [혼자 연습]·[봇이랑 연습]을 안 보임 */
   noBots?: boolean
-  /** 봇 대신 혼자 하기가 있는 게임 (초성 퀴즈) — 게임 창 연습 버튼 이름 */
+  /** 봇 대신 혼자 하기가 있는 게임 (초성 퀴즈) — 게임 창 연습 버튼 이름. 혼자 게임(play 'solo')이면 시작 버튼 이름 (동물 섬 대작전) */
   practiceLabel?: string
 }
 
@@ -242,6 +242,19 @@ export const GAMES: GameEntry[] = [
     icon: '⚫',
     colors: ['#e9c08a', '#8a5a24'],
     howto: ["카드로 흑·백을 정하고 흑이 먼저", "자리를 누르고 [착수하기]로 두기 (한 수 30초)", "가로·세로·대각선 다섯 개를 먼저 이으면 승리", "흑은 쌍삼·쌍사·장목 금지 (✕ 표시)"],
+  },
+  {
+    id: 'island',
+    title: '동물 섬 대작전',
+    description: '무너지는 섬에서 던지고 바다로 빠뜨려라',
+    path: '/games/island',
+    ready: true,
+    play: 'solo',
+    players: '1~2인',
+    icon: '🏝️',
+    colors: ['#7dd3fc', '#0369a1'],
+    practiceLabel: '시작하기',
+    howto: ['차례가 오면 45초 안에 걷고(←→)·점프(Enter)·조준(↑↓)해서 무기 하나 사용', '물풍선·솔방울은 꾹 눌렀다 떼면 던짐 (힘 막대) · 물풍선은 바람을 탐', '터지면 땅이 파이고 날아감 · 바다에 빠지면 바로 탈락', '팀마다 동물 셋, 상대 팀을 모두 쓰러뜨리면 승리 (봇 연습 · 한 기기 둘이서)'],
   },
   {
     id: 'batting',

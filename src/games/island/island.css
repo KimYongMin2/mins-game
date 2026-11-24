@@ -1,0 +1,69 @@
+/* 동물 섬 대작전 — 오락실 테마 토큰. 경기 중엔 섬 그림(16:9)을 화면 높이에 맞춰 크게 */
+.il-start,
+.il-result { display: flex; flex-direction: column; gap: 12px; max-width: 520px; margin: 8px auto 0; }
+.il-start__lead { margin: 0; font-weight: 700; font-size: 1.05rem; }
+.il-start__rules,
+.il-start__weapons { margin: 0; padding-left: 18px; color: var(--ink-soft); line-height: 1.6; font-size: 0.92rem; }
+.il-start__weapons b { color: var(--ink); margin-right: 4px; }
+.il-start__row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.il-start__label { font-weight: 700; margin-right: 4px; }
+.il-start__go { min-height: 52px; font-size: 1.05rem; }
+.il-start__career,
+.il-start__note { margin: 0; color: var(--ink-soft); font-size: 0.875rem; }
+
+.il-result__headline { display: flex; flex-direction: column; gap: 4px; padding: 16px; border: 2px solid var(--hair-strong, var(--ink-soft)); border-radius: 2px; }
+.il-result__headline strong { font-family: 'Black Han Sans', sans-serif; font-weight: 400; font-size: 2rem; }
+.il-result__headline--win { border-color: var(--brand); }
+.il-result__headline--win strong { color: var(--brand); }
+.il-result__buttons { display: flex; gap: 8px; flex-wrap: wrap; }
+.il-result__buttons .button { flex: 1; min-height: 48px; }
+
+.il-page.arcade--play { max-width: 1180px; }
+.il-game { --chrome: 340px; display: flex; flex-direction: column; gap: 8px; width: min(100%, calc((100dvh - var(--chrome)) * 16 / 9)); min-width: min(100%, 360px); margin: 0 auto; }
+.il-teams { display: grid; grid-template-columns: 1fr auto 1fr; gap: 10px; align-items: center; }
+.il-team { display: grid; gap: 4px; min-width: 0; }
+.il-team b { font-family: 'Black Han Sans', sans-serif; font-weight: 400; font-size: 1.05rem; }
+.il-team--b b { color: #4aa3ff; }
+.il-team--r { text-align: right; }
+.il-team--r b { color: #ff5a5f; }
+.il-bar { height: 10px; background: rgba(0, 0, 0, 0.35); border: 1px solid var(--hair-strong, #4b43a0); }
+.il-bar i { display: block; height: 100%; transition: width 0.3s; }
+.il-team--b .il-bar i { background: #4aa3ff; }
+.il-team--r .il-bar i { background: #ff5a5f; margin-left: auto; }
+.il-turn { font-family: 'Black Han Sans', sans-serif; font-size: 1.35rem; min-width: 3em; text-align: center; padding: 2px 10px; border: 2px solid var(--brand); color: var(--brand); font-variant-numeric: tabular-nums; }
+.il-turn--low { color: #ff5a5f; border-color: #ff5a5f; }
+
+.il-stage { position: relative; background: #8fd3f0; }
+.il-canvas { display: block; width: 100%; height: auto; aspect-ratio: 16 / 9; touch-action: none; cursor: grab; user-select: none; -webkit-user-select: none; }
+.il-zoom { position: absolute; right: 8px; bottom: 8px; display: flex; gap: 6px; }
+.il-zoom .button { min-width: 38px; font-weight: 800; }
+
+.il-weapons { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 6px; }
+.il-wp { display: grid; gap: 1px; justify-items: center; padding: 6px 2px; font-weight: 700; font-size: 0.9rem; touch-action: manipulation; }
+.il-wp small { font-weight: 500; font-size: 0.7rem; color: var(--ink-soft); }
+.il-wp kbd { font-family: inherit; font-size: 0.65rem; color: var(--ink-soft); border: 1px solid var(--hair-strong, #4b43a0); padding: 0 4px; }
+.il-wp[aria-pressed='true'] small { color: var(--brand); }
+.il-pad { display: grid; grid-template-columns: repeat(3, auto) 1fr repeat(2, auto) auto; gap: 6px; }
+.il-pad .button { min-width: 52px; min-height: 48px; font-weight: 700; touch-action: none; user-select: none; -webkit-user-select: none; }
+.il-fire { min-width: 140px; font-family: 'Black Han Sans', sans-serif; font-weight: 400; font-size: 1.05rem; }
+.il-help { margin: 0; color: var(--ink-soft); font-size: 0.8rem; line-height: 1.5; }
+
+@media (max-width: 640px) {
+  .il-wp { font-size: 0.75rem; }
+  .il-wp small,
+  .il-wp kbd { display: none; }
+  .il-pad { grid-template-columns: repeat(3, 1fr); }
+  .il-pad__sp { display: none; }
+  .il-fire { grid-column: span 3; }
+  .il-help { display: none; }
+  .il-zoom { right: 4px; bottom: 4px; gap: 4px; }
+  .il-zoom .button { min-width: 30px; min-height: 28px; padding: 2px 6px; font-size: 0.75rem; }
+}
+@media (orientation: landscape) and (max-height: 560px) {
+  .il-page.arcade--play { padding-top: 6px; padding-bottom: 6px; }
+  .il-game { --chrome: 200px; }
+  .il-help { display: none; }
+}
+@media (prefers-reduced-motion: reduce) { .il-bar i { transition: none; } }
+/* 표지 찍을 때는 그림만 */
+html[data-capture='1'] .il-zoom { display: none; }

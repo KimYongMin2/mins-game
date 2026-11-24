@@ -1379,7 +1379,7 @@ html:has(.arcade) body {
 
 /* 경기 장면: 화면 끝까지, 위아래 노란 줄 (폰 가로 — 점프 배구처럼 코트를 화면에 꽉 채우는 배치 — 에선 안 함) */
 @media (orientation: portrait), (min-height: 561px) {
-  .arcade--play :is(.zb-field-wrap, .vb-view, .ft-view-wrap, .mm-felt, .aw-view-wrap, .bm-view, .nc-view, .sv3, .rl3, .at-view, .yt-board-wrap, .nt-felt, .bt-view-wrap, .ar-target-wrap, .sd-stage) {
+  .arcade--play :is(.zb-field-wrap, .vb-view, .ft-view-wrap, .mm-felt, .aw-view-wrap, .bm-view, .nc-view, .sv3, .rl3, .at-view, .yt-board-wrap, .nt-felt, .bt-view-wrap, .ar-target-wrap, .sd-stage, .il-stage) {
     width: calc(100% + 32px);
     max-width: none;
     margin-inline: -16px;

@@ -255,7 +255,7 @@ export function MainPage({ nickname }: { nickname: string }) {
               </>
             ) : (
               <button type="button" className="arc-button" onClick={() => go(hero, hero.path)}>
-                기록 도전 시작
+                {hero.practiceLabel ?? '기록 도전 시작'}
               </button>
             )}
           </div>
@@ -396,7 +396,7 @@ export function MainPage({ nickname }: { nickname: string }) {
                     />
                   ) : (
                     <button type="button" className="button button--primary pvp-lobby__big" onClick={() => go(sheet.game, sheet.game.path)}>
-                      기록 도전 시작
+                      {sheet.game.practiceLabel ?? '기록 도전 시작'}
                     </button>
                   )}
                 </div>
