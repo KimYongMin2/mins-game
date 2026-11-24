@@ -7,7 +7,7 @@ function playOut(seed: number, maxSteps = 60 * 60 * 25) {
   const w = new World(seed)
   const bots = [new BotDriver('hard', seed + 1), new BotDriver('hard', seed + 2)]
   let steps = 0
-  while (!w.winner && steps < maxSteps) {
+  while (w.winner === null && steps < maxSteps) {
     bots[w.team].step(w)
     w.step(NO_KEYS)
     w.fx.length = 0
@@ -68,6 +68,21 @@ describe('동물 섬 대작전 엔진', () => {
     for (let i = 0; i < 45 * 60 + 200; i++) w.step(NO_KEYS)
     expect(w.team).not.toBe(team)
   })
+
+  it('편이 넷이면 동물 열둘, 봇끼리 끝까지', () => {
+    const w = new World(9, 4)
+    expect(w.animals.length).toBe(TEAM_SIZE * 4)
+    expect(new Set(w.animals.map((a) => a.team)).size).toBe(4)
+    const bots = [0, 1, 2, 3].map((i) => new BotDriver('hard', i + 50))
+    let steps = 0
+    while (w.winner === null && steps++ < 60 * 60 * 40) {
+      bots[w.team].step(w)
+      w.step(NO_KEYS)
+      w.fx.length = 0
+      w.carves.length = 0
+    }
+    expect(w.winner).not.toBeNull()
+  }, 60_000)
 
   it('봇끼리 하면 끝까지 가서 승자가 나온다', () => {
     for (const seed of [1, 2]) {

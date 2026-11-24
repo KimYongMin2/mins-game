@@ -82,6 +82,36 @@ describe('동물 섬 대작전 서버 심판', () => {
     expect(lastSnap(f.all).win).toBe(0)
   })
 
+  it('개인전: 사람마다 자기 편(4편), 나간 편은 사라지고 남은 봇끼리 끝까지', () => {
+    const f = fakeCtx([{ id: 'H', role: 'host' }])
+    const ref = islandReferee({ players: [{ id: 'H' }, { id: 'bot0' }, { id: 'bot1' }, { id: 'bot2' }], teams: null }, f.ctx)!
+    ref.input('H', { t: 'hello' })
+    const init = f.all.find((x) => x.m.t === 'init')!.m as { sides: number; players: { team: number }[] }
+    expect(init.sides).toBe(4)
+    expect(init.players.map((p) => p.team)).toEqual([0, 1, 2, 3])
+    ref.leave('H')
+    let guard = 0
+    while (!ref.finished() && guard++ < 60 * 60 * 40) {
+      f.advance(1000 / 60)
+      ref.tick(f.now)
+    }
+    const win = lastSnap(f.all).win
+    expect(win === 1 || win === 2 || win === 3 || win === 'draw').toBe(true)
+  }, 60_000)
+
+  it('팀전: 고른 팀대로 두 편, 한 팀이 비면 번갈아', () => {
+    const f = fakeCtx([{ id: 'H', role: 'host' }, { id: 'G', role: 'guest' }])
+    const ref = islandReferee({ players: [{ id: 'H' }, { id: 'G' }, { id: 'bot0' }], teams: [0, 0, 1] }, f.ctx)!
+    ref.input('H', { t: 'hello' })
+    const init = f.all.find((x) => x.m.t === 'init')!.m as { sides: number; players: { team: number }[] }
+    expect(init.sides).toBe(2)
+    expect(init.players.map((p) => p.team)).toEqual([0, 0, 1])
+    const f2 = fakeCtx([{ id: 'H', role: 'host' }, { id: 'G', role: 'guest' }])
+    const ref2 = islandReferee({ players: [{ id: 'H' }, { id: 'G' }], teams: [1, 1] }, f2.ctx)!
+    ref2.input('H', { t: 'hello' })
+    expect((f2.all.find((x) => x.m.t === 'init')!.m as { players: { team: number }[] }).players.map((p) => p.team)).toEqual([0, 1])
+  })
+
   it('봇 자리도 됨, 방에 없는 사람은 안 됨', () => {
     const f = fakeCtx([{ id: 'H', role: 'host' }])
     expect(islandReferee({ players: [{ id: 'H' }, { id: 'X' }] }, f.ctx)).toBeNull()

@@ -18,7 +18,7 @@ export type IslandMsg =
   | { t: 'jump' }
   | { t: 'pick'; w: WeaponId }
   | { t: 'target'; x: number }
-  | { t: 'init'; seed: number; players: RosterPlayer[]; carves: CarveRow[] }
+  | { t: 'init'; seed: number; sides: number; players: RosterPlayer[]; carves: CarveRow[] }
   | ({ t: 'snap' } & Snap)
 
 export type CarveRow = [number, number, number, 0 | 1]

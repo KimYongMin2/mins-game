@@ -2,9 +2,10 @@ import { useEffect, useRef, useState } from 'react'
 import { REFEREE_FROM } from '../../../shared/online/hubProtocol'
 import type { Member, Room } from '../../../shared/online/room'
 import { loadNickname } from '../../../shared/storage/nickname'
+import { type TeamPick, assignTeams, teamsReady } from '../../../shared/team/teams'
 import { BotDriver, type BotLevel } from '../bot/islandBot'
 import { H, HP, TEAM_SIZE, W, WEAPONS, type WeaponId, weaponOf } from '../constants'
-import { FAR, MINI, Renderer, VH, VW, type Cam } from '../field/renderer'
+import { FAR, MINI, Renderer, TEAM_COLOR, VH, VW, type Cam } from '../field/renderer'
 import { type IslandMsg, type RosterPlayer, type Snap, applySnap } from '../play/net'
 import { type Keys, type Team, World, chargePower } from '../play/world'
 import type { GameSummary } from '../records'
@@ -12,9 +13,9 @@ import { type SoundName, playSound } from '../sounds'
 
 type Props =
   | { mode: 'bot' | 'local'; level: BotLevel; onFinish: (s: GameSummary) => void }
-  | { mode: 'pvp'; level: BotLevel; room: Room<IslandMsg>; members: Member[]; bots: number; onFinish: (s: GameSummary) => void }
+  | { mode: 'pvp'; level: BotLevel; room: Room<IslandMsg>; members: Member[]; bots: number; teams: TeamPick | null; onFinish: (s: GameSummary) => void }
 
-type Hud = { live: boolean; sec: number; hp: [number, number]; weapon: WeaponId; team: Team; canAct: boolean; far: boolean; ctlName: string; names: [string, string] }
+type Hud = { live: boolean; sec: number; hp: number[]; weapon: WeaponId; team: Team; canAct: boolean; far: boolean; ctlName: string; names: string[] }
 
 const KEYMAP: Record<string, keyof Keys> = { ArrowLeft: 'left', KeyA: 'left', ArrowRight: 'right', KeyD: 'right', ArrowUp: 'up', KeyW: 'up', ArrowDown: 'down', KeyS: 'down' }
 const FX_SOUND: Partial<Record<string, SoundName>> = { bounce: 'bounce', land: 'land', boing: 'boing', whiff: 'whiff', turn: 'turn', throw: 'throw', reel: 'reel', gull: 'gull', jump: 'jump', dig: 'dig', splash: 'splash', hurt: 'ouch' }
@@ -161,7 +162,14 @@ export function GameScreen(props: Props) {
         refereeStarted.current = true
         const people = [{ id: room.myId, name: loadNickname() ?? '나' }, ...props.members.map((m) => ({ id: m.id, name: m.nickname }))]
         const bots = Array.from({ length: props.bots }, (_, i) => ({ id: `bot${i}`, name: `봇${i + 1}` }))
-        room.startReferee?.('island', { players: [...people, ...bots].slice(0, 4) })
+        const players = [...people, ...bots].slice(0, 4)
+        // 팀전이면 대기실에서 고른 팀(빈 팀이 생기면 번갈아), 아니면 개인전
+        let teams: number[] | null = null
+        if (props.teams) {
+          const t = assignTeams(players.map((p) => p.id), props.teams)
+          teams = teamsReady(t) ? t : players.map((_, i) => i % 2)
+        }
+        room.startReferee?.('island', { players, teams })
       }
       const n = net.current
       const hello = setInterval(() => {
@@ -179,7 +187,7 @@ export function GameScreen(props: Props) {
             return
           }
           // 처음이거나 심판이 새로 섰으면(씨앗값이 다르면) 섬을 새로 만듦
-          const w = new World(msg.seed)
+          const w = new World(msg.seed, msg.sides)
           for (const c of msg.carves) w.carve(c[0], c[1], c[2], c[3] === 1)
           w.carves.length = 0
           w.fx.length = 0
@@ -323,10 +331,10 @@ export function GameScreen(props: Props) {
         }
         const names = teamNames()
         const ctlName = pvp ? (net.current.roster.find((p) => p.id === net.current.cur?.s.ctl)?.name ?? names[w.team]) : names[w.team]
-        const label: [string, string] = [...names]
+        const label = [...names]
         label[w.team] = ctlName
         r.draw(ctx, w, cam.current, { showMini: !isFar(), names: label, myTurn: human(w) })
-        const hp = [0, 1].map((t) => w.alive(t as Team).reduce((s, a) => s + a.hp, 0)) as [number, number]
+        const hp = Array.from({ length: w.sides }, (_, t) => w.alive(t).reduce((s, a) => s + a.hp, 0))
         const next: Hud = { live: w.canAct(), sec: Math.ceil(w.timer / 60), hp, weapon: w.weapon, team: w.team, canAct: w.canAct() && human(w), far: isFar(), ctlName, names }
         const key = JSON.stringify(next)
         if (key !== lastHud) {
@@ -357,12 +365,13 @@ export function GameScreen(props: Props) {
     if (t === null || w.winner === null) return 'none'
     return w.winner === t ? 'win' : 'lose'
   }
-  function teamNames(): [string, string] {
+  function teamNames(): string[] {
     if (mode === 'bot') return ['나', '봇']
     if (mode === 'local') return ['파랑 팀', '빨강 팀']
     const r = net.current.roster
-    const of = (t: Team) => r.filter((p) => p.team === t).map((p) => (p.id === myId ? `${p.name}(나)` : p.name)).join('·') || (t === 0 ? '파랑 팀' : '빨강 팀')
-    return [of(0), of(1)]
+    const sides = worldRef.current?.sides ?? 2
+    const of = (t: Team) => r.filter((p) => p.team === t).map((p) => (p.id === myId ? `${p.name}(나)` : p.name)).join('·') || `${t + 1}편`
+    return Array.from({ length: sides }, (_, t) => of(t))
   }
   function summaryOf(w: World): GameSummary {
     return {
@@ -370,9 +379,10 @@ export function GameScreen(props: Props) {
       level,
       winner: w.winner ?? 'draw',
       myTeam: myTeam() ?? 0,
-      left: [w.alive(0).length, w.alive(1).length],
+      left: Array.from({ length: w.sides }, (_, t) => w.alive(t).length),
       turns: w.turnNo,
       names: teamNames(),
+      ffa: pvp && net.current.roster.length === w.sides,
     }
   }
 
@@ -579,22 +589,21 @@ export function GameScreen(props: Props) {
   const wInfo = weaponOf(hud?.weapon ?? 'balloon')
   const names = hud?.names ?? ['', '']
   const waiting = pvp && !hud
+  const half = Math.ceil(names.length / 2)
+  const sideBar = (t: number) => (
+    <div key={t} className={`il-team${t >= half ? ' il-team--r' : ''}${hud?.live && hud.team === t ? ' il-team--turn' : ''}`}>
+      <b style={{ color: TEAM_COLOR[t] }}>{names[t]}</b>
+      <div className="il-bar">
+        <i style={{ width: `${((hud?.hp[t] ?? total) / total) * 100}%`, background: TEAM_COLOR[t] }} />
+      </div>
+    </div>
+  )
   return (
     <div className="il-game" onContextMenu={(e) => e.preventDefault()}>
       <div className="il-teams">
-        <div className="il-team il-team--b">
-          <b>{names[0]}</b>
-          <div className="il-bar">
-            <i style={{ width: `${((hud?.hp[0] ?? total) / total) * 100}%` }} />
-          </div>
-        </div>
+        <div className="il-side">{names.slice(0, half).map((_, t) => sideBar(t))}</div>
         <div className={`il-turn${hud?.live && hud.sec <= 5 ? ' il-turn--low' : ''}`}>{hud?.live ? hud.sec : '·'}</div>
-        <div className="il-team il-team--r">
-          <b>{names[1]}</b>
-          <div className="il-bar">
-            <i style={{ width: `${((hud?.hp[1] ?? total) / total) * 100}%` }} />
-          </div>
-        </div>
+        <div className="il-side">{names.slice(half).map((_, i) => sideBar(half + i))}</div>
       </div>
 
       <div className="il-stage">

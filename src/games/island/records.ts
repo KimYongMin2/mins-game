@@ -15,15 +15,17 @@ export const EMPTY_RECORD: IslandRecord = { bot: { normal: EMPTY_TALLY, hard: EM
 export type GameSummary = {
   mode: 'bot' | 'local' | 'pvp'
   level: BotLevel
-  /** 이긴 팀 (0 = 파랑, 1 = 빨강) */
+  /** 이긴 편 (0 = 파랑, 1 = 빨강, 2 = 초록, 3 = 노랑) */
   winner: Team | 'draw'
   /** 내 팀 (봇 연습은 파랑, 둘이서는 의미 없음) */
   myTeam: Team
-  /** 팀마다 남은 동물 수 */
-  left: [number, number]
+  /** 편마다 남은 동물 수 */
+  left: number[]
   turns: number
-  /** 팀 이름 (친구 대전은 사람 이름) */
-  names: [string, string]
+  /** 편 이름 (친구 대전은 사람 이름) */
+  names: string[]
+  /** 친구 대전 개인전이면 true */
+  ffa?: boolean
 }
 
 const tally = (t: Tally, s: GameSummary): Tally => ({ games: t.games + 1, wins: t.wins + (s.winner === s.myTeam ? 1 : 0), draws: t.draws + (s.winner === 'draw' ? 1 : 0) })

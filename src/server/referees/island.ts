@@ -2,10 +2,11 @@ import { BotDriver } from '../../games/island/bot/islandBot'
 import { type CarveRow, type RosterPlayer, clampAim, clampPower, clampTarget, encodeSnap, isWeapon } from '../../games/island/play/net'
 import { type Fx, type Keys, NO_KEYS, type Team, World } from '../../games/island/play/world'
 import type { Referee, RefereeContext } from '../hub'
-import { readPlayers, serverSeed } from './common'
+import { readPlayers, readTeams, serverSeed } from './common'
 
 // 동물 섬 대작전 서버 심판: 서버가 섬을 1초에 60번 돌리고 1초에 30번 상태를 보낸다. 섬 모양은 씨앗값으로 폰이 같게 만들고,
-// 파인 곳은 번호를 붙여 이어 보냄(중간에 들어오거나 놓치면 hello로 처음부터). 사람은 두 팀에 번갈아(0,1,0,1), 같은 팀은 차례마다 돌아가며 조작.
+// 파인 곳은 번호를 붙여 이어 보냄(중간에 들어오거나 놓치면 hello로 처음부터).
+// 팀전(teams = 사람마다 0/1)이면 두 편, 같은 팀은 차례마다 돌아가며 조작. 개인전(teams 없음)이면 사람마다 자기 편(2~4편).
 // 봇 자리는 서버가 봇처럼 둠.
 
 const STEP_MS = 1000 / 60
@@ -16,11 +17,16 @@ export function islandReferee(setup: unknown, ctx: RefereeContext): Referee | nu
   const o = (setup ?? {}) as Record<string, unknown>
   const players = readPlayers(o.players, ctx, 2, 4)
   if (!players) return null
+  const picked = readTeams(o.teams, players.length)
+  if (picked === undefined) return null
+  // 팀전인데 한 팀이 비었으면 번갈아 나눔
+  const teams = picked && !(picked.includes(0) && picked.includes(1)) ? players.map((_, i) => (i % 2) as Team) : picked
+  const sides = teams ? 2 : players.length
   const seed = serverSeed()
-  const w = new World(seed)
-  const roster: (RosterPlayer & { gone: boolean })[] = players.map((p, i) => ({ id: p.id, name: p.name, kind: p.kind, team: (i % 2) as Team, gone: false }))
+  const w = new World(seed, sides)
+  const roster: (RosterPlayer & { gone: boolean })[] = players.map((p, i) => ({ id: p.id, name: p.name, kind: p.kind, team: teams ? teams[i] : i, gone: false }))
   const bots = new Map(roster.filter((p) => p.kind === 'bot').map((p, i) => [p.id, new BotDriver('normal', seed + i + 1)]))
-  const turns: [number, number] = [0, 0]
+  const turns = Array.from({ length: sides }, () => 0)
   const carveLog: CarveRow[] = []
   let fxBuf: Fx[] = []
   let sentCarves = 0
@@ -51,7 +57,7 @@ export function islandReferee(setup: unknown, ctx: RefereeContext): Referee | nu
     fxBuf = []
   }
   const checkTeams = () => {
-    for (const t of [0, 1] as const) if (!roster.some((p) => p.team === t && !p.gone)) w.forfeit(t)
+    for (let t = 0; t < sides; t++) if (!roster.some((p) => p.team === t && !p.gone) && w.alive(t).length) w.forfeit(t)
   }
 
   return {
@@ -59,7 +65,7 @@ export function islandReferee(setup: unknown, ctx: RefereeContext): Referee | nu
     input(from, msg) {
       const m = (msg ?? {}) as Record<string, unknown>
       if (m.t === 'hello') {
-        ctx.sendTo(from, { t: 'init', seed, players: roster.map(({ id, name, kind, team }) => ({ id, name, kind, team })), carves: carveLog.slice(0, sentCarves) })
+        ctx.sendTo(from, { t: 'init', seed, sides, players: roster.map(({ id, name, kind, team }) => ({ id, name, kind, team })), carves: carveLog.slice(0, sentCarves) })
         return true
       }
       if (!['keys', 'aim', 'press', 'release', 'jump', 'pick', 'target'].includes(m.t as string)) return false

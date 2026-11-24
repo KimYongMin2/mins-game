@@ -9,6 +9,7 @@ import { PlayHeader } from '../../shared/ui/PlayHeader'
 import { RematchReady } from '../../shared/ui/Ready'
 import { SoundToggle } from '../../shared/ui/SoundToggle'
 import { exitLandscape, goLandscape, usePortraitTouch } from '../../shared/ui/landscape'
+import type { TeamPick } from '../../shared/team/teams'
 import type { BotLevel } from './bot/islandBot'
 import { MAX_PLAYERS, MIN_PLAYERS, TEAM_SIZE, TURN_SEC, WEAPONS } from './constants'
 import { GameScreen } from './game/GameScreen'
@@ -17,12 +18,12 @@ import { type GameSummary, type IslandRecord, addGame, loadRecord, saveRecord } 
 import './island.css'
 
 // 동물 섬 대작전 (2026-11-24 사용자 요청). 팀마다 동물 셋이 무너지는 섬에서 차례대로 무기를 던진다.
-// 봇 연습 · 한 기기 둘이서 · 친구 대전(2~4명, 두 팀에 번갈아, 우리 게임 서버가 심판). 폰은 가로 화면으로.
+// 봇 연습 · 한 기기 둘이서 · 친구 대전(2~4명, 개인전 = 사람마다 자기 편 / 팀전 = 두 팀, 우리 게임 서버가 심판). 폰은 가로 화면으로.
 type Screen =
   | { kind: 'start' }
   | { kind: 'game'; key: number; mode: 'bot' | 'local' }
   | { kind: 'lobby' }
-  | { kind: 'pvp'; key: number; members: Member[]; bots: number }
+  | { kind: 'pvp'; key: number; members: Member[]; bots: number; teams: TeamPick | null }
   | { kind: 'result'; summary: GameSummary }
 
 const LEVELS: { id: BotLevel; label: string }[] = [
@@ -36,6 +37,7 @@ export function IslandPage() {
   const [room, setRoom] = useState<Room<IslandMsg> | null>(null)
   const [members, setMembers] = useState<Member[]>([])
   const [pvpBots, setPvpBots] = useState(0)
+  const [pvpTeams, setPvpTeams] = useState<TeamPick | null>(null)
   const portrait = usePortraitTouch()
   useEffect(installAudioUnlock, [])
   useEffect(() => () => exitLandscape(), [])
@@ -44,7 +46,7 @@ export function IslandPage() {
     if (!room) return
     const offMembers = room.onMembers(setMembers)
     const offMsg = room.onMessage((msg) => {
-      if (room.role === 'guest' && msg.t === 'start') setScreen({ kind: 'pvp', key: Date.now(), members: [], bots: 0 })
+      if (room.role === 'guest' && msg.t === 'start') setScreen({ kind: 'pvp', key: Date.now(), members: [], bots: 0, teams: null })
     })
     return () => {
       offMembers()
@@ -68,12 +70,13 @@ export function IslandPage() {
     setScreen({ kind: 'game', key: Date.now(), mode })
   }
 
-  function startPvp(r: Room<IslandMsg>, with_: Member[], bots: number) {
+  function startPvp(r: Room<IslandMsg>, with_: Member[], bots: number, teams: TeamPick | null) {
     const n = Math.max(0, Math.min(bots, MAX_PLAYERS - with_.length - 1))
     setPvpBots(n)
+    setPvpTeams(teams)
     void goLandscape()
     r.send({ t: 'start' })
-    setScreen({ kind: 'pvp', key: Date.now(), members: with_, bots: n })
+    setScreen({ kind: 'pvp', key: Date.now(), members: with_, bots: n, teams })
   }
 
   function finish(summary: GameSummary) {
@@ -135,7 +138,7 @@ export function IslandPage() {
             ))}
           </ul>
           <button type="button" className="button button--primary il-start__go" onClick={() => setScreen({ kind: 'lobby' })}>
-            친구랑 하기 <span>({MIN_PLAYERS}~{MAX_PLAYERS}명, 두 팀)</span>
+            친구랑 하기 <span>({MIN_PLAYERS}~{MAX_PLAYERS}명, 개인전·팀전)</span>
           </button>
           <p className="il-start__career">
             친구 대전 {record.pvp.games}판 · {record.pvp.wins}승
@@ -166,8 +169,9 @@ export function IslandPage() {
           nickname={loadNickname() ?? '익명'}
           capacity={MAX_PLAYERS}
           minPlayers={MIN_PLAYERS}
+          teams
           onConnected={setRoom}
-          onStart={(with_, bots) => room && startPvp(room, with_, bots)}
+          onStart={(with_, bots, teams) => room && startPvp(room, with_, bots, teams)}
           onBack={() => {
             room?.leave()
             setRoom(null)
@@ -177,16 +181,16 @@ export function IslandPage() {
       )}
 
       {screen.kind === 'game' && <GameScreen key={screen.key} mode={screen.mode} level={record.level} onFinish={finish} />}
-      {screen.kind === 'pvp' && room && <GameScreen key={screen.key} mode="pvp" level="normal" room={room} members={screen.members} bots={screen.bots} onFinish={finish} />}
+      {screen.kind === 'pvp' && room && <GameScreen key={screen.key} mode="pvp" level="normal" room={room} members={screen.members} bots={screen.bots} teams={screen.teams} onFinish={finish} />}
 
       {s && (
         <section className="il-result">
           <div className={`il-result__headline${s.mode !== 'local' && s.winner === s.myTeam ? ' il-result__headline--win' : ''}`}>
             <strong>
-              {s.winner === 'draw' ? '무승부' : s.mode === 'local' ? `${s.winner === 0 ? '파랑' : '빨강'} 팀 승리!` : s.winner === s.myTeam ? '승리!' : '패배'}
+              {s.winner === 'draw' ? '무승부' : s.mode === 'local' ? `${s.winner === 0 ? '파랑' : '빨강'} 팀 승리!` : s.winner === s.myTeam ? (s.ffa ? '1등!' : '승리!') : s.ffa ? `${s.names[s.winner]} 우승` : '패배'}
             </strong>
             <span>
-              남은 동물 {s.names[0]} {s.left[0]} : {s.left[1]} {s.names[1]} · {s.turns}차례
+              남은 동물 {s.names.map((n, i) => `${n} ${s.left[i]}`).join(' · ')} · {s.turns}차례
             </span>
           </div>
           <p className="il-start__career">
@@ -201,7 +205,7 @@ export function IslandPage() {
                 type="button"
                 className="button button--primary"
                 disabled={s.mode === 'pvp' && (!allReady || members.length + 1 + pvpBots < MIN_PLAYERS)}
-                onClick={() => (s.mode === 'pvp' ? room && startPvp(room, members, pvpBots) : play(s.mode))}
+                onClick={() => (s.mode === 'pvp' ? room && startPvp(room, members, pvpBots, pvpTeams) : play(s.mode))}
               >
                 새 섬에서 다시
               </button>

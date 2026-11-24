@@ -12,7 +12,7 @@ export const MINI = { w: 240, h: 135, x: VW / 2 - 120, y: 10 }
 export type Cam = { x: number; y: number; s: number }
 
 const INK = '#1a1430'
-export const TEAM_COLOR = ['#4aa3ff', '#ff5a5f'] as const
+export const TEAM_COLOR = ['#4aa3ff', '#ff5a5f', '#4cc96a', '#f5a524'] as const
 const KINDS: Record<AnimalKind, { fur: string; name: string }> = {
   bear: { fur: '#a8734a', name: '곰' },
   cat: { fur: '#f0b45a', name: '고양이' },
@@ -147,7 +147,7 @@ export class Renderer {
     this.floats = this.floats.filter((f) => f.t < 80)
   }
 
-  draw(ctx: CanvasRenderingContext2D, w: World, cam: Cam, opts: { showMini: boolean; names: readonly [string, string]; myTurn: boolean }) {
+  draw(ctx: CanvasRenderingContext2D, w: World, cam: Cam, opts: { showMini: boolean; names: readonly string[]; myTurn: boolean }) {
     this.frame++
     this.stepFx()
     const f = this.frame
@@ -608,7 +608,7 @@ export class Renderer {
     ctx.restore()
   }
 
-  private drawHud(ctx: CanvasRenderingContext2D, w: World, cam: Cam, opts: { showMini: boolean; names: readonly [string, string]; myTurn: boolean }) {
+  private drawHud(ctx: CanvasRenderingContext2D, w: World, cam: Cam, opts: { showMini: boolean; names: readonly string[]; myTurn: boolean }) {
     ctx.textAlign = 'left'
     ctx.font = "700 14px 'IBM Plex Sans KR', sans-serif"
     ctx.fillStyle = 'rgba(26,20,48,.72)'
@@ -635,7 +635,7 @@ export class Renderer {
       ctx.fillStyle = '#b9b3e6'
       ctx.fillText('없음', cx - 14, 34)
     }
-    if (!w.winner) {
+    if (w.winner === null) {
       const t = `${opts.names[w.team]} · ${KINDS[w.active.kind].name} 차례`
       ctx.font = "18px 'Black Han Sans', sans-serif"
       const tw = ctx.measureText(t).width + 24

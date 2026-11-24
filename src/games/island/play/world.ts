@@ -20,12 +20,13 @@ import {
 // 화면이 알아야 할 일(터짐·풍덩·다침…)은 fx로, 땅이 파인 곳은 carves로 쌓아 두면 화면이 가져간다.
 
 export type AnimalKind = 'bear' | 'cat' | 'rabbit' | 'fox' | 'panda' | 'frog'
-export const TEAM_KINDS: readonly [readonly AnimalKind[], readonly AnimalKind[]] = [
-  ['bear', 'cat', 'rabbit'],
-  ['fox', 'panda', 'frog'],
-]
+/** 편마다 동물 셋 — 편이 넷이면 돌려 씀 (옷 색으로 구분) */
+const ALL_KINDS: readonly AnimalKind[] = ['bear', 'cat', 'rabbit', 'fox', 'panda', 'frog']
+/** 편 수 (팀전·봇 연습·둘이서 = 2, 친구 대전 개인전 = 사람 수 2~4) */
+export const MAX_SIDES = 4
 
-export type Team = 0 | 1
+/** 편 번호 (0 = 파랑, 1 = 빨강, 2 = 초록, 3 = 노랑) */
+export type Team = number
 export type Face = 1 | -1
 
 export type Animal = {
@@ -113,16 +114,20 @@ export class World {
   fx: Fx[] = []
   carves: Carve[] = []
   private settleT = 0
-  private next: [number, number] = [0, 0]
+  /** 편 수 */
+  readonly sides: number
+  private next: number[]
   private rng: Rng
 
-  constructor(seed: number) {
+  constructor(seed: number, sides = 2) {
+    this.sides = Math.max(2, Math.min(MAX_SIDES, Math.floor(sides)))
+    this.next = Array.from({ length: this.sides }, () => 0)
     this.rng = createRng(seed)
     this.genTerrain()
     this.spawn()
     for (let i = 0; i < 160; i++) for (const a of this.animals) this.stepAnimal(a)
     this.fx = []
-    this.team = this.rng.next() < 0.5 ? 0 : 1
+    this.team = Math.floor(this.rng.next() * this.sides)
     this.startTurn(true)
   }
 
@@ -206,8 +211,10 @@ export class World {
   private spawn() {
     const taken: number[] = []
     let id = 0
+    // 동물이 많으면 조금 더 붙여 세움
+    const gap = Math.min(150, ((W - 220) / (TEAM_SIZE * this.sides)) * 0.8)
     for (let k = 0; k < TEAM_SIZE; k++)
-      for (const t of [0, 1] as const) {
+      for (let t = 0; t < this.sides; t++) {
         let x = 0
         let y = H
         let tries = 0
@@ -215,10 +222,10 @@ export class World {
           x = this.r(110, W - 110)
           y = this.surfaceAt(x)
           tries++
-        } while ((y > WATER - 80 || taken.some((o) => Math.abs(o - x) < 150)) && tries < 300)
+        } while ((y > WATER - 80 || taken.some((o) => Math.abs(o - x) < gap)) && tries < 300)
         taken.push(x)
         this.animals.push({
-          id: id++, team: t, kind: TEAM_KINDS[t][k], x, y: y - 2, vx: 0, vy: 0, slide: 0, air: true,
+          id: id++, team: t, kind: ALL_KINDS[(t * TEAM_SIZE + k) % ALL_KINDS.length], x, y: y - 2, vx: 0, vy: 0, slide: 0, air: true,
           hp: HP, alive: true, face: x < W / 2 ? 1 : -1, hit: 0, walkT: 0, moving: false, squash: 0, crouch: 0,
         })
       }
@@ -229,7 +236,7 @@ export class World {
   }
 
   private startTurn(first: boolean) {
-    if (!first) this.team = this.team === 0 ? 1 : 0
+    if (!first) this.team = this.nextSide(this.team)
     const list = this.animals.filter((a) => a.team === this.team)
     for (let k = 0; k < list.length; k++) {
       const a = list[this.next[this.team] % list.length]
@@ -260,7 +267,7 @@ export class World {
   }
 
   canAct() {
-    return this.phase === 'aim' && this.active.alive && !this.winner
+    return this.phase === 'aim' && this.active.alive && this.winner === null
   }
 
   pick(w: WeaponId) {
@@ -352,12 +359,35 @@ export class World {
     this.carves.push({ x, y, r, ring })
   }
 
-  /** 한 팀이 다 나가면 남은 팀 승리 (친구 대전) */
+  /** 살아 있는 동물이 있는 편들 */
+  sidesLeft() {
+    const out: Team[] = []
+    for (let t = 0; t < this.sides; t++) if (this.alive(t).length) out.push(t)
+    return out
+  }
+
+  private nextSide(from: Team) {
+    for (let k = 1; k <= this.sides; k++) {
+      const s = (from + k) % this.sides
+      if (this.alive(s).length) return s
+    }
+    return from
+  }
+
+  /** 한 편 사람이 모두 나감 (친구 대전) — 그 편 동물은 사라지고, 한 편만 남으면 끝 */
   forfeit(team: Team) {
-    if (this.winner) return
-    this.winner = team === 0 ? 1 : 0
-    this.phase = 'over'
-    this.fx.push({ t: 'win' })
+    if (this.winner !== null) return
+    for (const a of this.animals)
+      if (a.team === team && a.alive) {
+        a.alive = false
+        this.fx.push({ t: 'say', x: a.x, y: a.y - 50, text: '나감', color: '#fff' })
+      }
+    const left = this.sidesLeft()
+    if (left.length <= 1) {
+      this.winner = left[0] ?? 'draw'
+      this.phase = 'over'
+      this.fx.push({ t: 'win' })
+    } else if (this.active.team === team) this.toFlying()
   }
 
   private hurt(a: Animal, dmg: number) {
@@ -701,10 +731,9 @@ export class World {
     if (this.phase === 'flying') {
       this.settleT = this.settled() ? this.settleT + 1 : 0
       if (this.settleT > SETTLE_STEPS) {
-        const b = this.alive(0).length
-        const r = this.alive(1).length
-        if (!b || !r) {
-          this.winner = !b && !r ? 'draw' : b ? 0 : 1
+        const left = this.sidesLeft()
+        if (left.length <= 1) {
+          this.winner = left[0] ?? 'draw'
           this.phase = 'over'
           this.fx.push({ t: 'win' })
           return

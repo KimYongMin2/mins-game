@@ -31,15 +31,16 @@
   min-width: min(100%, 360px);
   margin: 0 auto;
 }
-.il-teams { grid-area: teams; display: grid; grid-template-columns: 1fr auto 1fr; gap: 10px; align-items: center; }
+.il-teams { grid-area: teams; display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); gap: 10px; align-items: center; }
+.il-side { display: flex; gap: 10px; min-width: 0; }
+.il-side > .il-team { flex: 1; }
+.il-team--turn b { text-decoration: underline; text-underline-offset: 3px; }
 .il-team { display: grid; gap: 4px; min-width: 0; }
-.il-team b { font-family: 'Black Han Sans', sans-serif; font-weight: 400; font-size: 1.05rem; color: #4aa3ff; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.il-team b { font-family: 'Black Han Sans', sans-serif; font-weight: 400; font-size: 1.05rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .il-team--r { text-align: right; }
-.il-team--r b { color: #ff5a5f; }
 .il-bar { height: 10px; background: rgba(0, 0, 0, 0.35); border: 1px solid var(--hair-strong, #4b43a0); }
 .il-bar i { display: block; height: 100%; transition: width 0.3s; }
-.il-team--b .il-bar i { background: #4aa3ff; }
-.il-team--r .il-bar i { background: #ff5a5f; margin-left: auto; }
+.il-team--r .il-bar i { margin-left: auto; }
 .il-turn { font-family: 'Black Han Sans', sans-serif; font-size: 1.35rem; min-width: 3em; text-align: center; padding: 2px 10px; border: 2px solid var(--brand); color: var(--brand); font-variant-numeric: tabular-nums; }
 .il-turn--low { color: #ff5a5f; border-color: #ff5a5f; }
 

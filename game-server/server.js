@@ -15184,15 +15184,15 @@ const WEAPONS = [
 ];
 //#endregion
 //#region src/games/island/play/world.ts
-const TEAM_KINDS = [[
+/** 편마다 동물 셋 — 편이 넷이면 돌려 씀 (옷 색으로 구분) */
+const ALL_KINDS = [
 	"bear",
 	"cat",
-	"rabbit"
-], [
+	"rabbit",
 	"fox",
 	"panda",
 	"frog"
-]];
+];
 const NO_KEYS = {
 	left: false,
 	right: false,
@@ -15257,15 +15257,19 @@ var World = class {
 	fx = [];
 	carves = [];
 	settleT = 0;
-	next = [0, 0];
+	/** 편 수 */
+	sides;
+	next;
 	rng;
-	constructor(seed) {
+	constructor(seed, sides = 2) {
+		this.sides = Math.max(2, Math.min(4, Math.floor(sides)));
+		this.next = Array.from({ length: this.sides }, () => 0);
 		this.rng = createRng(seed);
 		this.genTerrain();
 		this.spawn();
 		for (let i = 0; i < 160; i++) for (const a of this.animals) this.stepAnimal(a);
 		this.fx = [];
-		this.team = this.rng.next() < .5 ? 0 : 1;
+		this.team = Math.floor(this.rng.next() * this.sides);
 		this.startTurn(true);
 	}
 	r(a, b) {
@@ -15349,7 +15353,8 @@ var World = class {
 	spawn() {
 		const taken = [];
 		let id = 0;
-		for (let k = 0; k < 3; k++) for (const t of [0, 1]) {
+		const gap = Math.min(150, 1700 / (3 * this.sides) * .8);
+		for (let k = 0; k < 3; k++) for (let t = 0; t < this.sides; t++) {
 			let x = 0;
 			let y = H;
 			let tries = 0;
@@ -15357,12 +15362,12 @@ var World = class {
 				x = this.r(110, 1810);
 				y = this.surfaceAt(x);
 				tries++;
-			} while ((y > 930 || taken.some((o) => Math.abs(o - x) < 150)) && tries < 300);
+			} while ((y > 930 || taken.some((o) => Math.abs(o - x) < gap)) && tries < 300);
 			taken.push(x);
 			this.animals.push({
 				id: id++,
 				team: t,
-				kind: TEAM_KINDS[t][k],
+				kind: ALL_KINDS[(t * 3 + k) % ALL_KINDS.length],
 				x,
 				y: y - 2,
 				vx: 0,
@@ -15384,7 +15389,7 @@ var World = class {
 		return this.animals.filter((a) => a.team === team && a.alive);
 	}
 	startTurn(first) {
-		if (!first) this.team = this.team === 0 ? 1 : 0;
+		if (!first) this.team = this.nextSide(this.team);
 		const list = this.animals.filter((a) => a.team === this.team);
 		for (let k = 0; k < list.length; k++) {
 			const a = list[this.next[this.team] % list.length];
@@ -15413,7 +15418,7 @@ var World = class {
 		return [Math.cos(r) * this.active.face, -Math.sin(r)];
 	}
 	canAct() {
-		return this.phase === "aim" && this.active.alive && !this.winner;
+		return this.phase === "aim" && this.active.alive && this.winner === null;
 	}
 	pick(w) {
 		if (!this.canAct() || this.charging) return;
@@ -15532,12 +15537,38 @@ var World = class {
 			ring
 		});
 	}
-	/** 한 팀이 다 나가면 남은 팀 승리 (친구 대전) */
+	/** 살아 있는 동물이 있는 편들 */
+	sidesLeft() {
+		const out = [];
+		for (let t = 0; t < this.sides; t++) if (this.alive(t).length) out.push(t);
+		return out;
+	}
+	nextSide(from) {
+		for (let k = 1; k <= this.sides; k++) {
+			const s = (from + k) % this.sides;
+			if (this.alive(s).length) return s;
+		}
+		return from;
+	}
+	/** 한 편 사람이 모두 나감 (친구 대전) — 그 편 동물은 사라지고, 한 편만 남으면 끝 */
 	forfeit(team) {
-		if (this.winner) return;
-		this.winner = team === 0 ? 1 : 0;
-		this.phase = "over";
-		this.fx.push({ t: "win" });
+		if (this.winner !== null) return;
+		for (const a of this.animals) if (a.team === team && a.alive) {
+			a.alive = false;
+			this.fx.push({
+				t: "say",
+				x: a.x,
+				y: a.y - 50,
+				text: "나감",
+				color: "#fff"
+			});
+		}
+		const left = this.sidesLeft();
+		if (left.length <= 1) {
+			this.winner = left[0] ?? "draw";
+			this.phase = "over";
+			this.fx.push({ t: "win" });
+		} else if (this.active.team === team) this.toFlying();
 	}
 	hurt(a, dmg) {
 		if (dmg <= 0) return;
@@ -15923,10 +15954,9 @@ var World = class {
 		if (this.phase === "flying") {
 			this.settleT = this.settled() ? this.settleT + 1 : 0;
 			if (this.settleT > 55) {
-				const b = this.alive(0).length;
-				const r = this.alive(1).length;
-				if (!b || !r) {
-					this.winner = !b && !r ? "draw" : b ? 0 : 1;
+				const left = this.sidesLeft();
+				if (left.length <= 1) {
+					this.winner = left[0] ?? "draw";
 					this.phase = "over";
 					this.fx.push({ t: "win" });
 					return;
@@ -16169,19 +16199,24 @@ const STEP_MS$1 = 1e3 / 60;
 const MAX_CATCHUP$1 = 10;
 const SEND_EVERY = 2;
 function islandReferee(setup, ctx) {
-	const players = readPlayers((setup ?? {}).players, ctx, 2, 4);
+	const o = setup ?? {};
+	const players = readPlayers(o.players, ctx, 2, 4);
 	if (!players) return null;
+	const picked = readTeams(o.teams, players.length);
+	if (picked === void 0) return null;
+	const teams = picked && !(picked.includes(0) && picked.includes(1)) ? players.map((_, i) => i % 2) : picked;
+	const sides = teams ? 2 : players.length;
 	const seed = serverSeed();
-	const w = new World(seed);
+	const w = new World(seed, sides);
 	const roster = players.map((p, i) => ({
 		id: p.id,
 		name: p.name,
 		kind: p.kind,
-		team: i % 2,
+		team: teams ? teams[i] : i,
 		gone: false
 	}));
 	const bots = new Map(roster.filter((p) => p.kind === "bot").map((p, i) => [p.id, new BotDriver("normal", seed + i + 1)]));
-	const turns = [0, 0];
+	const turns = Array.from({ length: sides }, () => 0);
 	const carveLog = [];
 	let fxBuf = [];
 	let sentCarves = 0;
@@ -16219,7 +16254,7 @@ function islandReferee(setup, ctx) {
 		fxBuf = [];
 	};
 	const checkTeams = () => {
-		for (const t of [0, 1]) if (!roster.some((p) => p.team === t && !p.gone)) w.forfeit(t);
+		for (let t = 0; t < sides; t++) if (!roster.some((p) => p.team === t && !p.gone) && w.alive(t).length) w.forfeit(t);
 	};
 	return {
 		tickMs: STEP_MS$1,
@@ -16229,6 +16264,7 @@ function islandReferee(setup, ctx) {
 				ctx.sendTo(from, {
 					t: "init",
 					seed,
+					sides,
 					players: roster.map(({ id, name, kind, team }) => ({
 						id,
 						name,
