@@ -113,12 +113,12 @@ export function loadStats(): GameStat[] {
       const r = omok()
       return duel('omok', add(r.normal, r.hard), r.pvp)
     }),
-    // 동물 섬 대작전: 봇 연습(승·무) · 한 기기 둘이서(판 수)
+    // 동물 섬 대작전: 봇 연습(승) · 친구 대전(승) · 한 기기 둘이서(판 수)
     safe('island', () => {
       const r = island()
       const b = r.bot.normal.games + r.bot.hard.games
       const wins = r.bot.normal.wins + r.bot.hard.wins
-      return { id: 'island', played: b + r.local.games, bot: b ? `봇 ${b}판 · ${wins}승` : null, pvp: r.local.games ? `둘이서 ${r.local.games}판` : null }
+      return { id: 'island', played: b + r.pvp.games + r.local.games, bot: b ? `${b}판 · ${wins}승` : null, pvp: r.pvp.games ? `${r.pvp.games}판 · ${r.pvp.wins}승` : null }
     }),
     safe('batting', () => {
       const r = batting()

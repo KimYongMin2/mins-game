@@ -9138,7 +9138,7 @@ function muzzle(t, x, angleDeg) {
 	};
 }
 /** 포탄 궤적: 각도(0 = 오른쪽, 90 = 위, 180 = 왼쪽), 힘(0~100), 바람(+ = 오른쪽으로 미는 가속도) */
-function simulateShot(t, tanks, shooter, angleDeg, power, wind, maxSteps = Math.round(12 / STEP)) {
+function simulateShot$1(t, tanks, shooter, angleDeg, power, wind, maxSteps = Math.round(12 / STEP)) {
 	const a = angleDeg * Math.PI / 180;
 	const speed = power / 100 * 80;
 	let { x, y } = muzzle(t, tanks[shooter].x, angleDeg);
@@ -9211,13 +9211,13 @@ function simulateShot(t, tanks, shooter, angleDeg, power, wind, maxSteps = Math.
 	};
 }
 /** 폭발 피해: 가운데에서 멀수록 줄어든다 (DAMAGE_R 밖은 0) */
-function blastDamage(impact, center) {
+function blastDamage$1(impact, center) {
 	const d = Math.hypot(impact.x - center.x, impact.y - center.y);
 	return d >= 11 ? 0 : Math.round(45 * (1 - d / 11));
 }
 /** 터짐: 피해를 주고 땅을 판 뒤, 발밑이 꺼진 대포는 떨어진다 */
 function explode$1(t, tanks, impact) {
-	const damage = tanks.map((k) => k.alive ? blastDamage(impact, tankCenter(t, k.x)) : 0);
+	const damage = tanks.map((k) => k.alive ? blastDamage$1(impact, tankCenter(t, k.x)) : 0);
 	const terrain = carve(t, impact);
 	const fell = [];
 	tanks.forEach((k, i) => {
@@ -9269,7 +9269,7 @@ function chooseBotAim(rng, terrain, tanks, me, wind, level, teams = null) {
 	for (let a = 15; a <= 80; a += 2.5) {
 		const angle = right ? a : 180 - a;
 		for (let power = 15; power <= 100; power += 2) {
-			const s = simulateShot(terrain, tanks, me, angle, power, wind);
+			const s = simulateShot$1(terrain, tanks, me, angle, power, wind);
 			if (!s.impact) continue;
 			if (Math.hypot(s.impact.x - myPos.x, s.impact.y - myPos.y) < 11) continue;
 			const miss = Math.hypot(s.impact.x - goal.x, s.impact.y - goal.y);
@@ -9389,7 +9389,7 @@ function setAim(s, player, x, angle, power) {
 /** 발사: 궤적을 미리 다 계산해 두고, 날아가는 시간만큼 보여준다 */
 function launch(s) {
 	const t = s.tanks[s.turn];
-	const shot = simulateShot(s.terrain, s.tanks, s.turn, t.angle, t.power, s.wind);
+	const shot = simulateShot$1(s.terrain, s.tanks, s.turn, t.angle, t.power, s.wind);
 	const ms = Math.max(300, shot.steps * STEP * 1e3);
 	return {
 		...s,
@@ -9641,9 +9641,9 @@ const humanIndex = (players, key) => players.findIndex((p) => p.id === key && p.
 const isInt$1 = (x) => typeof x === "number" && Number.isInteger(x);
 //#endregion
 //#region src/server/referees/validate.ts
-const isNum$1 = (x) => typeof x === "number" && Number.isFinite(x);
+const isNum$2 = (x) => typeof x === "number" && Number.isFinite(x);
 const isInt = (x, min = -1e9, max = 1e9) => typeof x === "number" && Number.isInteger(x) && x >= min && x <= max;
-const isVec = (x) => !!x && typeof x === "object" && isNum$1(x.x) && isNum$1(x.y);
+const isVec = (x) => !!x && typeof x === "object" && isNum$2(x.x) && isNum$2(x.y);
 /** 숫자 잇기 바닥: 줄 최대 60개, 줄마다 최대 13장, 타일 번호 0~105 */
 const isTable = (x) => Array.isArray(x) && x.length <= 60 && x.every((row) => Array.isArray(row) && row.length <= 13 && row.every((t) => isInt(t, 0, 105)));
 //#endregion
@@ -9673,7 +9673,7 @@ function artilleryReferee(setup, ctx) {
 		input: (s, from, m) => {
 			if (m.t !== "aim" && m.t !== "fire") return void 0;
 			const player = humanIndex(s.players, from);
-			if (player < 0 || m.turnNo !== s.turnNo || !isNum$1(m.x) || !isNum$1(m.angle) || !isNum$1(m.power)) return null;
+			if (player < 0 || m.turnNo !== s.turnNo || !isNum$2(m.x) || !isNum$2(m.angle) || !isNum$2(m.power)) return null;
 			return {
 				type: m.t,
 				player,
@@ -14182,7 +14182,7 @@ const POS_MS = 100;
 const rand = () => crypto.getRandomValues(/* @__PURE__ */ new Uint32Array(1))[0] / 2 ** 32;
 const num = (v, lo, hi) => typeof v === "number" && Number.isFinite(v) && v >= lo && v <= hi;
 const cleanText = (v) => typeof v === "string" ? [...v.replace(/[\u0000-\u001f\u007f]/g, " ").trim()].slice(0, 60).join("") : "";
-const r2 = (v) => Math.round(v * 100) / 100;
+const r2$1 = (v) => Math.round(v * 100) / 100;
 let clock = () => Date.now();
 const pub = (p) => ({
 	id: p.id,
@@ -14246,7 +14246,7 @@ function fishingReferee(_setup, ctx) {
 	const cloverSpot = () => {
 		for (let i = 0; i < 400; i++) {
 			const x = -125 + rand() * 250, z = 18 + rand() * 80;
-			if (onGrass(x, z) && onGrass(x + .5, z) && onGrass(x, z + .5)) return [r2(x), r2(z)];
+			if (onGrass(x, z) && onGrass(x + .5, z) && onGrass(x, z + .5)) return [r2$1(x), r2$1(z)];
 		}
 		return [0, 30];
 	};
@@ -14320,8 +14320,8 @@ function fishingReferee(_setup, ctx) {
 				id: key,
 				name: mem.nickname,
 				...mem.avatar ? { avatar: mem.avatar } : {},
-				x: r2(SPAWN.x + Math.cos(a) * 2.5),
-				z: r2(SPAWN.z + Math.sin(a) * 1.5),
+				x: r2$1(SPAWN.x + Math.cos(a) * 2.5),
+				z: r2$1(SPAWN.z + Math.sin(a) * 1.5),
 				r: Math.PI,
 				bed: null,
 				fishing: "none",
@@ -14414,9 +14414,9 @@ function fishingReferee(_setup, ctx) {
 			p: pub(p)
 		});
 		const moved = Math.hypot(x - p.x, z - p.z) > .05;
-		p.x = r2(x);
-		p.z = r2(z);
-		p.r = r2(m.r);
+		p.x = r2$1(x);
+		p.z = r2$1(z);
+		p.r = r2$1(m.r);
 		if (p.ride !== null) {
 			const b = boats[p.ride];
 			b.x = p.x;
@@ -14468,7 +14468,7 @@ function fishingReferee(_setup, ctx) {
 		p.zone = t.zone;
 		if (bug) p.net = 1;
 		else delete p.net;
-		if (!bed) p.r = r2(t.r);
+		if (!bed) p.r = r2$1(t.r);
 		p.castAt = now;
 		p.castX = p.x;
 		p.castZ = p.z;
@@ -14667,7 +14667,7 @@ function fishingReferee(_setup, ctx) {
 		p.seat = i;
 		p.x = st.x;
 		p.z = st.z;
-		p.r = r2(st.r);
+		p.r = r2$1(st.r);
 		stopBuilding(p.id);
 		all({
 			t: "st",
@@ -14694,7 +14694,7 @@ function fishingReferee(_setup, ctx) {
 		p.bed = i;
 		p.x = BEDS[i].x;
 		p.z = BEDS[i].z;
-		p.r = r2(BEDS[i].r);
+		p.r = r2$1(BEDS[i].r);
 		all({
 			t: "st",
 			p: pub(p)
@@ -15118,6 +15118,1200 @@ function fishingReferee(_setup, ctx) {
 	};
 }
 const fishingRefereeFactory = (setup, ctx) => fishingReferee(setup, ctx);
+//#endregion
+//#region src/games/island/constants.ts
+const W$1 = 1920;
+const H = 1080;
+/** 중력 (칸/스텝²) — 시안에서 '뚝 떨어진다'고 해서 낮춤 */
+const G = .13;
+const TURN_STEPS = 2700;
+const DAMAGE = {
+	balloon: 45,
+	pine: 60,
+	egg: 8,
+	hammer: 12,
+	drill: 8
+};
+const WEAPONS = [
+	{
+		id: "balloon",
+		name: "물풍선",
+		sub: "바람 탐",
+		charge: true,
+		action: "꾹 눌러 던지기",
+		desc: "바람에 크게 휘고, 닿는 순간 터져 땅을 파고 주변을 날려요. 피해 최대 45"
+	},
+	{
+		id: "pine",
+		name: "솔방울",
+		sub: "3초 뒤",
+		charge: true,
+		action: "꾹 눌러 던지기",
+		desc: "통통 튀고 굴러가다 3초 뒤 크게 터져요. 맞히기 어려운 만큼 가장 세요. 피해 최대 60"
+	},
+	{
+		id: "gull",
+		name: "갈매기 떼",
+		sub: "목표 고르기",
+		charge: false,
+		action: "갈매기 부르기",
+		desc: "지도를 눌러 목표를 정하면 갈매기가 조개 다섯 개를 떨어뜨려요. 하나에 최대 8"
+	},
+	{
+		id: "hammer",
+		name: "뿅망치",
+		sub: "바로 앞",
+		charge: false,
+		action: "뿅망치 휘두르기",
+		desc: "바로 앞 상대를 쳐서 날려 보내요. 물가로 밀어 빠뜨리기 좋아요. 피해 12"
+	},
+	{
+		id: "rod",
+		name: "낚싯대",
+		sub: "이동",
+		charge: false,
+		action: "낚싯줄 던지기",
+		desc: "땅에 걸면 그쪽으로 끌려가요. 쓰면 그 차례는 끝나요"
+	},
+	{
+		id: "drill",
+		name: "두더지 삽",
+		sub: "땅 뚫기",
+		charge: false,
+		action: "땅 파기",
+		desc: "조준한 쪽으로 땅을 작게 파며 나아가요. 가는 길의 상대는 8. 쓰면 그 차례는 끝나요"
+	}
+];
+//#endregion
+//#region src/games/island/play/world.ts
+const TEAM_KINDS = [[
+	"bear",
+	"cat",
+	"rabbit"
+], [
+	"fox",
+	"panda",
+	"frog"
+]];
+const NO_KEYS = {
+	left: false,
+	right: false,
+	up: false,
+	down: false
+};
+/** 힘 0~1 (차올랐다 내려갔다 반복) */
+function chargePower(chargeT) {
+	const t = chargeT / 75 % 2;
+	return t < 1 ? t : 2 - t;
+}
+/** 던지는 빠르기 (힘 0~1) */
+const throwSpeed = (p) => 2.4 + p * 8.6;
+const WIND_ACCEL = .0035;
+const EGG_G = .11;
+const BLAST = {
+	balloon: {
+		r: 44,
+		kn: 2.6
+	},
+	pine: {
+		r: 56,
+		kn: 3
+	},
+	egg: {
+		r: 22,
+		kn: 1.2
+	}
+};
+const blastOf = (kind) => ({
+	...BLAST[kind],
+	dmg: DAMAGE[kind]
+});
+/** 터짐 피해 (봇이 미리 계산할 때도 씀) */
+function blastDamage(r, dmg, d) {
+	const reach = r * 1.5 + 10;
+	if (d > reach) return 0;
+	return Math.round(dmg * (.3 + .7 * (1 - d / reach)));
+}
+var World = class {
+	mask = new Uint8Array(W$1 * H);
+	animals = [];
+	projs = [];
+	gull = null;
+	wind = 0;
+	team = 0;
+	active;
+	phase = "aim";
+	timer = TURN_STEPS;
+	weapon = "balloon";
+	/** 조준 각도 (도, 바라보는 쪽 기준 위가 +) */
+	aim = 40;
+	charging = false;
+	chargeT = 0;
+	/** 갈매기 목표 x */
+	target = 0;
+	rodLine = null;
+	hammerT = 0;
+	drill = null;
+	winner = null;
+	turnNo = 0;
+	fx = [];
+	carves = [];
+	settleT = 0;
+	next = [0, 0];
+	rng;
+	constructor(seed) {
+		this.rng = createRng(seed);
+		this.genTerrain();
+		this.spawn();
+		for (let i = 0; i < 160; i++) for (const a of this.animals) this.stepAnimal(a);
+		this.fx = [];
+		this.team = this.rng.next() < .5 ? 0 : 1;
+		this.startTurn(true);
+	}
+	r(a, b) {
+		return a + this.rng.next() * (b - a);
+	}
+	solid(x, y) {
+		x |= 0;
+		y |= 0;
+		if (x < 0 || x >= 1920 || y < 0 || y >= 1080) return false;
+		return this.mask[y * W$1 + x] === 1;
+	}
+	surfaceAt(x) {
+		for (let y = 60; y < H; y++) if (this.solid(x, y)) return y;
+		return H;
+	}
+	fill(cx, cy, r, v) {
+		for (let y = Math.max(0, cy - r | 0); y <= Math.min(1079, cy + r); y++) for (let x = Math.max(0, cx - r | 0); x <= Math.min(1919, cx + r); x++) {
+			const dx = x - cx;
+			const dy = y - cy;
+			if (dx * dx + dy * dy <= r * r) this.mask[y * W$1 + x] = v;
+		}
+	}
+	genTerrain() {
+		const m = this.mask;
+		const p = [
+			this.r(0, 6),
+			this.r(0, 6),
+			this.r(0, 6)
+		];
+		const g1 = this.r(620, 760);
+		const g2 = this.r(1180, 1320);
+		const gw = this.r(70, 110);
+		const isl = [
+			[70, g1 - gw / 2],
+			[g1 + gw / 2, g2 - gw / 2],
+			[g2 + gw / 2, 1850]
+		];
+		const lift = [
+			this.r(-60, 40),
+			this.r(-170, -60),
+			this.r(-60, 40)
+		];
+		for (let x = 0; x < W$1; x++) {
+			const k = isl.findIndex(([a, b]) => x >= a && x <= b);
+			if (k < 0) continue;
+			const [a, b] = isl[k];
+			const mid = (a + b) / 2;
+			const half = (b - a) / 2;
+			let h = 660 + lift[k] + 70 * Math.sin(x * .006 + p[0]) + 38 * Math.sin(x * .017 + p[1]) + 14 * Math.sin(x * .045 + p[2]);
+			h -= 60 * Math.max(0, 1 - Math.abs(x - mid) / half) ** 2;
+			const e = Math.min(x - a, b - x);
+			if (e < 50) h += (50 - e) ** 1.6;
+			for (let y = Math.max(0, h | 0); y < H; y++) m[y * W$1 + x] = 1;
+		}
+		const plats = 3 + (this.rng.next() < .5 ? 1 : 0);
+		for (let k = 0; k < plats; k++) {
+			const cx = 220 + (k + this.r(.1, .9)) * 1480 / plats;
+			const cy = this.r(330, 470);
+			const rw = this.r(70, 120);
+			for (let y = cy - 6 | 0; y < cy + 34; y++) for (let x = cx - rw | 0; x < cx + rw; x++) {
+				if (x < 0 || x >= 1920) continue;
+				const dx = (x - cx) / rw;
+				const top = cy + 10 * dx * dx + 3 * Math.sin(x * .08 + k);
+				const bottom = cy + 34 - 30 * dx * dx;
+				if (y >= top && y <= bottom) m[y * W$1 + x] = 1;
+			}
+		}
+		for (let c = 0; c < 2; c++) {
+			const [a, b] = isl[Math.floor(this.rng.next() * 3)];
+			let x = this.r(a + 80, b - 80);
+			let y = this.surfaceAt(x) + this.r(70, 110);
+			const dir = this.rng.next() < .5 ? -1 : 1;
+			for (let s = 0; s < 34; s++) {
+				this.fill(x, y, 22 + 6 * Math.sin(s * .7), 0);
+				x += dir * 7;
+				y += this.r(-4, 4);
+				if (x < a + 30 || x > b - 30) break;
+			}
+		}
+	}
+	spawn() {
+		const taken = [];
+		let id = 0;
+		for (let k = 0; k < 3; k++) for (const t of [0, 1]) {
+			let x = 0;
+			let y = H;
+			let tries = 0;
+			do {
+				x = this.r(110, 1810);
+				y = this.surfaceAt(x);
+				tries++;
+			} while ((y > 930 || taken.some((o) => Math.abs(o - x) < 150)) && tries < 300);
+			taken.push(x);
+			this.animals.push({
+				id: id++,
+				team: t,
+				kind: TEAM_KINDS[t][k],
+				x,
+				y: y - 2,
+				vx: 0,
+				vy: 0,
+				slide: 0,
+				air: true,
+				hp: 100,
+				alive: true,
+				face: x < 960 ? 1 : -1,
+				hit: 0,
+				walkT: 0,
+				moving: false,
+				squash: 0,
+				crouch: 0
+			});
+		}
+	}
+	alive(team) {
+		return this.animals.filter((a) => a.team === team && a.alive);
+	}
+	startTurn(first) {
+		if (!first) this.team = this.team === 0 ? 1 : 0;
+		const list = this.animals.filter((a) => a.team === this.team);
+		for (let k = 0; k < list.length; k++) {
+			const a = list[this.next[this.team] % list.length];
+			this.next[this.team]++;
+			if (a.alive) {
+				this.active = a;
+				break;
+			}
+		}
+		this.wind = Math.round(this.r(-10, 10));
+		this.phase = "aim";
+		this.timer = TURN_STEPS;
+		this.charging = false;
+		this.chargeT = 0;
+		this.rodLine = null;
+		this.hammerT = 0;
+		this.drill = null;
+		this.aim = 40;
+		this.target = Math.min(1880, Math.max(40, this.active.x + this.active.face * 400));
+		if (this.weapon === "rod" || this.weapon === "gull" || this.weapon === "drill") this.weapon = "balloon";
+		this.turnNo++;
+		this.fx.push({ t: "turn" });
+	}
+	aimVec() {
+		const r = this.aim * Math.PI / 180;
+		return [Math.cos(r) * this.active.face, -Math.sin(r)];
+	}
+	canAct() {
+		return this.phase === "aim" && this.active.alive && !this.winner;
+	}
+	pick(w) {
+		if (!this.canAct() || this.charging) return;
+		this.weapon = w;
+	}
+	jump() {
+		const a = this.active;
+		if (!this.canAct() || a.air || a.crouch) return;
+		a.crouch = 6;
+		a.slide = 0;
+	}
+	/** 꾹 누르기 시작 (힘 모으는 무기) — 아니면 바로 씀 */
+	press() {
+		if (!this.canAct()) return;
+		if (this.weapon === "balloon" || this.weapon === "pine") {
+			this.charging = true;
+			this.chargeT = 0;
+		} else this.fire();
+	}
+	release() {
+		if (this.charging) this.fire();
+	}
+	setTarget(x) {
+		this.target = Math.max(20, Math.min(1900, x));
+	}
+	fire(powerOverride) {
+		if (!this.canAct()) return;
+		const a = this.active;
+		const w = this.weapon;
+		const [dx, dy] = this.aimVec();
+		const sx = a.x + dx * 18;
+		const sy = a.y - 20 + dy * 18;
+		this.charging = false;
+		if (w === "balloon" || w === "pine") {
+			const v = throwSpeed(powerOverride ?? chargePower(this.chargeT));
+			this.projs.push({
+				kind: w,
+				x: sx,
+				y: sy,
+				vx: dx * v,
+				vy: dy * v,
+				t: 0,
+				owner: a.id,
+				dead: false
+			});
+			this.fx.push({ t: "throw" });
+			this.toFlying();
+		} else if (w === "gull") {
+			const dir = this.target < a.x ? -1 : 1;
+			this.gull = {
+				x: dir > 0 ? -60 : 1980,
+				y: 150,
+				dir,
+				tx: this.target,
+				dropped: 0
+			};
+			this.fx.push({ t: "gull" });
+			this.toFlying();
+		} else if (w === "hammer") {
+			this.hammerT = 1;
+			this.toFlying();
+		} else if (w === "drill") {
+			this.drill = {
+				t: 0,
+				dx,
+				dy,
+				air: 0,
+				hit: /* @__PURE__ */ new Set()
+			};
+			this.phase = "dig";
+		} else if (w === "rod") {
+			let hx = sx;
+			let hy = sy;
+			let hit = false;
+			for (let s = 0; s < 80; s++) {
+				hx += dx * 4;
+				hy += dy * 4;
+				if (this.solid(hx, hy)) {
+					hit = true;
+					break;
+				}
+				if (hx < 0 || hx > 1920 || hy < 0) break;
+			}
+			if (hit) {
+				this.rodLine = {
+					x: hx,
+					y: hy,
+					t: 0
+				};
+				this.phase = "reel";
+				this.fx.push({ t: "reel" });
+			} else {
+				this.fx.push({
+					t: "say",
+					x: a.x,
+					y: a.y - 60,
+					text: "안 걸렸어요",
+					color: "#fff"
+				});
+				this.toFlying();
+			}
+		}
+		this.chargeT = 0;
+	}
+	toFlying() {
+		this.phase = "flying";
+		this.settleT = 0;
+	}
+	/** 땅 파기 (친구 대전 화면은 서버가 알려 준 파인 곳을 이걸로 따라 함) */
+	carve(x, y, r, ring) {
+		this.fill(x, y, r, 0);
+		this.carves.push({
+			x,
+			y,
+			r,
+			ring
+		});
+	}
+	/** 한 팀이 다 나가면 남은 팀 승리 (친구 대전) */
+	forfeit(team) {
+		if (this.winner) return;
+		this.winner = team === 0 ? 1 : 0;
+		this.phase = "over";
+		this.fx.push({ t: "win" });
+	}
+	hurt(a, dmg) {
+		if (dmg <= 0) return;
+		a.hp = Math.max(0, a.hp - dmg);
+		a.hit = 36;
+		this.fx.push({
+			t: "hurt",
+			x: a.x,
+			y: a.y - 58,
+			dmg,
+			team: a.team
+		});
+	}
+	explode(x, y, kind) {
+		const { r, dmg, kn } = blastOf(kind);
+		this.carve(x, y, r, true);
+		for (const a of this.animals) {
+			if (!a.alive) continue;
+			const dx = a.x - x;
+			const dy = a.y - 18 - y;
+			const d = Math.max(1, Math.sqrt(dx * dx + dy * dy));
+			const reach = r * 1.5 + 10;
+			if (d > reach) continue;
+			const f = 1 - d / reach;
+			this.hurt(a, blastDamage(r, dmg, d));
+			const k = kn * (.4 + .6 * f);
+			a.vx += dx / d * k;
+			a.vy += dy / d * k - k * .75;
+			a.air = true;
+			a.slide = 0;
+			a.crouch = 0;
+		}
+		this.fx.push({
+			t: "boom",
+			x,
+			y,
+			r
+		});
+	}
+	clearAt(x, y) {
+		return !this.solid(x, y) && !this.solid(x, y - 17) && !this.solid(x, y - 34);
+	}
+	/** 땅을 따라 옆으로 (오르막 8칸까지, 내리막은 붙어서) — 막히면 false */
+	groundMove(a, v) {
+		const nx = a.x + v;
+		if (nx < 4 || nx > 1916) return false;
+		for (let k = 0; k <= 8; k++) if (this.clearAt(nx, a.y - k)) {
+			a.x = nx;
+			a.y -= k;
+			let s = 0;
+			while (s < 9 && !this.solid(a.x, a.y + 1)) {
+				a.y++;
+				s++;
+			}
+			if (!this.solid(a.x, a.y + 1)) {
+				a.air = true;
+				a.vx = v;
+				a.vy = .3;
+				a.slide = 0;
+			}
+			return true;
+		}
+		return false;
+	}
+	walk(a, dir) {
+		a.face = dir;
+		if (a.air || a.crouch) return;
+		if (this.groundMove(a, dir * 1.6)) {
+			a.moving = true;
+			a.walkT++;
+		}
+	}
+	land(a) {
+		const vy = a.vy;
+		if (vy > 6.2) this.hurt(a, Math.round((vy - 6.2) * 12));
+		if (vy > 3.4 && Math.abs(a.vx) > 1.1) {
+			a.vy = -vy * .28;
+			a.vx *= .65;
+			a.y -= 1;
+			this.fx.push({ t: "bounce" });
+			return;
+		}
+		a.squash = Math.min(10, Math.round(vy * 2.2));
+		a.air = false;
+		a.slide = Math.abs(a.vx) > .4 ? a.vx * .85 : 0;
+		a.vx = 0;
+		a.vy = 0;
+		if (vy > 3) this.fx.push({ t: "land" });
+	}
+	stepAnimal(a) {
+		if (!a.alive) return;
+		if (a.hit > 0) a.hit--;
+		if (a.squash > 0) a.squash--;
+		if (a.crouch > 0) {
+			a.crouch--;
+			if (a.crouch > 0) return;
+			a.vy = -4;
+			a.vx = a.face * 2;
+			a.air = true;
+			a.y -= 1;
+			this.fx.push({ t: "jump" });
+		}
+		if (!a.air) {
+			if (a.slide) {
+				if (!this.groundMove(a, a.slide)) a.slide = 0;
+				else if (!a.air) {
+					a.slide *= .86;
+					if (Math.abs(a.slide) < .15) a.slide = 0;
+				}
+			}
+			if (!a.air && !this.solid(a.x, a.y + 1)) {
+				let s = 0;
+				while (s < 6 && !this.solid(a.x, a.y + 1)) {
+					a.y++;
+					s++;
+				}
+				if (!this.solid(a.x, a.y + 1)) {
+					a.air = true;
+					a.vx = a.slide;
+					a.vy = 0;
+					a.slide = 0;
+				}
+			}
+			if (!a.air) return;
+		}
+		a.vy += G;
+		a.vy -= a.vy * Math.abs(a.vy) * .0022;
+		a.vx *= .994;
+		const n = Math.ceil(Math.max(Math.abs(a.vx), Math.abs(a.vy)) / 1.5) || 1;
+		for (let s = 0; s < n; s++) {
+			const nx = a.x + a.vx / n;
+			const ny = a.y + a.vy / n;
+			const sg = Math.sign(a.vx);
+			if (sg && (this.solid(nx + sg * 12 * .8, ny - 10) || this.solid(nx + sg * 12 * .8, ny - 34 + 4))) a.vx = -a.vx * .3;
+			else a.x = nx;
+			if (a.vy < 0 && this.solid(a.x, ny - 34)) a.vy = .4;
+			else if (a.vy > 0 && this.solid(a.x, ny)) {
+				let y = ny;
+				let k = 0;
+				while (this.solid(a.x, y) && k++ < 16) y--;
+				a.y = y;
+				this.land(a);
+				break;
+			} else a.y = ny;
+		}
+		if (a.y > 1020 || a.x < -150 || a.x > 2070) {
+			a.alive = false;
+			a.hp = 0;
+			const x = Math.max(0, Math.min(W$1, a.x));
+			this.fx.push({
+				t: "splash",
+				x
+			}, {
+				t: "say",
+				x,
+				y: 970,
+				text: "풍덩!",
+				color: "#fff"
+			});
+		}
+	}
+	stepProj(p) {
+		p.t++;
+		if (p.kind === "balloon") p.vx += this.wind * WIND_ACCEL;
+		p.vy += p.kind === "egg" ? EGG_G : G;
+		const n = Math.ceil(Math.max(Math.abs(p.vx), Math.abs(p.vy)) / 1.5) || 1;
+		for (let s = 0; s < n; s++) {
+			const px = p.x;
+			const py = p.y;
+			p.x += p.vx / n;
+			p.y += p.vy / n;
+			let hitAnimal = false;
+			if (p.kind !== "pine") for (const a of this.animals) {
+				if (!a.alive || a.id === p.owner && p.t < 16) continue;
+				const dx = a.x - p.x;
+				const dy = a.y - 18 - p.y;
+				if (dx * dx + dy * dy < 361) hitAnimal = true;
+			}
+			if (this.solid(p.x, p.y) || hitAnimal) {
+				if (p.kind === "pine" && !hitAnimal) {
+					const sp = Math.hypot(p.vx, p.vy);
+					if (this.solid(p.x, py)) p.vx = -p.vx * .5;
+					else {
+						p.vy = -p.vy * .42;
+						p.vx *= .8;
+					}
+					p.x = px;
+					p.y = py;
+					if (sp > 1.2) this.fx.push({ t: "bounce" });
+					break;
+				}
+				this.explode(p.x, p.y, p.kind);
+				p.dead = true;
+				return;
+			}
+			if (p.y > 1010) {
+				this.fx.push({
+					t: "splash",
+					x: p.x
+				});
+				p.dead = true;
+				return;
+			}
+			if (p.x < -400 || p.x > 2320) {
+				p.dead = true;
+				return;
+			}
+		}
+		if (p.kind === "pine" && p.t >= 180) {
+			this.explode(p.x, p.y, "pine");
+			p.dead = true;
+		}
+	}
+	settled() {
+		return this.projs.length === 0 && !this.gull && this.hammerT === 0 && this.animals.every((a) => !a.alive || !a.air && !a.slide && !a.crouch);
+	}
+	step(keys) {
+		for (const a of this.animals) a.moving = false;
+		if (this.phase === "over") return;
+		const a = this.active;
+		if (this.phase === "aim" && a.alive) {
+			this.timer--;
+			if (this.weapon === "gull") {
+				if (keys.left) this.setTarget(this.target - 6);
+				if (keys.right) this.setTarget(this.target + 6);
+			} else {
+				if (keys.left) this.walk(a, -1);
+				if (keys.right) this.walk(a, 1);
+			}
+			if (keys.up) this.aim = Math.min(88, this.aim + 1.2);
+			if (keys.down) this.aim = Math.max(-60, this.aim - 1.2);
+			if (this.charging) this.chargeT++;
+			if (this.timer <= 0) {
+				if (this.charging) this.fire();
+				else this.toFlying();
+			}
+		}
+		if (this.phase === "reel" && this.rodLine) {
+			const line = this.rodLine;
+			line.t++;
+			const dx = line.x - a.x;
+			const dy = line.y - (a.y - 18);
+			const d = Math.sqrt(dx * dx + dy * dy);
+			const stop = () => {
+				a.air = true;
+				a.vx = dx / Math.max(1, d) * 1.5;
+				a.vy = -1.5;
+				this.rodLine = null;
+				this.toFlying();
+			};
+			if (d < 20 || line.t > 150) stop();
+			else {
+				const sp = Math.min(7, d);
+				const nx = a.x + dx / d * sp;
+				const ny = a.y + dy / d * sp;
+				if (!this.clearAt(nx, ny)) stop();
+				else {
+					a.x = nx;
+					a.y = ny;
+					a.air = false;
+					a.face = dx > 0 ? 1 : -1;
+				}
+			}
+		}
+		if (this.phase === "dig" && this.drill) {
+			const dr = this.drill;
+			dr.t++;
+			const nx = a.x + dr.dx * 1.6;
+			const ny = a.y + dr.dy * 1.6;
+			const cy = ny - 17;
+			let touched = false;
+			for (let yy = cy - 16 | 0; yy <= cy + 16 && !touched; yy += 4) for (let xx = nx - 16 | 0; xx <= nx + 16; xx += 4) if (this.solid(xx, yy)) {
+				touched = true;
+				break;
+			}
+			if (touched) {
+				dr.air = 0;
+				this.carve(nx, cy, 17, false);
+				if (dr.t % 7 === 0) this.fx.push({
+					t: "dig",
+					x: nx,
+					y: cy
+				});
+			} else dr.air++;
+			a.x = nx;
+			a.y = ny;
+			a.air = false;
+			for (const o of this.animals) {
+				if (!o.alive || o === a || dr.hit.has(o.id)) continue;
+				const ddx = o.x - nx;
+				const ddy = o.y - ny;
+				if (ddx * ddx + ddy * ddy < 676) {
+					dr.hit.add(o.id);
+					this.hurt(o, DAMAGE.drill);
+					o.vx = dr.dx * 1.6 + Math.sign(ddx || 1) * .8;
+					o.vy = -1.8;
+					o.air = true;
+					o.slide = 0;
+				}
+			}
+			if (dr.t >= 100 || dr.air > 12 || ny > 1010 || nx < 10 || nx > 1910) {
+				a.air = true;
+				a.vx = 0;
+				a.vy = 0;
+				this.drill = null;
+				this.toFlying();
+			}
+		}
+		if (this.hammerT > 0) {
+			this.hammerT++;
+			if (this.hammerT === 10) {
+				let any = false;
+				for (const o of this.animals) {
+					if (!o.alive || o === a) continue;
+					const dx = (o.x - a.x) * a.face;
+					const dy = o.y - a.y;
+					if (dx > -6 && dx < 42 && Math.abs(dy) < 34) {
+						any = true;
+						this.hurt(o, DAMAGE.hammer);
+						o.vx = a.face * 2.2;
+						o.vy = -2.8;
+						o.air = true;
+						o.slide = 0;
+						this.fx.push({
+							t: "say",
+							x: o.x,
+							y: o.y - 80,
+							text: "뿅!",
+							color: "#ffd23f"
+						});
+					}
+				}
+				if (any) this.fx.push({ t: "boing" });
+				else this.fx.push({ t: "whiff" }, {
+					t: "say",
+					x: a.x + a.face * 30,
+					y: a.y - 64,
+					text: "허공",
+					color: "#fff"
+				});
+			}
+			if (this.hammerT > 24) this.hammerT = 0;
+		}
+		if (this.gull) {
+			const g = this.gull;
+			g.x += g.dir * 7;
+			const rel = (g.x - g.tx) * g.dir;
+			if (g.dropped < 5 && rel > -90 + g.dropped * 40) {
+				this.projs.push({
+					kind: "egg",
+					x: g.x,
+					y: g.y + 14,
+					vx: g.dir * 1.4,
+					vy: .5,
+					t: 20,
+					owner: -1,
+					dead: false
+				});
+				g.dropped++;
+			}
+			if (g.x < -100 || g.x > 2020) this.gull = null;
+		}
+		for (const o of this.animals) {
+			if ((this.phase === "reel" || this.phase === "dig") && o === a) continue;
+			this.stepAnimal(o);
+			if (o.alive && o.hp <= 0) {
+				o.alive = false;
+				this.fx.push({
+					t: "ko",
+					x: o.x,
+					y: o.y
+				}, {
+					t: "say",
+					x: o.x,
+					y: o.y - 50,
+					text: "기절!",
+					color: "#fff"
+				});
+			}
+		}
+		for (const p of this.projs) this.stepProj(p);
+		this.projs = this.projs.filter((p) => !p.dead);
+		if (this.phase === "flying") {
+			this.settleT = this.settled() ? this.settleT + 1 : 0;
+			if (this.settleT > 55) {
+				const b = this.alive(0).length;
+				const r = this.alive(1).length;
+				if (!b || !r) {
+					this.winner = !b && !r ? "draw" : b ? 0 : 1;
+					this.phase = "over";
+					this.fx.push({ t: "win" });
+					return;
+				}
+				this.startTurn(false);
+			}
+		}
+		if (this.phase === "aim" && !a.alive) this.toFlying();
+	}
+};
+//#endregion
+//#region src/games/island/bot/islandBot.ts
+const SHAKE = {
+	normal: {
+		aim: 5,
+		power: .06
+	},
+	hard: {
+		aim: 1.4,
+		power: .018
+	}
+};
+/** 던지면 어디서 터지는지 (바다·밖이면 null) */
+function simulateShot(w, kind, x, y, vx, vy, ownerId) {
+	for (let t = 1; t < 900; t++) {
+		if (kind === "balloon") vx += w.wind * WIND_ACCEL;
+		vy += kind === "egg" ? EGG_G : G;
+		const n = Math.ceil(Math.max(Math.abs(vx), Math.abs(vy)) / 1.5) || 1;
+		for (let s = 0; s < n; s++) {
+			const px = x;
+			const py = y;
+			x += vx / n;
+			y += vy / n;
+			let hitAnimal = false;
+			if (kind !== "pine") for (const a of w.animals) {
+				if (!a.alive || a.id === ownerId && t < 16) continue;
+				const dx = a.x - x;
+				const dy = a.y - 18 - y;
+				if (dx * dx + dy * dy < 361) hitAnimal = true;
+			}
+			if (w.solid(x, y) || hitAnimal) {
+				if (kind === "pine" && !hitAnimal) {
+					if (w.solid(x, py)) vx = -vx * .5;
+					else {
+						vy = -vy * .42;
+						vx *= .8;
+					}
+					x = px;
+					y = py;
+					break;
+				}
+				return {
+					x,
+					y
+				};
+			}
+			if (y > 1010 || x < -400 || x > 2320) return null;
+		}
+		if (kind === "pine" && t >= 180) return {
+			x,
+			y
+		};
+	}
+	return null;
+}
+/** 그 자리에서 터지면 (상대 피해 − 우리 편 피해 × 1.5) */
+function scoreAt(w, kind, x, y) {
+	const { r, dmg } = blastOf(kind);
+	let s = 0;
+	for (const a of w.animals) {
+		if (!a.alive) continue;
+		const d = Math.hypot(a.x - x, a.y - 18 - y);
+		const hurt = Math.min(a.hp, blastDamage(r, dmg, d));
+		s += a.team === w.active.team ? -hurt * 1.5 : hurt;
+	}
+	return s;
+}
+function planTurn(w, level, rng) {
+	const me = w.active;
+	const foes = w.animals.filter((a) => a.alive && a.team !== me.team);
+	const near = foes.find((f) => Math.abs(f.x - me.x) < 38 && Math.abs(f.y - me.y) < 30);
+	if (near && rng.next() < .7) return {
+		weapon: "hammer",
+		face: near.x < me.x ? -1 : 1,
+		aim: 30,
+		power: 0,
+		target: 0
+	};
+	let best = null;
+	let bestScore = 0;
+	for (const kind of ["balloon", "pine"]) for (const face of [-1, 1]) for (let aim = -20; aim <= 85; aim += 5) for (let p = .2; p <= 1.001; p += .05) {
+		const r = aim * Math.PI / 180;
+		const dx = Math.cos(r) * face;
+		const dy = -Math.sin(r);
+		const v = throwSpeed(p);
+		const hit = simulateShot(w, kind, me.x + dx * 18, me.y - 20 + dy * 18, dx * v, dy * v, me.id);
+		if (!hit) continue;
+		const s = scoreAt(w, kind, hit.x, hit.y) * (kind === "pine" ? .8 : 1);
+		if (s > bestScore) {
+			bestScore = s;
+			best = {
+				weapon: kind,
+				face,
+				aim,
+				power: p,
+				target: 0
+			};
+		}
+	}
+	if (!best || bestScore < DAMAGE.egg) {
+		const t = foes[Math.floor(rng.next() * foes.length)] ?? me;
+		return {
+			weapon: "gull",
+			face: me.face,
+			aim: w.aim,
+			power: 0,
+			target: t.x
+		};
+	}
+	const sh = SHAKE[level];
+	best.aim = Math.max(-60, Math.min(88, best.aim + (rng.next() * 2 - 1) * sh.aim));
+	best.power = Math.max(.05, Math.min(1, best.power + (rng.next() * 2 - 1) * sh.power));
+	return best;
+}
+/** 봇 차례를 화면처럼 천천히: 생각 → 돌아서기·조준 → 힘 모으기 → 던지기 */
+var BotDriver = class {
+	plan = null;
+	turn = -1;
+	wait = 0;
+	rng;
+	level;
+	constructor(level, seed) {
+		this.level = level;
+		this.rng = createRng(seed);
+	}
+	step(w) {
+		if (!w.canAct()) return;
+		if (this.turn !== w.turnNo) {
+			this.turn = w.turnNo;
+			this.plan = null;
+			this.wait = 50;
+		}
+		if (this.wait > 0) {
+			this.wait--;
+			return;
+		}
+		if (!this.plan) {
+			this.plan = planTurn(w, this.level, this.rng);
+			w.pick(this.plan.weapon);
+			w.active.face = this.plan.face;
+			this.wait = 20;
+			return;
+		}
+		const p = this.plan;
+		if (p.weapon === "gull") {
+			w.setTarget(p.target);
+			w.fire();
+			return;
+		}
+		if (p.weapon === "hammer") {
+			w.fire();
+			return;
+		}
+		if (Math.abs(w.aim - p.aim) > 1.2) {
+			w.aim += Math.sign(p.aim - w.aim) * 1.2;
+			return;
+		}
+		w.aim = p.aim;
+		if (!w.charging) w.press();
+		else if (w.chargeT >= p.power * 75) w.fire(p.power);
+	}
+};
+//#endregion
+//#region src/games/island/play/net.ts
+const KINDS = [
+	"balloon",
+	"pine",
+	"egg"
+];
+const r1 = (x) => Math.round(x * 10) / 10;
+const r2 = (x) => Math.round(x * 100) / 100;
+function encodeSnap(w, ctl, cs, c, fx) {
+	return {
+		n: w.turnNo,
+		ph: w.phase,
+		tm: w.timer,
+		wd: w.wind,
+		team: w.team,
+		act: w.active.id,
+		wp: w.weapon,
+		aim: r1(w.aim),
+		ch: w.charging ? w.chargeT : -1,
+		tg: Math.round(w.target),
+		ctl,
+		win: w.winner,
+		hm: w.hammerT,
+		rod: w.rodLine ? [r1(w.rodLine.x), r1(w.rodLine.y)] : null,
+		an: w.animals.map((a) => [
+			r1(a.x),
+			r1(a.y),
+			r2(a.vx),
+			r2(a.vy),
+			a.face,
+			a.hp,
+			(a.alive ? 1 : 0) | (a.air ? 2 : 0) | (a.moving ? 4 : 0),
+			a.hit,
+			a.squash,
+			a.crouch,
+			r2(a.slide),
+			a.walkT
+		]),
+		pj: w.projs.map((p) => [
+			KINDS.indexOf(p.kind),
+			r1(p.x),
+			r1(p.y),
+			r2(p.vx),
+			r2(p.vy),
+			p.t
+		]),
+		gl: w.gull ? [
+			r1(w.gull.x),
+			w.gull.y,
+			w.gull.dir,
+			Math.round(w.gull.tx),
+			w.gull.dropped
+		] : null,
+		cs,
+		c,
+		fx
+	};
+}
+const isNum$1 = (x) => typeof x === "number" && Number.isFinite(x);
+const clampAim = (a) => isNum$1(a) ? Math.max(-60, Math.min(88, a)) : null;
+const clampPower = (p) => isNum$1(p) ? Math.max(0, Math.min(1, p)) : null;
+const clampTarget = (x) => isNum$1(x) ? Math.max(20, Math.min(1900, x)) : null;
+const isWeapon = (w) => WEAPONS.some((x) => x.id === w);
+//#endregion
+//#region src/server/referees/island.ts
+const STEP_MS$1 = 1e3 / 60;
+const MAX_CATCHUP$1 = 10;
+const SEND_EVERY = 2;
+function islandReferee(setup, ctx) {
+	const players = readPlayers((setup ?? {}).players, ctx, 2, 4);
+	if (!players) return null;
+	const seed = serverSeed();
+	const w = new World(seed);
+	const roster = players.map((p, i) => ({
+		id: p.id,
+		name: p.name,
+		kind: p.kind,
+		team: i % 2,
+		gone: false
+	}));
+	const bots = new Map(roster.filter((p) => p.kind === "bot").map((p, i) => [p.id, new BotDriver("normal", seed + i + 1)]));
+	const turns = [0, 0];
+	const carveLog = [];
+	let fxBuf = [];
+	let sentCarves = 0;
+	let keys = NO_KEYS;
+	let lastTurn = w.turnNo;
+	let lastTeam = w.team;
+	let lastPhase = w.phase;
+	let steps = 0;
+	const t0 = ctx.now();
+	let overAt = null;
+	const pickCtl = () => {
+		const list = roster.filter((p) => p.team === w.team && !p.gone);
+		return list.length ? list[turns[w.team] % list.length].id : "";
+	};
+	let ctl = pickCtl();
+	const drain = () => {
+		for (const c of w.carves) carveLog.push([
+			Math.round(c.x * 10) / 10,
+			Math.round(c.y * 10) / 10,
+			c.r,
+			c.ring ? 1 : 0
+		]);
+		w.carves.length = 0;
+		fxBuf.push(...w.fx);
+		w.fx.length = 0;
+	};
+	const send = () => {
+		const fresh = carveLog.slice(sentCarves);
+		ctx.broadcast({
+			t: "snap",
+			sd: seed,
+			...encodeSnap(w, ctl, sentCarves, fresh, fxBuf)
+		});
+		sentCarves = carveLog.length;
+		fxBuf = [];
+	};
+	const checkTeams = () => {
+		for (const t of [0, 1]) if (!roster.some((p) => p.team === t && !p.gone)) w.forfeit(t);
+	};
+	return {
+		tickMs: STEP_MS$1,
+		input(from, msg) {
+			const m = msg ?? {};
+			if (m.t === "hello") {
+				ctx.sendTo(from, {
+					t: "init",
+					seed,
+					players: roster.map(({ id, name, kind, team }) => ({
+						id,
+						name,
+						kind,
+						team
+					})),
+					carves: carveLog.slice(0, sentCarves)
+				});
+				return true;
+			}
+			if (![
+				"keys",
+				"aim",
+				"press",
+				"release",
+				"jump",
+				"pick",
+				"target"
+			].includes(m.t)) return false;
+			if (from !== ctl || !w.canAct()) return true;
+			if (m.t === "keys") keys = {
+				left: m.l === true,
+				right: m.r === true,
+				up: false,
+				down: false
+			};
+			else if (m.t === "aim") {
+				const a = clampAim(m.a);
+				if (a !== null) w.aim = a;
+			} else if (m.t === "press") w.press();
+			else if (m.t === "release") {
+				const p = clampPower(m.p);
+				if (w.charging && p !== null) w.fire(p);
+			} else if (m.t === "jump") w.jump();
+			else if (m.t === "pick" && isWeapon(m.w)) w.pick(m.w);
+			else if (m.t === "target") {
+				const x = clampTarget(m.x);
+				if (x !== null) w.setTarget(x);
+			}
+			return true;
+		},
+		tick(now) {
+			const target = Math.floor((now - t0) / STEP_MS$1);
+			let n = 0;
+			let force = false;
+			while (steps < target && n < MAX_CATCHUP$1) {
+				const bot = bots.get(ctl);
+				if (bot) bot.step(w);
+				w.step(bot ? NO_KEYS : keys);
+				drain();
+				steps++;
+				n++;
+				if (w.turnNo !== lastTurn) {
+					turns[lastTeam]++;
+					lastTurn = w.turnNo;
+					lastTeam = w.team;
+					ctl = pickCtl();
+					keys = NO_KEYS;
+					force = true;
+				}
+				if (w.phase !== lastPhase) {
+					lastPhase = w.phase;
+					force = true;
+				}
+			}
+			if (n > 0 && (force || steps % SEND_EVERY === 0)) send();
+			if (overAt === null && w.phase === "over") overAt = now;
+		},
+		leave(key) {
+			const p = roster.find((x) => x.id === key);
+			if (!p || p.gone) return;
+			p.gone = true;
+			if (ctl === key) {
+				ctl = pickCtl();
+				keys = NO_KEYS;
+			}
+			checkTeams();
+			drain();
+			send();
+		},
+		finished: () => overAt !== null && ctx.now() - overAt > 5e3
+	};
+}
 //#endregion
 //#region src/games/memory/bot/memoryBot.ts
 /** 열 수 있는 카드 중 기억에 없는 것을 우선, 없으면 아무거나 */
@@ -18947,7 +20141,7 @@ function survivalReferee(setup, ctx) {
 			const player = humanIndex(s.players, from);
 			const p = m.plan;
 			if (player < 0 || m.round !== s.round || !p || typeof p !== "object") return null;
-			if (p.pos !== null && !isVec(p.pos) || p.angle !== null && !isNum$1(p.angle) || typeof p.locked !== "boolean") return null;
+			if (p.pos !== null && !isVec(p.pos) || p.angle !== null && !isNum$2(p.angle) || typeof p.locked !== "boolean") return null;
 			return {
 				type: "plan",
 				player,
@@ -20912,6 +22106,7 @@ const REFEREES = {
 	doodle: doodleReferee,
 	chosung: chosungReferee,
 	spotdiff: spotdiffReferee,
+	island: islandReferee,
 	wordchain: wordchainReferee,
 	armwrestle: armwrestleReferee,
 	volley: volleyReferee,

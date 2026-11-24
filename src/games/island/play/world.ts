@@ -346,9 +346,18 @@ export class World {
     this.settleT = 0
   }
 
-  private carve(x: number, y: number, r: number, ring: boolean) {
+  /** 땅 파기 (친구 대전 화면은 서버가 알려 준 파인 곳을 이걸로 따라 함) */
+  carve(x: number, y: number, r: number, ring: boolean) {
     this.fill(x, y, r, 0)
     this.carves.push({ x, y, r, ring })
+  }
+
+  /** 한 팀이 다 나가면 남은 팀 승리 (친구 대전) */
+  forfeit(team: Team) {
+    if (this.winner) return
+    this.winner = team === 0 ? 1 : 0
+    this.phase = 'over'
+    this.fx.push({ t: 'win' })
   }
 
   private hurt(a: Animal, dmg: number) {

@@ -6,6 +6,7 @@ import { chosungReferee } from './chosung'
 import { doodleReferee } from './doodle'
 import { fightReferee } from './fight'
 import { fishingRefereeFactory } from './fishing'
+import { islandReferee } from './island'
 import { memoryReferee } from './memory'
 import { nunchiReferee } from './nunchi'
 import { omokReferee } from './omok'
@@ -34,6 +35,7 @@ export const REFEREES: Record<string, RefereeFactory> = {
   doodle: doodleReferee,
   chosung: chosungReferee,
   spotdiff: spotdiffReferee,
+  island: islandReferee,
   wordchain: wordchainReferee,
   armwrestle: armwrestleReferee,
   volley: volleyReferee,

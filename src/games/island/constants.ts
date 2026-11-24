@@ -11,6 +11,9 @@ export const G = 0.13
 export const BODY_R = 12
 export const TALL = 34
 export const TEAM_SIZE = 3
+/** 친구 대전 인원 (두 팀에 번갈아, 빈자리 봇) */
+export const MIN_PLAYERS = 2
+export const MAX_PLAYERS = 4
 export const HP = 100
 export const TURN_SEC = 45
 export const TURN_STEPS = TURN_SEC * 60
