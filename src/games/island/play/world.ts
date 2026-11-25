@@ -712,8 +712,8 @@ export class World {
       const g = this.gull
       g.x += g.dir * 7
       const rel = (g.x - g.tx) * g.dir
-      if (g.dropped < 5 && rel > -90 + g.dropped * 40) {
-        this.projs.push({ kind: 'egg', x: g.x, y: g.y + 14, vx: g.dir * 1.4, vy: 0.5, t: 20, owner: -1, dead: false })
+      if (g.dropped < 5 && rel > -80 + g.dropped * 40) {
+        this.projs.push({ kind: 'egg', x: g.x, y: g.y + 14, vx: 0, vy: 0.5, t: 20, owner: -1, dead: false })
         g.dropped++
       }
       if (g.x < -100 || g.x > W + 100) this.gull = null

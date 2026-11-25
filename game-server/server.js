@@ -15916,12 +15916,12 @@ var World = class {
 			const g = this.gull;
 			g.x += g.dir * 7;
 			const rel = (g.x - g.tx) * g.dir;
-			if (g.dropped < 5 && rel > -90 + g.dropped * 40) {
+			if (g.dropped < 5 && rel > -80 + g.dropped * 40) {
 				this.projs.push({
 					kind: "egg",
 					x: g.x,
 					y: g.y + 14,
-					vx: g.dir * 1.4,
+					vx: 0,
 					vy: .5,
 					t: 20,
 					owner: -1,
