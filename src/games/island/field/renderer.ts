@@ -1,4 +1,4 @@
-import { H, PINE_FUSE, W, WATER, weaponOf } from '../constants'
+import { H, MOVE_MAX, PINE_FUSE, W, WATER as WATER_START, weaponOf } from '../constants'
 import { type Animal, type AnimalKind, type Fx, type World, chargePower } from '../play/world'
 
 // 섬 그리기 (canvas 2D). 카메라는 내가 걷거나 끌 때만 움직이고(멀미), 흔들림은 없음.
@@ -123,8 +123,8 @@ export class Renderer {
         }
         for (let i = 0; i < n / 2; i++) this.parts.push({ x: f.x, y: f.y, vx: rnd(-3.5, 3.5), vy: rnd(-5.5, -1), t: 0, life: rnd(45, 80), c: i % 2 ? '#a3713f' : '#6dbb5e', s: rnd(3, 5) })
       } else if (f.t === 'splash') {
-        for (let i = 0; i < 26; i++) this.parts.push({ x: f.x + rnd(-8, 8), y: WATER, vx: rnd(-2.5, 2.5), vy: rnd(-7, -2), t: 0, life: rnd(35, 60), c: '#e6f8ff', s: rnd(3, 6) })
-        this.rings.push({ x: f.x, y: WATER, r: 18, t: 0, water: true })
+        for (let i = 0; i < 26; i++) this.parts.push({ x: f.x + rnd(-8, 8), y: world.water, vx: rnd(-2.5, 2.5), vy: rnd(-7, -2), t: 0, life: rnd(35, 60), c: '#e6f8ff', s: rnd(3, 6) })
+        this.rings.push({ x: f.x, y: world.water, r: 18, t: 0, water: true })
       } else if (f.t === 'hurt') this.floats.push({ x: f.x, y: f.y, text: `-${f.dmg}`, c: TEAM_COLOR[f.team], t: 0 })
       else if (f.t === 'say') this.floats.push({ x: f.x, y: f.y, text: f.text, c: f.color, t: 0 })
       else if (f.t === 'ko') for (let i = 0; i < 16; i++) this.parts.push({ x: f.x, y: f.y - 18, vx: rnd(-2.5, 2.5), vy: rnd(-4, 0), t: 0, life: 45, c: '#ffd23f', s: 4 })
@@ -173,7 +173,7 @@ export class Renderer {
       ctx.ellipse(x + 30 * s, cy - 12 * s, 30 * s, 16 * s, 0, 0, Math.PI * 2)
       ctx.fill()
     }
-    const horizon = (WATER - cam.y) * cam.s
+    const horizon = (WATER_START - cam.y) * cam.s
     ctx.fillStyle = '#86b9d4'
     for (const h of this.hills) {
       const x = (h.x - cam.x * 0.35) * cam.s * 0.7
@@ -184,8 +184,9 @@ export class Renderer {
 
     ctx.setTransform(cam.s * k, 0, 0, cam.s * k, -cam.x * cam.s * k, -cam.y * cam.s * k)
     ctx.fillStyle = '#9fd0e6'
-    ctx.fillRect(-1000, WATER - 30, W + 2000, 30)
+    ctx.fillRect(-1000, w.water - 30, W + 2000, 30)
     ctx.drawImage(this.terr, 0, 0)
+    for (const c of w.crates) this.drawCrate(ctx, c)
     for (const a of w.animals) if (a.alive) this.drawAnimal(ctx, w, a)
     if (w.canAct() && !clean) this.drawAim(ctx, w, cam)
     if (w.rodLine) {
@@ -220,13 +221,13 @@ export class Renderer {
       }
     }
     ctx.fillStyle = '#2f8fc4'
-    ctx.fillRect(-1000, WATER, W + 2000, H - WATER + 200)
-    const wave = (x: number) => WATER + 5 * Math.sin(x * 0.04 + f * 0.05)
+    ctx.fillRect(-1000, w.water, W + 2000, H - w.water + 200)
+    const wave = (x: number) => w.water + 5 * Math.sin(x * 0.04 + f * 0.05)
     ctx.fillStyle = '#4fb0e0'
     ctx.beginPath()
-    ctx.moveTo(-1000, WATER + 30)
+    ctx.moveTo(-1000, w.water + 30)
     for (let x = -1000; x <= W + 1000; x += 16) ctx.lineTo(x, wave(x))
-    ctx.lineTo(W + 1000, WATER + 30)
+    ctx.lineTo(W + 1000, w.water + 30)
     ctx.fill()
     ctx.strokeStyle = 'rgba(255,255,255,.75)'
     ctx.lineWidth = 3
@@ -257,6 +258,15 @@ export class Renderer {
       ctx.fillText(fl.text, sx, sy - fl.t * 0.5)
     }
     ctx.globalAlpha = 1
+    if (w.canAct() && !w.charging) {
+      // 걸음 막대 — 다 쓰면 그 자리에서 조준만
+      const [sx, sy] = toS(w.active.x, w.active.y)
+      const m = Math.max(0, Math.min(1, w.move / MOVE_MAX))
+      ctx.fillStyle = INK
+      ctx.fillRect(sx - 26, sy + 10, 52, 7)
+      ctx.fillStyle = m > 0.3 ? '#7dff8a' : m > 0 ? '#ffb02e' : '#6b6590'
+      ctx.fillRect(sx - 25, sy + 11, 50 * m, 5)
+    }
     if (w.charging) {
       const [sx, sy] = toS(w.active.x, w.active.y)
       const p = chargePower(w.chargeT)
@@ -456,7 +466,7 @@ export class Renderer {
       ctx.setLineDash([10, 10])
       ctx.beginPath()
       ctx.moveTo(w.target, 100)
-      ctx.lineTo(w.target, WATER)
+      ctx.lineTo(w.target, w.water)
       ctx.stroke()
       ctx.setLineDash([])
       ctx.beginPath()
@@ -571,6 +581,56 @@ export class Renderer {
     }
   }
 
+  private drawCrate(ctx: CanvasRenderingContext2D, c: World['crates'][number]) {
+    ctx.save()
+    ctx.translate(c.x, c.y)
+    ctx.strokeStyle = INK
+    ctx.lineWidth = 1.6
+    if (c.air) {
+      // 낙하산
+      ctx.fillStyle = '#fff'
+      ctx.beginPath()
+      ctx.moveTo(-26, -52)
+      ctx.quadraticCurveTo(0, -84, 26, -52)
+      ctx.closePath()
+      ctx.fill()
+      ctx.stroke()
+      ctx.fillStyle = '#ff5a5f'
+      ctx.beginPath()
+      ctx.moveTo(-9, -60)
+      ctx.quadraticCurveTo(0, -78, 9, -60)
+      ctx.closePath()
+      ctx.fill()
+      ctx.beginPath()
+      ctx.moveTo(-26, -52)
+      ctx.lineTo(-10, -22)
+      ctx.moveTo(26, -52)
+      ctx.lineTo(10, -22)
+      ctx.stroke()
+    }
+    ctx.fillStyle = c.kind === 'heal' ? '#f2f2ea' : '#c98a4b'
+    ctx.fillRect(-11, -22, 22, 22)
+    ctx.strokeRect(-11, -22, 22, 22)
+    if (c.kind === 'heal') {
+      ctx.fillStyle = '#ff5a5f'
+      ctx.fillRect(-2.5, -18, 5, 14)
+      ctx.fillRect(-7, -13.5, 14, 5)
+    } else {
+      ctx.strokeStyle = '#7a5230'
+      ctx.beginPath()
+      ctx.moveTo(-11, -22)
+      ctx.lineTo(11, 0)
+      ctx.moveTo(11, -22)
+      ctx.lineTo(-11, 0)
+      ctx.stroke()
+      ctx.fillStyle = '#ffd23f'
+      ctx.strokeStyle = INK
+      ctx.fillRect(-5, -16, 10, 10)
+      ctx.strokeRect(-5, -16, 10, 10)
+    }
+    ctx.restore()
+  }
+
   private drawGull(ctx: CanvasRenderingContext2D, g: NonNullable<World['gull']>) {
     const flap = Math.sin(this.frame * 0.35) * 9
     ctx.save()
@@ -635,6 +695,17 @@ export class Renderer {
       ctx.fillStyle = '#b9b3e6'
       ctx.fillText('없음', cx - 14, 34)
     }
+    const fi = w.floodIn()
+    const flood = w.water < WATER_START || fi === 0 ? '바닷물이 차오르는 중' : fi <= 4 ? `${fi}차례 뒤 바닷물이 차올라요` : ''
+    if (flood && w.winner === null) {
+      ctx.font = "700 13px 'IBM Plex Sans KR', sans-serif"
+      const fw = ctx.measureText(flood).width + 20
+      ctx.fillStyle = 'rgba(26,20,48,.72)'
+      ctx.fillRect(12, 50, fw, 26)
+      ctx.fillStyle = '#9be7ff'
+      ctx.fillText(flood, 22, 68)
+      ctx.font = "700 14px 'IBM Plex Sans KR', sans-serif"
+    }
     if (w.winner === null) {
       const t = `${opts.names[w.team]} · ${KINDS[w.active.kind].name} 차례`
       ctx.font = "18px 'Black Han Sans', sans-serif"
@@ -653,7 +724,9 @@ export class Renderer {
       ctx.fillRect(mx, my, mw, mh)
       ctx.drawImage(this.terr, mx, my, mw, mh)
       ctx.fillStyle = '#2f8fc4'
-      ctx.fillRect(mx, my + WATER * s, mw, mh - WATER * s)
+      ctx.fillRect(mx, my + w.water * s, mw, mh - w.water * s)
+      ctx.fillStyle = '#ffd23f'
+      for (const c of w.crates) ctx.fillRect(mx + c.x * s - 2, my + c.y * s - 4, 4, 4)
       for (const a of w.animals)
         if (a.alive) {
           ctx.fillStyle = a === w.active ? '#ffd23f' : TEAM_COLOR[a.team]

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { BotDriver } from '../bot/islandBot'
-import { TEAM_SIZE, W, WATER } from '../constants'
+import { AMMO, FLOOD_ROUNDS, MOVE_MAX, TEAM_SIZE, W, WATER } from '../constants'
 import { NO_KEYS, World, chargePower } from './world'
 
 function playOut(seed: number, maxSteps = 60 * 60 * 25) {
@@ -60,6 +60,47 @@ describe('동물 섬 대작전 엔진', () => {
     w.fire()
     for (let i = 0; i < 400 && w.turnNo === turn2; i++) w.step(NO_KEYS)
     expect(w.turnNo).toBe(turn2 + 1)
+  })
+
+  it('걸음 막대만큼만 걷고, 다 쓰면 못 걷는다', () => {
+    const w = new World(4)
+    const right = { ...NO_KEYS, right: true }
+    const left = { ...NO_KEYS, left: true }
+    for (let i = 0; i < 600; i++) w.step(i % 120 < 60 ? right : left)
+    expect(w.move).toBe(0)
+    const x = w.active.x
+    for (let i = 0; i < 60; i++) w.step(right)
+    expect(w.active.x).toBe(x)
+    expect(MOVE_MAX).toBeGreaterThan(0)
+  })
+
+  it('무기 개수가 다 떨어지면 못 고른다', () => {
+    const w = new World(6)
+    const team = w.team
+    w.pick('gull')
+    w.fire()
+    expect(w.ammoLeft('gull', team)).toBe(AMMO.gull - 1)
+    w.ammo[team].pine = 0
+    for (let i = 0; i < 2000 && w.team === team; i++) w.step(NO_KEYS)
+    for (let i = 0; i < 4000 && w.team !== team; i++) w.step(NO_KEYS)
+    w.pick('pine')
+    expect(w.weapon).not.toBe('pine')
+  })
+
+  it('보급 상자에 닿으면 그 편이 무기를 얻는다', () => {
+    const w = new World(8)
+    const a = w.active
+    w.crates.push({ id: 99, kind: 'drill', x: a.x, y: a.y - 200, vy: 0, air: true })
+    const before = w.ammoLeft('drill', a.team)
+    for (let i = 0; i < 400 && w.crates.length; i++) w.step(NO_KEYS)
+    expect(w.crates.length).toBe(0)
+    expect(w.ammoLeft('drill', a.team)).toBe(before + 1)
+  })
+
+  it('후반엔 차례가 끝날 때마다 바닷물이 차오른다', () => {
+    const w = new World(5)
+    for (let i = 0; i < 60 * 60 * 20 && w.turnNo <= FLOOD_ROUNDS * 2 + 1 && w.winner === null; i++) w.step(NO_KEYS)
+    expect(w.water).toBeLessThan(WATER)
   })
 
   it('시간이 다 되면 다음 차례', () => {

@@ -1,7 +1,7 @@
 import { noise, tone } from '../../shared/audio/synth'
 
 // 동물 섬 대작전 효과음 (Web Audio 합성, 음원 파일 없음)
-export type SoundName = 'throw' | 'boom' | 'bigBoom' | 'pop' | 'splash' | 'bounce' | 'boing' | 'whiff' | 'land' | 'ouch' | 'turn' | 'reel' | 'gull' | 'jump' | 'dig' | 'win' | 'lose'
+export type SoundName = 'throw' | 'boom' | 'bigBoom' | 'pop' | 'splash' | 'bounce' | 'boing' | 'whiff' | 'land' | 'ouch' | 'turn' | 'reel' | 'gull' | 'jump' | 'dig' | 'win' | 'lose' | 'flood' | 'crate' | 'drop'
 
 const RECIPES: Record<SoundName, () => void> = {
   throw: () => noise({ filter: 'bandpass', freq: 1400, to: 380, q: 1.4, duration: 0.22, gain: 0.18 }),
@@ -41,6 +41,12 @@ const RECIPES: Record<SoundName, () => void> = {
   },
   jump: () => noise({ filter: 'bandpass', freq: 700, to: 1400, duration: 0.1, gain: 0.08 }),
   dig: () => noise({ filter: 'lowpass', freq: 600, to: 200, duration: 0.09, gain: 0.12 }),
+  flood: () => {
+    noise({ filter: 'lowpass', freq: 400, to: 900, duration: 1.1, gain: 0.25 })
+    tone({ freq: 140, to: 90, duration: 0.9, gain: 0.12 })
+  },
+  crate: () => [660, 880, 1320].forEach((freq, i) => tone({ freq, type: 'triangle', duration: 0.1, gain: 0.1, delay: i * 0.06 })),
+  drop: () => noise({ filter: 'bandpass', freq: 600, to: 300, q: 2, duration: 0.5, gain: 0.08 }),
   win: () => [523, 659, 784, 1046].forEach((freq, i) => tone({ freq, type: 'triangle', duration: 0.25, gain: 0.12, delay: i * 0.12 })),
   lose: () => [392, 330, 262].forEach((freq, i) => tone({ freq, type: 'triangle', duration: 0.3, gain: 0.1, delay: i * 0.16 })),
 }

@@ -116,3 +116,7 @@
 @media (prefers-reduced-motion: reduce) { .il-bar i { transition: none; } }
 /* 표지 찍을 때는 그림만 */
 html[data-capture='1'] .il-zoom { display: none; }
+
+/* 무기 남은 개수 (보급 상자로 늘어남) */
+.il-wp__n { font-style: normal; font-size: 0.75em; margin-left: 3px; color: var(--brand); }
+.il-wp:disabled .il-wp__n { color: inherit; }

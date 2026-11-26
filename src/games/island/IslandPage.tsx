@@ -125,7 +125,9 @@ export function IslandPage() {
         <section className="il-start">
           <p className="il-start__lead">팀마다 동물 {TEAM_SIZE}마리, 무너지는 섬에서 차례대로 던지고 바다에 빠뜨려요.</p>
           <ul className="il-start__rules">
-            <li>차례가 오면 {TURN_SEC}초 안에 걷고·점프하고·조준해서 무기 하나를 써요</li>
+            <li>차례가 오면 {TURN_SEC}초 안에 걷고·점프하고·조준해서 무기 하나를 써요. 걷는 거리는 걸음 막대만큼</li>
+            <li>센 무기는 개수가 정해져 있어요. 낙하산 보급 상자에 닿으면 무기나 체력을 얻어요</li>
+            <li>판이 길어지면 차례마다 바닷물이 차올라요</li>
             <li>터지면 땅이 파이고 맞은 동물은 날아가요. 높이서 떨어지면 다치고, 바다에 빠지면 바로 탈락</li>
             <li>바람은 차례마다 바뀌고 물풍선이 바람을 타요</li>
             <li>상대 팀 동물을 모두 쓰러뜨리면 승리 · 폰은 가로 화면으로 해요</li>

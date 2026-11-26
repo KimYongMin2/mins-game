@@ -15122,6 +15122,8 @@ const fishingRefereeFactory = (setup, ctx) => fishingReferee(setup, ctx);
 //#region src/games/island/constants.ts
 const W$1 = 1920;
 const H = 1080;
+/** 바다 높이 — 이보다 아래로 떨어지면 탈락 */
+const WATER = 1010;
 /** 중력 (칸/스텝²) — 시안에서 '뚝 떨어진다'고 해서 낮춤 */
 const G = .13;
 const TURN_STEPS = 2700;
@@ -15181,6 +15183,31 @@ const WEAPONS = [
 		action: "땅 파기",
 		desc: "조준한 쪽으로 땅을 작게 파며 나아가요. 가는 길의 상대는 8. 쓰면 그 차례는 끝나요"
 	}
+];
+const weaponOf = (id) => WEAPONS.find((w) => w.id === id) ?? WEAPONS[0];
+/** 무기 개수 (편마다, -1 = 무제한) — 보급 상자로 더 얻음 */
+const AMMO = {
+	balloon: -1,
+	pine: 2,
+	gull: 1,
+	hammer: -1,
+	rod: 2,
+	drill: 2
+};
+const CRATE_KINDS = [
+	"heal",
+	"pine",
+	"gull",
+	"rod",
+	"drill"
+];
+/** 상자 내용 뽑는 무게 (순서는 CRATE_KINDS) */
+const CRATE_WEIGHTS = [
+	30,
+	25,
+	15,
+	15,
+	15
 ];
 //#endregion
 //#region src/games/island/play/world.ts
@@ -15254,6 +15281,15 @@ var World = class {
 	drill = null;
 	winner = null;
 	turnNo = 0;
+	/** 바다 높이 — 후반엔 차례마다 차오름 */
+	water = WATER;
+	/** 이번 차례 남은 걸음 (칸) */
+	move = 280;
+	/** 편마다 무기 개수 (-1 = 무제한) */
+	ammo;
+	crates = [];
+	crateId = 0;
+	flooded = false;
 	fx = [];
 	carves = [];
 	settleT = 0;
@@ -15264,6 +15300,7 @@ var World = class {
 	constructor(seed, sides = 2) {
 		this.sides = Math.max(2, Math.min(4, Math.floor(sides)));
 		this.next = Array.from({ length: this.sides }, () => 0);
+		this.ammo = Array.from({ length: this.sides }, () => ({ ...AMMO }));
 		this.rng = createRng(seed);
 		this.genTerrain();
 		this.spawn();
@@ -15385,6 +15422,92 @@ var World = class {
 			});
 		}
 	}
+	/** 남은 개수 (-1 = 무제한) */
+	ammoLeft(w, team = this.team) {
+		return this.ammo[team]?.[w] ?? -1;
+	}
+	/** 바닷물이 차오르기 시작할 때까지 남은 차례 (0이면 이번 차례 끝부터) */
+	floodIn() {
+		return Math.max(0, 6 * this.sides - this.turnNo);
+	}
+	dropCrate() {
+		if (this.crates.length >= 3 || this.rng.next() >= .45) return;
+		let roll = this.rng.next() * CRATE_WEIGHTS.reduce((a, b) => a + b, 0);
+		let kind = CRATE_KINDS[0];
+		for (let i = 0; i < CRATE_KINDS.length; i++) {
+			roll -= CRATE_WEIGHTS[i];
+			if (roll < 0) {
+				kind = CRATE_KINDS[i];
+				break;
+			}
+		}
+		for (let i = 0; i < 30; i++) {
+			const x = Math.round(this.r(100, 1820));
+			if (this.surfaceAt(x) > this.water - 60 || this.animals.some((a) => a.alive && Math.abs(a.x - x) < 40)) continue;
+			this.crates.push({
+				id: this.crateId++,
+				kind,
+				x,
+				y: -20,
+				vy: 0,
+				air: true
+			});
+			this.fx.push({ t: "drop" });
+			return;
+		}
+	}
+	collect(a, c) {
+		c.dead = true;
+		if (c.kind === "heal") {
+			const before = a.hp;
+			a.hp = Math.min(100, a.hp + 25);
+			this.fx.push({
+				t: "say",
+				x: c.x,
+				y: c.y - 40,
+				text: `체력 +${a.hp - before}`,
+				color: "#7dff8a"
+			});
+		} else {
+			const left = this.ammo[a.team][c.kind];
+			if (left >= 0) this.ammo[a.team][c.kind] = left + 1;
+			this.fx.push({
+				t: "say",
+				x: c.x,
+				y: c.y - 40,
+				text: `${weaponOf(c.kind).name} +1`,
+				color: "#ffd23f"
+			});
+		}
+		this.fx.push({ t: "crate" });
+	}
+	stepCrates() {
+		for (const c of this.crates) {
+			if (c.air || !this.solid(c.x, c.y + 1)) {
+				c.air = true;
+				c.vy = Math.min(c.vy + .06, 1.4);
+				const ny = c.y + c.vy;
+				if (this.solid(c.x, ny)) {
+					let y = ny;
+					let k = 0;
+					while (this.solid(c.x, y) && k++ < 20) y--;
+					c.y = y;
+					c.vy = 0;
+					c.air = false;
+				} else c.y = ny;
+			}
+			if (c.y > this.water) {
+				c.dead = true;
+				this.fx.push({
+					t: "splash",
+					x: c.x
+				});
+				continue;
+			}
+			for (const a of this.animals) if (a.alive && !c.dead && Math.abs(a.x - c.x) < 22 && a.y - c.y > -30 && a.y - c.y < 30) this.collect(a, c);
+		}
+		this.crates = this.crates.filter((c) => !c.dead);
+	}
 	alive(team) {
 		return this.animals.filter((a) => a.team === team && a.alive);
 	}
@@ -15400,6 +15523,9 @@ var World = class {
 			}
 		}
 		this.wind = Math.round(this.r(-10, 10));
+		if (!first) this.dropCrate();
+		this.move = 280;
+		this.flooded = false;
 		this.phase = "aim";
 		this.timer = TURN_STEPS;
 		this.charging = false;
@@ -15409,7 +15535,7 @@ var World = class {
 		this.drill = null;
 		this.aim = 40;
 		this.target = Math.min(1880, Math.max(40, this.active.x + this.active.face * 400));
-		if (this.weapon === "rod" || this.weapon === "gull" || this.weapon === "drill") this.weapon = "balloon";
+		if (this.weapon === "rod" || this.weapon === "gull" || this.weapon === "drill" || this.ammoLeft(this.weapon) === 0) this.weapon = "balloon";
 		this.turnNo++;
 		this.fx.push({ t: "turn" });
 	}
@@ -15421,12 +15547,13 @@ var World = class {
 		return this.phase === "aim" && this.active.alive && this.winner === null;
 	}
 	pick(w) {
-		if (!this.canAct() || this.charging) return;
+		if (!this.canAct() || this.charging || this.ammoLeft(w) === 0) return;
 		this.weapon = w;
 	}
 	jump() {
 		const a = this.active;
-		if (!this.canAct() || a.air || a.crouch) return;
+		if (!this.canAct() || a.air || a.crouch || this.move < 35) return;
+		this.move -= 35;
 		a.crouch = 6;
 		a.slide = 0;
 	}
@@ -15448,6 +15575,9 @@ var World = class {
 		if (!this.canAct()) return;
 		const a = this.active;
 		const w = this.weapon;
+		const left = this.ammoLeft(w);
+		if (left === 0) return;
+		if (left > 0) this.ammo[a.team][w] = left - 1;
 		const [dx, dy] = this.aimVec();
 		const sx = a.x + dx * 18;
 		const sy = a.y - 20 + dy * 18;
@@ -15601,6 +15731,17 @@ var World = class {
 			a.slide = 0;
 			a.crouch = 0;
 		}
+		for (const c of this.crates) if (Math.hypot(c.x - x, c.y - 10 - y) < r + 12) {
+			c.dead = true;
+			this.fx.push({
+				t: "say",
+				x: c.x,
+				y: c.y - 30,
+				text: "상자 펑",
+				color: "#fff"
+			});
+		}
+		this.crates = this.crates.filter((c) => !c.dead);
 		this.fx.push({
 			t: "boom",
 			x,
@@ -15635,10 +15776,11 @@ var World = class {
 	}
 	walk(a, dir) {
 		a.face = dir;
-		if (a.air || a.crouch) return;
+		if (a.air || a.crouch || this.move <= 0) return;
 		if (this.groundMove(a, dir * 1.6)) {
 			a.moving = true;
 			a.walkT++;
+			this.move = Math.max(0, this.move - 1.6);
 		}
 	}
 	land(a) {
@@ -15658,8 +15800,26 @@ var World = class {
 		a.vy = 0;
 		if (vy > 3) this.fx.push({ t: "land" });
 	}
+	/** 바다에 빠졌으면 탈락 */
+	drown(a) {
+		if (!(a.y > this.water + 10 || a.x < -150 || a.x > 2070)) return false;
+		a.alive = false;
+		a.hp = 0;
+		const x = Math.max(0, Math.min(W$1, a.x));
+		this.fx.push({
+			t: "splash",
+			x
+		}, {
+			t: "say",
+			x,
+			y: this.water - 40,
+			text: "풍덩!",
+			color: "#fff"
+		});
+		return true;
+	}
 	stepAnimal(a) {
-		if (!a.alive) return;
+		if (!a.alive || this.drown(a)) return;
 		if (a.hit > 0) a.hit--;
 		if (a.squash > 0) a.squash--;
 		if (a.crouch > 0) {
@@ -15714,21 +15874,7 @@ var World = class {
 				break;
 			} else a.y = ny;
 		}
-		if (a.y > 1020 || a.x < -150 || a.x > 2070) {
-			a.alive = false;
-			a.hp = 0;
-			const x = Math.max(0, Math.min(W$1, a.x));
-			this.fx.push({
-				t: "splash",
-				x
-			}, {
-				t: "say",
-				x,
-				y: 970,
-				text: "풍덩!",
-				color: "#fff"
-			});
-		}
+		this.drown(a);
 	}
 	stepProj(p) {
 		p.t++;
@@ -15764,7 +15910,7 @@ var World = class {
 				p.dead = true;
 				return;
 			}
-			if (p.y > 1010) {
+			if (p.y > this.water) {
 				this.fx.push({
 					t: "splash",
 					x: p.x
@@ -15869,7 +16015,7 @@ var World = class {
 					o.slide = 0;
 				}
 			}
-			if (dr.t >= 100 || dr.air > 12 || ny > 1010 || nx < 10 || nx > 1910) {
+			if (dr.t >= 100 || dr.air > 12 || ny > this.water || nx < 10 || nx > 1910) {
 				a.air = true;
 				a.vx = 0;
 				a.vy = 0;
@@ -15949,10 +16095,24 @@ var World = class {
 				});
 			}
 		}
+		this.stepCrates();
 		for (const p of this.projs) this.stepProj(p);
 		this.projs = this.projs.filter((p) => !p.dead);
 		if (this.phase === "flying") {
 			this.settleT = this.settled() ? this.settleT + 1 : 0;
+			if (this.settleT > 55 && !this.flooded && this.turnNo >= 6 * this.sides) {
+				this.flooded = true;
+				this.water = Math.max(240, this.water - 24);
+				this.fx.push({ t: "flood" }, {
+					t: "say",
+					x: this.active.x,
+					y: this.water - 60,
+					text: "바닷물이 차올라요!",
+					color: "#9be7ff"
+				});
+				for (const o of this.animals) if (o.alive) this.drown(o);
+				this.settleT = 0;
+			}
 			if (this.settleT > 55) {
 				const left = this.sidesLeft();
 				if (left.length <= 1) {
@@ -16013,7 +16173,7 @@ function simulateShot(w, kind, x, y, vx, vy, ownerId) {
 					y
 				};
 			}
-			if (y > 1010 || x < -400 || x > 2320) return null;
+			if (y > w.water || x < -400 || x > 2320) return null;
 		}
 		if (kind === "pine" && t >= 180) return {
 			x,
@@ -16047,13 +16207,24 @@ function planTurn(w, level, rng) {
 	};
 	let best = null;
 	let bestScore = 0;
-	for (const kind of ["balloon", "pine"]) for (const face of [-1, 1]) for (let aim = -20; aim <= 85; aim += 5) for (let p = .2; p <= 1.001; p += .05) {
+	/** 아무도 안 다치게 바다에 버리는 수 (쓸 게 없을 때) */
+	let pass = null;
+	for (const kind of ["balloon", "pine"].filter((k) => w.ammoLeft(k) !== 0)) for (const face of [-1, 1]) for (let aim = -20; aim <= 85; aim += 5) for (let p = .2; p <= 1.001; p += .05) {
 		const r = aim * Math.PI / 180;
 		const dx = Math.cos(r) * face;
 		const dy = -Math.sin(r);
 		const v = throwSpeed(p);
 		const hit = simulateShot(w, kind, me.x + dx * 18, me.y - 20 + dy * 18, dx * v, dy * v, me.id);
-		if (!hit) continue;
+		if (!hit) {
+			if (!pass && kind === "balloon") pass = {
+				weapon: kind,
+				face,
+				aim,
+				power: p,
+				target: 0
+			};
+			continue;
+		}
 		const s = scoreAt(w, kind, hit.x, hit.y) * (kind === "pine" ? .8 : 1);
 		if (s > bestScore) {
 			bestScore = s;
@@ -16066,7 +16237,7 @@ function planTurn(w, level, rng) {
 			};
 		}
 	}
-	if (!best || bestScore < DAMAGE.egg) {
+	if ((!best || bestScore < DAMAGE.egg) && w.ammoLeft("gull") !== 0) {
 		const t = foes[Math.floor(rng.next() * foes.length)] ?? me;
 		return {
 			weapon: "gull",
@@ -16076,6 +16247,13 @@ function planTurn(w, level, rng) {
 			target: t.x
 		};
 	}
+	if (!best) return pass ?? {
+		weapon: "balloon",
+		face: me.face,
+		aim: 60,
+		power: .5,
+		target: 0
+	};
 	const sh = SHAKE[level];
 	best.aim = Math.max(-60, Math.min(88, best.aim + (rng.next() * 2 - 1) * sh.aim));
 	best.power = Math.max(.05, Math.min(1, best.power + (rng.next() * 2 - 1) * sh.power));
@@ -16183,6 +16361,16 @@ function encodeSnap(w, ctl, cs, c, fx) {
 			Math.round(w.gull.tx),
 			w.gull.dropped
 		] : null,
+		wl: w.water,
+		mv: Math.round(w.move),
+		am: w.ammo.map((a) => WEAPONS.map((x) => a[x.id])),
+		cr: w.crates.map((c) => [
+			c.id,
+			CRATE_KINDS.indexOf(c.kind),
+			r1(c.x),
+			r1(c.y),
+			c.air ? 1 : 0
+		]),
 		cs,
 		c,
 		fx

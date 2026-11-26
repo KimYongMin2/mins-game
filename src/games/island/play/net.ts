@@ -1,4 +1,4 @@
-import { W, WEAPONS, type WeaponId } from '../constants'
+import { CRATE_KINDS, W, WEAPONS, type WeaponId } from '../constants'
 import type { Animal, Fx, Phase, Proj, Team, World } from './world'
 
 // 친구 대전 통신: 우리 게임 서버가 World를 1초에 60번 돌리고(src/server/referees/island.ts), 1초에 30번 상태(snap)를 보낸다.
@@ -48,6 +48,13 @@ export type Snap = {
   an: AnimalRow[]
   pj: ProjRow[]
   gl: [number, number, 1 | -1, number, number] | null
+  /** 바다 높이 · 남은 걸음 */
+  wl: number
+  mv: number
+  /** 편마다 무기 개수 (WEAPONS 순서, -1 = 무제한) */
+  am: number[][]
+  /** 상자 [번호, 종류(CRATE_KINDS), x, y, 공중이면 1] */
+  cr: [number, number, number, number, 0 | 1][]
   /** 이번에 보내는 파인 곳의 첫 번호 */
   cs: number
   c: CarveRow[]
@@ -76,6 +83,10 @@ export function encodeSnap(w: World, ctl: string, cs: number, c: CarveRow[], fx:
     an: w.animals.map((a) => [r1(a.x), r1(a.y), r2(a.vx), r2(a.vy), a.face, a.hp, (a.alive ? 1 : 0) | (a.air ? 2 : 0) | (a.moving ? 4 : 0), a.hit, a.squash, a.crouch, r2(a.slide), a.walkT]),
     pj: w.projs.map((p) => [KINDS.indexOf(p.kind), r1(p.x), r1(p.y), r2(p.vx), r2(p.vy), p.t]),
     gl: w.gull ? [r1(w.gull.x), w.gull.y, w.gull.dir, Math.round(w.gull.tx), w.gull.dropped] : null,
+    wl: w.water,
+    mv: Math.round(w.move),
+    am: w.ammo.map((a) => WEAPONS.map((x) => a[x.id])),
+    cr: w.crates.map((c) => [c.id, CRATE_KINDS.indexOf(c.kind), r1(c.x), r1(c.y), c.air ? 1 : 0]),
     cs,
     c,
     fx,
@@ -129,6 +140,15 @@ export function applySnap(w: World, s: Snap, prev: Snap | null, k: number) {
       p.y = lerp(prev.pj[i][2], row[2])
     }
     return p
+  })
+  w.water = s.wl ?? w.water
+  w.move = s.mv ?? w.move
+  s.am?.forEach((row, t) => {
+    if (w.ammo[t]) WEAPONS.forEach((x, i) => (w.ammo[t][x.id] = row[i] ?? -1))
+  })
+  w.crates = (s.cr ?? []).map(([id, kind, x, y, air]) => {
+    const p = prev?.cr?.find((c) => c[0] === id)
+    return { id, kind: CRATE_KINDS[kind] ?? 'heal', x, y: p && k < 1 ? lerp(p[3], y) : y, vy: 0, air: air === 1 }
   })
   w.gull = s.gl ? { x: s.gl[0], y: s.gl[1], dir: s.gl[2], tx: s.gl[3], dropped: s.gl[4] } : null
   if (w.gull && prev?.gl && k < 1) w.gull.x = lerp(prev.gl[0], s.gl![0])

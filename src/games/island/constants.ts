@@ -49,3 +49,21 @@ export const WEAPONS: WeaponInfo[] = [
 ]
 
 export const weaponOf = (id: WeaponId) => WEAPONS.find((w) => w.id === id) ?? WEAPONS[0]
+
+/** 한 차례 걸을 수 있는 거리(칸) — 걸음 막대 (사용자 요청 2026-11-26 '움직일 거리 제한') */
+export const MOVE_MAX = 280
+/** 점프 한 번에 쓰는 걸음 */
+export const JUMP_COST = 35
+/** 바닷물: 편마다 이 차례씩 돌고 나면(2편 12차례) 차례마다 차오름 (사용자 요청 — 버티기만 하는 판이 끝나게) */
+export const FLOOD_ROUNDS = 6
+export const FLOOD_STEP = 24
+/** 무기 개수 (편마다, -1 = 무제한) — 보급 상자로 더 얻음 */
+export const AMMO: Record<WeaponId, number> = { balloon: -1, pine: 2, gull: 1, hammer: -1, rod: 2, drill: 2 }
+/** 보급 상자: 차례마다 떨어질 확률·섬 위 최대 개수·체력 상자 회복 */
+export const CRATE_CHANCE = 0.45
+export const CRATE_MAX = 3
+export const CRATE_HEAL = 25
+export type CrateKind = 'heal' | 'pine' | 'gull' | 'rod' | 'drill'
+export const CRATE_KINDS: readonly CrateKind[] = ['heal', 'pine', 'gull', 'rod', 'drill']
+/** 상자 내용 뽑는 무게 (순서는 CRATE_KINDS) */
+export const CRATE_WEIGHTS = [30, 25, 15, 15, 15]

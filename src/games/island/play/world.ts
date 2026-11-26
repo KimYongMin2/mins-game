@@ -1,6 +1,17 @@
 import { createRng, type Rng } from '../../../shared/random'
 import {
+  AMMO,
   BODY_R,
+  CRATE_CHANCE,
+  CRATE_HEAL,
+  CRATE_KINDS,
+  CRATE_MAX,
+  CRATE_WEIGHTS,
+  type CrateKind,
+  FLOOD_ROUNDS,
+  FLOOD_STEP,
+  JUMP_COST,
+  MOVE_MAX,
   CHARGE_STEPS,
   DAMAGE,
   G,
@@ -14,6 +25,7 @@ import {
   W,
   WATER,
   type WeaponId,
+  weaponOf,
 } from '../constants'
 
 // 섬 한 판을 1/60초씩 돌리는 엔진. 땅은 칸마다 있음/없음(mask), 그림은 화면이 따로 그린다.
@@ -55,6 +67,8 @@ export type Animal = {
 }
 
 export type Proj = { kind: 'balloon' | 'pine' | 'egg'; x: number; y: number; vx: number; vy: number; t: number; owner: number; dead: boolean }
+/** 보급 상자 — 낙하산으로 천천히 내려오고, 동물이 닿으면 그 편이 가짐 */
+export type Crate = { id: number; kind: CrateKind; x: number; y: number; vy: number; air: boolean; dead?: boolean }
 export type Gull = { x: number; y: number; dir: Face; tx: number; dropped: number }
 export type Phase = 'aim' | 'flying' | 'reel' | 'dig' | 'over'
 export type Fx =
@@ -63,7 +77,7 @@ export type Fx =
   | { t: 'hurt'; x: number; y: number; dmg: number; team: Team }
   | { t: 'say'; x: number; y: number; text: string; color: string }
   | { t: 'ko'; x: number; y: number }
-  | { t: 'bounce' | 'land' | 'boing' | 'whiff' | 'turn' | 'throw' | 'reel' | 'gull' | 'jump' | 'win' }
+  | { t: 'bounce' | 'land' | 'boing' | 'whiff' | 'turn' | 'throw' | 'reel' | 'gull' | 'jump' | 'win' | 'flood' | 'crate' | 'drop' }
   | { t: 'dig'; x: number; y: number }
 export type Carve = { x: number; y: number; r: number; ring: boolean }
 export type Keys = { left: boolean; right: boolean; up: boolean; down: boolean }
@@ -111,6 +125,15 @@ export class World {
   drill: { t: number; dx: number; dy: number; air: number; hit: Set<number> } | null = null
   winner: Team | 'draw' | null = null
   turnNo = 0
+  /** 바다 높이 — 후반엔 차례마다 차오름 */
+  water = WATER
+  /** 이번 차례 남은 걸음 (칸) */
+  move = MOVE_MAX
+  /** 편마다 무기 개수 (-1 = 무제한) */
+  ammo: Record<WeaponId, number>[]
+  crates: Crate[] = []
+  private crateId = 0
+  private flooded = false
   fx: Fx[] = []
   carves: Carve[] = []
   private settleT = 0
@@ -122,6 +145,7 @@ export class World {
   constructor(seed: number, sides = 2) {
     this.sides = Math.max(2, Math.min(MAX_SIDES, Math.floor(sides)))
     this.next = Array.from({ length: this.sides }, () => 0)
+    this.ammo = Array.from({ length: this.sides }, () => ({ ...AMMO }))
     this.rng = createRng(seed)
     this.genTerrain()
     this.spawn()
@@ -231,6 +255,76 @@ export class World {
       }
   }
 
+  /** 남은 개수 (-1 = 무제한) */
+  ammoLeft(w: WeaponId, team: Team = this.team) {
+    return this.ammo[team]?.[w] ?? -1
+  }
+
+  /** 바닷물이 차오르기 시작할 때까지 남은 차례 (0이면 이번 차례 끝부터) */
+  floodIn() {
+    return Math.max(0, FLOOD_ROUNDS * this.sides - this.turnNo)
+  }
+
+  private dropCrate() {
+    if (this.crates.length >= CRATE_MAX || this.rng.next() >= CRATE_CHANCE) return
+    let roll = this.rng.next() * CRATE_WEIGHTS.reduce((a, b) => a + b, 0)
+    let kind: CrateKind = CRATE_KINDS[0]
+    for (let i = 0; i < CRATE_KINDS.length; i++) {
+      roll -= CRATE_WEIGHTS[i]
+      if (roll < 0) {
+        kind = CRATE_KINDS[i]
+        break
+      }
+    }
+    for (let i = 0; i < 30; i++) {
+      const x = Math.round(this.r(100, W - 100))
+      if (this.surfaceAt(x) > this.water - 60 || this.animals.some((a) => a.alive && Math.abs(a.x - x) < 40)) continue
+      this.crates.push({ id: this.crateId++, kind, x, y: -20, vy: 0, air: true })
+      this.fx.push({ t: 'drop' })
+      return
+    }
+  }
+
+  private collect(a: Animal, c: Crate) {
+    c.dead = true
+    if (c.kind === 'heal') {
+      const before = a.hp
+      a.hp = Math.min(HP, a.hp + CRATE_HEAL)
+      this.fx.push({ t: 'say', x: c.x, y: c.y - 40, text: `체력 +${a.hp - before}`, color: '#7dff8a' })
+    } else {
+      const left = this.ammo[a.team][c.kind]
+      if (left >= 0) this.ammo[a.team][c.kind] = left + 1
+      this.fx.push({ t: 'say', x: c.x, y: c.y - 40, text: `${weaponOf(c.kind).name} +1`, color: '#ffd23f' })
+    }
+    this.fx.push({ t: 'crate' })
+  }
+
+  private stepCrates() {
+    for (const c of this.crates) {
+      if (c.air || !this.solid(c.x, c.y + 1)) {
+        c.air = true
+        c.vy = Math.min(c.vy + 0.06, 1.4)
+        const ny = c.y + c.vy
+        if (this.solid(c.x, ny)) {
+          let y = ny
+          let k = 0
+          while (this.solid(c.x, y) && k++ < 20) y--
+          c.y = y
+          c.vy = 0
+          c.air = false
+        } else c.y = ny
+      }
+      if (c.y > this.water) {
+        c.dead = true
+        this.fx.push({ t: 'splash', x: c.x })
+        continue
+      }
+      for (const a of this.animals)
+        if (a.alive && !c.dead && Math.abs(a.x - c.x) < 22 && a.y - c.y > -30 && a.y - c.y < 30) this.collect(a, c)
+    }
+    this.crates = this.crates.filter((c) => !c.dead)
+  }
+
   alive(team: Team) {
     return this.animals.filter((a) => a.team === team && a.alive)
   }
@@ -247,6 +341,9 @@ export class World {
       }
     }
     this.wind = Math.round(this.r(-10, 10))
+    if (!first) this.dropCrate()
+    this.move = MOVE_MAX
+    this.flooded = false
     this.phase = 'aim'
     this.timer = TURN_STEPS
     this.charging = false
@@ -256,7 +353,7 @@ export class World {
     this.drill = null
     this.aim = 40
     this.target = Math.min(W - 40, Math.max(40, this.active.x + this.active.face * 400))
-    if (this.weapon === 'rod' || this.weapon === 'gull' || this.weapon === 'drill') this.weapon = 'balloon'
+    if (this.weapon === 'rod' || this.weapon === 'gull' || this.weapon === 'drill' || this.ammoLeft(this.weapon) === 0) this.weapon = 'balloon'
     this.turnNo++
     this.fx.push({ t: 'turn' })
   }
@@ -271,13 +368,14 @@ export class World {
   }
 
   pick(w: WeaponId) {
-    if (!this.canAct() || this.charging) return
+    if (!this.canAct() || this.charging || this.ammoLeft(w) === 0) return
     this.weapon = w
   }
 
   jump() {
     const a = this.active
-    if (!this.canAct() || a.air || a.crouch) return
+    if (!this.canAct() || a.air || a.crouch || this.move < JUMP_COST) return
+    this.move -= JUMP_COST
     a.crouch = 6
     a.slide = 0
   }
@@ -303,6 +401,9 @@ export class World {
     if (!this.canAct()) return
     const a = this.active
     const w = this.weapon
+    const left = this.ammoLeft(w)
+    if (left === 0) return
+    if (left > 0) this.ammo[a.team][w] = left - 1
     const [dx, dy] = this.aimVec()
     const sx = a.x + dx * 18
     const sy = a.y - 20 + dy * 18
@@ -416,6 +517,12 @@ export class World {
       a.slide = 0
       a.crouch = 0
     }
+    for (const c of this.crates)
+      if (Math.hypot(c.x - x, c.y - 10 - y) < r + 12) {
+        c.dead = true
+        this.fx.push({ t: 'say', x: c.x, y: c.y - 30, text: '상자 펑', color: '#fff' })
+      }
+    this.crates = this.crates.filter((c) => !c.dead)
     this.fx.push({ t: 'boom', x, y, r })
   }
 
@@ -450,10 +557,11 @@ export class World {
 
   private walk(a: Animal, dir: Face) {
     a.face = dir
-    if (a.air || a.crouch) return
+    if (a.air || a.crouch || this.move <= 0) return
     if (this.groundMove(a, dir * 1.6)) {
       a.moving = true
       a.walkT++
+      this.move = Math.max(0, this.move - 1.6)
     }
   }
 
@@ -475,8 +583,18 @@ export class World {
     if (vy > 3) this.fx.push({ t: 'land' })
   }
 
+  /** 바다에 빠졌으면 탈락 */
+  private drown(a: Animal) {
+    if (!(a.y > this.water + 10 || a.x < -150 || a.x > W + 150)) return false
+    a.alive = false
+    a.hp = 0
+    const x = Math.max(0, Math.min(W, a.x))
+    this.fx.push({ t: 'splash', x }, { t: 'say', x, y: this.water - 40, text: '풍덩!', color: '#fff' })
+    return true
+  }
+
   private stepAnimal(a: Animal) {
-    if (!a.alive) return
+    if (!a.alive || this.drown(a)) return
     if (a.hit > 0) a.hit--
     if (a.squash > 0) a.squash--
     if (a.crouch > 0) {
@@ -532,12 +650,7 @@ export class World {
         break
       } else a.y = ny
     }
-    if (a.y > WATER + 10 || a.x < -150 || a.x > W + 150) {
-      a.alive = false
-      a.hp = 0
-      const x = Math.max(0, Math.min(W, a.x))
-      this.fx.push({ t: 'splash', x }, { t: 'say', x, y: WATER - 40, text: '풍덩!', color: '#fff' })
-    }
+    this.drown(a)
   }
 
   private stepProj(p: Proj) {
@@ -575,7 +688,7 @@ export class World {
         p.dead = true
         return
       }
-      if (p.y > WATER) {
+      if (p.y > this.water) {
         this.fx.push({ t: 'splash', x: p.x })
         p.dead = true
         return
@@ -677,7 +790,7 @@ export class World {
           o.slide = 0
         }
       }
-      if (dr.t >= 100 || dr.air > 12 || ny > WATER || nx < 10 || nx > W - 10) {
+      if (dr.t >= 100 || dr.air > 12 || ny > this.water || nx < 10 || nx > W - 10) {
         a.air = true
         a.vx = 0
         a.vy = 0
@@ -726,10 +839,19 @@ export class World {
         this.fx.push({ t: 'ko', x: o.x, y: o.y }, { t: 'say', x: o.x, y: o.y - 50, text: '기절!', color: '#fff' })
       }
     }
+    this.stepCrates()
     for (const p of this.projs) this.stepProj(p)
     this.projs = this.projs.filter((p) => !p.dead)
     if (this.phase === 'flying') {
       this.settleT = this.settled() ? this.settleT + 1 : 0
+      if (this.settleT > SETTLE_STEPS && !this.flooded && this.turnNo >= FLOOD_ROUNDS * this.sides) {
+        // 후반: 차례가 끝날 때마다 바닷물이 차오름 → 잠긴 동물은 탈락
+        this.flooded = true
+        this.water = Math.max(240, this.water - FLOOD_STEP)
+        this.fx.push({ t: 'flood' }, { t: 'say', x: this.active.x, y: this.water - 60, text: '바닷물이 차올라요!', color: '#9be7ff' })
+        for (const o of this.animals) if (o.alive) this.drown(o)
+        this.settleT = 0
+      }
       if (this.settleT > SETTLE_STEPS) {
         const left = this.sidesLeft()
         if (left.length <= 1) {

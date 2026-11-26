@@ -15,10 +15,10 @@ type Props =
   | { mode: 'bot' | 'local'; level: BotLevel; onFinish: (s: GameSummary) => void }
   | { mode: 'pvp'; level: BotLevel; room: Room<IslandMsg>; members: Member[]; bots: number; teams: TeamPick | null; onFinish: (s: GameSummary) => void }
 
-type Hud = { live: boolean; sec: number; hp: number[]; weapon: WeaponId; team: Team; canAct: boolean; far: boolean; ctlName: string; names: string[] }
+type Hud = { ammo: number[]; live: boolean; sec: number; hp: number[]; weapon: WeaponId; team: Team; canAct: boolean; far: boolean; ctlName: string; names: string[] }
 
 const KEYMAP: Record<string, keyof Keys> = { ArrowLeft: 'left', KeyA: 'left', ArrowRight: 'right', KeyD: 'right', ArrowUp: 'up', KeyW: 'up', ArrowDown: 'down', KeyS: 'down' }
-const FX_SOUND: Partial<Record<string, SoundName>> = { bounce: 'bounce', land: 'land', boing: 'boing', whiff: 'whiff', turn: 'turn', throw: 'throw', reel: 'reel', gull: 'gull', jump: 'jump', dig: 'dig', splash: 'splash', hurt: 'ouch' }
+const FX_SOUND: Partial<Record<string, SoundName>> = { bounce: 'bounce', land: 'land', boing: 'boing', whiff: 'whiff', turn: 'turn', throw: 'throw', reel: 'reel', gull: 'gull', jump: 'jump', dig: 'dig', splash: 'splash', hurt: 'ouch', flood: 'flood', crate: 'crate', drop: 'drop' }
 const STEP = 1000 / 60
 
 export function GameScreen(props: Props) {
@@ -114,7 +114,7 @@ export function GameScreen(props: Props) {
     },
     pick(id: WeaponId) {
       const w = worldRef.current
-      if (!w || !human(w) || !w.canAct()) return
+      if (!w || !human(w) || !w.canAct() || w.ammoLeft(id) === 0) return
       const was = w.weapon
       if (pvp) {
         if (net.current.charging) return
@@ -335,7 +335,7 @@ export function GameScreen(props: Props) {
         label[w.team] = ctlName
         r.draw(ctx, w, cam.current, { showMini: !isFar(), names: label, myTurn: human(w) })
         const hp = Array.from({ length: w.sides }, (_, t) => w.alive(t).reduce((s, a) => s + a.hp, 0))
-        const next: Hud = { live: w.canAct(), sec: Math.ceil(w.timer / 60), hp, weapon: w.weapon, team: w.team, canAct: w.canAct() && human(w), far: isFar(), ctlName, names }
+        const next: Hud = { ammo: WEAPONS.map((x) => w.ammoLeft(x.id)), live: w.canAct(), sec: Math.ceil(w.timer / 60), hp, weapon: w.weapon, team: w.team, canAct: w.canAct() && human(w), far: isFar(), ctlName, names }
         const key = JSON.stringify(next)
         if (key !== lastHud) {
           lastHud = key
@@ -625,9 +625,12 @@ export function GameScreen(props: Props) {
 
       <div className="il-weapons" role="group" aria-label="무기">
         {WEAPONS.map((wp, i) => (
-          <button key={wp.id} type="button" className="button il-wp" aria-pressed={hud?.weapon === wp.id} disabled={!hud?.canAct} title={wp.desc} onClick={() => act.pick(wp.id)}>
+          <button key={wp.id} type="button" className="button il-wp" aria-pressed={hud?.weapon === wp.id} disabled={!hud?.canAct || hud.ammo[i] === 0} title={wp.desc} onClick={() => act.pick(wp.id)}>
             <kbd>{i + 1}</kbd>
-            {wp.name}
+            <span>
+              {wp.name}
+              {hud && hud.ammo[i] >= 0 && <em className="il-wp__n">×{hud.ammo[i]}</em>}
+            </span>
             <small>{wp.sub}</small>
           </button>
         ))}
@@ -671,7 +674,7 @@ export function GameScreen(props: Props) {
           {wInfo.action}
         </button>
       </div>
-      <p className="il-help">PC: ←→ 걷기 · ↑↓ 조준 · Enter 점프 · 1~6 무기 · Space 꾹 눌렀다 떼기 · Tab 전체 보기 · 휠·두 손가락으로 크기 · 화면이나 위 작은 지도 네모를 끌어 둘러보기</p>
+      <p className="il-help">걸음 막대(동물 아래 초록)만큼 걸을 수 있어요 · 보급 상자에 닿으면 무기·체력 · PC: ←→ 걷기 · ↑↓ 조준 · Enter 점프 · 1~6 무기 · Space 꾹 눌렀다 떼기 · Tab 전체 보기 · 휠·두 손가락으로 크기 · 화면이나 위 작은 지도 네모를 끌어 둘러보기</p>
     </div>
   )
 }
